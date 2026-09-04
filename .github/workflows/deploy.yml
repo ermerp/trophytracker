@@ -1,0 +1,82 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Zwei gleichzeitige Deploys wuerden Migrationen ueberlappen lassen.
+# Nicht abbrechen, sondern anstellen: ein halb angewendetes Schema
+# ist schlimmer als ein spaeter Deploy.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  pruefen:
+    name: Tests und Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  deploy:
+    name: Migrationen und Deployment
+    needs: pruefen
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Frontend bauen
+        run: npm run build
+
+      # Abschnitt 15.2: Sicherung VOR jeder Schemaaenderung. Eine fehlerhafte
+      # Migration ist der wahrscheinlichste Weg, Daten zu verlieren.
+      #
+      # Der Dump wird bewusst NICHT als Artifact hochgeladen: Artifacts eines
+      # oeffentlichen Repositories sind ueber den Run-Link herunterladbar, und
+      # das waere genau das Risiko "Backup landet im oeffentlichen Repo" aus
+      # Abschnitt 17. Er sichert diesen einen Lauf ab und wird mit ihm
+      # verworfen. Die dauerhafte Sicherung ins private Repo ist Stufe 8.
+      - name: Datenbank sichern
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 export trophytracker --remote --output=backup.sql
+
+      # Migrationen laufen VOR dem Deployment, damit neuer Code nie auf ein
+      # altes Schema trifft. Umgekehrt muessen sie abwaertskompatibel sein,
+      # weil in diesem Moment noch der alte Worker laeuft.
+      - name: Migrationen anwenden
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply trophytracker --remote
+
+      - name: Worker und Assets deployen
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy

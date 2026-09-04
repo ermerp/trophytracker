@@ -1,12 +1,12 @@
-# Spielesammlung – Technische Spezifikation
+# Trophytracker – Technische Spezifikation
 
-*Version 6 – Repository-Aufteilung, automatisches Deployment, Zugriffsschutz über Cloudflare Access.*
+*Version 7 – Frontend und API in einem Worker mit Static Assets, Zugriffsschutz über eine Access-Richtlinie am Worker.*
 
 ## 1. Use Cases
 
 | # | Use Case | Abgedeckt durch |
 |---|---|---|
-| 1 | Spielesammlung verwalten | `game`, `release`, `physical_copy`, `digital_entitlement` |
+| 1 | Sammlung verwalten | `game`, `release`, `physical_copy`, `digital_entitlement` |
 | 2 | Fortschritt verfolgen – über Trophäen und eigene Bewertung | `trophy_progress` + `play_status` |
 | 3 | Lücken erkennen: bisher nur digital, Disc existiert | `release.physical_release_status`, `v_luecken` |
 | 4 | Wunschliste | `plan_entry` mit `kind = 'wunsch'` |
@@ -37,7 +37,7 @@
 | Backend | Cloudflare Worker, TypeScript, Hono |
 | Datenbank | Cloudflare D1 (SQLite) |
 | Frontend | React + Vite + TypeScript, als PWA |
-| Hosting Frontend | Cloudflare Pages |
+| Hosting Frontend | Static Assets im selben Worker |
 | Geplanter Sync | Cloudflare Cron Trigger |
 | Feed-Import | GitHub Action (siehe 7.3) |
 | Deployment/CLI | Wrangler |
@@ -46,7 +46,7 @@
 | Gebrauchtpreise *(optional)* | rebuy / medimops Produktdatenfeed über AWIN |
 | Store-Preise *(optional)* | PSN Store Katalog-Endpunkte |
 
-Migrations über Wrangler D1 Migrations. Repository auf GitHub, Pages baut bei Push automatisch.
+Migrations über Wrangler D1 Migrations. Repository auf GitHub, die Deploy-Action baut und deployt bei Push auf `main`.
 
 **Hinweis zur CPU-Grenze:** Der Free Tier begrenzt auf 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit zählen nicht mit, nur Rechenzeit im Worker selbst. Die zusätzlichen Views sind daher unkritisch. Kritisch bleibt ausschliesslich das Parsen grosser Fremddaten – siehe 7.3.
 
@@ -495,7 +495,7 @@ Ein Wunschlisteneintrag braucht weder Release noch Plattform noch Trophäendaten
 
 ### 9.1 Erfassung
 
-Primär `BarcodeDetector` API (`formats: ['ean_13']`), Fallback `html5-qrcode`. Kamerazugriff braucht HTTPS – über Pages ohnehin gegeben.
+Primär `BarcodeDetector` API (`formats: ['ean_13']`), Fallback `html5-qrcode`. Kamerazugriff braucht HTTPS – über die `workers.dev`-Adresse ohnehin gegeben.
 
 Serienerfassung: nach jedem erkannten Code wird die Auflösung eingeblendet, ohne den Scanner zu schliessen. Für das Ersterfassen eines Regals ist das der Unterschied zwischen zehn Minuten und einem Abend.
 
@@ -708,7 +708,7 @@ POST   /api/imports/wishlist/parse    Body: { text } → Trefferliste zur Durchs
 POST   /api/imports/wishlist/confirm  Body: { entries[] } → schreibt plan_entry
 
 GET    /api/export/:liste.csv         sammlung|wunsch|todo|backlog|kauf|luecken|trophaeen
-GET    /api/export/backup.json        Vollsicherung, nur mit Backup-Token
+GET    /api/export/backup.json        Vollsicherung, nur für Maschinenzugriff (Verfahren: Stufe 8)
 
 GET    /api/upcoming                  v_erscheint_bald
 GET    /api/settings/weights          Rangformel-Gewichte
@@ -733,7 +733,7 @@ GET    /api/stats
 
 **Filter auf `/api/games`:** `platform`, `owned` (physisch/digital/beide/keins), `played` (ja/nein), `platinum` (ja/nein/nichtverfuegbar), `playStatus`, `physicalAvailable` (ja/nein/unbekannt), `search`.
 
-**Zugriffsschutz:** siehe Abschnitt 15.3. Kurz: Cloudflare Access vor Frontend und API, zusätzlich ein Bearer-Token für die Maschinen-Endpunkte (`/api/imports/feed`, `/api/export/backup.json`), die keinen Browser-Login durchlaufen können.
+**Zugriffsschutz:** siehe Abschnitt 15.3. Kurz: eine Access-Richtlinie am Worker – da Frontend und API derselbe Worker sind, deckt sie beides in einem ab. Wie die Maschinen-Endpunkte (`/api/imports/feed`, `/api/export/backup.json`) abgesichert werden, die keinen Browser-Login durchlaufen können, ist **in Stufe 8 zu entscheiden**.
 
 ---
 
@@ -798,8 +798,8 @@ Das Dashboard zeigt das Datum der letzten erfolgreichen Sicherung. Ein Backup, v
 Der Ablauf gehört in die README, nicht nur in den Kopf:
 
 ```
-wrangler d1 create spielesammlung-restore
-wrangler d1 execute spielesammlung-restore --remote --file=backup.sql
+wrangler d1 create trophytracker-restore
+wrangler d1 execute trophytracker-restore --remote --file=backup.sql
 ```
 
 Danach die Binding-ID in der Wrangler-Konfiguration umstellen und deployen. **Einmal testweise durchspielen**, solange nichts kaputt ist – ein ungetestetes Backup ist eine Vermutung.
@@ -818,8 +818,8 @@ CSV ist für Auswertung und Weitergabe gedacht, nicht als Sicherung: Beziehungen
 
 | Repo | Sichtbarkeit | Inhalt |
 |---|---|---|
-| `spielesammlung` | öffentlich | Worker, Frontend, Migrations, GitHub Actions, README |
-| `spielesammlung-backup` | **privat** | wöchentlicher SQL-Dump und JSON-Export |
+| `trophytracker` | öffentlich | Worker, Frontend, Migrations, GitHub Actions, README |
+| `trophytracker-backup` | **privat** | wöchentlicher SQL-Dump und JSON-Export |
 
 Die Trennung ist nicht optional. Der Dump aus Abschnitt 14 enthält die vollständige Sammlung; im öffentlichen Repo wäre sie für jeden lesbar, und Git-Historie lässt sich nachträglich nur mit Aufwand bereinigen.
 
@@ -827,11 +827,13 @@ Die Backup-Action bekommt einen **Fine-grained Personal Access Token**, dessen G
 
 **Was im öffentlichen Repo unbedenklich ist:** `account_id` und `database_id` in der Wrangler-Konfiguration. Das sind Bezeichner, keine Zugangsdaten – ohne authentifizierten Kontozugriff nutzlos.
 
-**Was dort niemals hingehört:** NPSSO und PSN-Refresh-Token, IGDB/Twitch-Zugangsdaten, AWIN-Feed-URLs (die enthalten die Publisher-ID), das API-Bearer-Token, der Cloudflare-API-Token. Alles davon liegt als Cloudflare Secret beziehungsweise GitHub Secret. `.dev.vars`, `.wrangler/` und `*.sql` gehören in die `.gitignore`.
+**Was dort niemals hingehört:** NPSSO und PSN-Refresh-Token, IGDB/Twitch-Zugangsdaten, AWIN-Feed-URLs (die enthalten die Publisher-ID), das API-Bearer-Token, der Cloudflare-API-Token. Alles davon liegt als Cloudflare Secret beziehungsweise GitHub Secret. `.dev.vars`, `.wrangler/` und `*.sql` gehören in die `.gitignore` – letzteres mit der Ausnahme `!migrations/*.sql`. Ohne diese Ausnahme würden die Migrationen mit ignoriert, und die Deploy-Action liefe gegen ein leeres Verzeichnis.
 
 ### 15.2 Automatisches Deployment
 
-**Frontend:** Git-Integration von Cloudflare Pages. Repo verbinden, Build-Kommando setzen, fertig – jeder Push auf `main` deployt. Pull Requests bekommen automatisch eine Vorschau-URL.
+**Frontend:** Kein eigenes Hosting. Vite baut das Frontend nach `frontend/dist`, und derselbe Worker liefert es als Static Assets aus (`assets.directory`, `not_found_handling: "single-page-application"`). `run_worker_first: ["/api/*"]` sorgt dafür, dass die API immer den Worker erreicht und alles Übrige auf `index.html` zurückfällt.
+
+Frontend und API teilen sich damit eine Origin: **kein CORS, ein Deploy-Pfad, eine Access-Richtlinie**. Der Preis sind die automatischen PR-Vorschau-URLs, die ein Pages-Projekt mitbrächte; nachrüstbar wären sie über `wrangler versions upload`, dessen Preview-URLs von derselben Access-Richtlinie abgedeckt sind.
 
 **Worker und Datenbank:** GitHub Action mit `cloudflare/wrangler-action`, ausgelöst durch Push auf `main`. Die Reihenfolge der Schritte ist wichtiger als das Werkzeug:
 
@@ -843,26 +845,32 @@ Schritt 1 ist der Grund, warum das eine Action ist und kein Klick im Dashboard. 
 
 Migrationen laufen **vor** dem Deployment, damit der neue Code nie auf ein altes Schema trifft. Umgekehrt gilt: Migrationen müssen abwärtskompatibel sein, weil der alte Worker in dem Moment noch läuft. Spalten hinzufügen ist unkritisch, Spalten umbenennen nicht – dafür braucht es zwei Deployments.
 
-Benötigte GitHub Secrets: `CLOUDFLARE_API_TOKEN` (Berechtigungen auf Workers Scripts, D1 und Pages beschränkt), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_REPO_TOKEN`.
+Benötigte GitHub Secrets: `CLOUDFLARE_API_TOKEN` (Berechtigungen auf Workers Scripts und D1 beschränkt, dazu Account Settings lesend – keine Zone- und keine Pages-Berechtigung) und `CLOUDFLARE_ACCOUNT_ID`. `BACKUP_REPO_TOKEN` kommt erst mit der Backup-Action in Stufe 8 dazu.
 
 ### 15.3 Zugriffsschutz
 
-Die Pages-Adresse ist öffentlich erreichbar. Ein Bearer-Token im LocalStorage allein ist dafür zu wenig: einmal geleakt, und die Sammlung ist lesbar, ohne dass es auffällt.
+Die `workers.dev`-Adresse ist öffentlich erreichbar. Ein Bearer-Token im LocalStorage allein ist dafür zu wenig: einmal geleakt, und die Sammlung ist lesbar, ohne dass es auffällt.
 
 **Cloudflare Access** davor löst das. Zero Trust ist für bis zu 50 Nutzer dauerhaft kostenlos, ohne Kreditkarte. Eingerichtet wird:
 
-- eine Access-Anwendung über die Pages-Domain und die Worker-Route
+- eine Access-Richtlinie direkt am Worker (*Protect this Worker behind Access* → **All traffic**), die dessen `workers.dev`-Adresse, Preview-URLs und spätere Custom Domains gemeinsam abdeckt
 - eine Richtlinie, die genau eine E-Mail-Adresse zulässt
 - Anmeldung per Einmalcode oder über einen Identitätsanbieter wie Google
 
 Ergebnis: Der Login steht vor der App, nicht darin. Ohne gültige Sitzung erreicht kein Aufruf den Worker, und der Worker muss keine Sitzungsverwaltung enthalten.
+
+**Keine eigene Domain nötig.** Die Richtlinie hängt am Worker selbst, nicht an einem Hostnamen in einer Zone – seit August 2026 deckt sie damit auch die `workers.dev`-Adresse ab. Die Team-Domain `<team>.cloudflareaccess.com` ist dabei nur der Login-Endpunkt und hostet nichts.
+
+Eine dokumentierte Einschränkung: Worker-Level-Access unterstützt keine WebSockets – Upgrade-Anfragen scheitern mit 403. Für dieses Projekt ohne Belang.
 
 **Ausnahmen für Maschinen.** Die GitHub Actions (Feed-Import, Backup-Export) können keinen Browser-Login durchlaufen. Zwei Wege:
 
 - Access Service Token für die Action, oder
 - diese Pfade von Access ausnehmen und mit einem eigenen Bearer-Token absichern
 
-Das Service Token ist sauberer, weil dann alles über einen Mechanismus läuft. Das Bearer-Token ist einfacher einzurichten. Beides ist vertretbar; die Entscheidung gehört in die README.
+Das Service Token ist sauberer, weil dann alles über einen Mechanismus läuft. Das Bearer-Token ist einfacher einzurichten. **Die Entscheidung ist in Stufe 8 zu treffen**, wenn mit der Backup-Action der erste Maschinen-Endpunkt tatsächlich existiert, und gehört dann in die README.
+
+Eine Randbedingung ist durch die Richtlinie am Worker hinzugekommen: Sie schützt den Worker als Ganzes, einzelne Pfade lassen sich davon nicht ausnehmen. Der zweite Weg bräuchte deshalb eine hostnamenbasierte Access-Anwendung und damit eine eigene Domain. Das Service Token ist damit der wahrscheinliche Ausgang – entschieden ist es aber nicht.
 
 **Falls Access nicht eingerichtet wird**, bleibt das Bearer-Token die Mindestanforderung – aber dann gehört ein Hinweis in die README, dass die Anwendung öffentlich erreichbar ist und ihre Sicherheit an einem einzigen Geheimnis hängt.
 
@@ -880,8 +888,8 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 
 | # | Inhalt | Ergebnis |
 |---|---|---|
-| 0 | Repos anlegen, Pages-Git-Integration, Deploy-Action, Cloudflare Access | Push auf `main` deployt, App ist geschützt |
-| 1 | Wrangler-Setup, Worker mit Hono, D1, vollständige Migration | Erreichbare leere App |
+| 0 | Repos anlegen, Worker mit Hono, Frontend-Gerüst als Static Assets, leere D1, Deploy-Action mit Export vor Migration, Access am Worker | Push auf `main` deployt, App ist geschützt |
+| 1 | Vollständige Migration, Repository-Schicht in `src/db/` | Erreichbare leere App mit Schema |
 | 2 | PSN-Auth, NPSSO-Eingabe, Rohabruf | Trophäendaten liegen roh vor |
 | 3 | Normalisierung, einfache Listenansicht | Use Case 2 teilweise: Trophäen und Platin sichtbar |
 | 4 | `game`/`release`, Matching-Vorschläge, Zuordnungsoberfläche | Sauberes Datenmodell |
@@ -929,8 +937,8 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 | Wunschlisten-Import trifft falsch | Datenmüll in der Liste | Keine automatische Übernahme, kein Freitext-Fallback, IGDB-Suche für Zeilen ohne Treffer |
 | Prüfliste läuft voll | Wird ignoriert und damit nutzlos | Aktiv gespielte Titel erzeugen keine Einträge, "unverändert lassen" setzt den Referenzpunkt neu |
 | Cloudflare-Konto weg | Totalverlust | Wöchentlicher Export in ein privates GitHub-Repository, ausserhalb von Cloudflare |
-| Backup landet im öffentlichen Repo | Sammlung öffentlich lesbar | Getrennte Repos, Fine-grained Token nur auf das private, `*.sql` in `.gitignore` |
-| Bearer-Token geleakt | Fremdzugriff auf die Daten | Cloudflare Access davor, Token nur noch für Maschinen-Endpunkte |
+| Backup landet im öffentlichen Repo | Sammlung öffentlich lesbar | Getrennte Repos, Fine-grained Token nur auf das private, `*.sql` in `.gitignore` (Ausnahme `!migrations/*.sql`), Dump nie als Workflow-Artifact |
+| Bearer-Token geleakt | Fremdzugriff auf die Daten | Access-Richtlinie am Worker davor; Absicherung der Maschinen-Endpunkte in Stufe 8 zu entscheiden |
 | Fehlerhafte Migration | Datenverlust | Export als erster Schritt jedes Deploy-Jobs, Migrationen abwärtskompatibel halten |
 | Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht auf dem Dashboard |
 | Wiederherstellung nie geprobt | Backup unbrauchbar | Ablauf in der README, einmal testweise durchgespielt |

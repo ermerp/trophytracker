@@ -1,4 +1,4 @@
-# Spielesammlung
+# Trophytracker
 
 Single-User-Webanwendung zur Verwaltung einer PlayStation-Spielesammlung (PS3, PS4, PS5).
 
@@ -11,7 +11,7 @@ Lies den relevanten Abschnitt, bevor du an einem Feature arbeitest. Diese Datei 
 
 - Backend: Cloudflare Worker, TypeScript, Hono
 - Datenbank: Cloudflare D1 (SQLite), Migrations über Wrangler
-- Frontend: React + Vite + TypeScript, PWA, auf Cloudflare Pages
+- Frontend: React + Vite + TypeScript, PWA, als Static Assets im selben Worker ausgeliefert
 - Geplante Jobs: Cloudflare Cron Triggers
 - Schwere Importe: GitHub Actions (nicht im Worker)
 - Zugriffsschutz: Cloudflare Access
@@ -19,10 +19,12 @@ Lies den relevanten Abschnitt, bevor du an einem Feature arbeitest. Diese Datei 
 ## Befehle
 
 ```bash
-npx wrangler dev                                  # lokal, mit lokaler D1
+npm run dev                                       # Frontend (Vite), proxyt /api auf :8787
+npx wrangler dev                                  # Worker + gebaute Assets, mit lokaler D1
 npx wrangler d1 migrations create <db> <name>     # neue Migration
 npx wrangler d1 migrations apply <db> --local     # lokal anwenden
 npx wrangler d1 export <db> --remote --output=backup.sql
+npm run build                                     # Frontend nach frontend/dist
 npm test                                          # Vitest
 ```
 
@@ -94,6 +96,18 @@ Das Repository ist öffentlich, das Backup-Repository ist privat. Ein Datenbank-
 ## Arbeitsweise
 
 - **Eine Stufe aus Abschnitt 16 der Spezifikation pro Branch.** Nicht mehrere zusammenfassen.
+  Branch-Namen nach dem Muster `stufe-<n>-<kurzbeschreibung>`. Merge nach `main` immer
+  mit `--no-ff`, damit jede Stufe im Verlauf ein eigener, umkehrbarer Block bleibt und
+  `git revert -m 1 <merge>` eine ganze Stufe zurücknimmt.
+- **Dokumentation gehört zur Aufgabe, nicht dahinter.** Es gibt zwei Orte, und beide
+  werden im selben Commit aktuell gehalten wie der Code:
+  - `docs/spezifikation.md` – die maßgebliche Quelle. Jede Abweichung wird dort
+    nachgezogen, an *allen* betroffenen Stellen, mit Versionsnummer in der Kopfzeile.
+  - `README.md` – Einrichtung, Secrets, Deployment, Wiederherstellung, aktueller Stand.
+    Was ein Aussenstehender braucht, um das Projekt zu betreiben.
+
+  Offene Entscheidungen bleiben ausdrücklich als offen markiert ("in Stufe N zu
+  entscheiden"), statt stillschweigend geschlossen zu werden.
 - **Vor größeren Aufgaben einen Plan vorlegen**, insbesondere bei allem, was Migrationen oder externe Schnittstellen berührt.
 - **Migrationen abwärtskompatibel halten.** Sie laufen vor dem Deployment, der alte Worker läuft in dem Moment noch. Spalten hinzufügen ist unkritisch, Umbenennen braucht zwei Deployments.
 - **Testen, was Logik ist, nicht was Glue ist.** Lohnend: Titel-Normalisierung und Matching, Trophäen-Normalisierung aus Roh-JSON, Änderungserkennung für die `review_queue`, Rangformel. Diese Funktionen sollen pur bleiben und ohne Datenbank testbar sein.
