@@ -854,8 +854,20 @@ Die `workers.dev`-Adresse ist öffentlich erreichbar. Ein Bearer-Token im LocalS
 **Cloudflare Access** davor löst das. Zero Trust ist für bis zu 50 Nutzer dauerhaft kostenlos. Beim Onboarding verlangt Cloudflare allerdings **doch Zahlungsdaten**, auch für den Free-Plan – die Dokumentation sagt dazu: "If you chose the Zero Trust Free plan, this step is still needed but you will not be charged." Eingerichtet wird:
 
 - eine Access-Richtlinie direkt am Worker (*Protect this Worker behind Access* → **All traffic**), die dessen `workers.dev`-Adresse, Preview-URLs und spätere Custom Domains gemeinsam abdeckt
-- eine Richtlinie, die genau eine E-Mail-Adresse zulässt
-- Anmeldung per Einmalcode oder über einen Identitätsanbieter wie Google
+- eine Richtlinie über die Option **Cloudflare account**: nur Mitglieder des
+  eigenen Cloudflare-Kontos dürfen sich anmelden. Bei einer Single-User-Anwendung
+  ist das genau eine Person
+- Anmeldung per Einmalcode (One-time PIN, unter *Integrations → Identity
+  providers* nachzurüsten) oder über einen Identitätsanbieter wie Google
+
+Der Dialog am Worker bietet nur zwei Richtlinien-Optionen: **Cloudflare account**
+und **Email domain**. Ein Selector für einzelne Adressen existiert dort nicht –
+den gibt es nur in der klassischen, hostnamenbasierten Access-Anwendung.
+
+**Email domain ist hier die falsche Wahl.** Sie lässt jeden mit einer verifizierten
+Adresse bei der angegebenen Domain herein; bei einem Freemail-Anbieter wie `web.de`
+wären das Millionen Menschen. Nur bei einer eigenen Firmendomain ergibt die Option
+Sinn.
 
 Ergebnis: Der Login steht vor der App, nicht darin. Ohne gültige Sitzung erreicht kein Aufruf den Worker, und der Worker muss keine Sitzungsverwaltung enthalten.
 
