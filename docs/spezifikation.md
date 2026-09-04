@@ -53,7 +53,10 @@ Migrations über Wrangler D1 Migrations. Repository auf GitHub, die Deploy-Actio
 **Cron Trigger helfen dagegen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für
 normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz muss deshalb aus dem
 Entwurf kommen, nicht aus dem Auslöser: **Arbeit pro Aufruf begrenzen** (der Trophäen-Sync holt
-höchstens zwei Seiten und merkt sich den nächsten Offset) und **Rohdaten ungeparst ablegen**.
+eine Seite à 100 Titel und merkt sich den nächsten Offset) und **Rohdaten ungeparst ablegen**.
+
+Die Grenze ist gemessen: Mit zwei Seiten je Aufruf lag die CPU-Zeit im p99 bei 8,7 ms von 10 ms
+erlaubten, mit einer Seite bei rund der Hälfte. Wer die Seitenzahl ändert, misst nach.
 
 ---
 

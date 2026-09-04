@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
 import { erstellePsnClient } from "../src/psn/client";
+import { SEITENGROESSE, SEITEN_JE_AUFRUF } from "../src/domain/trophy-pages";
 import { syncSchritt } from "../src/sync/run";
 import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophySeite } from "./psn-fake";
 
@@ -57,22 +58,31 @@ describe("syncSchritt", () => {
 	it("teilt eine grosse Sammlung ueber mehrere Aufrufe auf", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
 
-		// 450 Titel bei 100 je Seite und 2 Seiten je Aufruf -> 3 Aufrufe
-		const erste = await syncSchritt(repos(), psnMit(450).psn);
-		expect(erste).toMatchObject({ status: "laufend", weiter: true, seitenGeholt: 2 });
+		// Bewusst aus den Konstanten abgeleitet: Die Seitengrenze wird nach
+		// CPU-Messungen nachjustiert, der Test soll das ueberleben.
+		const TITEL = 450;
+		const seiten = Math.ceil(TITEL / SEITENGROESSE);
+		const aufrufe = Math.ceil(seiten / SEITEN_JE_AUFRUF);
 
-		const zweite = await syncSchritt(repos(), psnMit(450).psn);
-		expect(zweite).toMatchObject({ status: "laufend", weiter: true, offset: 400 });
+		for (let i = 1; i < aufrufe; i++) {
+			const zwischenstand = await syncSchritt(repos(), psnMit(TITEL).psn);
+			expect(zwischenstand).toMatchObject({
+				status: "laufend",
+				weiter: true,
+				seitenGeholt: SEITEN_JE_AUFRUF,
+			});
+		}
 
-		const dritte = await syncSchritt(repos(), psnMit(450).psn);
-		expect(dritte).toMatchObject({ status: "erfolg", weiter: false, titlesSeen: 450 });
+		const letzter = await syncSchritt(repos(), psnMit(TITEL).psn);
+		expect(letzter).toMatchObject({ status: "erfolg", weiter: false, titlesSeen: TITEL });
 
 		const { results } = await env.DB.prepare(
 			"SELECT endpoint FROM psn_raw_response ORDER BY id",
 		).all<{ endpoint: string }>();
-		expect(results).toHaveLength(5);
+
+		expect(results).toHaveLength(seiten);
 		expect(results[0].endpoint).toContain("offset=0");
-		expect(results[4].endpoint).toContain("offset=400");
+		expect(results[seiten - 1].endpoint).toContain(`offset=${(seiten - 1) * SEITENGROESSE}`);
 	});
 
 	it("legt die Rohantwort unveraendert ab", async () => {
