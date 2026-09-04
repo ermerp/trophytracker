@@ -12,8 +12,15 @@
 /** Seitengroesse. PSN erlaubt mehr, aber groessere Seiten kosten CPU beim Kopieren. */
 export const SEITENGROESSE = 100;
 
-/** Wie viele Seiten ein einzelner Aufruf hoechstens holt. */
-export const SEITEN_JE_AUFRUF = 2;
+/**
+ * Wie viele Seiten ein einzelner Aufruf hoechstens holt.
+ *
+ * Gemessen am ersten Produktivlauf: bei zwei Seiten je Aufruf lag die CPU-Zeit
+ * im p99 bei 8,7 ms - zu nah an der 10-ms-Grenze des Free Tier. Mit einer
+ * Seite je Aufruf halbiert sich der teuerste Posten (das Kopieren von rund
+ * 60 kB Antworttext). Die Oberflaeche ruft ohnehin wiederholt auf.
+ */
+export const SEITEN_JE_AUFRUF = 1;
 
 const TOTAL_REGEX = /"totalItemCount"\s*:\s*(\d+)/;
 

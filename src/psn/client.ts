@@ -62,7 +62,10 @@ async function alsSitzung(antwort: Response): Promise<Sitzung> {
 		accessToken: new Geheimnis(daten.access_token),
 		refreshToken: new Geheimnis(daten.refresh_token),
 		accessLaeuftAbUm: inZukunft(daten.expires_in ?? 3600),
-		refreshLaeuftAbUm: inZukunft(daten.refresh_token_expires_in ?? 60 * 24 * 3600),
+		// PSN liefert refresh_token_expires_in mit; gemessen sind das 10 Tage.
+		// Der Rueckfall ist bewusst kurz: Lieber einmal unnoetig ueber das
+		// NPSSO gehen, als einen laengst toten Token fuer gueltig zu halten.
+		refreshLaeuftAbUm: inZukunft(daten.refresh_token_expires_in ?? 3600),
 	};
 }
 

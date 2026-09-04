@@ -162,10 +162,14 @@ nicht gekürzt. Durchgesetzt über die Hülle `Geheimnis` in
 [`src/domain/secret.ts`](src/domain/secret.ts), geprüft von
 `test/keine-lecks.spec.ts`.
 
-**Abruf.** Ein Aufruf von `POST /api/sync` holt höchstens zwei Seiten und merkt
-sich den nächsten Offset – der Free Tier erlaubt 10 ms CPU je Aufruf, und Cron
-Trigger haben dieselbe Grenze. Die Oberfläche ruft so lange erneut auf, bis der
-Durchlauf fertig ist. Die Antworten werden **unverändert** abgelegt; die
+**Abruf.** Ein Aufruf von `POST /api/sync` holt **eine** Seite à 100 Titel und
+merkt sich den nächsten Offset – der Free Tier erlaubt 10 ms CPU je Aufruf, und
+Cron Trigger haben dieselbe Grenze. Die Oberfläche ruft so lange erneut auf, bis
+der Durchlauf fertig ist.
+
+Die Seitenzahl je Aufruf ist gemessen, nicht geschätzt: Mit zwei Seiten lag die
+CPU-Zeit im p99 bei 8,7 ms – zu nah an der Grenze. Nachzumessen über die
+GraphQL-Analytics (`workersInvocationsAdaptive`, `cpuTimeP50`/`cpuTimeP99`). Die Antworten werden **unverändert** abgelegt; die
 Normalisierung ist ein eigener Schritt in Stufe 3 und braucht keinen
 PSN-Zugriff.
 
