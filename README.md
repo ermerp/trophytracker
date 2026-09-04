@@ -138,17 +138,19 @@ not be charged."* Siehe [Kosten](#kosten).
    ```
 3. Nach dem ersten erfolgreichen Deploy: Workers & Pages → `trophytracker` →
    Tab **Access** → *Protect this Worker behind Access* → **All traffic**.
-4. Richtlinie anlegen – das ist ein **zweiter, eigener Schritt** neben der
-   Login-Methode. Die Login-Methode klärt, *wie* jemand sich ausweist; die
-   Richtlinie, *wer* durchgelassen wird:
+4. Im selben Dialog unter **Authentication policy** die Option
+   **Cloudflare account** wählen: nur Mitglieder des eigenen Cloudflare-Kontos
+   dürfen sich anmelden – bei einer Single-User-Anwendung genau eine Person.
 
-   | Feld | Wert |
-   |---|---|
-   | Action | `Allow` |
-   | Selector | `Emails` |
-   | Value | die eine erlaubte Adresse |
+   > **Nicht "Email domain" wählen.** Die Option lässt jeden mit einer
+   > verifizierten Adresse bei der angegebenen Domain herein. Bei einem
+   > Freemail-Anbieter wie `web.de` wären das Millionen Menschen. Sie ergibt nur
+   > bei einer eigenen Firmendomain Sinn.
 
-   Genau eine Adresse, wie in Abschnitt 15.3 gefordert.
+   Einen Selector für einzelne E-Mail-Adressen gibt es in diesem Dialog nicht;
+   den bietet nur die klassische, hostnamenbasierte Access-Anwendung. Für eine
+   feinere Richtlinie – mehrere Anbieter, Service Tokens, Gerätevorgaben – lässt
+   sich die Anwendung nachträglich in Zero Trust bearbeiten.
 
 Die Richtlinie hängt am Worker, nicht an einem Hostnamen – deshalb ist **keine
 eigene Domain nötig**, und sie deckt `workers.dev`-Adresse, Preview-URLs und
