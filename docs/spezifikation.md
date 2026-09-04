@@ -851,7 +851,7 @@ Benötigte GitHub Secrets: `CLOUDFLARE_API_TOKEN` (Berechtigungen auf Workers Sc
 
 Die `workers.dev`-Adresse ist öffentlich erreichbar. Ein Bearer-Token im LocalStorage allein ist dafür zu wenig: einmal geleakt, und die Sammlung ist lesbar, ohne dass es auffällt.
 
-**Cloudflare Access** davor löst das. Zero Trust ist für bis zu 50 Nutzer dauerhaft kostenlos, ohne Kreditkarte. Eingerichtet wird:
+**Cloudflare Access** davor löst das. Zero Trust ist für bis zu 50 Nutzer dauerhaft kostenlos. Beim Onboarding verlangt Cloudflare allerdings **doch Zahlungsdaten**, auch für den Free-Plan – die Dokumentation sagt dazu: "If you chose the Zero Trust Free plan, this step is still needed but you will not be charged." Eingerichtet wird:
 
 - eine Access-Richtlinie direkt am Worker (*Protect this Worker behind Access* → **All traffic**), die dessen `workers.dev`-Adresse, Preview-URLs und spätere Custom Domains gemeinsam abdeckt
 - eine Richtlinie, die genau eine E-Mail-Adresse zulässt
@@ -874,7 +874,30 @@ Eine Randbedingung ist durch die Richtlinie am Worker hinzugekommen: Sie schütz
 
 **Falls Access nicht eingerichtet wird**, bleibt das Bearer-Token die Mindestanforderung – aber dann gehört ein Hinweis in die README, dass die Anwendung öffentlich erreichbar ist und ihre Sicherheit an einem einzigen Geheimnis hängt.
 
-### 15.4 Was das Teilen wert ist
+### 15.4 Kostenmodell und Schutz vor ungewollten Kosten
+
+Alle genutzten Dienste liegen im Free-Tier. Entscheidend ist, **wie** Cloudflare
+mit dem Überschreiten umgeht: Die Free-Pläne rechnen nicht in eine Überziehung
+hinein, sondern blocken hart.
+
+| Dienst | Free-Grenze | Bei Überschreitung |
+|---|---|---|
+| Workers | 100.000 Anfragen/Tag | Fehler 1027 bzw. 429, keine Abrechnung |
+| Workers Static Assets | im Workers-Kontingent | 429 statt Auslieferung |
+| D1 | 5 GB, 5 Mio. gelesene / 100.000 geschriebene Zeilen pro Tag | Abfragen schlagen fehl, keine Abrechnung |
+| Zero Trust Access | 50 Sitze | Weitere Nutzer werden abgewiesen |
+
+Der Wechsel in einen Bezahlmodus ist damit immer eine **ausdrückliche Handlung**
+(Upgrade-Klick), kein Nebeneffekt von Nutzung. Für eine Single-User-Anwendung
+sind die Grenzen ohnehin um Größenordnungen entfernt: ein Sitz von 50, und ein
+Trophäen-Sync erzeugt einige hundert Anfragen, nicht hunderttausend.
+
+Nicht abgedeckt von dieser Zusicherung sind Dienste, die es gar keinen Free-Tier
+gibt – wer später etwa Workers Paid für Cron-Häufigkeiten oder R2 hinzunimmt,
+trifft diese Entscheidung bewusst. Für den in Abschnitt 2 beschriebenen Stack
+ist das nicht nötig.
+
+### 15.5 Was das Teilen wert ist
 
 Das Repo ist ohne deine Daten vollständig nachvollziehbar: Schema, Migrations, Matching-Logik und die Anbindungen sind der interessante Teil, die Sammlung ist es nicht. Wer das Projekt nachbauen will, legt eine eigene D1-Datenbank an und trägt sein eigenes NPSSO ein.
 
@@ -951,3 +974,4 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 | Store-Preise inoffiziell und volatil | Sale verfälscht Verlauf | `is_sale`-Flag, Abruf nur für vorgemerkte Releases |
 | Keine freie EAN-Datenbank | Barcode liefert nichts | Eigene Zuordnungstabelle, offene Scans protokolliert |
 | D1 relativ jung | Werkzeuge weniger ausgereift | Bei Single-User unkritisch, Schema ist Standard-SQLite und portierbar |
+| Ungewollt in einen Bezahlmodus rutschen | Unerwartete Kosten | Free-Pläne blocken bei Überschreitung, statt zu berechnen (15.4); Upgrade ist immer eine ausdrückliche Handlung |
