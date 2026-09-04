@@ -123,11 +123,32 @@ not be charged."* Siehe [Kosten](#kosten).
 1. Dashboard → Zero Trust → Team-Namen wählen (ergibt
    `<team>.cloudflareaccess.com`, den Login-Endpunkt). Die Team-Domain hostet
    nichts, sie führt nur die Anmeldung durch.
-2. Zero Trust → Settings → Authentication: **One-time PIN** genügt, ein
-   Identitätsanbieter ist nicht nötig.
+2. Zero Trust → **Integrations → Identity providers** → *Add new* →
+   **One-time PIN**. Neue Zero-Trust-Organisationen bekommen OTP **nicht** mehr
+   automatisch ("OTP is no longer added automatically"); ohne Eintrag greift der
+   Cloudflare-eigene Anbieter, der an eine bestehende Cloudflare-Sitzung
+   gebunden ist. OTP schickt stattdessen einen Code an die E-Mail-Adresse und
+   funktioniert dadurch auf jedem Gerät – am Handy der praktischere Weg.
+
+   Prüfen lässt sich der Stand ohne Dashboard:
+
+   ```bash
+   curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+     "https://api.cloudflare.com/client/v4/accounts/<account_id>/access/identity_providers"
+   ```
 3. Nach dem ersten erfolgreichen Deploy: Workers & Pages → `trophytracker` →
    Tab **Access** → *Protect this Worker behind Access* → **All traffic**.
-4. Richtlinie: Action `Allow`, Selector `Emails`, genau eine Adresse.
+4. Richtlinie anlegen – das ist ein **zweiter, eigener Schritt** neben der
+   Login-Methode. Die Login-Methode klärt, *wie* jemand sich ausweist; die
+   Richtlinie, *wer* durchgelassen wird:
+
+   | Feld | Wert |
+   |---|---|
+   | Action | `Allow` |
+   | Selector | `Emails` |
+   | Value | die eine erlaubte Adresse |
+
+   Genau eine Adresse, wie in Abschnitt 15.3 gefordert.
 
 Die Richtlinie hängt am Worker, nicht an einem Hostnamen – deshalb ist **keine
 eigene Domain nötig**, und sie deckt `workers.dev`-Adresse, Preview-URLs und
