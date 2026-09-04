@@ -168,4 +168,15 @@ dist
 
 .dev.vars
 .wrangler/
+
+# Datenbank-Dumps duerfen nie ins oeffentliche Repo (Abschnitt 15.1).
+# Migrationen sind davon ausgenommen - sie MUESSEN eingecheckt sein,
+# sonst laeuft die Deploy-Action gegen ein leeres Verzeichnis.
 *.sql
+!migrations/*.sql
+
+# Build-Ausgabe des Frontends
+frontend/dist/
+
+# WSL-Artefakte aus Windows-Downloads
+*:Zone.Identifier

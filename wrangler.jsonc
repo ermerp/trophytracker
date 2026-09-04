@@ -10,33 +10,33 @@
 	"observability": {
 		"enabled": true
 	},
-	"upload_source_maps": true
+	"upload_source_maps": true,
+
 	/**
-	 * Smart Placement
-	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
+	 * Frontend und API teilen sich einen Worker und damit eine Origin.
+	 * Kein CORS, ein Deploy-Pfad, eine Access-Richtlinie.
+	 *
+	 * run_worker_first: /api/* erreicht immer den Worker. Alles andere wird
+	 * zuerst gegen die Assets aufgeloest; unbekannte Pfade fallen auf
+	 * index.html zurueck, damit das SPA-Routing im Frontend greift.
 	 */
-	// "placement": {  "mode": "smart" }
+	"assets": {
+		"directory": "./frontend/dist",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application",
+		"run_worker_first": ["/api/*"]
+	},
+
 	/**
-	 * Bindings
-	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
-	 * databases, object storage, AI inference, real-time communication and more.
-	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
+	 * database_id ist ein Bezeichner, kein Zugangsdatum, und darf laut
+	 * Abschnitt 15.1 der Spezifikation im oeffentlichen Repo stehen.
+	 * Anlegen mit: npx wrangler d1 create trophytracker
 	 */
-	/**
-	 * Environment Variables
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
-	 * Note: Use secrets to store sensitive data.
-	 * https://developers.cloudflare.com/workers/configuration/secrets/
-	 */
-	// "vars": {  "MY_VARIABLE": "production_value" }
-	/**
-	 * Static Assets
-	 * https://developers.cloudflare.com/workers/static-assets/binding/
-	 */
-	// "assets": {  "directory": "./public/",  "binding": "ASSETS" }
-	/**
-	 * Service Bindings (communicate between multiple Workers)
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
-	 */
-	// "services": [  {   "binding": "MY_SERVICE",   "service": "my-service"  } ]
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "trophytracker",
+			"database_id": "PLATZHALTER_AUS_WRANGLER_D1_CREATE"
+		}
+	]
 }

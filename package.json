@@ -2,11 +2,16 @@
   "name": "trophytracker",
   "version": "0.0.0",
   "private": true,
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
+    "build": "npm run build --workspace frontend",
+    "dev": "npm run dev --workspace frontend",
+    "dev:worker": "wrangler dev",
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
     "start": "wrangler dev",
-    "test": "vitest",
+    "test": "vitest run",
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
