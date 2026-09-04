@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Einstellungen } from './Einstellungen'
 import './App.css'
 
 /**
@@ -49,8 +50,8 @@ function App() {
     <main>
       <h1>Trophytracker</h1>
       <p>
-        Stufe 1: Das Datenmodell steht – 16 Tabellen und 7 Views. Inhalte kommen
-        ab Stufe 2 mit der PSN-Anbindung.
+        Stufe 2: Trophäendaten lassen sich roh von PlayStation abrufen.
+        Ausgewertet werden sie in Stufe 3.
       </p>
 
       <section>
@@ -88,6 +89,8 @@ function App() {
         )}
         {gewichte.art === 'fehler' && <p>Keine Antwort: {gewichte.meldung}</p>}
       </section>
+
+      <Einstellungen />
     </main>
   )
 }

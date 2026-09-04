@@ -67,9 +67,16 @@ Ebenso: "nur digital gespielt" und "Lücke" sind Views, keine Spalten.
 
 Der Free Tier erlaubt 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit zählen nicht mit, eigenes Rechnen schon.
 
-- Sync und Importe laufen im Cron Trigger oder in einer GitHub Action, nie im Request-Pfad
+- **Cron Trigger helfen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz kommt aus dem Entwurf, nicht aus dem Auslöser: Arbeit pro Aufruf begrenzen und den Fortschritt in der Datenbank halten, damit der nächste Aufruf weitermacht
+- Schwere Importe (Händler-Feeds) laufen in einer GitHub Action, nicht im Worker
 - Große Fremddaten (Händler-Feeds) werden in der GitHub Action geparst und gefiltert; der Worker bekommt nur fertige Batches
 - Rohantworten seitenweise speichern, nicht am Stück parsen
+
+### Geheimnisse sind im Typ gekapselt
+
+NPSSO, Refresh- und Access Token wandern ausschliesslich als `Geheimnis` (`src/domain/secret.ts`) durch den Code. `toString()` und `toJSON()` redigieren, der Klartext ist nur über `.offenlegen()` erreichbar. Sie dürfen **nie** in einer API-Antwort, einer Fehlermeldung oder im Log erscheinen, auch nicht gekürzt — `observability.logs` ist eingeschaltet, was einmal drin steht, bleibt liegen.
+
+Daraus folgt: Die Antwort des PSN-Token-Endpunkts wird nie in `psn_raw_response` geschrieben. Dort landen ausschliesslich Trophäen-Seiten. `test/keine-lecks.spec.ts` prüft das über alle Routen, auch in den Fehlerpfaden.
 
 ### Rohdaten vor Normalisierung
 

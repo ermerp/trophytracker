@@ -1,0 +1,6 @@
+# Lokale Geheimnisse. Diese Datei ist ein Muster ohne Werte und darf
+# eingecheckt werden - .dev.vars selbst niemals.
+
+# Schluessel fuer die Verschluesselung von NPSSO und Refresh-Token in D1.
+# Erzeugen mit: openssl rand -base64 32
+NPSSO_KEY=

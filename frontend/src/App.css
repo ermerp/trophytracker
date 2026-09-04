@@ -15,3 +15,26 @@ table {
 td {
   padding: 0.15rem 1.5rem 0.15rem 0;
 }
+
+label {
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+input {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+  padding: 0.4rem;
+  margin-bottom: 0.6rem;
+  font: inherit;
+}
+
+button {
+  padding: 0.4rem 0.9rem;
+  font: inherit;
+}
+
+form {
+  margin-top: 1rem;
+}
