@@ -857,8 +857,13 @@ Die `workers.dev`-Adresse ist öffentlich erreichbar. Ein Bearer-Token im LocalS
 - eine Richtlinie über die Option **Cloudflare account**: nur Mitglieder des
   eigenen Cloudflare-Kontos dürfen sich anmelden. Bei einer Single-User-Anwendung
   ist das genau eine Person
-- Anmeldung per Einmalcode (One-time PIN, unter *Integrations → Identity
-  providers* nachzurüsten) oder über einen Identitätsanbieter wie Google
+- Anmeldung über das Cloudflare-Konto. Die Login-Methode folgt aus der
+  Richtlinie: *Cloudflare account* meldet gegen das Konto an, ein Einmalcode
+  (One-time PIN) oder ein Anbieter wie Google käme erst bei einer
+  adress- oder domainbasierten Richtlinie zum Einsatz
+
+Damit ist das Cloudflare-Konto das einzige Tor zur Anwendung – **Zwei-Faktor-
+Anmeldung dort ist Teil des Zugriffsschutzes**, nicht optionaler Komfort.
 
 Der Dialog am Worker bietet nur zwei Richtlinien-Optionen: **Cloudflare account**
 und **Email domain**. Ein Selector für einzelne Adressen existiert dort nicht –

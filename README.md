@@ -25,7 +25,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Sicherung vor Migration | `d1 export --remote` läuft als erster Schritt jedes Deploys |
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
-| Login | One-time PIN, Code per E-Mail, auch mobil |
+| Login | über das Cloudflare-Konto, auch mobil erprobt |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
@@ -136,12 +136,19 @@ not be charged."* Siehe [Kosten](#kosten).
 1. Dashboard → Zero Trust → Team-Namen wählen (ergibt
    `<team>.cloudflareaccess.com`, den Login-Endpunkt). Die Team-Domain hostet
    nichts, sie führt nur die Anmeldung durch.
-2. Zero Trust → **Integrations → Identity providers** → *Add new* →
-   **One-time PIN**. Neue Zero-Trust-Organisationen bekommen OTP **nicht** mehr
-   automatisch ("OTP is no longer added automatically"); ohne Eintrag greift der
-   Cloudflare-eigene Anbieter, der an eine bestehende Cloudflare-Sitzung
-   gebunden ist. OTP schickt stattdessen einen Code an die E-Mail-Adresse und
-   funktioniert dadurch auf jedem Gerät – am Handy der praktischere Weg.
+2. Login-Methode. **Welche greift, hängt von der Richtlinie ab** (Schritt 4):
+
+   | Richtlinie | Anmeldung läuft über |
+   |---|---|
+   | *Cloudflare account* | das Cloudflare-Konto selbst – kein Code, keine Einrichtung nötig |
+   | *Email domain* | einen Identitätsanbieter, z. B. One-time PIN mit Code per E-Mail |
+
+   Bei *Cloudflare account* ist hier also **nichts zu tun**. Ein separat unter
+   Zero Trust → *Integrations → Identity providers* eingerichteter One-time-PIN-
+   Anbieter bleibt dann ungenutzt.
+
+   Weil damit das Cloudflare-Konto das einzige Tor zur Anwendung ist, gehört dort
+   **Zwei-Faktor-Anmeldung** aktiviert.
 
    Prüfen lässt sich der Stand ohne Dashboard:
 
