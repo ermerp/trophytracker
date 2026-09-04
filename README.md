@@ -115,7 +115,10 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
 ## Zugriffsschutz
 
 Die `workers.dev`-Adresse ist öffentlich erreichbar, deshalb steht
-**Cloudflare Access** davor. Zero Trust ist für bis zu 50 Nutzer kostenlos.
+**Cloudflare Access** davor. Zero Trust ist für bis zu 50 Nutzer kostenlos –
+beim Onboarding verlangt Cloudflare trotzdem Zahlungsdaten. Laut Dokumentation:
+*"If you chose the Zero Trust Free plan, this step is still needed but you will
+not be charged."* Siehe [Kosten](#kosten).
 
 1. Dashboard → Zero Trust → Team-Namen wählen (ergibt
    `<team>.cloudflareaccess.com`, den Login-Endpunkt). Die Team-Domain hostet
@@ -191,6 +194,22 @@ deployen.
 Zusätzlich bietet Cloudflare `wrangler d1 time-travel` zum Zurückstellen auf
 einen Zeitpunkt. Das hilft gegen Bedienfehler, aber nicht gegen ein verlorenes
 Konto – dafür ist der wöchentliche Export in das private Repository zuständig.
+
+## Kosten
+
+Der gesamte Stack liegt im Free-Tier. Wichtiger als die Grenzen ist, wie
+Cloudflare mit dem Überschreiten umgeht: Die Free-Pläne **blocken**, statt in
+eine Überziehung hineinzurechnen.
+
+| Dienst | Free-Grenze | Bei Überschreitung |
+|---|---|---|
+| Workers (inkl. Static Assets) | 100.000 Anfragen/Tag | Fehler 1027 bzw. 429, keine Abrechnung |
+| D1 | 5 GB, 5 Mio. gelesene / 100.000 geschriebene Zeilen pro Tag | Abfragen schlagen fehl, keine Abrechnung |
+| Zero Trust Access | 50 Sitze | weitere Nutzer werden abgewiesen |
+
+Der Wechsel in einen Bezahlmodus ist deshalb immer eine ausdrückliche Handlung,
+kein Nebeneffekt von Nutzung. Für einen einzelnen Nutzer sind die Grenzen um
+Größenordnungen entfernt.
 
 ## Was niemals ins Repository gehört
 
