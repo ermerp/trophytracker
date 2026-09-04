@@ -7,3 +7,11 @@ main {
 section {
   margin-top: 2rem;
 }
+
+table {
+  border-collapse: collapse;
+}
+
+td {
+  padding: 0.15rem 1.5rem 0.15rem 0;
+}
