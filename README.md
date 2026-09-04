@@ -13,9 +13,10 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 0 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
-Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`, ist aber
-noch leer – das Datenmodell kommt in Stufe 1.
+**Stufe 1 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Das
+vollständige Datenmodell steht; Inhalte kommen ab Stufe 2 mit der
+PSN-Anbindung.
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -26,6 +27,8 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
+| Schema | 16 Tabellen, 7 Views, eine Migration |
+| Datenzugriff | Repository-Schicht in `src/db/`, erste Route `/api/settings/weights` |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
@@ -237,6 +240,31 @@ deployen.
 Zusätzlich bietet Cloudflare `wrangler d1 time-travel` zum Zurückstellen auf
 einen Zeitpunkt. Das hilft gegen Bedienfehler, aber nicht gegen ein verlorenes
 Konto – dafür ist der wöchentliche Export in das private Repository zuständig.
+
+## Aufbau
+
+```
+migrations/    nummerierte SQL-Dateien, laufen genau einmal
+src/index.ts   Hono-App, hängt Repositories je Anfrage ein
+src/api/       Route-Module
+src/db/        Repository-Schicht – der einzige Ort mit D1-Zugriff
+src/domain/    reine Logik ohne Datenbank, z. B. die Gewichte der Rangformel
+frontend/      React + Vite, wird als Static Assets mit dem Worker ausgeliefert
+```
+
+**Route-Handler rufen niemals `env.DB.prepare()` auf.** Sie greifen über
+`c.var.repos` zu. Das hält einen späteren Wechsel zu Turso, Postgres oder
+lokalem SQLite auf `src/db/` begrenzt.
+
+Getestet wird, was Logik ist, nicht was Glue ist: Die Views werden gegen
+eingespielte Daten geprüft, die Gewichte-Validierung ohne Datenbank. Die Tests
+laufen gegen dasselbe Schema wie Produktion – `vitest.config.mts` liest die
+Migrationen aus `migrations/` ein und wendet sie je Testlauf an.
+
+```bash
+npx wrangler d1 migrations apply trophytracker --local   # Schema lokal anlegen
+npm test
+```
 
 ## Kosten
 

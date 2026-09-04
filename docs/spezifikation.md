@@ -286,6 +286,12 @@ CREATE TABLE app_setting (
 -- w_critic, w_priority, w_favorite, w_price
 ```
 
+Vorbelegung aus Migration 0001: `w_critic = 0.5`, `w_priority = 0.3`, `w_favorite = 0.2`,
+`w_price = 0`. Die drei wirksamen summieren sich auf 1, ein Favorit erreicht damit maximal
+1.0 und alles Übrige höchstens 0.8 – `is_favorite` wirkt additiv. Seeds werden als
+`INSERT OR IGNORE` geschrieben, damit ein erneuter Lauf einen angepassten Wert nie
+zurücksetzt.
+
 ---
 
 ## 6. Datenmodell – Marktdaten (Use Case 7)
@@ -558,9 +564,16 @@ CREATE TABLE psn_credentials (
 );
 ```
 
+**Vor dem ersten NPSSO existiert keine Zeile.** Der CHECK kennt bewusst keinen Wert für
+"noch nie eingerichtet"; die Abwesenheit der Zeile sagt genau das aus. Stufe 2 legt sie beim
+ersten hinterlegten NPSSO an. Dashboard und Einstellungen unterscheiden damit drei Zustände:
+keine Zeile ("nicht eingerichtet"), `status = 'abgelaufen'` und `status = 'ok'`.
+
 ---
 
 ## 11. Abgeleitete Sichten
+
+Views listen ihre Spalten immer explizit auf, nie `SELECT *`. Bei `SELECT *` wächst die Ergebnismenge nach einem `ADD COLUMN` lautlos mit, während die Definition in `sqlite_master` unverändert bleibt – die einzige Stelle, an der SQLite bei Schemaänderungen still danebengreift.
 
 ```sql
 -- Use Case 3: Lücken. Digital gespielt, Disc existiert, nicht im Regal.
@@ -634,12 +647,16 @@ WHERE pe.status = 'offen'
 ORDER BY g.release_date;
 
 -- Use Case 5b: Kandidaten für den Backlog – im Besitz, nie angefasst.
+-- Die Klammern um das OR sind zwingend: AND bindet stärker, ohne sie würde
+-- die Bedingung als "physisch ODER (digital UND alles Übrige)" gelesen, und
+-- jedes Release mit einer Disc im Regal wäre Kandidat – auch ein zu 100 %
+-- durchgespieltes, das bereits auf einer Liste steht.
 CREATE VIEW v_backlog_kandidaten AS
 SELECT g.title, r.id AS release_id, r.platform
 FROM release r
 JOIN game g ON g.id = r.game_id
-WHERE EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)
-   OR EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id)
+WHERE (EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)
+    OR EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id))
 AND NOT EXISTS (
   SELECT 1 FROM trophy_progress t WHERE t.release_id = r.id AND t.progress_pct > 0
 )
