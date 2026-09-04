@@ -13,10 +13,10 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 1 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 2 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Das
-vollständige Datenmodell steht; Inhalte kommen ab Stufe 2 mit der
-PSN-Anbindung.
+Datenmodell steht, und Trophäendaten lassen sich **roh** von PlayStation
+abrufen. Ausgewertet werden sie in Stufe 3 – `trophy_progress` ist noch leer.
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -28,7 +28,8 @@ Was steht und in Betrieb nachgewiesen ist:
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
 | Schema | 16 Tabellen, 7 Views, eine Migration |
-| Datenzugriff | Repository-Schicht in `src/db/`, erste Route `/api/settings/weights` |
+| Datenzugriff | Repository-Schicht in `src/db/` |
+| PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
@@ -121,12 +122,56 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
    | `CLOUDFLARE_ACCOUNT_ID` | Deploy-Action | 0 |
    | `BACKUP_REPO_TOKEN` | Fine-grained PAT, nur auf das private Backup-Repo | 8 |
 
+   Dazu ein **Cloudflare Secret** (nicht GitHub):
+
+   | Secret | Wofür |
+   |---|---|
+   | `NPSSO_KEY` | Schlüssel für die Verschlüsselung von NPSSO und Refresh-Token in D1 |
+
+   ```bash
+   openssl rand -base64 32              # 32 Byte, Base64
+   npx wrangler secret put NPSSO_KEY    # produktiv
+   ```
+
+   Lokal gehört derselbe Wert in `.dev.vars` (siehe `.dev.vars.example`).
+
 5. **Zugriffsschutz einrichten** – siehe unten.
 
 6. **Geheimnisse für die externen Anbindungen** kommen als Cloudflare Secrets
    dazu, sobald die jeweilige Stufe erreicht ist (NPSSO und PSN-Refresh-Token ab
    Stufe 2, IGDB/Twitch ab Stufe 9, AWIN-Feed-URL ab Stufe 18). Lokal gehören sie
    in `.dev.vars`, niemals ins Repository.
+
+## PlayStation-Anbindung
+
+Die Anbindung ist inoffiziell. Der Zugang läuft über das **NPSSO** – ein Cookie
+aus dem angemeldeten Browser, kein Passwort:
+
+1. Bei PlayStation anmelden
+2. https://ca.account.sony.com/api/v1/ssocookie aufrufen
+3. Den Wert des Feldes `npsso` in den Einstellungen der App eintragen
+
+**Ablage.** NPSSO und Refresh-Token liegen AES-GCM-verschlüsselt in D1, der
+Schlüssel als Cloudflare Secret. Ein Datenbank-Dump enthält damit keinen
+verwertbaren Zugang. Warum nicht als Cloudflare Secret: Ein Worker kann keine
+Secrets schreiben, ein Eingabefeld braucht aber eine beschreibbare Ablage –
+siehe [Abschnitt 7.1](docs/spezifikation.md#71-psn-trophäen).
+
+**Keiner dieser Werte erscheint jemals in einer API-Antwort oder im Log**, auch
+nicht gekürzt. Durchgesetzt über die Hülle `Geheimnis` in
+[`src/domain/secret.ts`](src/domain/secret.ts), geprüft von
+`test/keine-lecks.spec.ts`.
+
+**Abruf.** Ein Aufruf von `POST /api/sync` holt höchstens zwei Seiten und merkt
+sich den nächsten Offset – der Free Tier erlaubt 10 ms CPU je Aufruf, und Cron
+Trigger haben dieselbe Grenze. Die Oberfläche ruft so lange erneut auf, bis der
+Durchlauf fertig ist. Die Antworten werden **unverändert** abgelegt; die
+Normalisierung ist ein eigener Schritt in Stufe 3 und braucht keinen
+PSN-Zugriff.
+
+Läuft das NPSSO ab, ist das kein Fehlerfall, sondern ein regulärer Zustand:
+`status` wird `abgelaufen`, vorhandene Daten bleiben stehen, und in den
+Einstellungen lässt sich ein neues NPSSO eintragen.
 
 ## Zugriffsschutz
 

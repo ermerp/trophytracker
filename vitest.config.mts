@@ -12,7 +12,13 @@ export default defineConfig({
 		cloudflareTest({
 			wrangler: { configPath: "./wrangler.jsonc" },
 			miniflare: {
-				bindings: { TEST_MIGRATIONS: migrations },
+				bindings: {
+					TEST_MIGRATIONS: migrations,
+					// Fester Testschluessel. Tests duerfen nie von einem echten
+					// Secret abhaengen - und dieser Wert ist absichtlich
+					// oeffentlich und nutzlos.
+					NPSSO_KEY: "dGVzdHNjaGx1ZXNzZWwtZnVlci12aXRlc3QtMzJieXQ=",
+				},
 			},
 		}),
 	],

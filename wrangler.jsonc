@@ -8,6 +8,11 @@
 	"account_id": "8124591ab46dbf5bab4efb3e54b60a3d",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-09-03",
+	/**
+	 * NPSSO_KEY wird als Secret gesetzt, nicht hier:
+	 *   npx wrangler secret put NPSSO_KEY
+	 * Lokal steht er in .dev.vars.
+	 */
 	"observability": {
 		"enabled": true
 	},

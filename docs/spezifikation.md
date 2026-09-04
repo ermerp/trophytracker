@@ -50,6 +50,11 @@ Migrations über Wrangler D1 Migrations. Repository auf GitHub, die Deploy-Actio
 
 **Hinweis zur CPU-Grenze:** Der Free Tier begrenzt auf 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit zählen nicht mit, nur Rechenzeit im Worker selbst. Die zusätzlichen Views sind daher unkritisch. Kritisch bleibt ausschliesslich das Parsen grosser Fremddaten – siehe 7.3.
 
+**Cron Trigger helfen dagegen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für
+normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz muss deshalb aus dem
+Entwurf kommen, nicht aus dem Auslöser: **Arbeit pro Aufruf begrenzen** (der Trophäen-Sync holt
+höchstens zwei Seiten und merkt sich den nächsten Offset) und **Rohdaten ungeparst ablegen**.
+
 ---
 
 ## 3. Datenmodell – Sammlung
@@ -360,7 +365,33 @@ Endpunkt `GET /api/trophy/v1/users/me/trophyTitles`, paginiert. Die v2-Trophy-AP
 
 **Sync-Ablauf:** `psn_sync_run` anlegen → alle Seiten abrufen und roh in `psn_raw_response` schreiben → daraus `trophy_progress` per UPSERT normalisieren → `release_id` und `play_status` unangetastet lassen → Status setzen. Die Trennung von Abruf und Normalisierung erlaubt beliebiges Wiederholen ohne PSN-Zugriff und liefert echte Testdaten.
 
-Tokens liegen als Cloudflare Secret, nicht in D1. Der Sync läuft im Cron Trigger, nicht im Request-Pfad.
+**Ablage der Zugangsdaten.** Eine frühere Fassung dieses Abschnitts verlangte „Tokens liegen als
+Cloudflare Secret, nicht in D1" und gleichzeitig ein Eingabefeld für ein neues NPSSO. Das schließt
+sich aus: Ein Worker kann keine Cloudflare Secrets schreiben, und Secrets-Store-Bindings sind zur
+Laufzeit ausschließlich lesbar. Ein Eingabefeld braucht aber eine zur Laufzeit beschreibbare Ablage.
+
+Deshalb: **NPSSO und Refresh-Token liegen AES-GCM-verschlüsselt in `psn_credentials`**, der
+Schlüssel als Cloudflare Secret `NPSSO_KEY`. Damit bleibt die Eingabe über die Oberfläche möglich –
+auch vom Handy –, und ein Datenbank-Dump enthält keinen verwertbaren Zugang. Der Sinn der
+ursprünglichen Regel ist erfüllt, ihr Wortlaut nicht.
+
+Der Refresh-Token nimmt denselben Weg, weil er rotiert und damit genau das Problem hat, an dem die
+Secret-Lösung scheitert.
+
+**Reihenfolge beim Anmelden:**
+
+1. Refresh-Token vorhanden und `refresh_expires_at` in der Zukunft → damit einen Access Token holen
+2. Schlägt das fehl oder fehlt der Token → aus dem NPSSO neu ableiten, frischen Refresh-Token ablegen
+3. Scheitert auch das → `status = 'abgelaufen'`, vorhandene Daten bleiben unangetastet
+
+Der normale Sync fasst das NPSSO damit gar nicht an – schonend gegenüber einer inoffiziellen
+Schnittstelle.
+
+**Weder NPSSO noch Refresh- oder Access Token dürfen jemals in einer API-Antwort oder im Log
+erscheinen, auch nicht gekürzt.** Durchgesetzt wird das über eine Hülle `Geheimnis`, deren
+`toString()` und `toJSON()` redigieren; der Klartext ist nur über einen ausdrücklichen Aufruf
+erreichbar. Daraus folgt außerdem: Die Antwort des Token-Endpunkts wird **nie** in
+`psn_raw_response` geschrieben – sie enthält den Refresh-Token und stünde sonst in jedem Dump.
 
 ### 7.2 Das Matching-Problem
 
@@ -563,6 +594,10 @@ CREATE TABLE psn_credentials (
   status             TEXT NOT NULL CHECK (status IN ('ok','abgelaufen','fehler'))
 );
 ```
+
+Ab Migration 0002 kommen `npsso_ciphertext`, `npsso_iv`, `npsso_stored_at`, `refresh_ciphertext`
+und `refresh_iv` hinzu; `psn_sync_run` bekommt `next_offset` für die seitenweise Blätterung.
+Die Verschlüsselung ist in 7.1 begründet.
 
 **Vor dem ersten NPSSO existiert keine Zeile.** Der CHECK kennt bewusst keinen Wert für
 "noch nie eingerichtet"; die Abwesenheit der Zeile sagt genau das aus. Stufe 2 legt sie beim

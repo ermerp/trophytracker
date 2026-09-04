@@ -1,4 +1,6 @@
+import { CredentialsRepository } from "./credentials";
 import { SettingsRepository } from "./settings";
+import { SyncRepository } from "./sync";
 
 /**
  * Die eine Stelle, an der D1 hereinkommt.
@@ -7,9 +9,11 @@ import { SettingsRepository } from "./settings";
  * Repository. Das haelt einen spaeteren Wechsel zu Turso, Postgres oder
  * lokalem SQLite auf src/db/ begrenzt.
  */
-export function createRepositories(db: D1Database) {
+export function createRepositories(db: D1Database, npssoKey: string) {
 	return {
 		settings: new SettingsRepository(db),
+		credentials: new CredentialsRepository(db, npssoKey),
+		sync: new SyncRepository(db),
 	};
 }
 
