@@ -13,9 +13,22 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-Stufe 0 der [Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge):
-Deployment-Pipeline und Zugriffsschutz stehen. Die Anwendung ist noch leer –
-das Datenmodell kommt in Stufe 1.
+**Stufe 0 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`, ist aber
+noch leer – das Datenmodell kommt in Stufe 1.
+
+Was steht und in Betrieb nachgewiesen ist:
+
+| | |
+|---|---|
+| Deployment | Push auf `main` baut, sichert, migriert und deployt |
+| Sicherung vor Migration | `d1 export --remote` läuft als erster Schritt jedes Deploys |
+| Frontend und API | ein Worker, eine Origin, kein CORS |
+| Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
+| Login | One-time PIN, Code per E-Mail, auch mobil |
+
+Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
+den Login unter `trophytracker.cloudflareaccess.com`.
 
 ## Architektur in einem Absatz
 
