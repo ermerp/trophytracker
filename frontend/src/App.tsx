@@ -1,46 +1,92 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 
-type Health = { status: string; zeit: string }
+/**
+ * Platzhalterseite. Sie zeigt, dass die Kette Access → Worker → Repository →
+ * D1 trägt, und wird in Stufe 3 durch die erste echte Ansicht ersetzt.
+ */
 
-type Zustand =
+type Health = { status: string; zeit: string }
+type Weights = Record<string, number>
+
+type Zustand<T> =
   | { art: 'laedt' }
-  | { art: 'ok'; health: Health }
+  | { art: 'ok'; daten: T }
   | { art: 'fehler'; meldung: string }
 
-function App() {
-  const [zustand, setZustand] = useState<Zustand>({ art: 'laedt' })
+function useApi<T>(pfad: string): Zustand<T> {
+  const [zustand, setZustand] = useState<Zustand<T>>({ art: 'laedt' })
 
   useEffect(() => {
-    fetch('/api/health')
+    let abgebrochen = false
+    fetch(pfad)
       .then(async (antwort) => {
         if (!antwort.ok) throw new Error(`HTTP ${antwort.status}`)
-        return (await antwort.json()) as Health
+        return (await antwort.json()) as T
       })
-      .then((health) => setZustand({ art: 'ok', health }))
-      .catch((fehler: unknown) =>
-        setZustand({
-          art: 'fehler',
-          meldung: fehler instanceof Error ? fehler.message : 'Unbekannter Fehler',
-        }),
+      .then((daten) => !abgebrochen && setZustand({ art: 'ok', daten }))
+      .catch(
+        (fehler: unknown) =>
+          !abgebrochen &&
+          setZustand({
+            art: 'fehler',
+            meldung: fehler instanceof Error ? fehler.message : 'Unbekannter Fehler',
+          }),
       )
-  }, [])
+    return () => {
+      abgebrochen = true
+    }
+  }, [pfad])
+
+  return zustand
+}
+
+function App() {
+  const health = useApi<Health>('/api/health')
+  const gewichte = useApi<Weights>('/api/settings/weights')
 
   return (
     <main>
       <h1>Trophytracker</h1>
-      <p>Stufe 0: Deployment-Pipeline und Zugriffsschutz stehen.</p>
+      <p>
+        Stufe 1: Das Datenmodell steht – 16 Tabellen und 7 Views. Inhalte kommen
+        ab Stufe 2 mit der PSN-Anbindung.
+      </p>
 
       <section>
-        <h2>Verbindung zur API</h2>
-        {zustand.art === 'laedt' && <p>wird geprüft …</p>}
-        {zustand.art === 'ok' && (
+        <h2>Worker</h2>
+        {health.art === 'laedt' && <p>wird geprüft …</p>}
+        {health.art === 'ok' && (
           <p>
-            <strong>{zustand.health.status}</strong> – Antwort des Workers um{' '}
-            {new Date(zustand.health.zeit).toLocaleString('de-DE')}
+            <strong>{health.daten.status}</strong> – Antwort um{' '}
+            {new Date(health.daten.zeit).toLocaleString('de-DE')}
           </p>
         )}
-        {zustand.art === 'fehler' && <p>Keine Antwort: {zustand.meldung}</p>}
+        {health.art === 'fehler' && <p>Keine Antwort: {health.meldung}</p>}
+      </section>
+
+      <section>
+        <h2>Datenbank</h2>
+        <p>
+          Gewichte der Rangformel, gelesen aus <code>app_setting</code> über die
+          Repository-Schicht:
+        </p>
+        {gewichte.art === 'laedt' && <p>wird geladen …</p>}
+        {gewichte.art === 'ok' && (
+          <table>
+            <tbody>
+              {Object.entries(gewichte.daten).map(([schluessel, wert]) => (
+                <tr key={schluessel}>
+                  <td>
+                    <code>{schluessel}</code>
+                  </td>
+                  <td>{wert}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {gewichte.art === 'fehler' && <p>Keine Antwort: {gewichte.meldung}</p>}
       </section>
     </main>
   )
