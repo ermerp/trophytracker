@@ -74,7 +74,19 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
    npx wrangler d1 info trophytracker
    ```
 
-2. **Cloudflare-API-Token erstellen** (My Profile → API Tokens → Custom token),
+2. **`workers.dev`-Subdomain anlegen.** Einmal Dashboard → Workers & Pages
+   öffnen; die Subdomain wird dabei automatisch erzeugt und du wählst ihren
+   Namen. Ohne sie hat `wrangler deploy` kein Ziel und die Deploy-Action
+   scheitert im letzten Schritt – anlegen kann Wrangler sie in CI nicht, weil
+   das eine interaktive Eingabe wäre.
+
+   ```bash
+   # Gegenprobe, bevor die Action laeuft:
+   curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+     "https://api.cloudflare.com/client/v4/accounts/<account_id>/workers/subdomain"
+   ```
+
+3. **Cloudflare-API-Token erstellen** (My Profile → API Tokens → Custom token),
    bewusst eng geschnitten:
 
    | Bereich | Berechtigung |
@@ -85,7 +97,7 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
 
    Keine Zone- und keine Pages-Berechtigung nötig.
 
-3. **GitHub Secrets** hinterlegen (Settings → Secrets and variables → Actions):
+4. **GitHub Secrets** hinterlegen (Settings → Secrets and variables → Actions):
 
    | Secret | Wofür | Ab Stufe |
    |---|---|---|
@@ -93,9 +105,9 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
    | `CLOUDFLARE_ACCOUNT_ID` | Deploy-Action | 0 |
    | `BACKUP_REPO_TOKEN` | Fine-grained PAT, nur auf das private Backup-Repo | 8 |
 
-4. **Zugriffsschutz einrichten** – siehe unten.
+5. **Zugriffsschutz einrichten** – siehe unten.
 
-5. **Geheimnisse für die externen Anbindungen** kommen als Cloudflare Secrets
+6. **Geheimnisse für die externen Anbindungen** kommen als Cloudflare Secrets
    dazu, sobald die jeweilige Stufe erreicht ist (NPSSO und PSN-Refresh-Token ab
    Stufe 2, IGDB/Twitch ab Stufe 9, AWIN-Feed-URL ab Stufe 18). Lokal gehören sie
    in `.dev.vars`, niemals ins Repository.
