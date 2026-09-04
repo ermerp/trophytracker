@@ -39,6 +39,9 @@ Für die Arbeit am Frontend ist `npm run dev` der richtige Einstieg. Um zu prüf
 was produktiv tatsächlich ausgeliefert wird, `npm run build` und dann
 `npx wrangler dev` allein aufrufen.
 
+Die lokale Entwicklung läuft gegen eine **lokale** D1 in `.wrangler/`, nicht gegen
+die produktive Datenbank. Nur Befehle mit `--remote` fassen die echten Daten an.
+
 ```bash
 npm test             # Vitest
 ```
@@ -55,9 +58,21 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
    npx wrangler d1 create trophytracker
    ```
 
-   Die ausgegebene `database_id` in `wrangler.jsonc` eintragen. Sie ist ein
-   Bezeichner, kein Zugangsdatum, und darf im öffentlichen Repository stehen –
-   genau wie die `account_id`.
+   Wrangler trägt das Binding selbst in `wrangler.jsonc` ein – **hängt dabei aber
+   einen zusätzlichen Eintrag an, statt einen vorhandenen zu füllen**, und benennt
+   das Binding nach der Datenbank. Danach kontrollieren, dass genau ein Eintrag
+   unter `d1_databases` steht und das Binding `DB` heißt; der Code greift über
+   `env.DB` darauf zu.
+
+   `database_id` und `account_id` sind Bezeichner, keine Zugangsdaten, und dürfen
+   im öffentlichen Repository stehen.
+
+   Prüfen lässt sich das Ergebnis ohne Deployment:
+
+   ```bash
+   npx wrangler deploy --dry-run   # muss env.DB und env.ASSETS zeigen, sonst nichts
+   npx wrangler d1 info trophytracker
+   ```
 
 2. **Cloudflare-API-Token erstellen** (My Profile → API Tokens → Custom token),
    bewusst eng geschnitten:

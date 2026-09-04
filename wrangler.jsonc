@@ -5,13 +5,13 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "trophytracker",
+	"account_id": "8124591ab46dbf5bab4efb3e54b60a3d",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-09-03",
 	"observability": {
 		"enabled": true
 	},
 	"upload_source_maps": true,
-
 	/**
 	 * Frontend und API teilen sich einen Worker und damit eine Origin.
 	 * Kein CORS, ein Deploy-Pfad, eine Access-Richtlinie.
@@ -24,19 +24,23 @@
 		"directory": "./frontend/dist",
 		"binding": "ASSETS",
 		"not_found_handling": "single-page-application",
-		"run_worker_first": ["/api/*"]
+		"run_worker_first": [
+			"/api/*"
+		]
 	},
-
 	/**
-	 * database_id ist ein Bezeichner, kein Zugangsdatum, und darf laut
-	 * Abschnitt 15.1 der Spezifikation im oeffentlichen Repo stehen.
-	 * Anlegen mit: npx wrangler d1 create trophytracker
+	 * account_id und database_id sind Bezeichner, keine Zugangsdaten, und
+	 * duerfen laut Abschnitt 15.1 der Spezifikation im oeffentlichen Repo
+	 * stehen. Region der Datenbank: EEUR.
+	 *
+	 * Lokale Entwicklung laeuft gegen eine lokale D1 (kein --remote), die
+	 * Produktivdaten werden dabei nicht angefasst.
 	 */
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "trophytracker",
-			"database_id": "PLATZHALTER_AUS_WRANGLER_D1_CREATE"
+			"database_id": "e874eab0-d1e1-4f84-a16c-52a2698a8355"
 		}
 	]
 }
