@@ -25,13 +25,15 @@ type Lauf = {
   meldung: string | null
 } | null
 
-type StatusAntwort = { zugang: Zugang; letzterLauf: Lauf }
+type StatusAntwort = { zugang: Zugang; letzterLauf: Lauf; trophaeen: number }
 
 type SyncAntwort = {
   status: 'erfolg' | 'laufend' | 'fehler'
+  phase: 'abruf' | 'normalisierung'
   offset: number
   seitenGeholt: number
   titlesSeen: number | null
+  offeneSeiten?: number
   weiter: boolean
   meldung?: string
 }
@@ -84,28 +86,56 @@ export function Einstellungen() {
     }
   }
 
+  /**
+   * Normalisierung erneut ausführen – ohne PSN-Zugriff.
+   * Nützlich, wenn die Abbildung korrigiert wurde: Die Rohdaten liegen schon.
+   */
+  async function neuNormalisieren() {
+    setMeldung(null)
+    setLaeuft(true)
+    setFortschritt('Normalisierung wird zurückgesetzt …')
+    try {
+      const antwort = await fetch('/api/sync/normalize', { method: 'POST' })
+      const daten = (await antwort.json()) as { fehler?: string; zurueckgesetzt?: number }
+      if (!antwort.ok) {
+        setMeldung(daten.fehler ?? 'Zurücksetzen fehlgeschlagen.')
+        setFortschritt(null)
+        return
+      }
+      await weiterlaufen(`${daten.zurueckgesetzt} Seiten werden neu ausgewertet …`)
+    } finally {
+      setLaeuft(false)
+    }
+  }
+
+  /** Ruft POST /api/sync, solange etwas offen ist. */
+  async function weiterlaufen(start: string) {
+    setFortschritt(start)
+    for (let runde = 0; runde < 100; runde++) {
+      const antwort = await fetch('/api/sync', { method: 'POST' })
+      const daten = (await antwort.json()) as SyncAntwort
+
+      if (daten.status === 'fehler') {
+        setMeldung(daten.meldung ?? 'Der Abruf ist fehlgeschlagen.')
+        break
+      }
+      setFortschritt(
+        daten.phase === 'abruf'
+          ? `Abruf: ${daten.offset} von ${daten.titlesSeen ?? '?'} Titeln …`
+          : daten.weiter
+            ? `Auswertung: noch ${daten.offeneSeiten ?? '?'} Seiten …`
+            : `Fertig: ${daten.titlesSeen ?? 0} Titel ausgewertet.`,
+      )
+      if (!daten.weiter) break
+    }
+    await statusLaden()
+  }
+
   async function synchronisieren() {
     setMeldung(null)
     setLaeuft(true)
-    setFortschritt('Abruf läuft …')
     try {
-      // Solange `weiter` kommt, ist die Sammlung noch nicht durch.
-      for (let runde = 0; runde < 50; runde++) {
-        const antwort = await fetch('/api/sync', { method: 'POST' })
-        const daten = (await antwort.json()) as SyncAntwort
-
-        if (daten.status === 'fehler') {
-          setMeldung(daten.meldung ?? 'Der Abruf ist fehlgeschlagen.')
-          break
-        }
-        setFortschritt(
-          daten.weiter
-            ? `${daten.offset} von ${daten.titlesSeen ?? '?'} Titeln geholt …`
-            : `Fertig: ${daten.titlesSeen ?? 0} Titel abgerufen.`,
-        )
-        if (!daten.weiter) break
-      }
-      await statusLaden()
+      await weiterlaufen('Abruf läuft …')
     } finally {
       setLaeuft(false)
     }
@@ -162,12 +192,19 @@ export function Einstellungen() {
 
       <h2>Trophäen abrufen</h2>
       <p>
-        Der Abruf legt die Antworten unverändert ab. Ausgewertet werden sie erst in der
-        nächsten Stufe.
+        Der Abruf legt die Antworten zuerst unverändert ab und wertet sie danach aus.
+        {status?.trophaeen ? ` Aktuell ${status.trophaeen} Titel ausgewertet.` : ''}
       </p>
       <button type="button" onClick={synchronisieren} disabled={laeuft || !zugang?.eingerichtet}>
         Jetzt abrufen
+      </button>{' '}
+      <button type="button" onClick={neuNormalisieren} disabled={laeuft}>
+        Nur neu auswerten
       </button>
+      <p className="zeile">
+        „Nur neu auswerten" nutzt die gespeicherten Rohdaten und spricht PlayStation
+        nicht an.
+      </p>
       {fortschritt && <p>{fortschritt}</p>}
       {status?.letzterLauf && (
         <p>
