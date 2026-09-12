@@ -34,12 +34,44 @@ type Antwort = { gesamt: number; listenOffen: number; gruppen: Gruppe[] }
 /** Lokale Änderungen an einer Gruppe, bis sie bestätigt wird. */
 type Entwurf = { titel: string; plattformen: Record<string, string> }
 
+/**
+ * Übersprungene Gruppen überdauern das Neuladen.
+ *
+ * Ohne das würde eine bewusst übersprungene Gruppe nach dem nächsten
+ * „Alle übernehmen" unmarkiert wieder auftauchen und beim übernächsten Klick
+ * doch übernommen – die Entscheidung wäre still überfahren. Bei 415 Gruppen
+ * über mehrere Sitzungen ist das kein Randfall.
+ */
+const SPEICHER = 'trophytracker.zuordnung.uebersprungen'
+
+function ladeUebersprungen(): Set<string> {
+  try {
+    const roh = localStorage.getItem(SPEICHER)
+    return new Set(roh ? (JSON.parse(roh) as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function merkeUebersprungen(werte: Set<string>) {
+  try {
+    localStorage.setItem(SPEICHER, JSON.stringify([...werte]))
+  } catch {
+    // Privater Modus oder gesperrter Speicher: dann eben nur für diese Sitzung.
+  }
+}
+
 export function Zuordnung() {
   const [daten, setDaten] = useState<Antwort | null>(null)
   const [entwuerfe, setEntwuerfe] = useState<Record<string, Entwurf>>({})
-  const [uebersprungen, setUebersprungen] = useState<Set<string>>(new Set())
+  const [uebersprungen, setUebersprungenRoh] = useState<Set<string>>(ladeUebersprungen)
   const [laeuft, setLaeuft] = useState(false)
   const [meldung, setMeldung] = useState<string | null>(null)
+
+  const setUebersprungen = useCallback((werte: Set<string>) => {
+    setUebersprungenRoh(werte)
+    merkeUebersprungen(werte)
+  }, [])
 
   const laden = useCallback(async () => {
     const antwort = await fetch(`/api/zuordnung/offen?limit=${SEITE}`)
@@ -109,8 +141,13 @@ export function Zuordnung() {
         if (uebersprungen.has(g.schluessel)) continue
         if (await uebernehmen(g)) n++
       }
-      setMeldung(`${n} Gruppen übernommen.`)
-      setUebersprungen(new Set())
+      setMeldung(
+        n === 0
+          ? 'Nichts übernommen – alle Gruppen auf dieser Seite sind übersprungen.'
+          : `${n} Gruppen übernommen.`,
+      )
+      // Markierungen bleiben bewusst stehen: Sie sind eine Entscheidung,
+      // keine Ansicht.
       await laden()
     } finally {
       setLaeuft(false)
@@ -152,7 +189,18 @@ export function Zuordnung() {
       <p>
         <button type="button" onClick={alleUebernehmen} disabled={laeuft}>
           Alle auf dieser Seite übernehmen
-        </button>
+        </button>{' '}
+        {uebersprungen.size > 0 && (
+          <>
+            <button type="button" onClick={() => setUebersprungen(new Set())} disabled={laeuft}>
+              {uebersprungen.size} Markierungen zurücksetzen
+            </button>
+          </>
+        )}
+      </p>
+      <p className="zeile">
+        Übersprungene Gruppen bleiben unzugeordnet und werden von „Alle übernehmen"
+        ausgelassen – auch nach dem Neuladen.
       </p>
       {meldung && <p role="status">{meldung}</p>}
 
@@ -208,14 +256,12 @@ export function Zuordnung() {
               </button>{' '}
               <button
                 type="button"
-                onClick={() =>
-                  setUebersprungen((v) => {
-                    const neu = new Set(v)
-                    if (weg) neu.delete(g.schluessel)
-                    else neu.add(g.schluessel)
-                    return neu
-                  })
-                }
+                onClick={() => {
+                  const neu = new Set(uebersprungen)
+                  if (weg) neu.delete(g.schluessel)
+                  else neu.add(g.schluessel)
+                  setUebersprungen(neu)
+                }}
                 disabled={laeuft}
               >
                 {weg ? 'Doch übernehmen' : 'Überspringen'}
