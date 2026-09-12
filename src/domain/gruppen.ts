@@ -24,10 +24,31 @@ export type TrophyEintrag = {
 	title_name: string;
 	platform: string;
 	progress_pct: number;
+	defined_bronze: number;
+	defined_silver: number;
+	defined_gold: number;
 	defined_platinum: number;
 	earned_platinum: number;
 	icon_url: string | null;
 };
+
+/**
+ * Troph
+aeenstruktur als Vergleichsmerkmal.
+ *
+ * Ein portiertes Spiel behaelt seine Liste, ein Remake bekommt eine neue.
+ * Gemessen an der echten Sammlung trennt das zuverlaessig: Shadow of the
+ * Colossus PS3 18/6/6/1 gegen PS4 25/7/5/1, Uncharted PS3 36/8/3/1 gegen PS4
+ * 41/8/4/1 - jeweils verschiedene Spiele.
+ *
+ * Es ist aber nur ein Hinweis, kein Beweis: GTA V hat auf PS3 47/8/3/1 und auf
+ * PS4/PS5 59/15/3/1, weil die neueren Fassungen Online-Troph
+aeen brachten -
+ * und ist trotzdem ein Spiel.
+ */
+function struktur(e: TrophyEintrag): string {
+	return `${e.defined_bronze}/${e.defined_silver}/${e.defined_gold}/${e.defined_platinum}`;
+}
 
 export type ReleaseVorschlag = {
 	npCommunicationId: string;
@@ -43,6 +64,9 @@ export type ReleaseVorschlag = {
 	fortschritt: number;
 	hatPlatin: boolean;
 	symbol: string | null;
+	/** Bronze/Silber/Gold/Platin der definierten Troph
+aeen. */
+	struktur: string;
 };
 
 export type Gruppenvorschlag = {
@@ -66,6 +90,7 @@ function alsReleaseVorschlag(e: TrophyEintrag): ReleaseVorschlag {
 		fortschritt: e.progress_pct,
 		hatPlatin: e.defined_platinum > 0 && e.earned_platinum > 0,
 		symbol: e.icon_url,
+		struktur: struktur(e),
 	};
 }
 
@@ -106,11 +131,19 @@ function trenneKollisionen(
 	});
 
 	if (!kollidiert) {
+		const strukturen = new Set(eintraege.map(struktur));
 		return [
 			{
 				schluessel,
 				titel: gruppenTitel(eintraege),
 				releases: eintraege.map(alsReleaseVorschlag),
+				hinweis:
+					strukturen.size > 1
+						? "Die Trophäenlisten unterscheiden sich in ihrem Aufbau " +
+							`(${[...strukturen].join(" gegen ")}). Das deutet auf ein Remake oder ` +
+							"ein anderes Spiel hin – kann aber auch an später ergänzten Trophäen liegen. " +
+							"Bitte prüfen."
+						: undefined,
 			},
 		];
 	}

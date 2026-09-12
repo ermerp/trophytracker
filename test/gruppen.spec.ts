@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { bildeGruppen, type TrophyEintrag } from "../src/domain/gruppen";
 
+type Struktur = { b?: number; s?: number; g?: number; p?: number };
+
 function eintrag(
 	titel: string,
 	platform: string,
+	struktur: Struktur = {},
 	np = titel.replace(/\W/g, "").slice(0, 10) + platform,
 ): TrophyEintrag {
 	return {
@@ -11,7 +14,10 @@ function eintrag(
 		title_name: titel,
 		platform,
 		progress_pct: 50,
-		defined_platinum: 1,
+		defined_bronze: struktur.b ?? 30,
+		defined_silver: struktur.s ?? 8,
+		defined_gold: struktur.g ?? 3,
+		defined_platinum: struktur.p ?? 1,
 		earned_platinum: 0,
 		icon_url: null,
 	};
@@ -66,14 +72,53 @@ describe("bildeGruppen", () => {
 	// die der Editionsfilter zusammenzieht - beide auf PS4. Als ein Spiel mit
 	// zwei PS4-Releases wuerde UNIQUE(game_id, platform, ...) verletzt.
 	it("trennt zwei Listen, die dieselbe Plattform beanspruchen", () => {
+		// Editionszusaetze werden weiterhin abgeschnitten - hier landen also
+		// beide auf demselben Schluessel und derselben Plattform.
 		const g = bildeGruppen([
-			eintrag("Call of Duty Modern Warfare", "PS4"),
-			eintrag("Call of Duty: Modern Warfare Remastered", "PS4"),
+			eintrag("BioShock Infinite", "PS4"),
+			eintrag("BioShock Infinite: The Complete Edition", "PS4"),
 		]);
 
 		expect(g).toHaveLength(2);
 		expect(g.every((x) => x.releases.length === 1)).toBe(true);
 		expect(g.every((x) => x.hinweis)).toBe(true);
+	});
+
+	it("trennt Remaster und Original nicht mehr per Kollision, sondern per Titel", () => {
+		const g = bildeGruppen([
+			eintrag("Call of Duty Modern Warfare", "PS4"),
+			eintrag("Call of Duty: Modern Warfare Remastered", "PS4"),
+		]);
+
+		// Verschiedene Schluessel: zwei eigenstaendige Gruppen, kein Hinweis noetig.
+		expect(g).toHaveLength(2);
+		expect(g.every((x) => x.hinweis === undefined)).toBe(true);
+	});
+
+	it("warnt bei abweichender Trophaeenstruktur", () => {
+		// Der echte Fall Shadow of the Colossus: PS3 18/6/6/1, PS4 25/7/5/1.
+		const g = bildeGruppen([
+			eintrag("Shadow of the Colossus", "PS3", { b: 18, s: 6, g: 6, p: 1 }),
+			eintrag("Shadow of the Colossus", "PS4", { b: 25, s: 7, g: 5, p: 1 }),
+		]);
+
+		expect(g).toHaveLength(1);
+		expect(g[0].hinweis).toMatch(/Aufbau/);
+		expect(g[0].hinweis).toContain("18/6/6/1");
+	});
+
+	it("warnt nicht bei gleicher Struktur", () => {
+		const g = bildeGruppen([
+			eintrag("The Witcher 3: Wild Hunt", "PS4", { b: 68, s: 8, g: 2, p: 1 }),
+			eintrag("The Witcher 3: Wild Hunt", "PS5", { b: 68, s: 8, g: 2, p: 1 }),
+		]);
+
+		expect(g[0].hinweis).toBeUndefined();
+	});
+
+	it("gibt die Struktur je Release mit aus", () => {
+		const g = bildeGruppen([eintrag("Bloodborne", "PS4", { b: 30, s: 8, g: 3, p: 1 })]);
+		expect(g[0].releases[0].struktur).toBe("30/8/3/1");
 	});
 
 	it("erzeugt nie eine Gruppe mit doppelter Plattform", () => {

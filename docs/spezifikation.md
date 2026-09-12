@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 9 – Zuordnung von Trophäenlisten zu Spielen und Releases.*
+*Version 10 – Trophäenstruktur als Matching-Signal, Korrekturwerkzeuge für Zuordnungen.*
 
 ## 1. Use Cases
 
@@ -439,6 +439,24 @@ Sonys Zählung; beide Releases anzulegen würde Besitz behaupten, den es viellei
 **Getrennte Listen sind unabhängig.** Hotline Miami 2 hat eine PS5-Liste bei 82 % und eine
 `PS3,PSVITA,PS4`-Liste bei 3 %. Mehrfaches Platin ist damit möglich und wird getrennt geführt.
 
+**Die Trophäenstruktur ist ein Signal, kein Beweis.** Ein portiertes Spiel behält seine Liste, ein
+Remake bekommt eine neue. Gemessen an der Sammlung trennt das zuverlässig: Shadow of the Colossus
+PS3 18/6/6/1 gegen PS4 25/7/5/1, Uncharted PS3 36/8/3/1 gegen PS4 41/8/4/1 — jeweils verschiedene
+Spiele. Aber GTA V hat PS3 47/8/3/1 und PS4/PS5 59/15/3/1, weil die neueren Fassungen
+Online-Trophäen brachten, und ist trotzdem ein Spiel. Abweichungen erzeugen deshalb einen
+**Hinweis**, keine Trennung.
+
+**„Remastered" und „Remake" werden nicht abgeschnitten**, Editionszusätze schon. Grund aus den
+Daten: 20 Titel tragen „Remastered" und sind eigenständige Spiele mit eigener Liste. Dagegen haben
+„BioShock Infinite" (PS3) und „BioShock Infinite: The Complete Edition" (PS4) exakt dieselbe
+Struktur 55/24/1/1 — dasselbe Spiel mit DLC.
+
+**Zuordnungen sind korrigierbar.** `PATCH /api/games/:id` benennt um,
+`POST /api/games/release/:id/abtrennen` löst ein Release in ein neues Spiel heraus. Das sind die
+einzigen Stellen, die eine bestehende Zuordnung verändern — auf ausdrückliche Anweisung des
+Nutzers. Die Regel, dass **kein automatischer Prozess** eine Zuordnung überschreibt, bleibt
+unberührt.
+
 Dieselbe Regel gilt für `market_offer` → `release`.
 
 ### 7.3 Händler-Feed (optional, spät)
@@ -781,6 +799,8 @@ GET    /api/deviations                v_abweichungen
 
 GET    /api/trophies
 GET    /api/trophies/unmatched
+GET    /api/games/uebersicht           Alle Zuordnungen als Tabelle, filter- und durchsuchbar
+POST   /api/games/release/:id/abtrennen  Release in ein neues Spiel herauslösen
 GET    /api/zuordnung/offen            Gruppenvorschläge, seitenweise
 POST   /api/zuordnung/gruppe           Gruppe bestätigen: ein Spiel, mehrere Releases
 POST   /api/zuordnung/liste/:npCommId  Einzelne Liste einem Release zuordnen

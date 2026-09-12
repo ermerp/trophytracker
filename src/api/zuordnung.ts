@@ -127,6 +127,92 @@ export const gameRoutes = new Hono<AppEnv>()
 			})),
 		});
 	})
+	/** Alle Zuordnungen als Tabelle. Abschnitt 12 ergaenzt. */
+	.get("/uebersicht", async (c) => {
+		const roh = c.req.query();
+		const filter = (["alle", "mehrfach", "auffaellig"] as const).includes(
+			roh.filter as "alle",
+		)
+			? (roh.filter as "alle" | "mehrfach" | "auffaellig")
+			: "auffaellig";
+
+		const { zeilen, gesamt } = await c.var.repos.games.uebersicht({
+			filter,
+			suche: roh.suche ?? "",
+			limit: Math.min(500, Math.max(1, Number(roh.limit) || 100)),
+			offset: Math.max(0, Number(roh.offset) || 0),
+		});
+
+		return c.json({
+			gesamt,
+			filter,
+			zeilen: zeilen.map((z) => ({
+				spielId: z.game_id,
+				titel: z.title,
+				releaseId: z.release_id,
+				plattform: z.platform,
+				rohTitel: z.title_name,
+				fortschritt: z.progress_pct,
+				struktur: z.struktur,
+				hatPlatin: (z.defined_platinum ?? 0) > 0 && (z.earned_platinum ?? 0) > 0,
+				releasesImSpiel: z.releases_im_spiel,
+				strukturWeichtAb: z.strukturWeichtAb,
+				ohneListe: z.ohneListe,
+				titelWirktAbgekuerzt: z.titelWirktAbgekuerzt,
+			})),
+		});
+	})
+
+	/** Abschnitt 12: Titel aendern. */
+	.patch("/:id", async (c) => {
+		const id = Number(c.req.param("id"));
+		if (!Number.isInteger(id)) return c.json({ fehler: "Ungültige Id." }, 400);
+
+		let koerper: unknown;
+		try {
+			koerper = await c.req.json();
+		} catch {
+			return c.json({ fehler: "Ungültiges JSON." }, 400);
+		}
+
+		const titel = typeof (koerper as { titel?: unknown })?.titel === "string"
+			? ((koerper as { titel: string }).titel).trim()
+			: "";
+		if (titel === "") return c.json({ fehler: "Feld 'titel' fehlt oder ist leer." }, 400);
+
+		if (!(await c.var.repos.games.umbenennen(id, titel))) {
+			return c.json({ fehler: "Spiel nicht gefunden." }, 404);
+		}
+		return c.json({ id, titel });
+	})
+
+	/**
+	 * Ein Release aus seinem Spiel herausloesen.
+	 *
+	 * Ergaenzung zu Abschnitt 12. Die einzige Route, die eine bestehende
+	 * Zuordnung veraendert - auf ausdrueckliche Anweisung.
+	 */
+	.post("/release/:releaseId/abtrennen", async (c) => {
+		const releaseId = Number(c.req.param("releaseId"));
+		if (!Number.isInteger(releaseId)) return c.json({ fehler: "Ungültige Id." }, 400);
+
+		let koerper: unknown;
+		try {
+			koerper = await c.req.json();
+		} catch {
+			return c.json({ fehler: "Ungültiges JSON." }, 400);
+		}
+
+		const titel = typeof (koerper as { titel?: unknown })?.titel === "string"
+			? ((koerper as { titel: string }).titel).trim()
+			: "";
+		if (titel === "") return c.json({ fehler: "Feld 'titel' fehlt oder ist leer." }, 400);
+
+		const ergebnis = await c.var.repos.games.releaseAbtrennen(releaseId, titel);
+		if (!ergebnis) return c.json({ fehler: "Release nicht gefunden." }, 404);
+		return c.json(ergebnis);
+	})
+
 	.get("/:id", async (c) => {
 		const id = Number(c.req.param("id"));
 		if (!Number.isInteger(id)) return c.json({ fehler: "Ungültige Id." }, 400);

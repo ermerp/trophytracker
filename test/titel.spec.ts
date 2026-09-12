@@ -54,12 +54,25 @@ describe("titelSchluessel", () => {
 		);
 	});
 
-	it("schneidet Editionszusaetze ab", () => {
+	it("schneidet Editionszusaetze ab - dasselbe Spiel mit DLC", () => {
+		// Belegt an den echten Daten: BioShock Infinite hat auf PS3 und als
+		// Complete Edition auf PS4 exakt dieselbe Struktur 55/24/1/1.
 		expect(titelSchluessel("BioShock Infinite: The Complete Edition")).toBe(
 			titelSchluessel("BioShock Infinite"),
 		);
-		expect(titelSchluessel("Uncharted: Drake's Fortune Remastered")).toBe(
+		expect(titelSchluessel("CastleStorm - Complete Edition")).toBe(
+			titelSchluessel("CastleStorm"),
+		);
+	});
+
+	it("schneidet 'Remastered' und 'Remake' NICHT ab", () => {
+		// Ein Remaster ist in aller Regel ein anderes Produkt mit eigener
+		// Troph\u00e4enliste: Uncharted PS3 36/8/3/1 gegen PS4 41/8/4/1.
+		expect(titelSchluessel("Uncharted: Drake's Fortune Remastered")).not.toBe(
 			titelSchluessel("Uncharted: Drake's Fortune"),
+		);
+		expect(titelSchluessel("FINAL FANTASY VII REMAKE")).not.toBe(
+			titelSchluessel("FINAL FANTASY VII"),
 		);
 	});
 

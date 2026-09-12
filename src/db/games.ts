@@ -13,6 +13,26 @@ export type GruppeErgebnis = {
 	uebersprungen: string[];
 };
 
+export type UebersichtZeile = {
+	game_id: number;
+	title: string;
+	release_id: number;
+	platform: string;
+	np_communication_id: string | null;
+	title_name: string | null;
+	progress_pct: number | null;
+	defined_bronze: number | null;
+	defined_silver: number | null;
+	defined_gold: number | null;
+	defined_platinum: number | null;
+	earned_platinum: number | null;
+	releases_im_spiel: number;
+	struktur?: string | null;
+	strukturWeichtAb?: boolean;
+	ohneListe?: boolean;
+	titelWirktAbgekuerzt?: boolean;
+};
+
 export type SpielZeile = {
 	id: number;
 	title: string;
@@ -36,7 +56,8 @@ export class GamesRepository {
 		const { results } = await this.db
 			.prepare(
 				"SELECT np_communication_id, title_name, platform, progress_pct, " +
-					"defined_platinum, earned_platinum, icon_url " +
+					"defined_bronze, defined_silver, defined_gold, defined_platinum, " +
+					"earned_platinum, icon_url " +
 					"FROM trophy_progress WHERE release_id IS NULL",
 			)
 			.all<TrophyEintrag>();
@@ -133,6 +154,126 @@ export class GamesRepository {
 			.bind(schluessel)
 			.all<{ id: number; platform: string }>();
 		return results;
+	}
+
+	/** Titel aendern. sort_title wird neu abgeleitet. */
+	async umbenennen(id: number, titel: string): Promise<boolean> {
+		const ergebnis = await this.db
+			.prepare("UPDATE game SET title = ?, sort_title = ? WHERE id = ?")
+			.bind(titel, titelSchluessel(titel), id)
+			.run();
+		return (ergebnis.meta.changes ?? 0) > 0;
+	}
+
+	/**
+	 * Loest ein Release aus seinem Spiel heraus in ein neues Spiel.
+	 *
+	 * Die einzige Stelle, die eine bestehende Zuordnung anfasst - und sie tut
+	 * es auf ausdrueckliche Anweisung des Nutzers. Die Regel "kein
+	 * automatischer Prozess ueberschreibt eine Zuordnung" bleibt unberuehrt.
+	 *
+	 * trophy_progress.release_id aendert sich NICHT: Die Troph
+aeenliste haengt
+	 * am Release, und das Release wandert mitsamt Liste.
+	 */
+	async releaseAbtrennen(
+		releaseId: number,
+		neuerTitel: string,
+	): Promise<{ gameId: number; altesSpielGeloescht: boolean } | null> {
+		const release = await this.db
+			.prepare("SELECT id, game_id FROM release WHERE id = ?")
+			.bind(releaseId)
+			.first<{ id: number; game_id: number }>();
+		if (!release) return null;
+
+		const altesSpiel = release.game_id;
+
+		const neu = await this.db
+			.prepare("INSERT INTO game (title, sort_title) VALUES (?, ?) RETURNING id")
+			.bind(neuerTitel, titelSchluessel(neuerTitel))
+			.first<{ id: number }>();
+		if (!neu) throw new Error("Neues Spiel konnte nicht angelegt werden.");
+
+		await this.db
+			.prepare("UPDATE release SET game_id = ? WHERE id = ?")
+			.bind(neu.id, releaseId)
+			.run();
+
+		// Ein Spiel ohne Releases hat keinen Zweck mehr.
+		const rest = await this.db
+			.prepare("SELECT COUNT(*) AS n FROM release WHERE game_id = ?")
+			.bind(altesSpiel)
+			.first<{ n: number }>();
+
+		const leer = (rest?.n ?? 0) === 0;
+		if (leer) {
+			await this.db.prepare("DELETE FROM game WHERE id = ?").bind(altesSpiel).run();
+		}
+
+		return { gameId: neu.id, altesSpielGeloescht: leer };
+	}
+
+	/**
+	 * Alle Zuordnungen als Tabelle, eine Zeile je Release.
+	 *
+	 * Serverseitig gefiltert und geblaettert - 431 Zeilen auf einmal wuerden
+	 * das 10-ms-Budget belasten, und die Auffaelligkeits-Erkennung braucht
+	 * ohnehin einen Blick ueber alle Releases eines Spiels.
+	 */
+	async uebersicht(optionen: {
+		filter: "alle" | "mehrfach" | "auffaellig";
+		suche: string;
+		limit: number;
+		offset: number;
+	}): Promise<{ zeilen: UebersichtZeile[]; gesamt: number }> {
+		const { results } = await this.db
+			.prepare(
+				`SELECT g.id AS game_id, g.title, r.id AS release_id, r.platform,
+				        t.np_communication_id, t.title_name, t.progress_pct,
+				        t.defined_bronze, t.defined_silver, t.defined_gold, t.defined_platinum,
+				        t.earned_platinum,
+				        (SELECT COUNT(*) FROM release r2 WHERE r2.game_id = g.id) AS releases_im_spiel
+				 FROM game g
+				 JOIN release r ON r.game_id = g.id
+				 LEFT JOIN trophy_progress t ON t.release_id = r.id
+				 ORDER BY g.sort_title, r.platform`,
+			)
+			.all<UebersichtZeile & { releases_im_spiel: number }>();
+
+		// Struktur je Spiel sammeln, um Abweichungen zu erkennen.
+		const strukturenJeSpiel = new Map<number, Set<string>>();
+		for (const z of results) {
+			const s = `${z.defined_bronze}/${z.defined_silver}/${z.defined_gold}/${z.defined_platinum}`;
+			const vorhanden = strukturenJeSpiel.get(z.game_id);
+			if (vorhanden) vorhanden.add(s);
+			else strukturenJeSpiel.set(z.game_id, new Set([s]));
+		}
+
+		const angereichert = results.map((z) => ({
+			...z,
+			struktur:
+				z.np_communication_id === null
+					? null
+					: `${z.defined_bronze}/${z.defined_silver}/${z.defined_gold}/${z.defined_platinum}`,
+			strukturWeichtAb: (strukturenJeSpiel.get(z.game_id)?.size ?? 1) > 1,
+			ohneListe: z.np_communication_id === null,
+			titelWirktAbgekuerzt: /^[A-Z]{2,3}\s/.test(z.title),
+		}));
+
+		const suche = optionen.suche.trim().toLowerCase();
+		const gefiltert = angereichert.filter((z) => {
+			if (suche && !z.title.toLowerCase().includes(suche)) return false;
+			if (optionen.filter === "mehrfach") return z.releases_im_spiel > 1;
+			if (optionen.filter === "auffaellig") {
+				return z.strukturWeichtAb || z.ohneListe || z.titelWirktAbgekuerzt;
+			}
+			return true;
+		});
+
+		return {
+			zeilen: gefiltert.slice(optionen.offset, optionen.offset + optionen.limit),
+			gesamt: gefiltert.length,
+		};
 	}
 
 	async spieleListe(limit: number, offset: number): Promise<{ zeilen: SpielZeile[]; gesamt: number }> {
