@@ -57,6 +57,12 @@ PSN-Trophäentitel, Feed-Artikel und IGDB-Treffer werden **vorgeschlagen**, nich
 
 Beim Wunschlisten-Import gibt es keinen Freitext-Fallback. Zeilen ohne Treffer gehen in die IGDB-Suche. Ein Eintrag ohne Zuordnung entsteht nur auf ausdrückliche Anweisung des Nutzers.
 
+### Zuordnungen müssen korrigierbar sein
+
+Was halb- oder vollautomatisch entsteht, muss sich in der Oberfläche zurücknehmen lassen: umbenennen, auftrennen, einzeln statt als Gruppe übernehmen. Sonst steht der Nutzer vor einem Ergebnis, das er als falsch erkennt und nicht ändern kann.
+
+Das gilt auch für seine Zwischenentscheidungen: Ein "überspringen" ist eine Entscheidung und darf ein Neuladen überstehen, nicht nur den Moment.
+
 ### Berechnetes nicht speichern
 
 Die Rangformel (Kritikerwertung, Priorität, Favorit, später Preis) wird bei der Abfrage berechnet. Gespeichert werden nur die Bestandteile, die Gewichte liegen in `app_setting`.
@@ -135,6 +141,7 @@ Das Repository ist öffentlich, das Backup-Repository ist privat. Ein Datenbank-
 - **Views listen ihre Spalten explizit auf, nie `SELECT *`.** Das ist der eine Fall, in dem SQLite still danebengreift: Bei `SELECT *` wächst die Ergebnismenge nach einem `ADD COLUMN` lautlos mit, während die Definition in `sqlite_master` unverändert bleibt. Ein Test in `test/migration.spec.ts` hält die Regel fest.
 - **Seeds immer als `INSERT OR IGNORE`.** Nicht wegen Idempotenz — Migrationen laufen wegen der `d1_migrations`-Buchführung ohnehin nur einmal —, sondern damit ein erneuter Lauf einen vom Nutzer angepassten Wert niemals zurücksetzt. Kein `CREATE TABLE IF NOT EXISTS`: das verdeckt ein abweichendes Schema, und lautes Scheitern ist dort das bessere Verhalten.
 - **Testen, was Logik ist, nicht was Glue ist.** Lohnend: Titel-Normalisierung und Matching, Trophäen-Normalisierung aus Roh-JSON, Änderungserkennung für die `review_queue`, Rangformel. Diese Funktionen sollen pur bleiben und ohne Datenbank testbar sein.
+- **Abgleichlogik gegen die echten Daten prüfen, bevor sie gebaut wird.** Titelnormalisierung, Matching und Importe treffen auf Fremddaten mit Eigenheiten, die sich nicht erraten lassen. Die Produktivdatenbank ist lesend verfügbar (`wrangler d1 execute --remote --json`), und ein Domain-Modul lässt sich mit `npx esbuild <datei> --format=esm` transpilieren und in Node gegen den echten Bestand laufen lassen — ohne echte Daten ins Repository zu holen.
 - **Deutsche Bezeichner in Daten und Oberfläche** (Statuswerte, Anzeigetexte), englische im Code (Variablen, Funktionen). Das Schema in der Spezifikation zeigt die Konvention.
 - **Bei Unklarheiten in der Spezifikation nachfragen**, statt eine Annahme zu treffen und weiterzubauen.
 
