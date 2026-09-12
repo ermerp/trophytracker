@@ -170,9 +170,23 @@ merkt sich den nächsten Offset – der Free Tier erlaubt 10 ms CPU je Aufruf, u
 Cron Trigger haben dieselbe Grenze. Die Oberfläche ruft so lange erneut auf, bis
 der Durchlauf fertig ist.
 
-Die Seitenzahl je Aufruf ist gemessen, nicht geschätzt: Mit zwei Seiten lag die
-CPU-Zeit im p99 bei 8,7 ms – zu nah an der Grenze. Nachzumessen über die
-GraphQL-Analytics (`workersInvocationsAdaptive`, `cpuTimeP50`/`cpuTimeP99`). Die Antworten werden **unverändert** abgelegt; die
+Die Seitenzahl je Aufruf ist gemessen, nicht geschätzt. Werte je Aufruf, gegen
+die echte Sammlung von 431 Titeln:
+
+| Aufruf | CPU |
+|---|---|
+| Abruf einer Seite | 3 ms |
+| Normalisierung einer Seite | 5–7 ms |
+| Übrige Routen | 0–3 ms |
+
+Von 10 ms erlaubten. Die Arbeit je Aufruf ist konstant – 100 Titel je Seite,
+unabhängig von der Größe der Sammlung –, der Wert wächst also nicht mit.
+Steigt er bei einer späteren Messung über 8 ms, wird eine Seite in zwei
+Hälften verarbeitet.
+
+Nachmessen: GraphQL-Analytics (`workersInvocationsAdaptive`) für Quantile,
+Workers-Observability (`telemetry/query`) für die Zuordnung je Route – nur
+letztere zeigt, *welcher* Aufruf teuer ist. Die Antworten werden **unverändert** abgelegt; die
 Normalisierung ist ein eigener Schritt in Stufe 3 und braucht keinen
 PSN-Zugriff.
 
