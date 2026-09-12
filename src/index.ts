@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { psnRoutes } from "./api/psn";
 import { settingsRoutes } from "./api/settings";
+import { trophyRoutes } from "./api/trophies";
 import { createRepositories } from "./db";
 import { erstellePsnClient, type PsnClient } from "./psn/client";
 import type { AppEnv } from "./types";
@@ -34,6 +35,7 @@ export function createApp(psnFactory: () => PsnClient = () => erstellePsnClient(
 	app.get("/api/health", (c) => c.json({ status: "ok", zeit: new Date().toISOString() }));
 
 	app.route("/api/settings", settingsRoutes);
+	app.route("/api/trophies", trophyRoutes);
 	app.route("/api", psnRoutes);
 
 	return app;

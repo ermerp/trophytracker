@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { Geheimnis } from "../domain/secret";
 import { PsnAuthError } from "../psn/client";
-import { syncSchritt } from "../sync/run";
+import { normalisierungWiederholen, syncSchritt } from "../sync/run";
 import type { AppEnv } from "../types";
 
 /**
@@ -55,18 +55,33 @@ export const psnRoutes = new Hono<AppEnv>()
 		return c.json(ergebnis, ergebnis.status === "fehler" ? 502 : 200);
 	})
 
+	/**
+	 * Normalisierung erneut ausfuehren - ohne PSN-Zugriff.
+	 * Der eigentliche Zweck der Trennung aus Abschnitt 7.1.
+	 */
+	.post("/sync/normalize", async (c) => {
+		const ergebnis = await normalisierungWiederholen(c.var.repos);
+		if (!ergebnis) {
+			return c.json({ fehler: "Es gibt keinen abgeschlossenen Lauf zum Wiederholen." }, 409);
+		}
+		return c.json({ zurueckgesetzt: ergebnis.seiten, laufId: ergebnis.laufId, weiter: true });
+	})
+
 	.get("/sync/status", async (c) => {
-		const [lauf, zugang] = await Promise.all([
+		const [lauf, zugang, trophaeen] = await Promise.all([
 			c.var.repos.sync.letzterLauf(),
 			c.var.repos.credentials.anzeige(),
+			c.var.repos.trophies.anzahl(),
 		]);
 
 		return c.json({
 			zugang,
+			trophaeen,
 			letzterLauf: lauf
 				? {
 						id: lauf.id,
 						status: lauf.status,
+						phase: lauf.phase,
 						gestartetAm: lauf.started_at,
 						beendetAm: lauf.finished_at,
 						titlesSeen: lauf.titles_seen,

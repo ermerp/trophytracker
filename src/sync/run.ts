@@ -1,4 +1,5 @@
 import type { Repositories } from "../db";
+import { normalisiereSeite } from "../domain/normalize";
 import { Geheimnis } from "../domain/secret";
 import {
 	SEITENGROESSE,
@@ -10,9 +11,14 @@ import { PsnAuthError, type PsnClient, type Sitzung } from "../psn/client";
 
 export type SyncErgebnis = {
 	status: "erfolg" | "laufend" | "fehler";
+	phase: "abruf" | "normalisierung";
 	offset: number;
 	seitenGeholt: number;
 	titlesSeen: number | null;
+	/** Nur in der Normalisierungsphase gefuellt. */
+	titelGeschrieben?: number;
+	verworfen?: number;
+	offeneSeiten?: number;
 	weiter: boolean;
 	meldung?: string;
 };
@@ -63,6 +69,11 @@ export async function syncSchritt(
 	psn: PsnClient,
 ): Promise<SyncErgebnis> {
 	const lauf = (await repos.sync.laufenderLauf()) ?? (await repos.sync.starten());
+
+	if (lauf.phase === "normalisierung") {
+		return normalisierungsSchritt(repos, lauf.id, lauf.titles_seen);
+	}
+
 	let offset = lauf.next_offset;
 	let seitenGeholt = 0;
 
@@ -83,21 +94,32 @@ export async function syncSchritt(
 			const weiterAb = naechsterOffset(offset, SEITENGROESSE, gesamt);
 
 			if (weiterAb === null) {
-				await repos.sync.abschliessen(lauf.id, gesamt ?? 0);
-				await repos.credentials.erfolgVermerken();
+				// Abruf fertig - jetzt normalisieren, im naechsten Aufruf.
+				// Der Lauf wird hier bewusst NICHT abgeschlossen: Er bleibt
+				// 'laufend', damit der naechste Aufruf ihn wiederfindet, statt
+				// einen neuen zu starten und erneut PSN abzurufen.
+				await repos.sync.phaseSetzen(lauf.id, "normalisierung");
 				return {
-					status: "erfolg",
+					status: "laufend",
+					phase: "normalisierung",
 					offset,
 					seitenGeholt,
 					titlesSeen: gesamt,
-					weiter: false,
+					weiter: true,
 				};
 			}
 			offset = weiterAb;
 		}
 
 		await repos.sync.fortschrittSetzen(lauf.id, offset);
-		return { status: "laufend", offset, seitenGeholt, titlesSeen: gesamt, weiter: true };
+		return {
+			status: "laufend",
+			phase: "abruf",
+			offset,
+			seitenGeholt,
+			titlesSeen: gesamt,
+			weiter: true,
+		};
 	} catch (fehler) {
 		const meldung = meldungFuer(fehler);
 		await repos.sync.fehlschlagen(lauf.id, meldung);
@@ -109,7 +131,15 @@ export async function syncSchritt(
 		} else {
 			await repos.credentials.statusSetzen("fehler");
 		}
-		return { status: "fehler", offset, seitenGeholt, titlesSeen: null, weiter: false, meldung };
+		return {
+			status: "fehler",
+			phase: lauf.phase,
+			offset,
+			seitenGeholt,
+			titlesSeen: null,
+			weiter: false,
+			meldung,
+		};
 	}
 }
 
@@ -125,6 +155,89 @@ function meldungFuer(fehler: unknown): string {
 		return fehler.message;
 	}
 	return "Der Abruf ist fehlgeschlagen.";
+}
+
+/**
+ * Verarbeitet EINE noch offene Rohantwort.
+ *
+ * Wie beim Abruf ist die Begrenzung der Schutz gegen die 10-ms-CPU-Grenze:
+ * eine Seite bedeutet ein JSON.parse ueber rund 60 kB und 100 UPSERTs. Der
+ * Aufrufer wiederholt, bis nichts mehr offen ist.
+ *
+ * Diese Phase fasst PSN nicht an - sie liest ausschliesslich aus
+ * psn_raw_response und ist deshalb beliebig wiederholbar.
+ */
+export async function normalisierungsSchritt(
+	repos: Repositories,
+	laufId: number,
+	titlesSeen: number | null,
+): Promise<SyncErgebnis> {
+	const roh = await repos.sync.naechsteUnverarbeitete(laufId);
+
+	if (!roh) {
+		const gesamt = await repos.trophies.anzahl();
+		await repos.sync.abschliessen(laufId, gesamt);
+		await repos.credentials.erfolgVermerken();
+		return {
+			status: "erfolg",
+			phase: "normalisierung",
+			offset: 0,
+			seitenGeholt: 0,
+			titlesSeen: gesamt,
+			offeneSeiten: 0,
+			weiter: false,
+		};
+	}
+
+	try {
+		const { titel, verworfen } = normalisiereSeite(roh.payload);
+		const geschrieben = await repos.trophies.upsertSeite(titel);
+		await repos.sync.alsNormalisiertMarkieren(roh.id);
+
+		const offen = await repos.sync.offeneRohantworten(laufId);
+		return {
+			status: "laufend",
+			phase: "normalisierung",
+			offset: 0,
+			seitenGeholt: 0,
+			titlesSeen,
+			titelGeschrieben: geschrieben,
+			verworfen,
+			offeneSeiten: offen,
+			weiter: true,
+		};
+	} catch (fehler) {
+		const meldung =
+			fehler instanceof Error ? `Normalisierung fehlgeschlagen: ${fehler.message}` : "Normalisierung fehlgeschlagen.";
+		await repos.sync.fehlschlagen(laufId, meldung);
+		return {
+			status: "fehler",
+			phase: "normalisierung",
+			offset: 0,
+			seitenGeholt: 0,
+			titlesSeen: null,
+			weiter: false,
+			meldung,
+		};
+	}
+}
+
+/**
+ * Bereitet die Wiederholung der Normalisierung vor - ohne PSN-Zugriff.
+ *
+ * Setzt normalized_at des juengsten erfolgreichen Laufs zurueck und stellt ihn
+ * zurueck in die Normalisierungsphase. Die folgenden Aufrufe von syncSchritt
+ * arbeiten ihn dann erneut ab, ohne Sony anzusprechen.
+ */
+export async function normalisierungWiederholen(
+	repos: Repositories,
+): Promise<{ laufId: number; seiten: number } | null> {
+	const lauf = await repos.sync.letzterErfolgreicherLauf();
+	if (!lauf) return null;
+
+	const seiten = await repos.sync.normalisierungZuruecksetzen(lauf.id);
+	await repos.sync.zurueckInNormalisierung(lauf.id);
+	return { laufId: lauf.id, seiten };
 }
 
 /** Nur fuer die NPSSO-Pruefung beim Eintragen. */

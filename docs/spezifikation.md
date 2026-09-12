@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 7 – Frontend und API in einem Worker mit Static Assets, Zugriffsschutz über eine Access-Richtlinie am Worker.*
+*Version 8 – PS Vita als vierte Plattform, Normalisierung als eigene Sync-Phase.*
 
 ## 1. Use Cases
 
@@ -88,10 +88,12 @@ CREATE TABLE game (
 -- Ein Spiel auf einer konkreten Plattform.
 -- Zwingend getrennt: GTA V existiert auf PS3, PS4 und PS5
 -- mit je eigener Trophäenliste und eigenem Preis.
+-- Vita ist seit Migration 0003 dabei: Die Trophäenliste enthielt 24 reine
+-- Vita-Titel und 26 weitere in Cross-Gen-Listen.
 CREATE TABLE release (
   id            INTEGER PRIMARY KEY,
   game_id       INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
-  platform      TEXT NOT NULL CHECK (platform IN ('PS3','PS4','PS5')),
+  platform      TEXT NOT NULL CHECK (platform IN ('PS3','PS4','PS5','PSVITA')),
   edition       TEXT,
   region        TEXT,
 
@@ -142,6 +144,13 @@ CREATE TABLE trophy_progress (
   np_communication_id TEXT PRIMARY KEY,
   np_service_name     TEXT NOT NULL,     -- 'trophy' (PS3/PS4/Vita) | 'trophy2' (PS5)
   title_name          TEXT NOT NULL,
+
+  -- Rohwert von PSN, bewusst ohne CHECK. Cross-Gen-Titel teilen sich eine
+  -- Trophäenliste und liefern mehrere Plattformen kommagetrennt. Gemessen an
+  -- 431 echten Titeln: PS4 (218), PS3 (95), PS5 (61), PSVITA (24),
+  -- PSVITA,PS4 (13), PS3,PSVITA,PS4 (10), PS3,PS4 (5), PS3,PSVITA (3),
+  -- PS5,PSPC (2). Hier stehen Tatsachen von Sony, keine Auswahl des Nutzers;
+  -- das Aufteilen passiert erst beim Matching.
   platform            TEXT NOT NULL,
   icon_url            TEXT,
 
@@ -173,8 +182,10 @@ CREATE TABLE trophy_progress (
 CREATE INDEX idx_trophy_unmatched ON trophy_progress(release_id) WHERE release_id IS NULL;
 ```
 
-**Platin-Logik:** `defined_platinum > 0 AND earned_platinum > 0`.
-Die Prüfung auf `defined_platinum > 0` ist zwingend – viele PS3-Titel und kleinere Spiele haben gar keine Platin-Trophäe und würden sonst dauerhaft als "Platin offen" erscheinen.
+**Platin-Logik:** dreiwertig, nicht Boolean – `erspielt` / `offen` / `nicht_verfuegbar`.
+Die Prüfung auf `defined_platinum > 0` ist zwingend: **93 von 431 Titeln der echten Sammlung
+definieren gar keine Platin-Trophäe** (22 %). Als Boolean modelliert würden sie dauerhaft als
+"Platin offen" erscheinen – dieselbe Haltung wie bei `physical_release_status`.
 
 ### 4.2 Eigene Bewertung
 
@@ -600,6 +611,14 @@ CREATE TABLE psn_credentials (
 
 Ab Migration 0002 kommen `npsso_ciphertext`, `npsso_iv`, `npsso_stored_at`, `refresh_ciphertext`
 und `refresh_iv` hinzu; `psn_sync_run` bekommt `next_offset` für die seitenweise Blätterung.
+Migration 0004 ergänzt `psn_sync_run.phase` (`abruf` | `normalisierung`) und
+`psn_raw_response.normalized_at`.
+
+**Der Sync hat zwei Phasen.** Erst werden alle Seiten roh abgelegt, danach normalisiert – beides
+mit begrenzter Arbeit je Aufruf. Ein Zurücksetzen von `normalized_at` lässt die Normalisierung
+erneut laufen, ohne PSN anzusprechen (`POST /api/sync/normalize`). Das ist der praktische Nutzen
+der Trennung aus 7.1: Eine fehlerhafte Abbildung wird korrigiert und erneut ausgeführt, statt die
+Daten neu holen zu müssen.
 Die Verschlüsselung ist in 7.1 begründet.
 
 **Vor dem ersten NPSSO existiert keine Zeile.** Der CHECK kennt bewusst keinen Wert für
@@ -986,7 +1005,7 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 0 | Repos anlegen, Worker mit Hono, Frontend-Gerüst als Static Assets, leere D1, Deploy-Action mit Export vor Migration, Access am Worker | Push auf `main` deployt, App ist geschützt |
 | 1 | Vollständige Migration, Repository-Schicht in `src/db/` | Erreichbare leere App mit Schema |
 | 2 | PSN-Auth, NPSSO-Eingabe, Rohabruf | Trophäendaten liegen roh vor |
-| 3 | Normalisierung, einfache Listenansicht | Use Case 2 teilweise: Trophäen und Platin sichtbar |
+| 3 | Vita als vierte Plattform, Normalisierung als zweite Sync-Phase, Trophäenliste | Use Case 2 teilweise: Trophäen und Platin sichtbar |
 | 4 | `game`/`release`, Matching-Vorschläge, Zuordnungsoberfläche | Sauberes Datenmodell |
 | 5 | Besitz erfassen (physisch und digital), Sammlungsansicht mit Filtern | **Use Case 1** |
 | 6 | `play_status`, Statuswechsel im Spieldetail, Abweichungsansicht | **Use Case 2** |

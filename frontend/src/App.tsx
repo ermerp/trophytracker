@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Einstellungen } from './Einstellungen'
+import { Trophaeen } from './Trophaeen'
 import './App.css'
 
 /**
@@ -50,9 +51,13 @@ function App() {
     <main>
       <h1>Trophytracker</h1>
       <p>
-        Stufe 2: Trophäendaten lassen sich roh von PlayStation abrufen.
-        Ausgewertet werden sie in Stufe 3.
+        Stufe 3: Trophäen und Platin sind sichtbar. Die Zuordnung zu Spielen
+        und Plattformen kommt in Stufe 4.
       </p>
+
+      <Trophaeen />
+
+      <Einstellungen />
 
       <section>
         <h2>Worker</h2>
@@ -90,7 +95,6 @@ function App() {
         {gewichte.art === 'fehler' && <p>Keine Antwort: {gewichte.meldung}</p>}
       </section>
 
-      <Einstellungen />
     </main>
   )
 }
