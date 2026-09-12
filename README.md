@@ -372,6 +372,11 @@ trotzdem ein Spiel.
 Tabelle, eine Zeile je Release, mit Filter auf Auffälligkeiten. Titel lassen
 sich direkt ändern, und ein Release lässt sich als eigenes Spiel abtrennen.
 
+Ändert sich die Titelnormalisierung, veralten die Sortierschlüssel: Die
+automatische Zuordnung sucht darüber und findet dann falsche oder gar keine
+Kandidaten. Die Ansicht markiert veraltete Schlüssel und bietet den Knopf zum
+Neuberechnen.
+
 ## Kosten
 
 Der gesamte Stack liegt im Free-Tier. Wichtiger als die Grenzen ist, wie

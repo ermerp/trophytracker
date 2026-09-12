@@ -182,6 +182,10 @@ CREATE TABLE trophy_progress (
 CREATE INDEX idx_trophy_unmatched ON trophy_progress(release_id) WHERE release_id IS NULL;
 ```
 
+Migration 0005 ergänzt `matched_at` und `matched_source` (`automatisch` | `manuell`). Sie halten
+fest, wann und wodurch `release_id` gesetzt wurde — die Grundlage dafür, eine Zuordnung später
+nachvollziehen und gezielt korrigieren zu können (7.2).
+
 **Platin-Logik:** dreiwertig, nicht Boolean – `erspielt` / `offen` / `nicht_verfuegbar`.
 Die Prüfung auf `defined_platinum > 0` ist zwingend: **93 von 431 Titeln der echten Sammlung
 definieren gar keine Platin-Trophäe** (22 %). Als Boolean modelliert würden sie dauerhaft als
@@ -835,6 +839,7 @@ GET    /api/trophies
 GET    /api/trophies/unmatched
 GET    /api/games/uebersicht           Alle Zuordnungen als Tabelle, filter- und durchsuchbar
 POST   /api/games/release/:id/abtrennen  Release in ein neues Spiel herauslösen
+POST   /api/games/schluessel-neu-berechnen  sort_title aller Spiele aus dem Titel neu ableiten
 GET    /api/zuordnung/offen            Gruppenvorschläge, seitenweise
 POST   /api/zuordnung/gruppe           Gruppe bestätigen: ein Spiel, mehrere Releases
 POST   /api/zuordnung/liste/:npCommId  Einzelne Liste einem Release zuordnen
