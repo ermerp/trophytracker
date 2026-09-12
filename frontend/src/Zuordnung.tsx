@@ -20,6 +20,8 @@ type ReleaseVorschlag = {
   fortschritt: number
   hatPlatin: boolean
   symbol: string | null
+  struktur: string
+  titelVorschlag: string
 }
 
 type Gruppe = {
@@ -67,6 +69,8 @@ export function Zuordnung() {
   const [uebersprungen, setUebersprungenRoh] = useState<Set<string>>(ladeUebersprungen)
   const [laeuft, setLaeuft] = useState(false)
   const [meldung, setMeldung] = useState<string | null>(null)
+  /** Titel je Liste, wenn sie einzeln angelegt wird. */
+  const [eigenTitel, setEigenTitel] = useState<Record<string, string>>({})
 
   const setUebersprungen = useCallback((werte: Set<string>) => {
     setUebersprungenRoh(werte)
@@ -119,6 +123,42 @@ export function Zuordnung() {
       return false
     }
     return true
+  }
+
+  /**
+   * Eine einzelne Liste als eigenes Spiel anlegen.
+   *
+   * Nötig, wenn eine Gruppe doch verschiedene Spiele enthält – „Game of
+   * Thrones" ist auf PS3 das Cyanide-Rollenspiel und auf PS4 die
+   * Telltale-Serie. Die Trophäenstrukturen verraten es, entscheiden kann es
+   * nur der Nutzer.
+   */
+  async function alsEigenesSpiel(gruppe: Gruppe, release: ReleaseVorschlag) {
+    const titel = eigenTitel[release.npCommunicationId] ?? release.titelVorschlag
+    const plattform = entwuerfe[gruppe.schluessel]?.plattformen[release.npCommunicationId]
+    if (!titel.trim() || !plattform) return
+
+    setLaeuft(true)
+    setMeldung(null)
+    try {
+      const antwort = await fetch('/api/zuordnung/gruppe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          titel: titel.trim(),
+          releases: [{ npCommunicationId: release.npCommunicationId, plattform }],
+        }),
+      })
+      if (!antwort.ok) {
+        const f = (await antwort.json()) as { fehler?: string }
+        setMeldung(f.fehler ?? 'Anlegen fehlgeschlagen.')
+        return
+      }
+      setMeldung(`Angelegt: ${titel.trim()}`)
+      await laden()
+    } finally {
+      setLaeuft(false)
+    }
   }
 
   async function einzeln(gruppe: Gruppe) {
@@ -199,6 +239,10 @@ export function Zuordnung() {
         )}
       </p>
       <p className="zeile">
+        Enthält eine Gruppe verschiedene Spiele, lege die Listen mit „Einzeln anlegen"
+        getrennt an – der Titel je Zeile ist änderbar.
+      </p>
+      <p className="zeile">
         Übersprungene Gruppen bleiben unzugeordnet und werden von „Alle übernehmen"
         ausgelassen – auch nach dem Neuladen.
       </p>
@@ -226,6 +270,7 @@ export function Zuordnung() {
                     <tr key={r.npCommunicationId}>
                       <td>{r.rohTitel}</td>
                       <td>{r.fortschritt} %{r.hatPlatin && ' · Platin'}</td>
+                      <td>{r.struktur}</td>
                       <td>
                         {r.alternativen.length > 1 ? (
                           <select
@@ -244,6 +289,30 @@ export function Zuordnung() {
                         )}
                         {r.geteilt && (
                           <span className="zeile"> geteilte Liste: {r.plattformRoh}</span>
+                        )}
+                      </td>
+                      <td>
+                        {g.releases.length > 1 && (
+                          <>
+                            <input
+                              type="text"
+                              value={eigenTitel[r.npCommunicationId] ?? r.titelVorschlag}
+                              onChange={(e) =>
+                                setEigenTitel((v) => ({
+                                  ...v,
+                                  [r.npCommunicationId]: e.target.value,
+                                }))
+                              }
+                              aria-label={`Eigener Titel für ${r.rohTitel}`}
+                            />{' '}
+                            <button
+                              type="button"
+                              onClick={() => alsEigenesSpiel(g, r)}
+                              disabled={laeuft || weg}
+                            >
+                              Einzeln anlegen
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>

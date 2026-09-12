@@ -67,6 +67,14 @@ export type ReleaseVorschlag = {
 	/** Bronze/Silber/Gold/Platin der definierten Troph
 aeen. */
 	struktur: string;
+	/**
+	 * Titelvorschlag, falls diese Liste als EIGENES Spiel angelegt wird.
+	 *
+	 * Gebraucht, wenn eine Gruppe doch verschiedene Spiele enthaelt - etwa
+	 * "Game of Thrones" (PS4, Telltale) und "Game of Thrones trophies"
+	 * (PS3, Cyanide). Dann zaehlt der eigene Name, nicht der Gruppentitel.
+	 */
+	titelVorschlag: string;
 };
 
 export type Gruppenvorschlag = {
@@ -91,6 +99,7 @@ function alsReleaseVorschlag(e: TrophyEintrag): ReleaseVorschlag {
 		hatPlatin: e.defined_platinum > 0 && e.earned_platinum > 0,
 		symbol: e.icon_url,
 		struktur: struktur(e),
+		titelVorschlag: anzeigeTitel(e.title_name),
 	};
 }
 
