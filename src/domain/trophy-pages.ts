@@ -19,6 +19,13 @@ export const SEITENGROESSE = 100;
  * im p99 bei 8,7 ms - zu nah an der 10-ms-Grenze des Free Tier. Mit einer
  * Seite je Aufruf halbiert sich der teuerste Posten (das Kopieren von rund
  * 60 kB Antworttext). Die Oberflaeche ruft ohnehin wiederholt auf.
+ *
+ * Nach Stufe 3 erneut gemessen, je Aufruf einzeln statt als p99 ueber alles:
+ * Abruf 3 ms, Normalisierung 5 bis 7 ms. Die Normalisierung ist der teuerste
+ * Posten (JSON.parse ueber 60 kB plus 100 UPSERTs). Nicht weiter gesenkt, weil
+ * die Arbeit je Aufruf konstant ist - 100 Titel je Seite, unabhaengig von der
+ * Groesse der Sammlung. Waechst der Wert bei einer spaeteren Messung ueber
+ * 8 ms, wird eine Seite in zwei Haelften verarbeitet.
  */
 export const SEITEN_JE_AUFRUF = 1;
 
