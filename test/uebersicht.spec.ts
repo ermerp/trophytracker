@@ -218,3 +218,40 @@ describe("Abkuerzungs-Erkennung", () => {
 		},
 	);
 });
+
+describe("Sortierschluessel neu berechnen", () => {
+	it("erkennt einen veralteten Schluessel und korrigiert ihn", async () => {
+		const { gameId } = await spielMit("Alan Wake Remastered", [
+			{ plattform: "PS4", struktur: { b: 30, s: 8, g: 3, p: 1 }, nr: 1 },
+		]);
+		// Zustand nachstellen, wie ihn die aeltere Normalisierung hinterliess
+		await env.DB.prepare("UPDATE game SET sort_title = 'alan wake' WHERE id = ?")
+			.bind(gameId)
+			.run();
+
+		const vorher = await hole("/api/games/uebersicht?filter=auffaellig");
+		expect(vorher.zeilen[0].schluesselVeraltet).toBe(true);
+
+		const antwort = await SELF.fetch(
+			"https://example.com/api/games/schluessel-neu-berechnen",
+			{ method: "POST" },
+		);
+		expect(await antwort.json()).toMatchObject({ geaendert: 1 });
+
+		const g = await env.DB.prepare("SELECT sort_title FROM game WHERE id = ?")
+			.bind(gameId)
+			.first<{ sort_title: string }>();
+		expect(g?.sort_title).toBe("alan wake remastered");
+	});
+
+	it("aendert nichts, wenn alle Schluessel stimmen", async () => {
+		await spielMit("Bloodborne", [
+			{ plattform: "PS4", struktur: { b: 30, s: 8, g: 3, p: 1 }, nr: 1 },
+		]);
+		const antwort = await SELF.fetch(
+			"https://example.com/api/games/schluessel-neu-berechnen",
+			{ method: "POST" },
+		);
+		expect(await antwort.json()).toMatchObject({ geaendert: 0 });
+	});
+});

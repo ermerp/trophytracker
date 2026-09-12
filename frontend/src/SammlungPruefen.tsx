@@ -24,6 +24,7 @@ type Zeile = {
   strukturWeichtAb: boolean
   ohneListe: boolean
   titelWirktAbgekuerzt: boolean
+  schluesselVeraltet: boolean
 }
 
 type Antwort = { gesamt: number; filter: Filter; zeilen: Zeile[] }
@@ -59,6 +60,18 @@ export function SammlungPruefen() {
   useEffect(() => {
     void laden()
   }, [laden])
+
+  async function schluesselNeu() {
+    setLaeuft(true)
+    try {
+      const antwort = await fetch('/api/games/schluessel-neu-berechnen', { method: 'POST' })
+      const d = (await antwort.json()) as { geprueft: number; geaendert: number }
+      setMeldung(`${d.geaendert} von ${d.geprueft} Sortierschlüsseln neu berechnet.`)
+      await laden()
+    } finally {
+      setLaeuft(false)
+    }
+  }
 
   async function umbenennen(spielId: number, titel: string) {
     setLaeuft(true)
@@ -125,6 +138,17 @@ export function SammlungPruefen() {
         />
       </p>
 
+      {daten.zeilen.some((z) => z.schluesselVeraltet) && (
+        <p className="hinweis">
+          Einige Sortierschlüssel stammen aus einer älteren Fassung der Titelnormalisierung.
+          Solange sie veraltet sind, findet die automatische Zuordnung beim nächsten Sync
+          falsche oder gar keine Kandidaten.{' '}
+          <button type="button" onClick={schluesselNeu} disabled={laeuft}>
+            Jetzt neu berechnen
+          </button>
+        </p>
+      )}
+
       <p>
         {daten.gesamt === 0
           ? filter === 'auffaellig'
@@ -179,7 +203,12 @@ export function SammlungPruefen() {
                       </>
                     )}
                   </td>
-                  <td className="zeile">{z.rohTitel ?? '—'}</td>
+                  <td className="zeile">
+                    {z.rohTitel ?? '—'}
+                    {z.schluesselVeraltet && (
+                      <div className="auffaellig">Sortierschlüssel veraltet</div>
+                    )}
+                  </td>
                   <td>
                     {trenntGerade === z.releaseId ? (
                       <>

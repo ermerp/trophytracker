@@ -159,8 +159,20 @@ export const gameRoutes = new Hono<AppEnv>()
 				strukturWeichtAb: z.strukturWeichtAb,
 				ohneListe: z.ohneListe,
 				titelWirktAbgekuerzt: z.titelWirktAbgekuerzt,
+				schluesselVeraltet: z.schluesselVeraltet,
 			})),
 		});
+	})
+
+	/**
+	 * Sortierschluessel aller Spiele neu berechnen.
+	 *
+	 * Noetig nach jeder Aenderung an der Titelnormalisierung: sort_title ist
+	 * abgeleitet und veraltet sonst still, was die automatische Zuordnung
+	 * unbrauchbar macht.
+	 */
+	.post("/schluessel-neu-berechnen", async (c) => {
+		return c.json(await c.var.repos.games.sortierschluesselNeuBerechnen());
 	})
 
 	/** Abschnitt 12: Titel aendern. */
