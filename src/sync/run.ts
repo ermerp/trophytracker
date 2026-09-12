@@ -8,6 +8,7 @@ import {
 	naechsterOffset,
 } from "../domain/trophy-pages";
 import { PsnAuthError, type PsnClient, type Sitzung } from "../psn/client";
+import { ordneAutomatischZu } from "./zuordnung";
 
 export type SyncErgebnis = {
 	status: "erfolg" | "laufend" | "fehler";
@@ -175,6 +176,11 @@ export async function normalisierungsSchritt(
 	const roh = await repos.sync.naechsteUnverarbeitete(laufId);
 
 	if (!roh) {
+		// Nach der Normalisierung: neue Listen, die eindeutig zu einem
+		// bestehenden Release passen, automatisch zuordnen (Abschnitt 7.2).
+		// Beim Erstlauf greift das nie - es gibt noch keine Spiele.
+		await ordneAutomatischZu(repos);
+
 		const gesamt = await repos.trophies.anzahl();
 		await repos.sync.abschliessen(laufId, gesamt);
 		await repos.credentials.erfolgVermerken();

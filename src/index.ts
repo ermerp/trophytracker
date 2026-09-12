@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { psnRoutes } from "./api/psn";
 import { settingsRoutes } from "./api/settings";
 import { trophyRoutes } from "./api/trophies";
+import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
 import { erstellePsnClient, type PsnClient } from "./psn/client";
 import type { AppEnv } from "./types";
@@ -36,6 +37,8 @@ export function createApp(psnFactory: () => PsnClient = () => erstellePsnClient(
 
 	app.route("/api/settings", settingsRoutes);
 	app.route("/api/trophies", trophyRoutes);
+	app.route("/api/zuordnung", zuordnungRoutes);
+	app.route("/api/games", gameRoutes);
 	app.route("/api", psnRoutes);
 
 	return app;

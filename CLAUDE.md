@@ -84,6 +84,12 @@ PSN-Antworten werden zuerst unverändert in `psn_raw_response` geschrieben, dana
 
 Der Sync hat deshalb zwei Phasen (`psn_sync_run.phase`): erst `abruf`, dann `normalisierung`, beide mit begrenzter Arbeit je Aufruf. `POST /api/sync/normalize` setzt `normalized_at` zurück und lässt die Normalisierung erneut laufen — ohne PSN.
 
+### Titelnormalisierung ist geteilte Logik
+
+`src/domain/titel.ts` hält `titelSchluessel` (aggressiv, nur zum Vergleichen) und `anzeigeTitel` (zurückhaltend, für `game.title`). Beide werden ab Stufe 9 auch für IGDB und ab Stufe 11 für den Wunschlisten-Import gebraucht — Änderungen dort wirken auf alle Abgleiche. `trophy_progress.title_name` bleibt immer der Rohwert von Sony.
+
+Gegen die echten 431 Titel abgesichert: Diakritika werden gefaltet (sonst wird „Ragnarök" zu „ragnar k"), nicht-lateinische Titel fallen auf den Anzeigenamen zurück (sonst wäre der Schlüssel leer), und ein hängendes „the" nach entfernter Edition wird abgeschnitten.
+
 ### Keine echten PSN-Daten als Testdaten
 
 Die Rohantworten in der Produktionsdatenbank wären perfektes Testmaterial und enthalten die vollständige Spielhistorie des Nutzers. Dieses Repository ist öffentlich. Testdaten werden deshalb nachgebaut (`test/trophy-fixtures.ts`), nie kopiert — dieselbe Regel wie beim Datenbank-Dump.

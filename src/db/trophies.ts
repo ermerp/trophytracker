@@ -89,6 +89,15 @@ export class TrophiesRepository {
 		return titel.length;
 	}
 
+	/** Traegt dieses Release bereits eine Trophaeenliste? */
+	async releaseIstBelegt(releaseId: number): Promise<boolean> {
+		const z = await this.db
+			.prepare("SELECT 1 AS x FROM trophy_progress WHERE release_id = ? LIMIT 1")
+			.bind(releaseId)
+			.first<{ x: number }>();
+		return z !== null;
+	}
+
 	async anzahl(): Promise<number> {
 		const zeile = await this.db
 			.prepare("SELECT COUNT(*) AS n FROM trophy_progress")

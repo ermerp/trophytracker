@@ -76,3 +76,34 @@ ul.trophaeen img {
 .platin.nicht_verfuegbar {
   font-style: italic;
 }
+
+ul.gruppen {
+  list-style: none;
+  padding: 0;
+}
+
+ul.gruppen li {
+  border-top: 1px solid rgba(128, 128, 128, 0.3);
+  padding: 0.8rem 0;
+}
+
+ul.gruppen li.uebersprungen {
+  opacity: 0.45;
+}
+
+ul.gruppen input[type='text'] {
+  max-width: 24rem;
+  margin-bottom: 0.3rem;
+}
+
+ul.gruppen td {
+  padding: 0.1rem 1rem 0.1rem 0;
+  font-size: 0.9rem;
+}
+
+.hinweis {
+  font-size: 0.85rem;
+  border-left: 3px solid rgba(200, 140, 0, 0.7);
+  padding-left: 0.6rem;
+  margin: 0.3rem 0;
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Einstellungen } from './Einstellungen'
 import { Trophaeen } from './Trophaeen'
+import { Zuordnung } from './Zuordnung'
 import './App.css'
 
 /**
@@ -51,9 +52,11 @@ function App() {
     <main>
       <h1>Trophytracker</h1>
       <p>
-        Stufe 3: Trophäen und Platin sind sichtbar. Die Zuordnung zu Spielen
-        und Plattformen kommt in Stufe 4.
+        Stufe 4: Aus Trophäenlisten werden Spiele und Releases. Besitz
+        erfassen kommt in Stufe 5.
       </p>
+
+      <Zuordnung />
 
       <Trophaeen />
 
