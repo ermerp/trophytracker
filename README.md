@@ -362,6 +362,16 @@ Bestätigung geschrieben (Abschnitt 7.2). Zwei Sonderfälle:
 Ab dem zweiten Sync ordnet die Automatik neue Listen zu, wenn es **genau
 einen** passenden Kandidaten gibt. Alles andere bleibt offen.
 
+**Die Trophäenstruktur verrät Remakes.** Ein portiertes Spiel behält seine
+Liste, ein Remake bekommt eine neue — Shadow of the Colossus hat auf PS3
+18/6/6/1 und auf PS4 25/7/5/1. Weichen die Strukturen innerhalb einer Gruppe
+ab, erscheint ein Hinweis. Kein Automatismus: GTA V weicht ebenfalls ab und ist
+trotzdem ein Spiel.
+
+**Korrigieren.** Die Ansicht „Sammlung prüfen" zeigt alle Zuordnungen als
+Tabelle, eine Zeile je Release, mit Filter auf Auffälligkeiten. Titel lassen
+sich direkt ändern, und ein Release lässt sich als eigenes Spiel abtrennen.
+
 ## Kosten
 
 Der gesamte Stack liegt im Free-Tier. Wichtiger als die Grenzen ist, wie

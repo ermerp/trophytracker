@@ -107,3 +107,47 @@ ul.gruppen td {
   padding-left: 0.6rem;
   margin: 0.3rem 0;
 }
+
+.tabelle {
+  overflow-x: auto;
+}
+
+.tabelle table {
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+.tabelle th {
+  text-align: left;
+  padding: 0.2rem 0.6rem 0.2rem 0;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.4);
+}
+
+.tabelle td {
+  padding: 0.2rem 0.6rem 0.2rem 0;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+.tabelle input[type='text'] {
+  width: 16rem;
+  margin: 0;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.85rem;
+}
+
+.auffaellig {
+  color: #b35c00;
+  font-weight: 600;
+}
+
+input.auffaellig {
+  color: inherit;
+  border-color: #b35c00;
+}
+
+input[type='search'] {
+  display: inline;
+  width: auto;
+  margin: 0;
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Einstellungen } from './Einstellungen'
 import { Trophaeen } from './Trophaeen'
+import { SammlungPruefen } from './SammlungPruefen'
 import { Zuordnung } from './Zuordnung'
 import './App.css'
 
@@ -57,6 +58,8 @@ function App() {
       </p>
 
       <Zuordnung />
+
+      <SammlungPruefen />
 
       <Trophaeen />
 

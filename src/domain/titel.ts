@@ -23,6 +23,18 @@ const MARKENZEICHEN = /[™®©]/g;
  *
  * "Trophies" und "Trophy Set" stehen tatsaechlich in PSN-Titeln
  * ("No Man's Sky Trophies"). Die uebrigen sind Editionsnamen.
+ *
+ * "Remastered" und "Remake" stehen bewusst NICHT hier. Sie bezeichnen in aller
+ * Regel ein anderes Produkt mit eigener Troph
+aeenliste, nicht dieselbe Fassung:
+ * "Uncharted: Drake's Fortune" (PS3, 36/8/3/1) und die PS4-Remaster-Fassung
+ * (41/8/4/1) haben verschiedene Listen. Im Bestand tragen 20 Titel
+ * "Remastered" oder "Remake" und sind eigenstaendige Spiele - kein einziger
+ * Fall profitierte vom Abschneiden.
+ *
+ * Editionszusaetze bleiben dagegen: "BioShock Infinite" (PS3) und
+ * "BioShock Infinite: The Complete Edition" (PS4) haben exakt dieselbe
+ * Struktur 55/24/1/1 - dasselbe Spiel mit DLC.
  */
 const ZUSAETZE = [
 	"game of the year edition",
@@ -35,7 +47,6 @@ const ZUSAETZE = [
 	"ultimate edition",
 	"trophy set",
 	"trophies",
-	"remastered",
 	"definitive",
 	"complete",
 	"deluxe",
