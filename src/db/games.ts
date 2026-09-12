@@ -13,6 +13,25 @@ export type GruppeErgebnis = {
 	uebersprungen: string[];
 };
 
+/**
+ * Sieht der Titel nach einer von Sony gekuerzten Bezeichnung aus?
+ *
+ * Erste Fassung pruefte nur "zwei bis drei Grossbuchstaben am Anfang" und
+ * markierte damit auch "THE FINALS" und "ACE COMBAT INFINITY" - komplett
+ * grossgeschriebene Titel, also Schreibweise statt Abkuerzung.
+ *
+ * Zusaetzliche Bedingung: Der Titel muss Kleinbuchstaben enthalten. Dann
+ * sticht das Kuerzel heraus ("AC Brotherhood"), statt Teil einer
+ * durchgaengigen Grossschreibung zu sein.
+ *
+ * Preis: Vollstaendig grossgeschriebene Abkuerzungen wie "GTA IV" fallen
+ * heraus. Das ist der bewusste Tausch - drei falsche Treffer gegen einen
+ * verpassten, und Rauschen macht einen Filter nutzlos.
+ */
+function wirktAbgekuerzt(titel: string): boolean {
+	return /^[A-Z]{2,3}\s/.test(titel) && /[a-z]/.test(titel);
+}
+
 export type UebersichtZeile = {
 	game_id: number;
 	title: string;
@@ -257,7 +276,7 @@ aeenliste haengt
 					: `${z.defined_bronze}/${z.defined_silver}/${z.defined_gold}/${z.defined_platinum}`,
 			strukturWeichtAb: (strukturenJeSpiel.get(z.game_id)?.size ?? 1) > 1,
 			ohneListe: z.np_communication_id === null,
-			titelWirktAbgekuerzt: /^[A-Z]{2,3}\s/.test(z.title),
+			titelWirktAbgekuerzt: wirktAbgekuerzt(z.title),
 		}));
 
 		const suche = optionen.suche.trim().toLowerCase();
