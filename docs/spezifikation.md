@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 8 – PS Vita als vierte Plattform, Normalisierung als eigene Sync-Phase.*
+*Version 9 – Zuordnung von Trophäenlisten zu Spielen und Releases.*
 
 ## 1. Use Cases
 
@@ -413,11 +413,31 @@ PSN-Trophäentitel lassen sich nicht zuverlässig automatisch auf Releases abbil
 
 **Kein vollautomatisches Matching bauen.** Stattdessen:
 
-1. Vorschlag per normalisiertem Titelvergleich (Kleinschreibung, Sonderzeichen entfernt, Editionszusätze abgeschnitten)
-2. Eindeutiger Treffer mit hoher Ähnlichkeit → automatisch zuordnen
+1. Vorschlag per normalisiertem Titelvergleich (`src/domain/titel.ts`): Kleinschreibung, Diakritika
+   gefaltet, Markenzeichen und Sonderzeichen entfernt, Editions- und Listenzusätze abgeschnitten
+2. Eindeutiger Treffer mit hoher Ähnlichkeit → automatisch zuordnen. Konkret: **genau ein** Release,
+   dessen Spiel denselben Titelschlüssel trägt und dessen Plattform in der Liste vorkommt, und das
+   noch keine Liste trägt. Zwei Kandidaten bedeuten, dass die Entscheidung dem Nutzer gehört
 3. Alles andere landet in "nicht zugeordnet"
 4. Eigene Oberfläche zum Zuordnen, inklusive Anlegen von Spiel und Release aus dem Trophäeneintrag heraus
-5. Einmal gesetzte Zuordnungen sind dauerhaft und werden nie automatisch überschrieben
+5. Einmal gesetzte Zuordnungen sind dauerhaft und werden nie automatisch überschrieben.
+   `matched_source` hält fest, ob sie automatisch entstand oder vom Nutzer gesetzt wurde
+
+**Gruppierung.** Trophäenlisten mit gleichem Titelschlüssel werden als *ein* Spiel mit je einem
+Release vorgeschlagen – GTA V mit seinen drei Listen wird ein `game` mit drei `release`-Zeilen.
+Beanspruchen zwei Listen dieselbe Plattform, werden sie **getrennt** vorgeschlagen: `UNIQUE
+(game_id, platform, edition, region)` ließe das nicht zu, und meist sind es tatsächlich
+verschiedene Spiele. In den echten Daten trifft es „Call of Duty Modern Warfare" (2019) und
+„Call of Duty: Modern Warfare Remastered" (2016), die der Editionsfilter zusammenzieht.
+
+**Geteilte Listen.** 33 der 431 Listen gelten für mehrere Plattformen (`PS3,PSVITA,PS4`). Sony
+teilt dort den Fortschritt: Es gibt einen Wert und ein mögliches Platin, und die Antwort verrät
+nicht, wo gespielt wurde. Daraus entsteht **ein** Release, dessen Plattform der Nutzer wählt –
+vorausgewählt ist die neueste. Ein Release steht für das eigene Exemplar, die Trophäenliste für
+Sonys Zählung; beide Releases anzulegen würde Besitz behaupten, den es vielleicht nicht gibt.
+
+**Getrennte Listen sind unabhängig.** Hotline Miami 2 hat eine PS5-Liste bei 82 % und eine
+`PS3,PSVITA,PS4`-Liste bei 3 %. Mehrfaches Platin ist damit möglich und wird getrennt geführt.
 
 Dieselbe Regel gilt für `market_offer` → `release`.
 
@@ -761,8 +781,9 @@ GET    /api/deviations                v_abweichungen
 
 GET    /api/trophies
 GET    /api/trophies/unmatched
-POST   /api/trophies/:npCommId/match
-POST   /api/trophies/:npCommId/create-game
+GET    /api/zuordnung/offen            Gruppenvorschläge, seitenweise
+POST   /api/zuordnung/gruppe           Gruppe bestätigen: ein Spiel, mehrere Releases
+POST   /api/zuordnung/liste/:npCommId  Einzelne Liste einem Release zuordnen
 
 GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen&sort=rang
 POST   /api/plans
@@ -1006,7 +1027,7 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 1 | Vollständige Migration, Repository-Schicht in `src/db/` | Erreichbare leere App mit Schema |
 | 2 | PSN-Auth, NPSSO-Eingabe, Rohabruf | Trophäendaten liegen roh vor |
 | 3 | Vita als vierte Plattform, Normalisierung als zweite Sync-Phase, Trophäenliste | Use Case 2 teilweise: Trophäen und Platin sichtbar |
-| 4 | `game`/`release`, Matching-Vorschläge, Zuordnungsoberfläche | Sauberes Datenmodell |
+| 4 | `game`/`release`, Titelnormalisierung, Gruppenvorschläge, Zuordnungsoberfläche | Sauberes Datenmodell |
 | 5 | Besitz erfassen (physisch und digital), Sammlungsansicht mit Filtern | **Use Case 1** |
 | 6 | `play_status`, Statuswechsel im Spieldetail, Abweichungsansicht | **Use Case 2** |
 | 7 | Prüfliste, zunächst nur `erstimport` | **Use Case 8**, Ersteinrichtung – Datenbestand steht |

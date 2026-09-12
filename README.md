@@ -14,10 +14,10 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 3 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
-Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev` und
-zeigt die Trophäensammlung mit Fortschritt und Platin. Die Zuordnung zu Spielen
-und Plattformen kommt in Stufe 4.
+**Stufe 4 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
+den Trophäenlisten lassen sich Spiele und Releases anlegen; Besitz erfassen
+kommt in Stufe 5.
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -33,6 +33,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
 | Ansicht | Trophäenliste mit Sortierung, Platin-Filter und Blätterung |
+| Zuordnung | Gruppenvorschläge nach Titel, ein Spiel mit mehreren Releases |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
@@ -342,6 +343,24 @@ Migrationen aus `migrations/` ein und wendet sie je Testlauf an.
 npx wrangler d1 migrations apply trophytracker --local   # Schema lokal anlegen
 npm test
 ```
+
+## Zuordnung von Trophäenlisten
+
+Aus einer Trophäenliste wird ein `release`, aus mehreren Listen desselben
+Spiels **ein** `game` mit mehreren Releases — GTA V erscheint einmal in der
+Sammlung, mit drei Plattformen.
+
+Die Gruppierung schlägt vor, sie entscheidet nicht. Nichts wird ohne
+Bestätigung geschrieben (Abschnitt 7.2). Zwei Sonderfälle:
+
+- **Geteilte Listen** (`PS3,PSVITA,PS4`) gelten bei Sony für mehrere
+  Plattformen und teilen den Fortschritt. Daraus entsteht ein Release, dessen
+  Plattform du wählst — vorausgewählt ist die neueste.
+- **Gleiche Plattform zweimal** in einer Gruppe deutet auf verschiedene Spiele
+  hin. Sie werden getrennt vorgeschlagen, mit Hinweis.
+
+Ab dem zweiten Sync ordnet die Automatik neue Listen zu, wenn es **genau
+einen** passenden Kandidaten gibt. Alles andere bleibt offen.
 
 ## Kosten
 

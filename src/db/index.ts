@@ -1,4 +1,5 @@
 import { CredentialsRepository } from "./credentials";
+import { GamesRepository } from "./games";
 import { SettingsRepository } from "./settings";
 import { SyncRepository } from "./sync";
 import { TrophiesRepository } from "./trophies";
@@ -16,6 +17,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		credentials: new CredentialsRepository(db, npssoKey),
 		sync: new SyncRepository(db),
 		trophies: new TrophiesRepository(db),
+		games: new GamesRepository(db),
 	};
 }
 
