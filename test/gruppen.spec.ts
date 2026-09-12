@@ -167,3 +167,35 @@ describe("bildeGruppen", () => {
 		expect(bildeGruppen([])).toEqual([]);
 	});
 });
+
+describe("Titelvorschlag je Release", () => {
+	it("liefert je Liste einen eigenen bereinigten Titel", () => {
+		// Fuer den Fall, dass eine Gruppe doch verschiedene Spiele enthaelt:
+		// "Game of Thrones trophies" (PS3, Cyanide) und "Game of Thrones"
+		// (PS4, Telltale) haben verschiedene Trophaeenstrukturen.
+		const g = bildeGruppen([
+			eintrag("Game of Thrones trophies", "PS3", { b: 34, s: 15, g: 1, p: 1 }),
+			eintrag("Game of Thrones", "PS4", { b: 34, s: 12, g: 2, p: 1 }),
+		]);
+
+		expect(g).toHaveLength(1);
+		expect(g[0].hinweis).toMatch(/Aufbau/);
+		expect(g[0].releases.map((r) => r.titelVorschlag).sort()).toEqual([
+			"Game of Thrones",
+			"Game of Thrones",
+		]);
+	});
+
+	it("behaelt Unterschiede im Titelvorschlag, wo es welche gibt", () => {
+		const g = bildeGruppen([
+			eintrag("God of War", "PS4", { b: 22, s: 9, g: 5, p: 1 }),
+			eintrag("God of War® Trophies", "PS3", { b: 20, s: 10, g: 5, p: 1 }),
+		]);
+
+		expect(g[0].releases.map((r) => r.titelVorschlag).sort()).toEqual([
+			"God of War",
+			"God of War",
+		]);
+		expect(g[0].hinweis).toMatch(/22\/9\/5\/1|20\/10\/5\/1/);
+	});
+});
