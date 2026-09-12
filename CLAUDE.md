@@ -1,6 +1,6 @@
 # Trophytracker
 
-Single-User-Webanwendung zur Verwaltung einer PlayStation-Spielesammlung (PS3, PS4, PS5).
+Single-User-Webanwendung zur Verwaltung einer PlayStation-Spielesammlung (PS3, PS4, PS5, PS Vita).
 
 **Die vollständige Spezifikation steht in `docs/spezifikation.md`. Sie ist die maßgebliche Quelle.**
 Lies den relevanten Abschnitt, bevor du an einem Feature arbeitest. Diese Datei enthält nur das, was in jeder Sitzung gilt.
@@ -81,6 +81,12 @@ Daraus folgt: Die Antwort des PSN-Token-Endpunkts wird nie in `psn_raw_response`
 ### Rohdaten vor Normalisierung
 
 PSN-Antworten werden zuerst unverändert in `psn_raw_response` geschrieben, danach normalisiert. Die beiden Schritte bleiben getrennt, damit die Normalisierung ohne PSN-Zugriff wiederholbar ist.
+
+Der Sync hat deshalb zwei Phasen (`psn_sync_run.phase`): erst `abruf`, dann `normalisierung`, beide mit begrenzter Arbeit je Aufruf. `POST /api/sync/normalize` setzt `normalized_at` zurück und lässt die Normalisierung erneut laufen — ohne PSN.
+
+### Keine echten PSN-Daten als Testdaten
+
+Die Rohantworten in der Produktionsdatenbank wären perfektes Testmaterial und enthalten die vollständige Spielhistorie des Nutzers. Dieses Repository ist öffentlich. Testdaten werden deshalb nachgebaut (`test/trophy-fixtures.ts`), nie kopiert — dieselbe Regel wie beim Datenbank-Dump.
 
 ### Datenbankzugriff kapseln
 

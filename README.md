@@ -1,6 +1,7 @@
 # Trophytracker
 
-Single-User-Webanwendung zur Verwaltung einer PlayStation-Spielesammlung (PS3, PS4, PS5):
+Single-User-Webanwendung zur Verwaltung einer PlayStation-Spielesammlung
+(PS3, PS4, PS5, PS Vita):
 Besitz, Trophäenfortschritt, eigene Bewertung, Wunsch- und Kaufliste.
 
 Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifikation.md).
@@ -13,10 +14,10 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 2 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
-Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Das
-Datenmodell steht, und Trophäendaten lassen sich **roh** von PlayStation
-abrufen. Ausgewertet werden sie in Stufe 3 – `trophy_progress` ist noch leer.
+**Stufe 3 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev` und
+zeigt die Trophäensammlung mit Fortschritt und Platin. Die Zuordnung zu Spielen
+und Plattformen kommt in Stufe 4.
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -30,6 +31,8 @@ Was steht und in Betrieb nachgewiesen ist:
 | Schema | 16 Tabellen, 7 Views, eine Migration |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
+| Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
+| Ansicht | Trophäenliste mit Sortierung, Platin-Filter und Blätterung |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
@@ -172,6 +175,17 @@ CPU-Zeit im p99 bei 8,7 ms – zu nah an der Grenze. Nachzumessen über die
 GraphQL-Analytics (`workersInvocationsAdaptive`, `cpuTimeP50`/`cpuTimeP99`). Die Antworten werden **unverändert** abgelegt; die
 Normalisierung ist ein eigener Schritt in Stufe 3 und braucht keinen
 PSN-Zugriff.
+
+**Zwei Phasen.** Ein Lauf holt zuerst alle Seiten roh, danach normalisiert er
+sie zu `trophy_progress` – beides mit begrenzter Arbeit je Aufruf. Die
+Normalisierung fasst PSN nicht an und lässt sich jederzeit wiederholen:
+
+```
+POST /api/sync/normalize     # setzt zurück, danach normalisiert POST /api/sync erneut
+```
+
+Das ist der praktische Nutzen der Trennung: Ist die Abbildung falsch, wird sie
+korrigiert und erneut ausgeführt, statt die Daten neu von Sony zu holen.
 
 Läuft das NPSSO ab, ist das kein Fehlerfall, sondern ein regulärer Zustand:
 `status` wird `abgelaufen`, vorhandene Daten bleiben stehen, und in den

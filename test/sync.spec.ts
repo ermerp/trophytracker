@@ -35,6 +35,22 @@ function psnMit(total: number) {
 	return { psn: erstellePsnClient(fetch), aufrufe };
 }
 
+/**
+ * Ruft syncSchritt, bis nichts mehr offen ist.
+ *
+ * Seit Stufe 3 hat ein Lauf zwei Phasen: erst Abruf, dann Normalisierung.
+ * "erfolg" steht deshalb erst am Ende beider.
+ */
+async function bisFertig(psn: ReturnType<typeof erstellePsnClient>, max = 30) {
+	const schritte = [];
+	for (let i = 0; i < max; i++) {
+		const e = await syncSchritt(repos(), psn);
+		schritte.push(e);
+		if (!e.weiter) break;
+	}
+	return schritte;
+}
+
 beforeEach(leeren);
 
 describe("syncSchritt", () => {
@@ -46,13 +62,16 @@ describe("syncSchritt", () => {
 		expect(ergebnis.meldung).toMatch(/kein NPSSO/i);
 	});
 
-	it("holt eine kleine Sammlung in einem Aufruf ab", async () => {
+	it("holt eine kleine Sammlung ab und normalisiert sie", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
-		const { psn } = psnMit(50);
 
-		const ergebnis = await syncSchritt(repos(), psn);
+		const schritte = await bisFertig(psnMit(50).psn);
 
-		expect(ergebnis).toMatchObject({ status: "erfolg", weiter: false, titlesSeen: 50 });
+		// Eine Seite reicht fuer 50 Titel, der erste Aufruf meldet deshalb
+		// direkt den Wechsel in die Normalisierung.
+		expect(schritte[0]).toMatchObject({ status: "laufend", phase: "normalisierung" });
+		expect(schritte.at(-1)).toMatchObject({ status: "erfolg", weiter: false });
+		expect(await repos().trophies.anzahl()).toBe(50);
 	});
 
 	it("teilt eine grosse Sammlung ueber mehrere Aufrufe auf", async () => {
@@ -73,8 +92,9 @@ describe("syncSchritt", () => {
 			});
 		}
 
-		const letzter = await syncSchritt(repos(), psnMit(TITEL).psn);
-		expect(letzter).toMatchObject({ status: "erfolg", weiter: false, titlesSeen: TITEL });
+		// Der letzte Abrufschritt wechselt in die Normalisierung, nicht auf Erfolg.
+		const wechsel = await syncSchritt(repos(), psnMit(TITEL).psn);
+		expect(wechsel).toMatchObject({ status: "laufend", phase: "normalisierung" });
 
 		const { results } = await env.DB.prepare(
 			"SELECT endpoint FROM psn_raw_response ORDER BY id",
@@ -87,7 +107,7 @@ describe("syncSchritt", () => {
 
 	it("legt die Rohantwort unveraendert ab", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
-		await syncSchritt(repos(), psnMit(20).psn);
+		await bisFertig(psnMit(20).psn);
 
 		const zeile = await env.DB.prepare("SELECT payload FROM psn_raw_response").first<{
 			payload: string;
@@ -97,7 +117,7 @@ describe("syncSchritt", () => {
 
 	it("schreibt KEINE Token-Antwort in die Rohdaten", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
-		await syncSchritt(repos(), psnMit(20).psn);
+		await bisFertig(psnMit(20).psn);
 
 		const { results } = await env.DB.prepare(
 			"SELECT payload FROM psn_raw_response",
@@ -111,7 +131,7 @@ describe("syncSchritt", () => {
 
 	it("nutzt beim zweiten Lauf den Refresh-Token statt des NPSSO", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
-		await syncSchritt(repos(), psnMit(20).psn);
+		await bisFertig(psnMit(20).psn);
 
 		const { psn, aufrufe } = psnMit(20);
 		await syncSchritt(repos(), psn);
@@ -122,7 +142,7 @@ describe("syncSchritt", () => {
 
 	it("faellt auf das NPSSO zurueck, wenn der Refresh-Token abgelehnt wird", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
-		await syncSchritt(repos(), psnMit(20).psn);
+		await bisFertig(psnMit(20).psn);
 
 		let ersterTokenAufruf = true;
 		const { fetch, aufrufe } = fakeFetch([
@@ -140,15 +160,15 @@ describe("syncSchritt", () => {
 			[/trophyTitles/, () => new Response(trophySeite(0, 20))],
 		]);
 
-		const ergebnis = await syncSchritt(repos(), erstellePsnClient(fetch));
+		const schritte = await bisFertig(erstellePsnClient(fetch));
 
-		expect(ergebnis.status).toBe("erfolg");
+		expect(schritte.at(-1)?.status).toBe("erfolg");
 		expect(aufrufe.some((a) => a.url.includes("authorize"))).toBe(true);
 	});
 
 	it("setzt bei abgelaufenem Zugang den Status, ohne Daten anzutasten", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
-		await syncSchritt(repos(), psnMit(20).psn);
+		await bisFertig(psnMit(20).psn);
 		const vorher = await env.DB.prepare("SELECT COUNT(*) AS n FROM psn_raw_response").first<{
 			n: number;
 		}>();
@@ -170,7 +190,7 @@ describe("syncSchritt", () => {
 
 	it("vermerkt den Erfolg in den Zugangsdaten", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
-		await syncSchritt(repos(), psnMit(20).psn);
+		await bisFertig(psnMit(20).psn);
 
 		const anzeige = await repos().credentials.anzeige();
 		expect(anzeige.status).toBe("ok");

@@ -1,6 +1,7 @@
 import { CredentialsRepository } from "./credentials";
 import { SettingsRepository } from "./settings";
 import { SyncRepository } from "./sync";
+import { TrophiesRepository } from "./trophies";
 
 /**
  * Die eine Stelle, an der D1 hereinkommt.
@@ -14,6 +15,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		settings: new SettingsRepository(db),
 		credentials: new CredentialsRepository(db, npssoKey),
 		sync: new SyncRepository(db),
+		trophies: new TrophiesRepository(db),
 	};
 }
 
