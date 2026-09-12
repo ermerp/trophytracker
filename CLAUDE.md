@@ -88,6 +88,8 @@ Der Sync hat deshalb zwei Phasen (`psn_sync_run.phase`): erst `abruf`, dann `nor
 
 `src/domain/titel.ts` hält `titelSchluessel` (aggressiv, nur zum Vergleichen) und `anzeigeTitel` (zurückhaltend, für `game.title`). Beide werden ab Stufe 9 auch für IGDB und ab Stufe 11 für den Wunschlisten-Import gebraucht — Änderungen dort wirken auf alle Abgleiche. `trophy_progress.title_name` bleibt immer der Rohwert von Sony.
 
+**`game.sort_title` ist abgeleitet und veraltet still**, wenn sich `titelSchluessel` ändert. Nach jeder Änderung an der Normalisierung `POST /api/games/schluessel-neu-berechnen` aufrufen — sonst findet die automatische Zuordnung über `sort_title` falsche oder gar keine Kandidaten. Die Ansicht „Sammlung prüfen" markiert veraltete Schlüssel.
+
 Gegen die echten 431 Titel abgesichert: Diakritika werden gefaltet (sonst wird „Ragnarök" zu „ragnar k"), nicht-lateinische Titel fallen auf den Anzeigenamen zurück (sonst wäre der Schlüssel leer), und ein hängendes „the" nach entfernter Edition wird abgeschnitten.
 
 ### Keine echten PSN-Daten als Testdaten

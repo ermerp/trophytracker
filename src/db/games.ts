@@ -35,6 +35,7 @@ function wirktAbgekuerzt(titel: string): boolean {
 export type UebersichtZeile = {
 	game_id: number;
 	title: string;
+	sort_title: string;
 	release_id: number;
 	platform: string;
 	np_communication_id: string | null;
@@ -50,6 +51,7 @@ export type UebersichtZeile = {
 	strukturWeichtAb?: boolean;
 	ohneListe?: boolean;
 	titelWirktAbgekuerzt?: boolean;
+	schluesselVeraltet?: boolean;
 };
 
 export type SpielZeile = {
@@ -175,6 +177,33 @@ export class GamesRepository {
 		return results;
 	}
 
+	/**
+	 * Rechnet sort_title fuer alle Spiele neu aus dem Titel aus.
+	 *
+	 * sort_title ist abgeleitete Information. Aendert sich die Regel in
+	 * titelSchluessel - und das ist bereits zweimal passiert -, veralten die
+	 * gespeicherten Werte still. Folge: Die automatische Zuordnung sucht ueber
+	 * sort_title und findet dann zu viele oder zu wenige Kandidaten.
+	 *
+	 * Nach jeder Aenderung an der Normalisierung aufrufen.
+	 */
+	async sortierschluesselNeuBerechnen(): Promise<{ geprueft: number; geaendert: number }> {
+		const { results } = await this.db
+			.prepare("SELECT id, title, sort_title FROM game")
+			.all<{ id: number; title: string; sort_title: string }>();
+
+		const zuAendern = results
+			.map((g) => ({ id: g.id, neu: titelSchluessel(g.title), alt: g.sort_title }))
+			.filter((g) => g.neu !== g.alt);
+
+		if (zuAendern.length > 0) {
+			const anweisung = this.db.prepare("UPDATE game SET sort_title = ? WHERE id = ?");
+			await this.db.batch(zuAendern.map((g) => anweisung.bind(g.neu, g.id)));
+		}
+
+		return { geprueft: results.length, geaendert: zuAendern.length };
+	}
+
 	/** Titel aendern. sort_title wird neu abgeleitet. */
 	async umbenennen(id: number, titel: string): Promise<boolean> {
 		const ergebnis = await this.db
@@ -247,7 +276,7 @@ aeenliste haengt
 	}): Promise<{ zeilen: UebersichtZeile[]; gesamt: number }> {
 		const { results } = await this.db
 			.prepare(
-				`SELECT g.id AS game_id, g.title, r.id AS release_id, r.platform,
+				`SELECT g.id AS game_id, g.title, g.sort_title, r.id AS release_id, r.platform,
 				        t.np_communication_id, t.title_name, t.progress_pct,
 				        t.defined_bronze, t.defined_silver, t.defined_gold, t.defined_platinum,
 				        t.earned_platinum,
@@ -277,6 +306,7 @@ aeenliste haengt
 			strukturWeichtAb: (strukturenJeSpiel.get(z.game_id)?.size ?? 1) > 1,
 			ohneListe: z.np_communication_id === null,
 			titelWirktAbgekuerzt: wirktAbgekuerzt(z.title),
+			schluesselVeraltet: titelSchluessel(z.title) !== z.sort_title,
 		}));
 
 		const suche = optionen.suche.trim().toLowerCase();
@@ -284,7 +314,9 @@ aeenliste haengt
 			if (suche && !z.title.toLowerCase().includes(suche)) return false;
 			if (optionen.filter === "mehrfach") return z.releases_im_spiel > 1;
 			if (optionen.filter === "auffaellig") {
-				return z.strukturWeichtAb || z.ohneListe || z.titelWirktAbgekuerzt;
+				return (
+					z.strukturWeichtAb || z.ohneListe || z.titelWirktAbgekuerzt || z.schluesselVeraltet
+				);
 			}
 			return true;
 		});
