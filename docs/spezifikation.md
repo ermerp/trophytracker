@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 10 – Trophäenstruktur als Matching-Signal, Korrekturwerkzeuge für Zuordnungen.*
+*Version 11 – Lücken bewusst verwerfen, wenn die physische Fassung nicht gewünscht ist.*
 
 ## 1. Use Cases
 
@@ -8,7 +8,7 @@
 |---|---|---|
 | 1 | Sammlung verwalten | `game`, `release`, `physical_copy`, `digital_entitlement` |
 | 2 | Fortschritt verfolgen – über Trophäen und eigene Bewertung | `trophy_progress` + `play_status` |
-| 3 | Lücken erkennen: bisher nur digital, Disc existiert | `release.physical_release_status`, `v_luecken` |
+| 3 | Lücken erkennen: bisher nur digital, Disc existiert | `release.physical_release_status`, `v_luecken`; verworfene Lücken siehe 5.3 |
 | 4 | Wunschliste | `plan_entry` mit `kind = 'wunsch'` |
 | 5a | To-Do: was spiele ich als nächstes (kurz, geordnet) | `plan_entry` mit `kind = 'todo'` |
 | 5b | Backlog / Pile of Shame: irgendwann mal | `plan_entry` mit `kind = 'backlog'` |
@@ -281,6 +281,33 @@ Zwei getrennte Felder, weil sie zwei verschiedene Fragen beantworten:
 - `is_favorite` ist der binäre Anker für **"das will ich wirklich"**. Er filtert, statt zu sortieren, und überlebt jede Änderung der Rangformel unbeschadet.
 
 Ein Favorit mit mässiger Kritikerwertung soll nicht nach unten rutschen, nur weil die Formel gerade anders gewichtet ist. Deshalb ist Favorit kein Prioritätswert 6.
+
+### 5.3 Eine Lücke bewusst verwerfen
+
+Nicht jede Lücke ist ein Kaufwunsch. Ein Spiel, das digital vorliegt und als Disc existiert, taucht
+in `v_luecken` auf – aber vielleicht ist die physische Fassung gar nicht gewollt: kein
+Sammlerinteresse, zu teuer, oder die digitale Fassung genügt.
+
+**Dafür braucht es kein neues Feld.** Ein `plan_entry` mit `kind = 'kauf'`, `origin = 'luecke'` und
+`status = 'verworfen'` sagt genau das aus: geprüft und entschieden. `resolved_at` hält fest, wann.
+
+Die Entscheidung bleibt damit dort, wo alle Absichten liegen, und die Historie geht nicht verloren –
+derselbe Grund, aus dem Wunschliste, To-Do, Backlog und Kaufliste in *einer* Tabelle stehen. Ein
+späterer Sinneswandel ist ein Feld-Update auf `offen`, kein Neuanlegen.
+
+**Folgen für die Sichten:**
+
+- `v_kaufkandidaten` blendet Releases mit verworfenem Kaufeintrag aus. Bisher filterte die View nur
+  auf `status = 'offen'`, wodurch ein verworfener Eintrag den Kandidaten wieder auftauchen ließ –
+  das war ein Fehler.
+- `v_luecken` behält den Eintrag, kennzeichnet ihn aber über eine Spalte `verworfen`. Eine Lücke ist
+  eine **Tatsache** (digital gespielt, Disc existiert, nicht im Regal); dass sie nicht geschlossen
+  werden soll, ist eine **Absicht**. Die Tatsache zu löschen, weil die Absicht fehlt, wäre dieselbe
+  Vermischung, die Abschnitt 1 als Designfehler benennt.
+- Die Lückenansicht blendet verworfene Einträge **standardmäßig aus**, mit einem Umschalter für
+  "auch verworfene zeigen". So verschwinden sie aus dem Blick, ohne aus den Daten zu verschwinden.
+
+Umsetzung mit Stufe 14 (Lückenansicht) und Stufe 15 (Kaufliste).
 
 ### 5.2 Rangberechnung (Use Case 10)
 
@@ -678,6 +705,10 @@ SELECT
   t.progress_pct,
   (t.defined_platinum > 0 AND t.earned_platinum > 0) AS hat_platin,
   ps.status AS eigener_status,
+  -- Absicht statt Tatsache: Die Luecke bleibt bestehen, ist aber als bewusst
+  -- abgelehnt gekennzeichnet (5.3). Die Ansicht blendet sie standardmaessig aus.
+  EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = r.id
+            AND pe.kind = 'kauf' AND pe.status = 'verworfen') AS verworfen,
   (SELECT MIN(price_cents) FROM market_offer m
      WHERE m.release_id = r.id AND m.in_stock = 1) AS bester_gebrauchtpreis_cents
 FROM trophy_progress t
@@ -692,9 +723,12 @@ WHERE t.progress_pct > 0
 CREATE VIEW v_kaufkandidaten AS
 SELECT 'luecke' AS quelle, release_id, title, platform, bester_gebrauchtpreis_cents
 FROM v_luecken
+-- 'offen' schliesst den bereits uebernommenen Kandidaten aus, 'verworfen' den
+-- bewusst abgelehnten (5.3). Ohne 'verworfen' taeuchte eine abgelehnte Luecke
+-- bei jeder Abfrage wieder als Kandidat auf.
 WHERE release_id NOT IN (
   SELECT release_id FROM plan_entry
-  WHERE kind = 'kauf' AND status = 'offen' AND release_id IS NOT NULL
+  WHERE kind = 'kauf' AND status IN ('offen','verworfen') AND release_id IS NOT NULL
 )
 UNION ALL
 SELECT 'wunsch', pe.release_id, COALESCE(g.title, pe.title_raw),
@@ -860,7 +894,7 @@ GET    /api/stats
 | Sammlung | 1 | Kachelraster mit Covern, Filterleiste, Suche |
 | Spieldetail | 1, 2, 7 | Releases, Exemplare, Trophäen je Stufe, eigener Status, Preisverlauf je Kanal |
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
-| Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden |
+| Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden. Knopf "physisch nicht gewünscht"; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar |
 | Wunschliste | 4, 11 | Nach Rang sortiert, Favoriten-Filter, Erscheinungsdatum bei unveröffentlichten Titeln |
 | To-Do | 5a | Kurz und manuell sortierbar (Drag-and-drop) |
 | Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
@@ -1057,7 +1091,7 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 11 | Wunschlisten-Import mit Suche, Ansicht "Ohne Zuordnung" | **Use Cases 9 und 12** |
 | 12 | To-Do und Backlog mit Sortierung und Kandidatenvorschlägen | **Use Cases 5a und 5b** |
 | 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` | **Use Case 8** vollständig |
-| 14 | `physical_release_status` manuell pflegbar, Lückenansicht | **Use Case 3** |
+| 14 | `physical_release_status` manuell pflegbar, Lückenansicht, Lücken verwerfen (5.3) | **Use Case 3** |
 | 15 | Kaufliste mit Kandidaten und Rangberechnung, "Erscheint bald" | **Use Cases 6, 10, 11** |
 | 16 | Barcode-Scan mit Auflösungskette (ohne Feed) | Komfort bei Erfassung |
 | 17 | Cron Trigger, PWA | Automatik und Komfort |

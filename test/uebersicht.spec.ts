@@ -197,3 +197,24 @@ describe("POST /api/games/release/:id/abtrennen", () => {
 		expect((await abtrennen(9999, "Egal")).status).toBe(404);
 	});
 });
+
+describe("Abkuerzungs-Erkennung", () => {
+	const anlegen = (titel: string) =>
+		spielMit(titel, [{ plattform: "PS4", struktur: { b: 30, s: 8, g: 3, p: 1 }, nr: 1 }]);
+
+	it.each(["AC Brotherhood", "AC Revelations"])("markiert %s", async (titel) => {
+		await anlegen(titel);
+		const a = await hole("/api/games/uebersicht?filter=alle");
+		expect(a.zeilen[0].titelWirktAbgekuerzt).toBe(true);
+	});
+
+	// Komplett grossgeschriebene Titel sind Schreibweise, keine Abkuerzung.
+	it.each(["THE FINALS", "ACE COMBAT INFINITY", "GTA IV"])(
+		"markiert %s nicht",
+		async (titel) => {
+			await anlegen(titel);
+			const a = await hole("/api/games/uebersicht?filter=alle");
+			expect(a.zeilen[0].titelWirktAbgekuerzt).toBe(false);
+		},
+	);
+});
