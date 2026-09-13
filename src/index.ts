@@ -3,6 +3,7 @@ import { deviationRoutes } from "./api/deviations";
 import { digitalEntitlementRoutes, physicalCopyRoutes } from "./api/ownership";
 import { psnRoutes } from "./api/psn";
 import { releaseRoutes } from "./api/releases";
+import { reviewRoutes } from "./api/review";
 import { settingsRoutes } from "./api/settings";
 import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
@@ -44,6 +45,7 @@ export function createApp(psnFactory: () => PsnClient = () => erstellePsnClient(
 	app.route("/api/games", gameRoutes);
 	app.route("/api/releases", releaseRoutes);
 	app.route("/api/deviations", deviationRoutes);
+	app.route("/api/review", reviewRoutes);
 	app.route("/api/physical-copies", physicalCopyRoutes);
 	app.route("/api/digital-entitlements", digitalEntitlementRoutes);
 	app.route("/api", psnRoutes);

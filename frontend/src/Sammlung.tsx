@@ -16,6 +16,7 @@ import {
   type Plattform,
   type Quelle,
 } from './api'
+import { Hinweise } from './Hinweise'
 
 /**
  * Sammlung (Use Case 1): Kachelraster mit Filterleiste und Suche.
@@ -250,6 +251,8 @@ export function Sammlung() {
   return (
     <>
       <h1>Sammlung</h1>
+
+      <Hinweise />
 
       <SpielAnlegen onAngelegt={laden} />
 

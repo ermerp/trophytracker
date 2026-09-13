@@ -12,6 +12,7 @@ const GESAMT = 250; // drei Seiten a 100
 
 async function leeren() {
 	await env.DB.batch([
+		env.DB.prepare("DELETE FROM review_queue"),
 		env.DB.prepare("DELETE FROM play_status"),
 		env.DB.prepare("DELETE FROM release"),
 		env.DB.prepare("DELETE FROM game"),
@@ -152,10 +153,12 @@ describe("Vorbelegung von play_status im Sync", () => {
 		const releaseId = await releaseFuerTestspiel7();
 		const schritte = await bisFertig();
 
-		// Fixture: 45 % Fortschritt → am_spielen
-		expect(schritte.at(-1)).toMatchObject({ status: "erfolg", vorbelegt: 1 });
+		// Fixture: 45 % Fortschritt → am_spielen; und ab in die Pruefliste
+		expect(schritte.at(-1)).toMatchObject({ status: "erfolg", vorbelegt: 1, eingereiht: 1 });
 		const z = await env.DB.prepare("SELECT status FROM play_status WHERE release_id = ?").bind(releaseId).first();
 		expect(z).toEqual({ status: "am_spielen" });
+		const q = await env.DB.prepare("SELECT reason FROM review_queue WHERE release_id = ?").bind(releaseId).first();
+		expect(q).toEqual({ reason: "erstimport" });
 	});
 
 	it("laesst einen gesetzten Status beim zweiten Sync stehen", async () => {
@@ -165,8 +168,9 @@ describe("Vorbelegung von play_status im Sync", () => {
 
 		const schritte = await bisFertig();
 
-		expect(schritte.at(-1)).toMatchObject({ status: "erfolg", vorbelegt: 0 });
+		expect(schritte.at(-1)).toMatchObject({ status: "erfolg", vorbelegt: 0, eingereiht: 0 });
 		const z = await env.DB.prepare("SELECT status FROM play_status WHERE release_id = ?").bind(releaseId).first();
 		expect(z).toEqual({ status: "abgebrochen" });
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM review_queue").first()).toEqual({ n: 0 });
 	});
 });

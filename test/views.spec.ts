@@ -187,3 +187,36 @@ describe("v_ohne_igdb", () => {
 		]);
 	});
 });
+
+describe("v_review_offen", () => {
+	it("liefert seit Migration 0007 game_id, Bild und Trophaeenverteilung", async () => {
+		const r = await spiel(1, "Bloodborne");
+		await trophaeen(r, 100, true);
+		await env.DB.prepare("INSERT INTO review_queue (release_id, reason) VALUES (?, 'erstimport')").bind(r).run();
+
+		const z = await env.DB.prepare(
+			"SELECT game_id, release_id, reason, defined_platinum, earned_platinum, hat_platin FROM v_review_offen",
+		).first();
+		expect(z).toEqual({
+			game_id: r,
+			release_id: r,
+			reason: "erstimport",
+			defined_platinum: 1,
+			earned_platinum: 1,
+			hat_platin: 1,
+		});
+	});
+
+	it("sortiert erstimport nach Fortschritt absteigend", async () => {
+		const a = await spiel(1, "Niedrig");
+		const b = await spiel(2, "Hoch");
+		await trophaeen(a, 10);
+		await trophaeen(b, 90);
+		await env.DB.batch([
+			env.DB.prepare("INSERT INTO review_queue (release_id, reason) VALUES (?, 'erstimport')").bind(a),
+			env.DB.prepare("INSERT INTO review_queue (release_id, reason) VALUES (?, 'erstimport')").bind(b),
+		]);
+		const { results } = await env.DB.prepare("SELECT title FROM v_review_offen").all();
+		expect(results.map((x: any) => x.title)).toEqual(["Hoch", "Niedrig"]);
+	});
+});

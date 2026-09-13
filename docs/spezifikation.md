@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 13 – Eigene Bewertung: Statuswechsel im Spieldetail, Vorbelegung, Abweichungsansicht; Sicherung wird im Deploy geprüft.*
+*Version 14 – Prüfliste mit `erstimport`: sieben Aktionen, Einreihung durch Sync und Zuordnung, zweite Runde über `unentschieden` sichtbar.*
 
 ## 1. Use Cases
 
@@ -580,6 +580,8 @@ Der Sync **schreibt nur in die Warteschlange**, er ändert nie einen Status. Ste
 
 `erstimport` hängt an `reviewed_at`, nicht an der Existenz einer `play_status`-Zeile: Seit Stufe 6 belegt der Sync den Status vor (4.2), fast jedes Release hat also eine Zeile. Die Ersteinrichtung zeigt die Vorbelegung und lässt sie bestätigen oder ändern. Ein im Spieldetail von Hand gesetzter Status zählt bereits als Durchsicht und erscheint nicht mehr als `erstimport`.
 
+**Auslöser der Einreihung.** `ReviewRepository.einreihen` (ein `INSERT OR IGNORE … SELECT`) läuft am Ende jeder Normalisierung – direkt nach der Vorbelegung – und nach jeder Zuordnung, manuell wie automatisch. Den Bestand hat Migration 0007 einmalig eingereiht; der Deploy-Job protokolliert die Zeilenzahl. Stufe 7 kennt nur `erstimport`; `neue_trophaeen` und `dlc_erweitert` füllt die Änderungserkennung in Stufe 13.
+
 Der Filter "nicht `am_spielen`" ist wichtig: bei einem Spiel, das du gerade aktiv zockst, kommen bei jedem Sync neue Trophäen dazu. Das ist keine Nachricht, sondern der Normalfall – es würde die Liste sonst zumüllen.
 
 **Die Oberfläche.** Ein Spiel pro Bildschirm mit Cover, Plattform, Trophäenverteilung, Platin-Kennzeichen und – bei Änderungen – dem Vorher-Nachher-Vergleich aus `detail`. Der Grund steht als Überschrift: "Du hast weitergespielt" oder "Neue DLC-Trophäen erschienen".
@@ -592,6 +594,9 @@ Der Filter "nicht `am_spielen`" ist wichtig: bei einem Spiel, das du gerade akti
 | Auf To-Do | `play_status = 'pausiert'` + `plan_entry(kind='todo', origin='triage')` |
 | Ins Backlog | `play_status = 'pausiert'` + `plan_entry(kind='backlog', origin='triage')` |
 | Unverändert lassen | Status bleibt, Eintrag verschwindet trotzdem |
+| Überspringen | `play_status = 'unentschieden'`; Eintrag verschwindet, das Spiel bleibt über den Status-Filter der Sammlung auffindbar – die zweite Runde |
+
+Die Aktionen setzen **nur den Status**; Bewertung, Notiz und Daten bleiben stehen. „Auf To-Do" und „Ins Backlog" legen den `plan_entry` nur an, wenn am Release noch kein offener `todo`- oder `backlog`-Eintrag hängt. Tastenkürzel 1–7 lösen die Aktionen aus.
 
 **Jede Entscheidung** löscht die Zeile aus `review_queue` und stempelt `reviewed_earned_total`, `reviewed_defined_total` und `reviewed_at` auf den aktuellen Stand. Damit ist der Referenzpunkt gesetzt, und dasselbe Spiel taucht erst bei der nächsten echten Änderung wieder auf.
 
@@ -768,10 +773,12 @@ WHERE pe.kind = 'wunsch' AND pe.status = 'offen';
 -- Use Case 8: offene Prüfliste, angereichert für die Anzeige.
 CREATE VIEW v_review_offen AS
 SELECT rq.reason, rq.detail, rq.enqueued_at,
-       g.title, r.id AS release_id, r.platform,
-       t.progress_pct,
+       g.id AS game_id, g.title, g.cover_url,
+       r.id AS release_id, r.platform,
+       t.icon_url, t.progress_pct, t.last_played_at,
        (t.defined_platinum > 0 AND t.earned_platinum > 0) AS hat_platin,
-       t.earned_bronze, t.earned_silver, t.earned_gold,
+       t.defined_bronze, t.defined_silver, t.defined_gold, t.defined_platinum,
+       t.earned_bronze, t.earned_silver, t.earned_gold, t.earned_platinum,
        ps.status AS aktueller_status
 FROM review_queue rq
 JOIN release r ON r.id = rq.release_id
@@ -873,9 +880,9 @@ PATCH  /api/plans/:id                 inkl. kind-Wechsel, status, is_favorite
 PUT    /api/plans/reorder             Body: { kind, orderedIds } – To-Do-Reihenfolge
 DELETE /api/plans/:id
 
-GET    /api/review/queue              v_review_offen, paginiert
-POST   /api/review/:releaseId/decide  Body: { action } – siehe 8.1
-GET    /api/review/progress           erledigt / offen
+GET    /api/review/queue              v_review_offen, paginiert (limit, offset); ein Eintrag je Bildschirm
+POST   /api/review/:releaseId/decide  Body: { aktion } – sieben Aktionen aus 8.1; Antwort mit status, planAngelegt, nochOffen
+GET    /api/review/progress           { offen, erledigt, gesamt, unentschieden } – unentschieden ist die zweite Runde
 
 GET    /api/igdb/search?q=            Eingebaute Suche für Import und Nachpflege
 GET    /api/unmatched                 v_ohne_igdb
@@ -920,7 +927,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 
 | Ansicht | Use Case | Inhalt |
 |---|---|---|
-| Dashboard | – | Kennzahlen je Plattform, Platin-Zähler, Backlog-Länge, letzter Sync, Warnung bei abgelaufenem NPSSO |
+| Dashboard | – | Kennzahlen je Plattform, Platin-Zähler, Backlog-Länge, letzter Sync, Warnung bei abgelaufenem NPSSO; offene Prüfliste mit Anzahl **und daneben die Anzahl der `unentschieden`-Einträge mit Link auf die gefilterte Sammlung** – sonst verschwindet die zweite Runde aus dem Blick, sobald die Prüfliste leer ist |
 | Sammlung | 1 | Kachelraster mit Covern, Filterleiste, Suche. Schnellerfassung je Release („+ Disc", „+ digital") mit Rückgängig direkt in der Kachel, eigener Status je Release als Text und Filter und Löschen am Kennzeichen – bei 431 Titeln entscheidet die Klickzahl, ob die Ersterfassung des Regals durchgezogen wird. „Spiel anlegen" für Titel ohne Trophäenliste. Bis Stufe 9 steht das Trophäensymbol an der Stelle des Covers |
 | Spieldetail | 1, 2, 7 | Releases, Exemplare (Zustand, Anleitung, Kaufdatum, Preis, EAN, Notiz), digitale Berechtigungen; je Release „Trophäen (Sony)" und „Eigene Bewertung" (Status, Bewertung 1–10, Begonnen/Beendet, Notiz) nebeneinander, nie verrechnet; Preisverlauf je Kanal; Release hinzufügen und löschen, Spiel löschen |
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
@@ -929,7 +936,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | To-Do | 5a | Kurz und manuell sortierbar (Drag-and-drop) |
 | Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
 | Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert nach Rang, mit Herkunftskennzeichnung |
-| Prüfliste | 8 | Ein Spiel pro Bildschirm, sechs Aktionen, Grund und Vorher-Nachher, Fortschrittsanzeige |
+| Prüfliste | 8 | Ein Spiel pro Bildschirm, sieben Aktionen mit Tastenkürzeln 1–7, Grund und Vorher-Nachher, aktueller (vorbelegter) Status, Fortschrittsanzeige „noch n von m"; jederzeit verlassen, jede Entscheidung ist schon gespeichert |
 | Wunschliste importieren | 9 | Textfeld oder Datei, dreigeteilte Trefferliste, IGDB-Suche für Zeilen ohne Treffer |
 | Ohne Zuordnung | 12 | Listenübergreifend, mit IGDB-Suchfeld zum Nachziehen |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |
@@ -938,7 +945,9 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 
 **Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den fünf Hauptansichten (Sammlung, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
 
-Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/einstellungen`, `/zuordnung`, `/pruefen`, `/trophaeen`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen; Zuordnung, Sammlung prüfen und Trophäen hängen als Werkzeuge an den Einstellungen. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
+Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/pruefen`, `/trophaeen`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen; Zuordnung, Sammlung prüfen und Trophäen hängen als Werkzeuge an den Einstellungen. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
+
+Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste) und nicht zugeordnete Trophäenlisten, jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
 
 **Darstellungsregeln**
 
@@ -1021,7 +1030,7 @@ Frontend und API teilen sich damit eine Origin: **kein CORS, ein Deploy-Pfad, ei
 1. `wrangler d1 export` – Sicherung **vor** jeder Schemaänderung
 2. Sicherung prüfen: Der Dump schreibt eine `INSERT`-Zeile je Datensatz; die Zahlen werden je Tabelle gegen `COUNT(*)` der Datenbank gehalten. Weicht eine ab, **bricht der Job hier ab**, vor der Migration. Ins Log kommen nur Zahlen, nie Inhalt
 3. `wrangler d1 migrations apply --remote`
-4. Datenmigrationen protokollieren ihre Wirkung (seit 0006: Zahl der `play_status`-Zeilen neben der Erwartung), damit sie sich gegen eine bekannte Zahl halten lässt
+4. Datenmigrationen protokollieren ihre Wirkung (0006: `play_status`, 0007: `review_queue`, jeweils neben der Erwartung), damit sie sich gegen eine bekannte Zahl halten lässt
 5. `wrangler deploy`
 
 Schritt 1 ist der Grund, warum das eine Action ist und kein Klick im Dashboard. Eine fehlerhafte Migration ist der wahrscheinlichste Weg, Daten zu verlieren, und der einzige Zeitpunkt, an dem ein frisches Backup wirklich zählt, ist die Sekunde davor. Schritt 2 kam mit der ersten Migration, die Daten schreibt (Stufe 6): Ein Export, den niemand prüft, ist eine Sicherung nur dem Namen nach.

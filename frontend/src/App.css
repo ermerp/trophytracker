@@ -423,3 +423,99 @@ ul.digital {
   grid-column: 1 / -1;
   margin: 0;
 }
+
+/* --- Stufe 7: Pruefliste und Hinweise --- */
+
+.hinweise {
+  list-style: none;
+  padding: 0.6rem 0.8rem;
+  margin: 0 0 1rem;
+  border: 1px solid rgba(200, 140, 0, 0.5);
+  border-radius: 6px;
+  background: rgba(200, 140, 0, 0.08);
+}
+
+.hinweise li + li {
+  margin-top: 0.3rem;
+}
+
+.prueflisten-kopf h1 {
+  margin-bottom: 0.2rem;
+}
+
+.fortschrittsbalken {
+  height: 0.4rem;
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 0.2rem;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.fortschrittsbalken div {
+  height: 100%;
+  background: rgba(60, 140, 90, 0.8);
+}
+
+.pruefkarte {
+  display: flex;
+  gap: 1.2rem;
+  align-items: flex-start;
+  margin-bottom: 1.2rem;
+}
+
+.pruefkarte .bild {
+  flex: none;
+  width: 8rem;
+  height: 8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(128, 128, 128, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 3rem;
+  color: rgba(128, 128, 128, 0.7);
+}
+
+.pruefkarte .bild img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pruefkarte h2 {
+  margin: 0.2rem 0 0.6rem;
+}
+
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.aktionen button {
+  flex: 1 1 10rem;
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+}
+
+.aktionen kbd {
+  display: inline-block;
+  min-width: 1.2rem;
+  margin-right: 0.3rem;
+  padding: 0 0.3rem;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+@media (max-width: 30rem) {
+  .pruefkarte {
+    flex-direction: column;
+  }
+
+  .aktionen button {
+    flex-basis: 100%;
+  }
+}
