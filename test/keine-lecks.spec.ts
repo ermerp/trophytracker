@@ -125,6 +125,12 @@ describe("Dichtheitsprüfung", () => {
 				body: JSON.stringify({ releaseId: 1, quelle: "kauf" }),
 			}),
 			await ruf(app, "/api/releases/1", { method: "DELETE" }),
+			await ruf(app, "/api/releases/1/play-status", {
+				method: "PUT",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ status: "am_spielen" }),
+			}),
+			await ruf(app, "/api/deviations"),
 		];
 
 		for (const text of antworten) {

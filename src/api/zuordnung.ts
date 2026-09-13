@@ -9,9 +9,11 @@ import {
 	type SpieleFilter,
 } from "../db/games";
 import { bildeGruppen } from "../domain/gruppen";
+import { istPlayStatus } from "../domain/play-status";
 import { istErlaubtePlattform, titelSchluessel } from "../domain/titel";
 import type { AppEnv } from "../types";
 import { exemplarAntwort } from "./ownership";
+import { bewertungAntwort } from "./releases";
 
 /**
  * Zuordnung von Trophaeenlisten zu Spielen und Releases.
@@ -82,6 +84,8 @@ export const zuordnungRoutes = new Hono<AppEnv>()
 		}
 
 		const ergebnis = await c.var.repos.games.gruppeAnlegen(titel, releases);
+		// Frisch zugeordnete Listen bekommen sofort ihre Vorbelegung (4.2).
+		await c.var.repos.playStatus.vorbelegen();
 		return c.json({
 			...ergebnis,
 			nochOffen: await c.var.repos.games.anzahlUnzugeordnet(),
@@ -114,6 +118,7 @@ export const zuordnungRoutes = new Hono<AppEnv>()
 		if (!gesetzt) {
 			return c.json({ fehler: "Liste unbekannt oder bereits zugeordnet." }, 409);
 		}
+		await c.var.repos.playStatus.vorbelegen();
 
 		return c.json({ zugeordnet: true, nochOffen: await c.var.repos.games.anzahlUnzugeordnet() });
 	});
@@ -137,6 +142,7 @@ function releaseAntwort(r: ReleaseZeile) {
 		fortschritt: r.progress_pct,
 		platin: r.progress_pct === null ? null : platinAus(r.defined_platinum, r.earned_platinum),
 		zuletztGespielt: r.last_played_at,
+		status: r.play_status,
 		exemplare: r.exemplare,
 		digital: r.digital ? r.digital.split(",") : [],
 	};
@@ -158,6 +164,7 @@ export const gameRoutes = new Hono<AppEnv>()
 			owned: ausWahl(q.owned, BESITZ_FILTER),
 			played: ausWahl(q.played, JA_NEIN),
 			platinum: ausWahl(q.platinum, PLATIN_FILTER),
+			playStatus: istPlayStatus(q.playStatus) ? q.playStatus : undefined,
 			physicalAvailable: ausWahl(q.physicalAvailable, DISC_FILTER),
 			search: q.search ?? "",
 			sort: ausWahl(q.sort, SORTIERUNGEN) ?? "titel",
@@ -335,6 +342,9 @@ export const gameRoutes = new Hono<AppEnv>()
 		const detail = await c.var.repos.games.spielDetail(id);
 		if (!detail) return c.json({ fehler: "Spiel nicht gefunden." }, 404);
 		const besitz = await c.var.repos.ownership.copiesForGame(id);
+		const bewertungen = new Map(
+			(await c.var.repos.playStatus.fuerSpiel(id)).map((b) => [b.release_id, b] as const),
+		);
 
 		return c.json({
 			id: detail.spiel.id,
@@ -370,6 +380,7 @@ export const gameRoutes = new Hono<AppEnv>()
 								},
 								zuletztGespielt: r.last_played_at,
 							},
+				bewertung: bewertungen.has(r.id) ? bewertungAntwort(bewertungen.get(r.id)!) : null,
 				exemplare: besitz.exemplare.filter((e) => e.release_id === r.id).map(exemplarAntwort),
 				digital: besitz.digital
 					.filter((d) => d.release_id === r.id)

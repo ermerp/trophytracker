@@ -204,7 +204,10 @@ main {
     border-right: 1px solid rgba(128, 128, 128, 0.3);
   }
 
+  /* Als Grid-Item wuerde main mit margin:auto auf Inhaltsbreite schrumpfen. */
   main {
+    width: 100%;
+    box-sizing: border-box;
     padding-bottom: 2rem;
   }
 }
@@ -381,4 +384,42 @@ button.gefaehrlich {
 ul.digital {
   padding-left: 1.2rem;
   margin: 0.2rem 0;
+}
+
+/* --- Stufe 6: Bewertung neben Trophaeen --- */
+
+.nebeneinander {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0 2rem;
+}
+
+.nebeneinander h3 {
+  margin-top: 0.8rem;
+}
+
+.bewertung-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 0.4rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.bewertung-form label {
+  font-size: 0.9rem;
+}
+
+.bewertung-form select {
+  font: inherit;
+}
+
+.bewertung-form input[type='text'],
+.bewertung-form input[type='date'] {
+  display: block;
+  margin: 0.1rem 0 0;
+}
+
+.bewertung-form p {
+  grid-column: 1 / -1;
+  margin: 0;
 }

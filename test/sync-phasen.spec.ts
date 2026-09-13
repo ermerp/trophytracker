@@ -12,6 +12,9 @@ const GESAMT = 250; // drei Seiten a 100
 
 async function leeren() {
 	await env.DB.batch([
+		env.DB.prepare("DELETE FROM play_status"),
+		env.DB.prepare("DELETE FROM release"),
+		env.DB.prepare("DELETE FROM game"),
 		env.DB.prepare("DELETE FROM trophy_progress"),
 		env.DB.prepare("DELETE FROM psn_raw_response"),
 		env.DB.prepare("DELETE FROM psn_sync_run"),
@@ -130,5 +133,40 @@ describe("normalisierungWiederholen", () => {
 
 	it("meldet null, wenn es keinen abgeschlossenen Lauf gibt", async () => {
 		expect(await normalisierungWiederholen(repos())).toBeNull();
+	});
+});
+
+/**
+ * Abschnitt 4.2: Die Vorbelegung greift am Ende der Normalisierung - und
+ * nur beim ersten Mal. Ein gesetzter Status ueberlebt jeden weiteren Sync.
+ */
+describe("Vorbelegung von play_status im Sync", () => {
+	/** Spiel mit Release, dessen Titelschluessel zur Fixture "Testspiel 7" passt. */
+	async function releaseFuerTestspiel7(): Promise<number> {
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (1, 'Testspiel 7', 'testspiel 7')").run();
+		await env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (1, 1, 'PS4')").run();
+		return 1;
+	}
+
+	it("belegt eine automatisch zugeordnete Liste am Ende des Laufs vor", async () => {
+		const releaseId = await releaseFuerTestspiel7();
+		const schritte = await bisFertig();
+
+		// Fixture: 45 % Fortschritt → am_spielen
+		expect(schritte.at(-1)).toMatchObject({ status: "erfolg", vorbelegt: 1 });
+		const z = await env.DB.prepare("SELECT status FROM play_status WHERE release_id = ?").bind(releaseId).first();
+		expect(z).toEqual({ status: "am_spielen" });
+	});
+
+	it("laesst einen gesetzten Status beim zweiten Sync stehen", async () => {
+		const releaseId = await releaseFuerTestspiel7();
+		await bisFertig();
+		await repos().playStatus.setzen(releaseId, { status: "abgebrochen" });
+
+		const schritte = await bisFertig();
+
+		expect(schritte.at(-1)).toMatchObject({ status: "erfolg", vorbelegt: 0 });
+		const z = await env.DB.prepare("SELECT status FROM play_status WHERE release_id = ?").bind(releaseId).first();
+		expect(z).toEqual({ status: "abgebrochen" });
 	});
 });

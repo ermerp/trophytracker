@@ -1,4 +1,5 @@
 import type { TrophyEintrag } from "../domain/gruppen";
+import type { PlayStatus } from "../domain/play-status";
 import { titelSchluessel, type Plattform } from "../domain/titel";
 
 export type ZuOrdnenderRelease = {
@@ -61,8 +62,7 @@ export const DISC_FILTER = ["ja", "nein", "unbekannt"] as const;
 export const SORTIERUNGEN = ["titel", "zuletzt"] as const;
 
 /**
- * Filter auf GET /api/games (Abschnitt 12). `playStatus` fehlt noch: die
- * eigene Bewertung kommt in Stufe 6.
+ * Filter auf GET /api/games (Abschnitt 12).
  *
  * Semantik: Ein Spiel erscheint, wenn mindestens ein Release alle
  * Release-Filter zugleich erfuellt. `platform=PS4&owned=physisch` heisst also
@@ -73,6 +73,8 @@ export type SpieleFilter = {
 	owned?: (typeof BESITZ_FILTER)[number];
 	played?: (typeof JA_NEIN)[number];
 	platinum?: (typeof PLATIN_FILTER)[number];
+	/** Fehlende Zeile zaehlt fuer den Filter als 'nicht_gespielt' (wie in v_backlog_kandidaten). */
+	playStatus?: PlayStatus;
 	physicalAvailable?: (typeof DISC_FILTER)[number];
 	search?: string;
 	sort: (typeof SORTIERUNGEN)[number];
@@ -99,6 +101,8 @@ export type ReleaseZeile = {
 	defined_platinum: number | null;
 	earned_platinum: number | null;
 	last_played_at: string | null;
+	/** null = keine Zeile. Wird so ausgegeben, nicht als 'nicht_gespielt' verkleidet. */
+	play_status: PlayStatus | null;
 	exemplare: number;
 	/** Kommagetrennte Quellen, z. B. "kauf,plus" - oder null. */
 	digital: string | null;
@@ -442,12 +446,17 @@ aeenliste haengt
 			bedingungen.push("r.physical_release_status = ?");
 			werte.push(filter.physicalAvailable);
 		}
+		if (filter.playStatus) {
+			bedingungen.push("COALESCE(ps.status, 'nicht_gespielt') = ?");
+			werte.push(filter.playStatus);
+		}
 
 		const releaseBedingung =
 			bedingungen.length === 0 ? "" : " AND " + bedingungen.map((b) => `(${b})`).join(" AND ");
 		const woher =
 			"FROM game g WHERE EXISTS (SELECT 1 FROM release r " +
 			"LEFT JOIN trophy_progress t ON t.release_id = r.id " +
+			"LEFT JOIN play_status ps ON ps.release_id = r.id " +
 			`WHERE r.game_id = g.id${releaseBedingung})`;
 
 		const suche = (filter.search ?? "").trim().toLowerCase();
@@ -485,9 +494,11 @@ aeenliste haengt
 			.prepare(
 				`SELECT r.id, r.game_id, r.platform, r.physical_release_status,
 				        t.progress_pct, t.defined_platinum, t.earned_platinum, t.last_played_at,
+				        ps.status AS play_status,
 				        (SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare,
 				        (SELECT GROUP_CONCAT(d.source) FROM digital_entitlement d WHERE d.release_id = r.id) AS digital
 				 FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id
+				 LEFT JOIN play_status ps ON ps.release_id = r.id
 				 WHERE r.game_id IN (${ids.map(() => "?").join(",")})
 				 ORDER BY r.game_id, r.platform`,
 			)
