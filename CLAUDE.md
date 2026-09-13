@@ -78,6 +78,15 @@ Der Free Tier erlaubt 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit z
 - Große Fremddaten (Händler-Feeds) werden in der GitHub Action geparst und gefiltert; der Worker bekommt nur fertige Batches
 - Rohantworten seitenweise speichern, nicht am Stück parsen
 
+### Zeilenlese-Grenze respektieren
+
+D1 zählt **gelesene Zeilen** (Scans, nicht Ergebniszeilen), und der Free Tier erlaubt 5 Millionen am Tag. Danach antwortet jede Abfrage aus dem Worker bis Mitternacht UTC mit `D1_ERROR`, die Anwendung ist tot. Am 13.09.2026 ist das passiert: Die Sammlungsansicht las ohne Indizes 160 000 Zeilen je Seite, sortiert nach „zuletzt gespielt" 741 000.
+
+- **Jeder Fremdschlüssel hat einen Index** (Migration 0008). Wer eine Tabelle mit `REFERENCES` anlegt, legt den Index in derselben Migration an
+- **Korrelierte Unterabfragen nur über indizierte Spalten.** Ein Unterselect je Ergebniszeile ist in Ordnung, wenn er ein Index-Lookup ist; als Tabellenscan multipliziert er sich mit der Zeilenzahl
+- `test/lesekosten.spec.ts` misst die heißen Abfragen gegen einen Bestand in Produktionsgröße über `meta.rows_read` der lokalen D1. Neue Listenabfragen kommen dort dazu, bevor sie deployt werden
+- `npx wrangler d1 info trophytracker` zeigt `rows_read_24h`; bei mehr als einer Million ohne Import stimmt etwas nicht
+
 ### Geheimnisse sind im Typ gekapselt
 
 NPSSO, Refresh- und Access Token wandern ausschliesslich als `Geheimnis` (`src/domain/secret.ts`) durch den Code. `toString()` und `toJSON()` redigieren, der Klartext ist nur über `.offenlegen()` erreichbar. Sie dürfen **nie** in einer API-Antwort, einer Fehlermeldung oder im Log erscheinen, auch nicht gekürzt — `observability.logs` ist eingeschaltet, was einmal drin steht, bleibt liegen.

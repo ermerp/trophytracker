@@ -31,7 +31,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 16 Tabellen, 7 Views, eine Migration |
+| Schema | 16 Tabellen, 7 Views, acht Migrationen |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
@@ -46,6 +46,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Prüfliste | Ein Spiel pro Bildschirm, sieben Aktionen (Tasten 1–7), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung |
 | Offene Posten | Hinweisblock in der Sammlung: Prüfliste, `unentschieden`, nicht zugeordnete Listen – bis es das Dashboard gibt |
 | Sicherung geprüft | Der Export wird vor der Migration gegen die Zeilenzahlen der Datenbank gehalten; Datenmigrationen protokollieren ihre Wirkung |
+| Lesekosten | Indizes auf allen Fremdschlüsseln; `test/lesekosten.spec.ts` misst die heißen Abfragen gegen 430 Listen (D1 Free Tier: 5 Mio. gelesene Zeilen/Tag) |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
