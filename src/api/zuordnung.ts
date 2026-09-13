@@ -1,7 +1,17 @@
 import { Hono } from "hono";
+import {
+	BESITZ_FILTER,
+	DISC_FILTER,
+	JA_NEIN,
+	PLATIN_FILTER,
+	SORTIERUNGEN,
+	type ReleaseZeile,
+	type SpieleFilter,
+} from "../db/games";
 import { bildeGruppen } from "../domain/gruppen";
-import { istErlaubtePlattform } from "../domain/titel";
+import { istErlaubtePlattform, titelSchluessel } from "../domain/titel";
 import type { AppEnv } from "../types";
+import { exemplarAntwort } from "./ownership";
 
 /**
  * Zuordnung von Trophaeenlisten zu Spielen und Releases.
@@ -108,24 +118,117 @@ export const zuordnungRoutes = new Hono<AppEnv>()
 		return c.json({ zugeordnet: true, nochOffen: await c.var.repos.games.anzahlUnzugeordnet() });
 	});
 
-/** Abschnitt 12: GET /api/games */
+/** Nimmt einen Query-Wert nur an, wenn er in der erlaubten Liste steht; sonst undefined. */
+function ausWahl<T extends string>(wert: string | undefined, erlaubt: readonly T[]): T | undefined {
+	return wert !== undefined && (erlaubt as readonly string[]).includes(wert) ? (wert as T) : undefined;
+}
+
+/** Platin dreiwertig: 93 der 431 Listen haben gar kein Platin, dort waere "offen" falsch. */
+function platinAus(definiert: number | null, erspielt: number | null): "erspielt" | "offen" | "nicht_verfuegbar" {
+	if ((definiert ?? 0) === 0) return "nicht_verfuegbar";
+	return (erspielt ?? 0) > 0 ? "erspielt" : "offen";
+}
+
+function releaseAntwort(r: ReleaseZeile) {
+	return {
+		id: r.id,
+		plattform: r.platform,
+		discFassung: r.physical_release_status,
+		fortschritt: r.progress_pct,
+		platin: r.progress_pct === null ? null : platinAus(r.defined_platinum, r.earned_platinum),
+		zuletztGespielt: r.last_played_at,
+		exemplare: r.exemplare,
+		digital: r.digital ? r.digital.split(",") : [],
+	};
+}
+
+/**
+ * Abschnitt 12: GET /api/games mit Filtern.
+ *
+ * Unbekannte Filterwerte werden ignoriert, nicht mit 400 beantwortet: Ein
+ * alter Link mit einem Wert, den es nicht mehr gibt, soll die Liste zeigen,
+ * nicht eine Fehlermeldung.
+ */
 export const gameRoutes = new Hono<AppEnv>()
 	.get("/", async (c) => {
-		const limit = Math.min(200, Math.max(1, Number(c.req.query("limit")) || 50));
-		const offset = Math.max(0, Number(c.req.query("offset")) || 0);
-		const { zeilen, gesamt } = await c.var.repos.games.spieleListe(limit, offset);
+		const q = c.req.query();
+		const plattform = q.platform !== undefined && istErlaubtePlattform(q.platform) ? q.platform : undefined;
+		const filter: SpieleFilter = {
+			platform: plattform,
+			owned: ausWahl(q.owned, BESITZ_FILTER),
+			played: ausWahl(q.played, JA_NEIN),
+			platinum: ausWahl(q.platinum, PLATIN_FILTER),
+			physicalAvailable: ausWahl(q.physicalAvailable, DISC_FILTER),
+			search: q.search ?? "",
+			sort: ausWahl(q.sort, SORTIERUNGEN) ?? "titel",
+			limit: Math.min(200, Math.max(1, Number(q.limit) || 50)),
+			offset: Math.max(0, Number(q.offset) || 0),
+		};
+		const { zeilen, releases, gesamt } = await c.var.repos.games.spieleListe(filter);
+
+		const releasesJeSpiel = new Map<number, ReleaseZeile[]>();
+		for (const r of releases) {
+			const liste = releasesJeSpiel.get(r.game_id);
+			if (liste) liste.push(r);
+			else releasesJeSpiel.set(r.game_id, [r]);
+		}
 
 		return c.json({
 			gesamt,
-			limit,
-			offset,
+			limit: filter.limit,
+			offset: filter.offset,
+			sort: filter.sort,
 			spiele: zeilen.map((z) => ({
 				id: z.id,
 				titel: z.title,
-				cover: z.cover_url,
-				releases: z.releases,
+				bild: z.cover_url ?? z.icon_url,
+				zuletztGespielt: z.zuletzt_gespielt,
+				releases: (releasesJeSpiel.get(z.id) ?? []).map(releaseAntwort),
 			})),
 		});
+	})
+
+	/**
+	 * Spiel von Hand anlegen, ohne Trophaeenliste.
+	 *
+	 * Gibt es schon ein Spiel mit demselben Titelschluessel, kommt 409 mit
+	 * den Kandidaten zurueck - der Nutzer entscheidet, ob er ein Release
+	 * dort anhaengt oder mit `trotzdem` ein zweites Spiel anlegt.
+	 */
+	.post("/", async (c) => {
+		let koerper: unknown;
+		try {
+			koerper = await c.req.json();
+		} catch {
+			return c.json({ fehler: "Ungültiges JSON." }, 400);
+		}
+		const k = koerper as { titel?: unknown; plattform?: unknown; trotzdem?: unknown };
+
+		const titel = typeof k?.titel === "string" ? k.titel.trim() : "";
+		if (titel === "") return c.json({ fehler: "Feld 'titel' fehlt oder ist leer." }, 400);
+		if (typeof k?.plattform !== "string" || !istErlaubtePlattform(k.plattform)) {
+			return c.json({ fehler: `Unbekannte Plattform: ${String(k?.plattform)}` }, 400);
+		}
+
+		if (k.trotzdem !== true) {
+			const kandidaten = await c.var.repos.games.spieleNachSchluessel(titelSchluessel(titel));
+			if (kandidaten.length > 0) {
+				return c.json(
+					{
+						fehler: "Ein Spiel mit diesem Titel gibt es schon.",
+						kandidaten: kandidaten.map((g) => ({
+							spielId: g.id,
+							titel: g.title,
+							plattformen: g.plattformen ? g.plattformen.split(",") : [],
+						})),
+					},
+					409,
+				);
+			}
+		}
+
+		const ergebnis = await c.var.repos.games.spielAnlegen(titel, k.plattform);
+		return c.json({ spielId: ergebnis.gameId, releaseId: ergebnis.releaseId, titel }, 201);
 	})
 	/** Alle Zuordnungen als Tabelle. Abschnitt 12 ergaenzt. */
 	.get("/uebersicht", async (c) => {
@@ -231,5 +334,56 @@ export const gameRoutes = new Hono<AppEnv>()
 
 		const detail = await c.var.repos.games.spielDetail(id);
 		if (!detail) return c.json({ fehler: "Spiel nicht gefunden." }, 404);
-		return c.json(detail);
+		const besitz = await c.var.repos.ownership.copiesForGame(id);
+
+		return c.json({
+			id: detail.spiel.id,
+			titel: detail.spiel.title,
+			bild: detail.spiel.cover_url ?? detail.releases.find((r) => r.icon_url)?.icon_url ?? null,
+			igdbId: detail.spiel.igdb_id,
+			releases: detail.releases.map((r) => ({
+				id: r.id,
+				plattform: r.platform,
+				edition: r.edition,
+				region: r.region,
+				discFassung: r.physical_release_status,
+				discQuelle: r.physical_source,
+				trophaeen:
+					r.np_communication_id === null
+						? null
+						: {
+								npCommunicationId: r.np_communication_id,
+								rohTitel: r.title_name,
+								fortschritt: r.progress_pct,
+								platin: platinAus(r.defined_platinum, r.earned_platinum),
+								erspielt: {
+									bronze: r.earned_bronze,
+									silber: r.earned_silver,
+									gold: r.earned_gold,
+									platin: r.earned_platinum,
+								},
+								definiert: {
+									bronze: r.defined_bronze,
+									silber: r.defined_silver,
+									gold: r.defined_gold,
+									platin: r.defined_platinum,
+								},
+								zuletztGespielt: r.last_played_at,
+							},
+				exemplare: besitz.exemplare.filter((e) => e.release_id === r.id).map(exemplarAntwort),
+				digital: besitz.digital
+					.filter((d) => d.release_id === r.id)
+					.map((d) => ({ id: d.id, quelle: d.source, erworbenAm: d.acquired_at })),
+			})),
+		});
+	})
+
+	/** Spiel loeschen; Trophaeenlisten fallen in die Zuordnung zurueck. */
+	.delete("/:id", async (c) => {
+		const id = Number(c.req.param("id"));
+		if (!Number.isInteger(id)) return c.json({ fehler: "Ungültige Id." }, 400);
+
+		const ergebnis = await c.var.repos.games.spielLoeschen(id);
+		if (!ergebnis) return c.json({ fehler: "Spiel nicht gefunden." }, 404);
+		return c.json({ id, geloescht: true, ...ergebnis });
 	});

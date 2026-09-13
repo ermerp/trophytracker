@@ -54,12 +54,89 @@ export type UebersichtZeile = {
 	schluesselVeraltet?: boolean;
 };
 
+export const BESITZ_FILTER = ["physisch", "digital", "beide", "keins"] as const;
+export const JA_NEIN = ["ja", "nein"] as const;
+export const PLATIN_FILTER = ["ja", "nein", "nichtverfuegbar"] as const;
+export const DISC_FILTER = ["ja", "nein", "unbekannt"] as const;
+export const SORTIERUNGEN = ["titel", "zuletzt"] as const;
+
+/**
+ * Filter auf GET /api/games (Abschnitt 12). `playStatus` fehlt noch: die
+ * eigene Bewertung kommt in Stufe 6.
+ *
+ * Semantik: Ein Spiel erscheint, wenn mindestens ein Release alle
+ * Release-Filter zugleich erfuellt. `platform=PS4&owned=physisch` heisst also
+ * "hat eine PS4-Disc", nicht "hat irgendeine Disc und irgendein PS4-Release".
+ */
+export type SpieleFilter = {
+	platform?: Plattform;
+	owned?: (typeof BESITZ_FILTER)[number];
+	played?: (typeof JA_NEIN)[number];
+	platinum?: (typeof PLATIN_FILTER)[number];
+	physicalAvailable?: (typeof DISC_FILTER)[number];
+	search?: string;
+	sort: (typeof SORTIERUNGEN)[number];
+	limit: number;
+	offset: number;
+};
+
 export type SpielZeile = {
 	id: number;
 	title: string;
 	sort_title: string;
 	cover_url: string | null;
-	releases: number;
+	/** Trophaeensymbol als Stand-in fuer das Cover, bis Stufe 9 IGDB bringt. */
+	icon_url: string | null;
+	zuletzt_gespielt: string | null;
+};
+
+export type ReleaseZeile = {
+	id: number;
+	game_id: number;
+	platform: string;
+	physical_release_status: "ja" | "nein" | "unbekannt";
+	progress_pct: number | null;
+	defined_platinum: number | null;
+	earned_platinum: number | null;
+	last_played_at: string | null;
+	exemplare: number;
+	/** Kommagetrennte Quellen, z. B. "kauf,plus" - oder null. */
+	digital: string | null;
+};
+
+export type SpielDetail = {
+	spiel: {
+		id: number;
+		title: string;
+		sort_title: string;
+		cover_url: string | null;
+		igdb_id: number | null;
+		release_date: string | null;
+		release_status: string;
+		critic_score: number | null;
+		created_at: string;
+	};
+	releases: Array<{
+		id: number;
+		platform: string;
+		edition: string | null;
+		region: string | null;
+		physical_release_status: "ja" | "nein" | "unbekannt";
+		physical_source: string | null;
+		np_communication_id: string | null;
+		title_name: string | null;
+		icon_url: string | null;
+		progress_pct: number | null;
+		defined_bronze: number | null;
+		defined_silver: number | null;
+		defined_gold: number | null;
+		defined_platinum: number | null;
+		earned_bronze: number | null;
+		earned_silver: number | null;
+		earned_gold: number | null;
+		earned_platinum: number | null;
+		last_played_at: string | null;
+	}>;
 };
 
 /**
@@ -327,34 +404,246 @@ aeenliste haengt
 		};
 	}
 
-	async spieleListe(limit: number, offset: number): Promise<{ zeilen: SpielZeile[]; gesamt: number }> {
-		const gesamt = await this.db.prepare("SELECT COUNT(*) AS n FROM game").first<{ n: number }>();
-		const { results } = await this.db
+	/**
+	 * Gefilterte Spieleliste fuer die Sammlungsansicht.
+	 *
+	 * Die Bedingungen kommen aus festen Textbausteinen, Nutzerwerte gehen
+	 * ausschliesslich als Bindings hinein. Zwei Abfragen: erst die Seite der
+	 * Spiele, dann die Releases dieser Spiele. Kein Rechnen im Worker.
+	 */
+	async spieleListe(filter: SpieleFilter): Promise<{
+		zeilen: SpielZeile[];
+		releases: ReleaseZeile[];
+		gesamt: number;
+	}> {
+		const bedingungen: string[] = [];
+		const werte: unknown[] = [];
+
+		if (filter.platform) {
+			bedingungen.push("r.platform = ?");
+			werte.push(filter.platform);
+		}
+		const physisch = "EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)";
+		const digital = "EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id)";
+		switch (filter.owned) {
+			case "physisch": bedingungen.push(physisch); break;
+			case "digital": bedingungen.push(digital); break;
+			case "beide": bedingungen.push(physisch, digital); break;
+			case "keins": bedingungen.push(`NOT ${physisch}`, `NOT ${digital}`); break;
+		}
+		if (filter.played === "ja") bedingungen.push("COALESCE(t.progress_pct, 0) > 0");
+		if (filter.played === "nein") bedingungen.push("COALESCE(t.progress_pct, 0) = 0");
+		switch (filter.platinum) {
+			case "ja": bedingungen.push("t.defined_platinum > 0 AND t.earned_platinum > 0"); break;
+			case "nein": bedingungen.push("t.defined_platinum > 0 AND t.earned_platinum = 0"); break;
+			case "nichtverfuegbar": bedingungen.push("COALESCE(t.defined_platinum, 0) = 0"); break;
+		}
+		if (filter.physicalAvailable) {
+			bedingungen.push("r.physical_release_status = ?");
+			werte.push(filter.physicalAvailable);
+		}
+
+		const releaseBedingung =
+			bedingungen.length === 0 ? "" : " AND " + bedingungen.map((b) => `(${b})`).join(" AND ");
+		const woher =
+			"FROM game g WHERE EXISTS (SELECT 1 FROM release r " +
+			"LEFT JOIN trophy_progress t ON t.release_id = r.id " +
+			`WHERE r.game_id = g.id${releaseBedingung})`;
+
+		const suche = (filter.search ?? "").trim().toLowerCase();
+		const sucheBedingung = suche ? " AND instr(lower(g.title), ?) > 0" : "";
+		if (suche) werte.push(suche);
+
+		const zuletzt =
+			"(SELECT MAX(t2.last_played_at) FROM trophy_progress t2 JOIN release r2 " +
+			"ON r2.id = t2.release_id WHERE r2.game_id = g.id)";
+		const sortierung =
+			filter.sort === "zuletzt"
+				? `${zuletzt} IS NULL, ${zuletzt} DESC, g.sort_title`
+				: "g.sort_title";
+
+		const [zaehlung, seite] = await this.db.batch([
+			this.db.prepare(`SELECT COUNT(*) AS n ${woher}${sucheBedingung}`).bind(...werte),
+			this.db
+				.prepare(
+					`SELECT g.id, g.title, g.sort_title, g.cover_url,
+					        (SELECT t3.icon_url FROM trophy_progress t3 JOIN release r3 ON r3.id = t3.release_id
+					          WHERE r3.game_id = g.id AND t3.icon_url IS NOT NULL ORDER BY r3.platform DESC LIMIT 1) AS icon_url,
+					        ${zuletzt} AS zuletzt_gespielt
+					 ${woher}${sucheBedingung}
+					 ORDER BY ${sortierung} LIMIT ? OFFSET ?`,
+				)
+				.bind(...werte, filter.limit, filter.offset),
+		]);
+
+		const zeilen = seite.results as SpielZeile[];
+		const gesamt = (zaehlung.results[0] as { n: number } | undefined)?.n ?? 0;
+		if (zeilen.length === 0) return { zeilen, releases: [], gesamt };
+
+		const ids = zeilen.map((z) => z.id);
+		const { results: releases } = await this.db
 			.prepare(
-				"SELECT g.id, g.title, g.sort_title, g.cover_url, " +
-					"(SELECT COUNT(*) FROM release r WHERE r.game_id = g.id) AS releases " +
-					"FROM game g ORDER BY g.sort_title LIMIT ? OFFSET ?",
+				`SELECT r.id, r.game_id, r.platform, r.physical_release_status,
+				        t.progress_pct, t.defined_platinum, t.earned_platinum, t.last_played_at,
+				        (SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare,
+				        (SELECT GROUP_CONCAT(d.source) FROM digital_entitlement d WHERE d.release_id = r.id) AS digital
+				 FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id
+				 WHERE r.game_id IN (${ids.map(() => "?").join(",")})
+				 ORDER BY r.game_id, r.platform`,
 			)
-			.bind(limit, offset)
-			.all<SpielZeile>();
-		return { zeilen: results, gesamt: gesamt?.n ?? 0 };
+			.bind(...ids)
+			.all<ReleaseZeile>();
+
+		return { zeilen, releases, gesamt };
 	}
 
-	async spielDetail(id: number) {
-		const spiel = await this.db.prepare("SELECT * FROM game WHERE id = ?").bind(id).first();
+	async spielDetail(id: number): Promise<SpielDetail | null> {
+		const spiel = await this.db
+			.prepare(
+				"SELECT id, title, sort_title, cover_url, igdb_id, release_date, release_status, " +
+					"critic_score, created_at FROM game WHERE id = ?",
+			)
+			.bind(id)
+			.first<SpielDetail["spiel"]>();
 		if (!spiel) return null;
 
 		const { results: releases } = await this.db
 			.prepare(
-				"SELECT r.id, r.platform, r.edition, r.region, r.physical_release_status, " +
-					"t.np_communication_id, t.title_name, t.platform AS trophy_platform, " +
-					"t.progress_pct, t.defined_platinum, t.earned_platinum " +
+				"SELECT r.id, r.platform, r.edition, r.region, r.physical_release_status, r.physical_source, " +
+					"t.np_communication_id, t.title_name, t.icon_url, t.progress_pct, " +
+					"t.defined_bronze, t.defined_silver, t.defined_gold, t.defined_platinum, " +
+					"t.earned_bronze, t.earned_silver, t.earned_gold, t.earned_platinum, t.last_played_at " +
 					"FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id " +
 					"WHERE r.game_id = ? ORDER BY r.platform",
 			)
 			.bind(id)
-			.all();
+			.all<SpielDetail["releases"][number]>();
 
 		return { spiel, releases };
+	}
+
+	/**
+	 * Spiel von Hand anlegen - ohne Trophaeenliste.
+	 *
+	 * Der Fall, den die Zuordnung nicht abdeckt: eine Disc im Regal, die nie
+	 * gestartet wurde. Dublettenpruefung macht die Route ueber
+	 * releasesNachSchluessel, damit sie dem Nutzer Kandidaten zeigen kann.
+	 */
+	async spielAnlegen(titel: string, plattform: Plattform): Promise<{ gameId: number; releaseId: number }> {
+		const spiel = await this.db
+			.prepare("INSERT INTO game (title, sort_title) VALUES (?, ?) RETURNING id")
+			.bind(titel, titelSchluessel(titel))
+			.first<{ id: number }>();
+		if (!spiel) throw new Error("Spiel konnte nicht angelegt werden.");
+
+		const release = await this.db
+			.prepare("INSERT INTO release (game_id, platform) VALUES (?, ?) RETURNING id")
+			.bind(spiel.id, plattform)
+			.first<{ id: number }>();
+		if (!release) throw new Error("Release konnte nicht angelegt werden.");
+
+		return { gameId: spiel.id, releaseId: release.id };
+	}
+
+	/** Spiele mit gleichem Titelschluessel, fuer die Dublettenwarnung beim Anlegen. */
+	async spieleNachSchluessel(
+		schluessel: string,
+	): Promise<Array<{ id: number; title: string; plattformen: string }>> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT g.id, g.title, " +
+					"(SELECT GROUP_CONCAT(r.platform) FROM release r WHERE r.game_id = g.id) AS plattformen " +
+					"FROM game g WHERE g.sort_title = ? ORDER BY g.id",
+			)
+			.bind(schluessel)
+			.all<{ id: number; title: string; plattformen: string }>();
+		return results;
+	}
+
+	/**
+	 * Release zu einem bestehenden Spiel hinzufuegen.
+	 *
+	 * Die Belegung wird von Hand geprueft: UNIQUE (game_id, platform, edition,
+	 * region) greift bei NULL in edition und region nicht, weil SQLite NULLs
+	 * in UNIQUE-Constraints als verschieden behandelt.
+	 */
+	async releaseAnlegen(
+		gameId: number,
+		plattform: Plattform,
+	): Promise<{ releaseId: number } | "spiel_fehlt" | "belegt"> {
+		const spiel = await this.db.prepare("SELECT 1 AS x FROM game WHERE id = ?").bind(gameId).first();
+		if (!spiel) return "spiel_fehlt";
+
+		const belegt = await this.db
+			.prepare(
+				"SELECT 1 AS x FROM release WHERE game_id = ? AND platform = ? " +
+					"AND edition IS NULL AND region IS NULL",
+			)
+			.bind(gameId, plattform)
+			.first();
+		if (belegt) return "belegt";
+
+		const r = await this.db
+			.prepare("INSERT INTO release (game_id, platform) VALUES (?, ?) RETURNING id")
+			.bind(gameId, plattform)
+			.first<{ id: number }>();
+		if (!r) throw new Error("Release konnte nicht angelegt werden.");
+		return { releaseId: r.id };
+	}
+
+	/**
+	 * Release loeschen.
+	 *
+	 * Die Trophaeenliste bleibt erhalten und faellt per ON DELETE SET NULL in
+	 * die Zuordnung zurueck. Herkunft der alten Zuordnung wird geloescht, sonst
+	 * truege eine offene Liste eine matched_source. Exemplare kaskadieren.
+	 * Ein Spiel ohne Releases wird mit entfernt, wie bei releaseAbtrennen.
+	 */
+	async releaseLoeschen(
+		releaseId: number,
+	): Promise<{ spielGeloescht: boolean; listeFreigegeben: boolean } | null> {
+		const release = await this.db
+			.prepare("SELECT game_id FROM release WHERE id = ?")
+			.bind(releaseId)
+			.first<{ game_id: number }>();
+		if (!release) return null;
+
+		const [freigabe] = await this.db.batch([
+			this.db
+				.prepare(
+					"UPDATE trophy_progress SET release_id = NULL, matched_at = NULL, matched_source = NULL " +
+						"WHERE release_id = ?",
+				)
+				.bind(releaseId),
+			this.db.prepare("DELETE FROM release WHERE id = ?").bind(releaseId),
+		]);
+
+		const rest = await this.db
+			.prepare("SELECT COUNT(*) AS n FROM release WHERE game_id = ?")
+			.bind(release.game_id)
+			.first<{ n: number }>();
+		const leer = (rest?.n ?? 0) === 0;
+		if (leer) {
+			await this.db.prepare("DELETE FROM game WHERE id = ?").bind(release.game_id).run();
+		}
+
+		return { spielGeloescht: leer, listeFreigegeben: (freigabe.meta.changes ?? 0) > 0 };
+	}
+
+	/** Spiel samt Releases loeschen; Trophaeenlisten fallen in die Zuordnung zurueck. */
+	async spielLoeschen(id: number): Promise<{ listenFreigegeben: number } | null> {
+		const spiel = await this.db.prepare("SELECT 1 AS x FROM game WHERE id = ?").bind(id).first();
+		if (!spiel) return null;
+
+		const [freigabe] = await this.db.batch([
+			this.db
+				.prepare(
+					"UPDATE trophy_progress SET release_id = NULL, matched_at = NULL, matched_source = NULL " +
+						"WHERE release_id IN (SELECT id FROM release WHERE game_id = ?)",
+				)
+				.bind(id),
+			this.db.prepare("DELETE FROM game WHERE id = ?").bind(id),
+		]);
+		return { listenFreigegeben: freigabe.meta.changes ?? 0 };
 	}
 }

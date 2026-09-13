@@ -14,10 +14,12 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 4 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 5 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
-den Trophäenlisten lassen sich Spiele und Releases anlegen; Besitz erfassen
-kommt in Stufe 5.
+den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
+erfassen – physische Exemplare und digitale Berechtigungen – und die Sammlung
+danach filtern (Use Case 1). Die eigene Bewertung (`play_status`) kommt in
+Stufe 6.
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -34,6 +36,10 @@ Was steht und in Betrieb nachgewiesen ist:
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
 | Ansicht | Trophäenliste mit Sortierung, Platin-Filter und Blätterung |
 | Zuordnung | Gruppenvorschläge nach Titel, ein Spiel mit mehreren Releases |
+| Sammlung | Kachelraster mit Filtern (Plattform, Besitz, gespielt, Platin, Disc-Fassung), Suche, Schnellerfassung mit Rückgängig |
+| Spieldetail | Exemplare mit Zustand, Kaufdatum, Preis, EAN; digitale Quellen (Kauf, PS Plus, Testversion); Releases anlegen und löschen |
+| Besitz | Spiele ohne Trophäenliste von Hand anlegen, Dublettenwarnung über den Titelschlüssel |
+| Navigation | `react-router-dom`, Leiste unten (Handy) bzw. seitlich (Desktop), Filter in der URL |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.

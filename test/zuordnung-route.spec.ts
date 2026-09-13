@@ -169,7 +169,9 @@ describe("GET /api/games", () => {
 
 		const a2 = await hole("/api/games");
 		expect(a2.gesamt).toBe(1);
-		expect(a2.spiele[0]).toMatchObject({ titel: "Grand Theft Auto V", releases: 2 });
+		expect(a2.spiele[0].titel).toBe("Grand Theft Auto V");
+		expect(a2.spiele[0].releases.map((r: any) => r.plattform)).toEqual(["PS4", "PS5"]);
+		expect(a2.spiele[0].releases[0]).toMatchObject({ exemplare: 0, digital: [], discFassung: "unbekannt" });
 	});
 
 	it("liefert das Detail mit Trophaeenstand", async () => {
@@ -179,8 +181,9 @@ describe("GET /api/games", () => {
 		]);
 
 		const detail = await hole(`/api/games/${gameId}`);
-		expect(detail.spiel.title).toBe("Bloodborne");
-		expect(detail.releases[0]).toMatchObject({ platform: "PS4", progress_pct: 45 });
+		expect(detail.titel).toBe("Bloodborne");
+		expect(detail.releases[0]).toMatchObject({ plattform: "PS4", exemplare: [], digital: [] });
+		expect(detail.releases[0].trophaeen).toMatchObject({ fortschritt: 45, platin: "offen" });
 	});
 
 	it("meldet 404 fuer ein unbekanntes Spiel", async () => {

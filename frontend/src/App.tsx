@@ -1,107 +1,60 @@
-import { useEffect, useState } from 'react'
+import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { Einstellungen } from './Einstellungen'
-import { Trophaeen } from './Trophaeen'
+import { Navigation } from './Navigation'
+import { Sammlung } from './Sammlung'
 import { SammlungPruefen } from './SammlungPruefen'
+import { Spieldetail } from './Spieldetail'
+import { Trophaeen } from './Trophaeen'
 import { Zuordnung } from './Zuordnung'
 import './App.css'
 
 /**
- * Platzhalterseite. Sie zeigt, dass die Kette Access → Worker → Repository →
- * D1 trägt, und wird in Stufe 3 durch die erste echte Ansicht ersetzt.
+ * Ansichten nach Abschnitt 13. Der SPA-Fallback im Worker
+ * (`not_found_handling: single-page-application`) liefert für jeden
+ * unbekannten Pfad die index.html, sodass Direktaufrufe wie /spiel/42
+ * funktionieren.
  */
 
-type Health = { status: string; zeit: string }
-type Weights = Record<string, number>
-
-type Zustand<T> =
-  | { art: 'laedt' }
-  | { art: 'ok'; daten: T }
-  | { art: 'fehler'; meldung: string }
-
-function useApi<T>(pfad: string): Zustand<T> {
-  const [zustand, setZustand] = useState<Zustand<T>>({ art: 'laedt' })
-
-  useEffect(() => {
-    let abgebrochen = false
-    fetch(pfad)
-      .then(async (antwort) => {
-        if (!antwort.ok) throw new Error(`HTTP ${antwort.status}`)
-        return (await antwort.json()) as T
-      })
-      .then((daten) => !abgebrochen && setZustand({ art: 'ok', daten }))
-      .catch(
-        (fehler: unknown) =>
-          !abgebrochen &&
-          setZustand({
-            art: 'fehler',
-            meldung: fehler instanceof Error ? fehler.message : 'Unbekannter Fehler',
-          }),
-      )
-    return () => {
-      abgebrochen = true
-    }
-  }, [pfad])
-
-  return zustand
+/** Werkzeuge, die keine Dauernavigation sind (Abschnitt 13). */
+function Werkzeuge() {
+  return (
+    <section>
+      <h2>Werkzeuge</h2>
+      <ul>
+        <li><Link to="/zuordnung">Zuordnung</Link> – Trophäenlisten zu Spielen und Releases machen</li>
+        <li><Link to="/pruefen">Sammlung prüfen</Link> – alle Zuordnungen als Tabelle</li>
+        <li><Link to="/trophaeen">Trophäen</Link> – die Rohliste von Sony</li>
+      </ul>
+    </section>
+  )
 }
 
 function App() {
-  const health = useApi<Health>('/api/health')
-  const gewichte = useApi<Weights>('/api/settings/weights')
-
   return (
-    <main>
-      <h1>Trophytracker</h1>
-      <p>
-        Stufe 4: Aus Trophäenlisten werden Spiele und Releases. Besitz
-        erfassen kommt in Stufe 5.
-      </p>
-
-      <Zuordnung />
-
-      <SammlungPruefen />
-
-      <Trophaeen />
-
-      <Einstellungen />
-
-      <section>
-        <h2>Worker</h2>
-        {health.art === 'laedt' && <p>wird geprüft …</p>}
-        {health.art === 'ok' && (
-          <p>
-            <strong>{health.daten.status}</strong> – Antwort um{' '}
-            {new Date(health.daten.zeit).toLocaleString('de-DE')}
-          </p>
-        )}
-        {health.art === 'fehler' && <p>Keine Antwort: {health.meldung}</p>}
-      </section>
-
-      <section>
-        <h2>Datenbank</h2>
-        <p>
-          Gewichte der Rangformel, gelesen aus <code>app_setting</code> über die
-          Repository-Schicht:
-        </p>
-        {gewichte.art === 'laedt' && <p>wird geladen …</p>}
-        {gewichte.art === 'ok' && (
-          <table>
-            <tbody>
-              {Object.entries(gewichte.daten).map(([schluessel, wert]) => (
-                <tr key={schluessel}>
-                  <td>
-                    <code>{schluessel}</code>
-                  </td>
-                  <td>{wert}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {gewichte.art === 'fehler' && <p>Keine Antwort: {gewichte.meldung}</p>}
-      </section>
-
-    </main>
+    <div className="app">
+      <Navigation />
+      <main>
+        <Routes>
+          <Route path="/" element={<Navigate to="/sammlung" replace />} />
+          <Route path="/sammlung" element={<Sammlung />} />
+          <Route path="/spiel/:id" element={<Spieldetail />} />
+          <Route
+            path="/einstellungen"
+            element={
+              <>
+                <h1>Einstellungen</h1>
+                <Einstellungen />
+                <Werkzeuge />
+              </>
+            }
+          />
+          <Route path="/zuordnung" element={<Zuordnung />} />
+          <Route path="/pruefen" element={<SammlungPruefen />} />
+          <Route path="/trophaeen" element={<Trophaeen />} />
+          <Route path="*" element={<Navigate to="/sammlung" replace />} />
+        </Routes>
+      </main>
+    </div>
   )
 }
 
