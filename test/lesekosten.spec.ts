@@ -1,0 +1,103 @@
+import { env, SELF } from "cloudflare:test";
+import { describe, it, expect, beforeAll } from "vitest";
+
+/**
+ * Zeilenlese-Kosten der heissen Abfragen.
+ *
+ * D1 zaehlt gelesene Zeilen, und der Free Tier erlaubt 5 Millionen am Tag.
+ * Am 13.09.2026 hat die Sammlungsansicht mit korrelierten Unterabfragen
+ * ohne Indizes 11,7 Millionen Zeilen an einem Vormittag gelesen und die
+ * Anwendung fuer den Rest des Tages lahmgelegt. Dieser Test misst die
+ * Kosten gegen einen Bestand in Produktionsgroesse (rund 430 Listen) ueber
+ * meta.rows_read der lokalen D1 und haelt sie unter einer Grenze.
+ */
+
+const ANZAHL = 430;
+const B = "https://example.com";
+
+beforeAll(async () => {
+	await env.DB.batch(
+		["review_queue", "play_status", "physical_copy", "digital_entitlement", "trophy_progress", "release", "game"].map(
+			(t) => env.DB.prepare(`DELETE FROM ${t}`),
+		),
+	);
+	const spiele = env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (?, ?, ?)");
+	const releases = env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (?, ?, ?)");
+	const listen = env.DB.prepare(
+		"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, icon_url, " +
+			"progress_pct, defined_platinum, earned_platinum, last_played_at, synced_at, release_id) " +
+			"VALUES (?, 'trophy', ?, ?, ?, ?, 1, ?, ?, '2026-01-01', ?)",
+	);
+	const status = env.DB.prepare("INSERT INTO play_status (release_id, status) VALUES (?, 'am_spielen')");
+	const queue = env.DB.prepare("INSERT INTO review_queue (release_id, reason) VALUES (?, 'erstimport')");
+	const anweisungen: D1PreparedStatement[] = [];
+	for (let i = 1; i <= ANZAHL; i++) {
+		const plattform = ["PS3", "PS4", "PS5", "PSVITA"][i % 4];
+		anweisungen.push(spiele.bind(i, `Spiel ${i}`, `spiel ${String(i).padStart(4, "0")}`));
+		anweisungen.push(releases.bind(i, i, plattform));
+		anweisungen.push(
+			listen.bind(`NPWR${i}`, `Spiel ${i}`, plattform, `https://x.invalid/${i}.png`, i % 101, i % 5 === 0 ? 1 : 0, `2025-01-${String((i % 28) + 1).padStart(2, "0")}T00:00:00Z`, i),
+		);
+		anweisungen.push(status.bind(i));
+		anweisungen.push(queue.bind(i));
+	}
+	for (let i = 0; i < anweisungen.length; i += 200) {
+		await env.DB.batch(anweisungen.slice(i, i + 200));
+	}
+});
+
+/** Gelesene Zeilen einer Abfrage, gemessen an der lokalen D1. */
+async function zeilenGelesen(sql: string, ...werte: unknown[]): Promise<number> {
+	const r = await env.DB.prepare(sql).bind(...werte).all();
+	return r.meta.rows_read ?? -1;
+}
+
+describe("Zeilenlese-Kosten bei 430 Listen", () => {
+	it("Sammlung, eine Seite nach Titel", async () => {
+		const antwort = await SELF.fetch(`${B}/api/games?limit=50`);
+		expect(antwort.status).toBe(200);
+	});
+
+	it("misst die Abfragen der Sammlung einzeln", async () => {
+		const zuletzt =
+			"(SELECT MAX(t2.last_played_at) FROM trophy_progress t2 JOIN release r2 ON r2.id = t2.release_id WHERE r2.game_id = g.id)";
+		const seite = await zeilenGelesen(
+			`SELECT g.id, g.title, g.sort_title, g.cover_url,
+			  (SELECT t3.icon_url FROM trophy_progress t3 JOIN release r3 ON r3.id = t3.release_id
+			    WHERE r3.game_id = g.id AND t3.icon_url IS NOT NULL ORDER BY r3.platform DESC LIMIT 1) AS icon_url,
+			  ${zuletzt} AS zuletzt_gespielt
+			 FROM game g WHERE EXISTS (SELECT 1 FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id
+			   LEFT JOIN play_status ps ON ps.release_id = r.id WHERE r.game_id = g.id)
+			 ORDER BY g.sort_title LIMIT 50 OFFSET 0`,
+		);
+		const sortiertNachZuletzt = await zeilenGelesen(
+			`SELECT g.id FROM game g WHERE EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id)
+			 ORDER BY ${zuletzt} IS NULL, ${zuletzt} DESC, g.sort_title LIMIT 50`,
+		);
+		const releasesDerSeite = await zeilenGelesen(
+			`SELECT r.id, ps.status,
+			  (SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare,
+			  (SELECT GROUP_CONCAT(d.source) FROM digital_entitlement d WHERE d.release_id = r.id) AS digital
+			 FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id
+			 LEFT JOIN play_status ps ON ps.release_id = r.id
+			 WHERE r.game_id IN (${Array.from({ length: 50 }, (_, i) => i + 1).join(",")})`,
+		);
+		const pruefliste = await zeilenGelesen("SELECT release_id FROM v_review_offen LIMIT 1 OFFSET 0");
+		const uebersicht = await zeilenGelesen(
+			`SELECT g.id, r.id, t.np_communication_id,
+			  (SELECT COUNT(*) FROM release r2 WHERE r2.game_id = g.id) AS releases_im_spiel
+			 FROM game g JOIN release r ON r.game_id = g.id LEFT JOIN trophy_progress t ON t.release_id = r.id
+			 ORDER BY g.sort_title, r.platform`,
+		);
+
+		console.info({ seite, sortiertNachZuletzt, releasesDerSeite, pruefliste, uebersicht });
+
+		// Grenzen: grosszuegig gegenueber dem, was mit Indizes noetig ist,
+		// aber Groessenordnungen unter dem, was ohne Indizes anfaellt.
+		expect(seite).toBeLessThan(20_000);
+		expect(sortiertNachZuletzt).toBeLessThan(20_000);
+		expect(releasesDerSeite).toBeLessThan(5_000);
+		expect(pruefliste).toBeLessThan(10_000);
+		expect(uebersicht).toBeLessThan(20_000);
+	});
+});

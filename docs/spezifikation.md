@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 14 – Prüfliste mit `erstimport`: sieben Aktionen, Einreihung durch Sync und Zuordnung, zweite Runde über `unentschieden` sichtbar.*
+*Version 15 – Zeilenlese-Grenze von D1: Indizes auf allen Fremdschlüsseln, Lesekosten-Test.*
 
 ## 1. Use Cases
 
@@ -49,6 +49,17 @@
 Migrations über Wrangler D1 Migrations. Repository auf GitHub, die Deploy-Action baut und deployt bei Push auf `main`.
 
 **Hinweis zur CPU-Grenze:** Der Free Tier begrenzt auf 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit zählen nicht mit, nur Rechenzeit im Worker selbst. Die zusätzlichen Views sind daher unkritisch. Kritisch bleibt ausschliesslich das Parsen grosser Fremddaten – siehe 7.3.
+
+**Hinweis zur Zeilenlese-Grenze:** D1 zählt gelesene Zeilen – gescannte, nicht zurückgegebene – und
+der Free Tier erlaubt 5 Millionen am Tag. Ist die Grenze erreicht, antwortet jede Abfrage aus dem
+Worker bis Mitternacht UTC mit einem Fehler; die Anwendung ist bis dahin unbenutzbar, die Daten
+bleiben unberührt. Das ist am 13.09.2026 eingetreten: Ohne Indizes auf den Fremdschlüsseln war
+jeder Join auf `trophy_progress.release_id` ein Tabellenscan, und die korrelierten Unterabfragen
+der Sammlungsansicht lasen 160 000 Zeilen je Seite (741 000 bei Sortierung nach „zuletzt
+gespielt"). Seit Migration 0008 trägt jeder Fremdschlüssel einen Index; dieselben Abfragen lesen
+2 000 bis 5 000 Zeilen. `test/lesekosten.spec.ts` misst die heißen Abfragen gegen einen Bestand in
+Produktionsgröße und hält Obergrenzen fest. Regel: Wer eine Tabelle mit `REFERENCES` anlegt, legt
+den Index in derselben Migration an; korrelierte Unterabfragen laufen nur über indizierte Spalten.
 
 **Cron Trigger helfen dagegen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für
 normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz muss deshalb aus dem
@@ -197,6 +208,7 @@ CREATE TABLE trophy_progress (
 );
 
 CREATE INDEX idx_trophy_unmatched ON trophy_progress(release_id) WHERE release_id IS NULL;
+CREATE INDEX idx_trophy_release   ON trophy_progress(release_id);   -- Migration 0008, siehe Abschnitt 2
 ```
 
 Migration 0005 ergänzt `matched_at` und `matched_source` (`automatisch` | `manuell`). Sie halten
@@ -1172,6 +1184,7 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 | Backup landet im öffentlichen Repo | Sammlung öffentlich lesbar | Getrennte Repos, Fine-grained Token nur auf das private, `*.sql` in `.gitignore` (Ausnahme `!migrations/*.sql`), Dump nie als Workflow-Artifact |
 | Bearer-Token geleakt | Fremdzugriff auf die Daten | Access-Richtlinie am Worker davor; Absicherung der Maschinen-Endpunkte in Stufe 8 zu entscheiden |
 | Fehlerhafte Migration | Datenverlust | Export als erster Schritt jedes Deploy-Jobs, Migrationen abwärtskompatibel halten |
+| D1-Tageslimit für gelesene Zeilen erreicht | Anwendung bis Mitternacht UTC tot | Indizes auf allen Fremdschlüsseln, `test/lesekosten.spec.ts` als Wächter, `rows_read_24h` in `wrangler d1 info` beobachten (Abschnitt 2) |
 | Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht auf dem Dashboard |
 | Wiederherstellung nie geprobt | Backup unbrauchbar | Ablauf in der README, einmal testweise durchgespielt |
 | Kritikerwertung fehlt | Rang verzerrt | `COALESCE(critic_score, 70)` – unbewertete Titel werden weder bevorzugt noch bestraft |
