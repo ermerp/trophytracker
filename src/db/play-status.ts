@@ -91,6 +91,34 @@ export class PlayStatusRepository {
 					felder.rating ?? null,
 					felder.notes ?? null,
 				),
+			...this.stempelStatements(releaseId),
+		]);
+
+		return this.fuerRelease(releaseId);
+	}
+
+	/**
+	 * Nur den Status setzen - Datum, Bewertung und Notiz bleiben stehen.
+	 * Fuer die Pruefliste: Eine Triage-Entscheidung darf keine Notiz
+	 * loeschen. Stempelt und raeumt wie setzen.
+	 */
+	statusStatement(releaseId: number, status: PlayStatus): D1PreparedStatement {
+		return this.db
+			.prepare(
+				"INSERT INTO play_status (release_id, status) VALUES (?, ?) " +
+					"ON CONFLICT(release_id) DO UPDATE SET status = excluded.status, updated_at = datetime('now')",
+			)
+			.bind(releaseId, status);
+	}
+
+	/**
+	 * Durchsicht festhalten (Abschnitt 8.1): reviewed_* auf den aktuellen
+	 * Trophaeenstand stempeln und den offenen Pruefeintrag entfernen. Von
+	 * setzen und von der Pruefliste gemeinsam benutzt, damit "durchgesehen"
+	 * ueberall dasselbe heisst.
+	 */
+	stempelStatements(releaseId: number): D1PreparedStatement[] {
+		return [
 			this.db
 				.prepare(
 					"UPDATE trophy_progress SET " +
@@ -100,9 +128,7 @@ export class PlayStatusRepository {
 				)
 				.bind(releaseId),
 			this.db.prepare("DELETE FROM review_queue WHERE release_id = ?").bind(releaseId),
-		]);
-
-		return this.fuerRelease(releaseId);
+		];
 	}
 
 	/**

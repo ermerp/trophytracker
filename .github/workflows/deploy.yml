@@ -79,7 +79,7 @@ jobs:
           test -s backup.sql || { echo "::error::backup.sql fehlt oder ist leer"; exit 1; }
           echo "Dump: $(wc -c < backup.sql) Byte, $(grep -c 'INSERT INTO' backup.sql || true) INSERT-Zeilen"
 
-          tabellen="trophy_progress game release physical_copy digital_entitlement play_status"
+          tabellen="trophy_progress game release physical_copy digital_entitlement play_status review_queue plan_entry"
           abfrage=""
           for t in $tabellen; do abfrage="$abfrage (SELECT COUNT(*) FROM $t) AS $t,"; done
           zaehlung=$(npx wrangler d1 execute trophytracker --remote --json \
@@ -110,19 +110,25 @@ jobs:
           command: d1 migrations apply trophytracker --remote
 
       # Datenmigrationen hinterlassen ihre Wirkung im Log, damit sie sich
-      # gegen eine bekannte Zahl halten laesst. Erwartung fuer play_status:
-      # jede zugeordnete Trophaeenliste mit Fortschritt > 0 (Abschnitt 4.2).
-      - name: Vorbelegung protokollieren
+      # gegen eine bekannte Zahl halten laesst.
+      #   play_status  (0006): jede zugeordnete Liste mit Fortschritt > 0 (4.2)
+      #   review_queue (0007): jede zugeordnete Liste, nie durchgesehen (8.1)
+      - name: Datenmigrationen protokollieren
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           npx wrangler d1 execute trophytracker --remote --json --command \
-            "SELECT (SELECT COUNT(*) FROM play_status) AS play_status,
-                    (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND progress_pct > 0) AS erwartet,
-                    (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL) AS zugeordnet" \
-            | jq -r '.[0].results[0] | "play_status: \(.play_status) Zeilen, erwartet mindestens \(.erwartet) (zugeordnete Listen mit Fortschritt) von \(.zugeordnet) zugeordneten Listen"'
+            "SELECT (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL) AS zugeordnet,
+                    (SELECT COUNT(*) FROM play_status) AS play_status,
+                    (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND progress_pct > 0) AS ps_erwartet,
+                    (SELECT COUNT(*) FROM review_queue) AS review_queue,
+                    (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND reviewed_at IS NULL) AS rq_erwartet" \
+            | jq -r '.[0].results[0] |
+                "zugeordnete Listen: \(.zugeordnet)",
+                "play_status: \(.play_status) Zeilen, erwartet mindestens \(.ps_erwartet) (zugeordnete Listen mit Fortschritt)",
+                "review_queue: \(.review_queue) Zeilen, erwartet \(.rq_erwartet) (zugeordnete Listen, nie durchgesehen)"'
 
       - name: Worker und Assets deployen
         uses: cloudflare/wrangler-action@v4

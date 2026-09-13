@@ -12,6 +12,7 @@ import { bildeGruppen } from "../domain/gruppen";
 import { istPlayStatus } from "../domain/play-status";
 import { istErlaubtePlattform, titelSchluessel } from "../domain/titel";
 import type { AppEnv } from "../types";
+import { platinAus } from "./antwort";
 import { exemplarAntwort } from "./ownership";
 import { bewertungAntwort } from "./releases";
 
@@ -84,8 +85,10 @@ export const zuordnungRoutes = new Hono<AppEnv>()
 		}
 
 		const ergebnis = await c.var.repos.games.gruppeAnlegen(titel, releases);
-		// Frisch zugeordnete Listen bekommen sofort ihre Vorbelegung (4.2).
+		// Frisch zugeordnete Listen bekommen sofort ihre Vorbelegung (4.2)
+		// und landen in der Pruefliste (8.1).
 		await c.var.repos.playStatus.vorbelegen();
+		await c.var.repos.review.einreihen();
 		return c.json({
 			...ergebnis,
 			nochOffen: await c.var.repos.games.anzahlUnzugeordnet(),
@@ -119,6 +122,7 @@ export const zuordnungRoutes = new Hono<AppEnv>()
 			return c.json({ fehler: "Liste unbekannt oder bereits zugeordnet." }, 409);
 		}
 		await c.var.repos.playStatus.vorbelegen();
+		await c.var.repos.review.einreihen();
 
 		return c.json({ zugeordnet: true, nochOffen: await c.var.repos.games.anzahlUnzugeordnet() });
 	});
@@ -126,12 +130,6 @@ export const zuordnungRoutes = new Hono<AppEnv>()
 /** Nimmt einen Query-Wert nur an, wenn er in der erlaubten Liste steht; sonst undefined. */
 function ausWahl<T extends string>(wert: string | undefined, erlaubt: readonly T[]): T | undefined {
 	return wert !== undefined && (erlaubt as readonly string[]).includes(wert) ? (wert as T) : undefined;
-}
-
-/** Platin dreiwertig: 93 der 431 Listen haben gar kein Platin, dort waere "offen" falsch. */
-function platinAus(definiert: number | null, erspielt: number | null): "erspielt" | "offen" | "nicht_verfuegbar" {
-	if ((definiert ?? 0) === 0) return "nicht_verfuegbar";
-	return (erspielt ?? 0) > 0 ? "erspielt" : "offen";
 }
 
 function releaseAntwort(r: ReleaseZeile) {

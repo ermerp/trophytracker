@@ -22,6 +22,8 @@ export type SyncErgebnis = {
 	offeneSeiten?: number;
 	/** Am Ende der Normalisierung: vorbelegte play_status-Zeilen (Abschnitt 4.2). */
 	vorbelegt?: number;
+	/** Am Ende der Normalisierung: neu in die Pruefliste eingereiht (Abschnitt 8.1). */
+	eingereiht?: number;
 	weiter: boolean;
 	meldung?: string;
 };
@@ -187,6 +189,9 @@ export async function normalisierungsSchritt(
 		// Release seinen ersten Status. Schreibt nur ohne Zeile oder bei
 		// 'nicht_gespielt' - ein gesetzter Status ueberlebt jeden Sync.
 		const vorbelegt = await repos.playStatus.vorbelegen();
+		// Abschnitt 8.1: Der Sync schreibt nur in die Warteschlange, nie einen
+		// Status. Stufe 7 kennt nur 'erstimport'.
+		const eingereiht = await repos.review.einreihen();
 
 		const gesamt = await repos.trophies.anzahl();
 		await repos.sync.abschliessen(laufId, gesamt);
@@ -199,6 +204,7 @@ export async function normalisierungsSchritt(
 			titlesSeen: gesamt,
 			offeneSeiten: 0,
 			vorbelegt,
+			eingereiht,
 			weiter: false,
 		};
 	}

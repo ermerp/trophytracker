@@ -101,3 +101,26 @@ export type Bewertung = {
   notiz: string | null
   geaendertAm: string
 }
+
+export const REVIEW_AKTIONEN = [
+  'durchgespielt',
+  'abgebrochen',
+  'spiele_gerade',
+  'auf_todo',
+  'ins_backlog',
+  'unveraendert',
+  'ueberspringen',
+] as const
+export type ReviewAktion = (typeof REVIEW_AKTIONEN)[number]
+
+export const AKTIONSTEXT: Record<ReviewAktion, string> = {
+  durchgespielt: 'Durchgespielt',
+  abgebrochen: 'Abgebrochen',
+  spiele_gerade: 'Spiele gerade',
+  auf_todo: 'Auf To-Do',
+  ins_backlog: 'Ins Backlog',
+  unveraendert: 'Unverändert lassen',
+  ueberspringen: 'Überspringen',
+}
+
+export type ReviewFortschritt = { offen: number; erledigt: number; gesamt: number; unentschieden: number }

@@ -14,12 +14,13 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 6 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 7 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
-erfassen (Use Case 1) und je Release die eigene Bewertung setzen – neben dem
-Trophäenstand, nie damit verrechnet (Use Case 2). Die Prüfliste für die
-Ersteinrichtung kommt in Stufe 7.
+erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
+Die Prüfliste führt einmal durch den ganzen Bestand (Use Case 8, vorerst nur
+`erstimport`) – danach steht der Datenbestand. Stufe 8 sichert ihn ins
+private Repository.
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -42,6 +43,8 @@ Was steht und in Betrieb nachgewiesen ist:
 | Navigation | `react-router-dom`, Leiste unten (Handy) bzw. seitlich (Desktop), Filter in der URL |
 | Bewertung | Status, Bewertung 1–10, Begonnen/Beendet, Notiz je Release; Vorbelegung beim ersten Auftreten einer Trophäenliste, danach nie mehr automatisch angefasst |
 | Abweichungen | Trophäenstand und Bewertung passen nicht zusammen – zur Durchsicht in den Einstellungen |
+| Prüfliste | Ein Spiel pro Bildschirm, sieben Aktionen (Tasten 1–7), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung |
+| Offene Posten | Hinweisblock in der Sammlung: Prüfliste, `unentschieden`, nicht zugeordnete Listen – bis es das Dashboard gibt |
 | Sicherung geprüft | Der Export wird vor der Migration gegen die Zeilenzahlen der Datenbank gehalten; Datenmigrationen protokollieren ihre Wirkung |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
@@ -294,8 +297,8 @@ aus. Die Reihenfolge ist der eigentliche Inhalt:
    geprüft: `INSERT`-Zeilen je Tabelle im Dump gegen `COUNT(*)` der Datenbank.
    Weicht eine Zahl ab, bricht der Job vor der Migration ab. Nur Zahlen im Log
 3. `wrangler d1 migrations apply --remote`
-4. Datenmigrationen protokollieren ihre Wirkung – seit 0006 die Zahl der
-   `play_status`-Zeilen neben der Erwartung (zugeordnete Listen mit Fortschritt)
+4. Datenmigrationen protokollieren ihre Wirkung – `play_status` (0006) und
+   `review_queue` (0007), jeweils neben der Erwartung
 5. `wrangler deploy`
 
 Schritt 2 ist der Grund, warum das eine Action ist und kein Klick im Dashboard:

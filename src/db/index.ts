@@ -2,6 +2,7 @@ import { CredentialsRepository } from "./credentials";
 import { GamesRepository } from "./games";
 import { OwnershipRepository } from "./ownership";
 import { PlayStatusRepository } from "./play-status";
+import { ReviewRepository } from "./review";
 import { SettingsRepository } from "./settings";
 import { SyncRepository } from "./sync";
 import { TrophiesRepository } from "./trophies";
@@ -14,6 +15,7 @@ import { TrophiesRepository } from "./trophies";
  * lokalem SQLite auf src/db/ begrenzt.
  */
 export function createRepositories(db: D1Database, npssoKey: string) {
+	const playStatus = new PlayStatusRepository(db);
 	return {
 		settings: new SettingsRepository(db),
 		credentials: new CredentialsRepository(db, npssoKey),
@@ -21,7 +23,8 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		trophies: new TrophiesRepository(db),
 		games: new GamesRepository(db),
 		ownership: new OwnershipRepository(db),
-		playStatus: new PlayStatusRepository(db),
+		playStatus,
+		review: new ReviewRepository(db, playStatus),
 	};
 }
 

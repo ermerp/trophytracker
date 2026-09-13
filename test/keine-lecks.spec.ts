@@ -131,6 +131,13 @@ describe("Dichtheitsprüfung", () => {
 				body: JSON.stringify({ status: "am_spielen" }),
 			}),
 			await ruf(app, "/api/deviations"),
+			await ruf(app, "/api/review/queue"),
+			await ruf(app, "/api/review/progress"),
+			await ruf(app, "/api/review/1/decide", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ aktion: "unveraendert" }),
+			}),
 		];
 
 		for (const text of antworten) {

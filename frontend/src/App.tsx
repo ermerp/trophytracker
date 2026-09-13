@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { Abweichungen } from './Abweichungen'
 import { Einstellungen } from './Einstellungen'
 import { Navigation } from './Navigation'
+import { Pruefliste } from './Pruefliste'
 import { Sammlung } from './Sammlung'
 import { SammlungPruefen } from './SammlungPruefen'
 import { Spieldetail } from './Spieldetail'
@@ -22,6 +23,7 @@ function Werkzeuge() {
     <section>
       <h2>Werkzeuge</h2>
       <ul>
+        <li><Link to="/pruefliste">Prüfliste</Link> – Trophäenbestand einmal durchgehen, danach nur Änderungen</li>
         <li><Link to="/zuordnung">Zuordnung</Link> – Trophäenlisten zu Spielen und Releases machen</li>
         <li><Link to="/pruefen">Sammlung prüfen</Link> – alle Zuordnungen als Tabelle</li>
         <li><Link to="/trophaeen">Trophäen</Link> – die Rohliste von Sony</li>
@@ -39,6 +41,7 @@ function App() {
           <Route path="/" element={<Navigate to="/sammlung" replace />} />
           <Route path="/sammlung" element={<Sammlung />} />
           <Route path="/spiel/:id" element={<Spieldetail />} />
+          <Route path="/pruefliste" element={<Pruefliste />} />
           <Route
             path="/einstellungen"
             element={
