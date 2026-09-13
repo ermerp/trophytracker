@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 11 – Lücken bewusst verwerfen, wenn die physische Fassung nicht gewünscht ist.*
+*Version 12 – Besitz erfassen: Exemplare, digitale Berechtigungen, Sammlungsfilter, manuelles Anlegen.*
 
 ## 1. Use Cases
 
@@ -132,6 +132,23 @@ CREATE TABLE digital_entitlement (
   UNIQUE (release_id, source)
 );
 ```
+
+**Ein Exemplar belegt die Disc-Fassung.** `physical_copy` hängt an einem konkreten Release; wer ein
+Exemplar einträgt, hat die Disc nachweislich in der Hand. Das Anlegen setzt deshalb
+`physical_release_status` von `unbekannt` auf `ja` mit `physical_source = 'manuell'` – und nur
+das: ein `nein` des Nutzers und ein bereits gesetztes `ja` (etwa aus dem Feed) bleiben unangetastet.
+`physical_release_region` bleibt dabei NULL, denn der Besitz belegt die Existenz der Disc, nicht ihre
+Region; ein geratenes `PAL` würde den Feed-Abgleich in Stufe 18 irreführen. Das Löschen eines
+Exemplars setzt nichts zurück – dass ein Exemplar weg ist, sagt nichts darüber, ob es die Disc gibt.
+
+**Anlegen von Hand.** Spiel und Release entstehen nicht nur aus der Zuordnung (7.2), sondern auch
+über `POST /api/games` und `POST /api/releases` – für die Disc, die nie gestartet wurde und deshalb
+keine Trophäenliste hat. `POST /api/games` prüft den Titelschlüssel: Gibt es schon ein Spiel mit
+demselben `sort_title`, antwortet die Route mit `409` und den Kandidaten, und der Nutzer entscheidet,
+ob er dort ein Release anhängt oder mit `trotzdem` ein zweites Spiel anlegt. `DELETE` auf Release
+oder Spiel gibt anhängende Trophäenlisten in die Zuordnung zurück (`release_id`, `matched_at` und
+`matched_source` werden NULL); Exemplare und Berechtigungen kaskadieren. Bleibt ein Spiel ohne
+Release, wird es mit gelöscht.
 
 ---
 
@@ -817,13 +834,13 @@ WHERE (ps.status IN ('durchgespielt','komplettiert') AND COALESCE(t.progress_pct
 ```
 GET    /api/games                     Liste mit Filtern
 GET    /api/games/:id                 Detail: Releases, Copies, Trophäen, Status, Preise
-POST   /api/games
+POST   /api/games                     Body: { titel, plattform, trotzdem? } – 409 mit Kandidaten bei gleichem Titelschlüssel
 PATCH  /api/games/:id
-DELETE /api/games/:id
+DELETE /api/games/:id                 Trophäenlisten zurück in die Zuordnung
 
-POST   /api/releases
-PATCH  /api/releases/:id              inkl. physical_release_status, psn_product_id
-DELETE /api/releases/:id
+POST   /api/releases                  Body: { spielId, plattform } – 409, wenn die Plattform belegt ist
+PATCH  /api/releases/:id              inkl. physical_release_status, psn_product_id (ab Stufe 14)
+DELETE /api/releases/:id              Trophäenliste zurück in die Zuordnung; leeres Spiel wird mit gelöscht
 
 GET    /api/physical-copies
 POST   /api/physical-copies
@@ -885,7 +902,9 @@ POST   /api/settings/npsso
 GET    /api/stats
 ```
 
-**Filter auf `/api/games`:** `platform`, `owned` (physisch/digital/beide/keins), `played` (ja/nein), `platinum` (ja/nein/nichtverfuegbar), `playStatus`, `physicalAvailable` (ja/nein/unbekannt), `search`.
+**Filter auf `/api/games`:** `platform`, `owned` (physisch/digital/beide/keins), `played` (ja/nein), `platinum` (ja/nein/nichtverfuegbar), `playStatus` (ab Stufe 6), `physicalAvailable` (ja/nein/unbekannt), `search`, dazu `sort` (titel/zuletzt), `limit`, `offset`.
+
+Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein Release alle Filter zugleich** erfüllt. `platform=PS4&owned=physisch` heisst also "hat eine PS4-Disc", nicht "hat irgendeine Disc und irgendein PS4-Release". Unbekannte Filterwerte werden ignoriert, nicht mit `400` beantwortet – ein alter Link soll die Liste zeigen, keine Fehlermeldung. Die Suche ist eine einfache Teilstringsuche im Titel, keine Suche über den Titelschlüssel.
 
 **Zugriffsschutz:** siehe Abschnitt 15.3. Kurz: eine Access-Richtlinie am Worker – da Frontend und API derselbe Worker sind, deckt sie beides in einem ab. Wie die Maschinen-Endpunkte (`/api/imports/feed`, `/api/export/backup.json`) abgesichert werden, die keinen Browser-Login durchlaufen können, ist **in Stufe 8 zu entscheiden**.
 
@@ -896,8 +915,8 @@ GET    /api/stats
 | Ansicht | Use Case | Inhalt |
 |---|---|---|
 | Dashboard | – | Kennzahlen je Plattform, Platin-Zähler, Backlog-Länge, letzter Sync, Warnung bei abgelaufenem NPSSO |
-| Sammlung | 1 | Kachelraster mit Covern, Filterleiste, Suche |
-| Spieldetail | 1, 2, 7 | Releases, Exemplare, Trophäen je Stufe, eigener Status, Preisverlauf je Kanal |
+| Sammlung | 1 | Kachelraster mit Covern, Filterleiste, Suche. Schnellerfassung je Release („+ Disc", „+ digital") mit Rückgängig direkt in der Kachel und Löschen am Kennzeichen – bei 431 Titeln entscheidet die Klickzahl, ob die Ersterfassung des Regals durchgezogen wird. „Spiel anlegen" für Titel ohne Trophäenliste. Bis Stufe 9 steht das Trophäensymbol an der Stelle des Covers |
+| Spieldetail | 1, 2, 7 | Releases, Exemplare (Zustand, Anleitung, Kaufdatum, Preis, EAN, Notiz), digitale Berechtigungen, Trophäen je Stufe, eigener Status, Preisverlauf je Kanal; Release hinzufügen und löschen, Spiel löschen |
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
 | Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden. Knopf "physisch nicht gewünscht"; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar |
 | Wunschliste | 4, 11 | Nach Rang sortiert, Favoriten-Filter, Erscheinungsdatum bei unveröffentlichten Titeln |
@@ -912,6 +931,8 @@ GET    /api/stats
 | Einstellungen | – | NPSSO, Sync, Sync-Historie, offene Scans, Abweichungen, Gewichte der Rangformel, Export und Backup-Status |
 
 **Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den fünf Hauptansichten (Sammlung, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
+
+Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/einstellungen`, `/zuordnung`, `/pruefen`, `/trophaeen`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen; Zuordnung, Sammlung prüfen und Trophäen hängen als Werkzeuge an den Einstellungen. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
 
 **Darstellungsregeln**
 

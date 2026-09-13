@@ -111,6 +111,20 @@ describe("Dichtheitsprüfung", () => {
 			await ruf(app, "/api/sync/status"),
 			await ruf(app, "/api/settings/weights"),
 			await ruf(app, "/api/health"),
+			await ruf(app, "/api/games?owned=physisch&search=x"),
+			await ruf(app, "/api/games/1"),
+			await ruf(app, "/api/physical-copies"),
+			await ruf(app, "/api/physical-copies", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ releaseId: 1, zustand: "gut" }),
+			}),
+			await ruf(app, "/api/digital-entitlements", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ releaseId: 1, quelle: "kauf" }),
+			}),
+			await ruf(app, "/api/releases/1", { method: "DELETE" }),
 		];
 
 		for (const text of antworten) {
