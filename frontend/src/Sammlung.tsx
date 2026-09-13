@@ -5,11 +5,14 @@ import {
   DISCTEXT,
   PLATINTEXT,
   PLATTFORMEN,
+  PLAY_STATUS,
   QUELLEN,
   QUELLENTEXT,
+  STATUSTEXT,
   anfrage,
   type DiscFassung,
   type Platin,
+  type PlayStatus,
   type Plattform,
   type Quelle,
 } from './api'
@@ -36,6 +39,7 @@ type Release = {
   fortschritt: number | null
   platin: Platin | null
   zuletztGespielt: string | null
+  status: PlayStatus | null
   exemplare: number
   digital: Quelle[]
 }
@@ -73,6 +77,8 @@ const FILTER = {
     text: 'Platin',
     werte: [['ja', 'erspielt'], ['nein', 'offen'], ['nichtverfuegbar', 'nicht vorgesehen']] as const,
   },
+  // „nicht gespielt" deckt auch Releases ohne Zeile ab (COALESCE im Server).
+  playStatus: { text: 'Status', werte: PLAY_STATUS.map((w) => [w, STATUSTEXT[w]] as const) },
   physicalAvailable: {
     text: 'Disc-Fassung',
     werte: [['ja', 'ja'], ['nein', 'nein'], ['unbekannt', 'unbekannt']] as const,
@@ -322,6 +328,7 @@ export function Sammlung() {
                         ? ' · keine Trophäenliste'
                         : ` · ${r.fortschritt} % · ${PLATINTEXT[r.platin ?? 'nicht_verfuegbar']}`}
                     </div>
+                    <div className="zeile">{r.status ? STATUSTEXT[r.status] : 'kein Status'}</div>
                     <div className="zeile" title={DISCTEXT[r.discFassung]}>
                       {r.discFassung === 'unbekannt' ? 'Disc: unbekannt' : `Disc: ${r.discFassung}`}
                     </div>

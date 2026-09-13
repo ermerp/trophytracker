@@ -141,6 +141,11 @@ describe("v_abweichungen", () => {
 			.run();
 
 		expect(await zaehle("v_abweichungen")).toBe(1);
+		// Seit Migration 0006 mit Ids, damit die Oberflaeche verlinken kann.
+		expect(await env.DB.prepare("SELECT game_id, release_id FROM v_abweichungen").first()).toEqual({
+			game_id: r,
+			release_id: r,
+		});
 	});
 
 	it("meldet 'nicht_gespielt' trotz Fortschritt", async () => {

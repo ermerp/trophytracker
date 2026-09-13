@@ -8,6 +8,7 @@ import {
 	type Zustand,
 } from "../db/ownership";
 import type { AppEnv } from "../types";
+import { ISO_DATUM, liesJson } from "./validierung";
 
 /**
  * Besitz erfassen: physische Exemplare und digitale Berechtigungen
@@ -17,19 +18,9 @@ import type { AppEnv } from "../types";
  * genau hier, nirgends sonst.
  */
 
-const ISO_DATUM = /^\d{4}-\d{2}-\d{2}$/;
 const EAN = /^\d{8,14}$/;
 
 type Koerper = Record<string, unknown>;
-
-async function liesJson(c: { req: { json(): Promise<unknown> } }): Promise<Koerper | null> {
-	try {
-		const k = await c.req.json();
-		return k !== null && typeof k === "object" ? (k as Koerper) : null;
-	} catch {
-		return null;
-	}
-}
 
 /**
  * Prueft die Felder eines Exemplars. Nur Felder, die im Koerper vorkommen,

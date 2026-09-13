@@ -25,10 +25,26 @@ async function listen(...t: Array<{ name: string; platform: string; nr: number }
 
 beforeEach(async () => {
 	await env.DB.batch([
+		env.DB.prepare("DELETE FROM play_status"),
 		env.DB.prepare("DELETE FROM trophy_progress"),
 		env.DB.prepare("DELETE FROM release"),
 		env.DB.prepare("DELETE FROM game"),
 	]);
+});
+
+describe("Vorbelegung nach der Zuordnung (4.2)", () => {
+	it("gibt einer frisch angelegten Gruppe sofort ihren Status", async () => {
+		const [a] = await listen({ name: "Bloodborne", platform: "PS4", nr: 1 });
+		const antwort = await sende("/api/zuordnung/gruppe", {
+			titel: "Bloodborne",
+			releases: [{ npCommunicationId: a, plattform: "PS4" }],
+		});
+		const { releaseIds } = (await antwort.json()) as { releaseIds: number[] };
+
+		// Fixture: 45 % → am_spielen
+		const z = await env.DB.prepare("SELECT status FROM play_status WHERE release_id = ?").bind(releaseIds[0]).first();
+		expect(z).toEqual({ status: "am_spielen" });
+	});
 });
 
 describe("GET /api/zuordnung/offen", () => {

@@ -20,6 +20,8 @@ export type SyncErgebnis = {
 	titelGeschrieben?: number;
 	verworfen?: number;
 	offeneSeiten?: number;
+	/** Am Ende der Normalisierung: vorbelegte play_status-Zeilen (Abschnitt 4.2). */
+	vorbelegt?: number;
 	weiter: boolean;
 	meldung?: string;
 };
@@ -181,6 +183,11 @@ export async function normalisierungsSchritt(
 		// Beim Erstlauf greift das nie - es gibt noch keine Spiele.
 		await ordneAutomatischZu(repos);
 
+		// Abschnitt 4.2: Erst jetzt, mit zugeordneten Listen, bekommt ein
+		// Release seinen ersten Status. Schreibt nur ohne Zeile oder bei
+		// 'nicht_gespielt' - ein gesetzter Status ueberlebt jeden Sync.
+		const vorbelegt = await repos.playStatus.vorbelegen();
+
 		const gesamt = await repos.trophies.anzahl();
 		await repos.sync.abschliessen(laufId, gesamt);
 		await repos.credentials.erfolgVermerken();
@@ -191,6 +198,7 @@ export async function normalisierungsSchritt(
 			seitenGeholt: 0,
 			titlesSeen: gesamt,
 			offeneSeiten: 0,
+			vorbelegt,
 			weiter: false,
 		};
 	}

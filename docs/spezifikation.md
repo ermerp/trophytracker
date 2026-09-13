@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 12 – Besitz erfassen: Exemplare, digitale Berechtigungen, Sammlungsfilter, manuelles Anlegen.*
+*Version 13 – Eigene Bewertung: Statuswechsel im Spieldetail, Vorbelegung, Abweichungsansicht; Sicherung wird im Deploy geprüft.*
 
 ## 1. Use Cases
 
@@ -230,10 +230,12 @@ CREATE TABLE play_status (
 
 **Regeln für den Sync:**
 
-Es gibt genau zwei Automatiken, und sie greifen **ausschliesslich beim allerersten Import** eines Titels, also solange keine `play_status`-Zeile existiert:
+Es gibt genau zwei Automatiken, und sie greifen **ausschliesslich beim ersten Auftreten** einer Trophäenliste an einem Release – solange keine `play_status`-Zeile existiert oder sie `nicht_gespielt` lautet (eine von Hand angelegte Disc, die inzwischen gestartet wurde):
 
 1. `progress_pct = 100` → `komplettiert`
 2. `progress_pct > 0` → `am_spielen`
+
+Die Vorbelegung ist ein set-basiertes Statement (`PlayStatusRepository.vorbelegen`) und läuft am Ende jeder Normalisierung sowie nach jeder Zuordnung (7.2), weil ein Status am Release hängt und erst mit der Zuordnung ein Release existiert. Den Bestand, der vor Stufe 6 zugeordnet wurde, holt Migration 0006 einmalig nach (`INSERT OR IGNORE`); der Deploy-Job protokolliert die Zeilenzahl.
 
 **Danach ändert kein automatischer Prozess je wieder einen Status.** Jede spätere Trophäenänderung wandert in die Prüfliste (Abschnitt 8) und wartet auf deine Entscheidung. Auch der Fall "war 100 %, ist durch ein neues DLC nur noch 80 %" führt nicht zu einer stillen Statusänderung – er wird vorgelegt.
 
@@ -242,6 +244,8 @@ Es gibt genau zwei Automatiken, und sie greifen **ausschliesslich beim allererst
 `komplettiert` und `durchgespielt` gelten in allen Listen und Auswertungen gleichermassen als erledigt. Der Unterschied ist rein beschreibend.
 
 Alle übrigen Abweichungen zwischen Trophäen und Bewertung werden angezeigt, nicht korrigiert. `durchgespielt` bei 20 % Trophäenfortschritt ist ein gültiger Zustand – Story beendet, Sammelaufgaben liegen gelassen.
+
+**Manuell setzen = durchgesehen.** `PUT /api/releases/:id/play-status` setzt Status, Start- und Enddatum, Bewertung (1–10) und Notiz. Wer den Status im Spieldetail setzt, hat das Spiel gesehen: Der Aufruf stempelt zugleich `reviewed_*` auf den aktuellen Trophäenstand und löscht einen offenen `review_queue`-Eintrag (8.1) – sonst legte die Prüfliste dasselbe Spiel gleich noch einmal vor.
 
 ---
 
@@ -568,11 +572,13 @@ CREATE TABLE review_queue (
 
 | Bedingung | Reason |
 |---|---|
-| keine `play_status`-Zeile vorhanden | `erstimport` |
+| `reviewed_at IS NULL` – noch nie durchgesehen | `erstimport` |
 | `earned_total` gestiegen, Status ist gesetzt und nicht `am_spielen` | `neue_trophaeen` |
 | `defined_total` gestiegen | `dlc_erweitert` |
 
 Der Sync **schreibt nur in die Warteschlange**, er ändert nie einen Status. Steht ein Release schon in der Warteschlange, wird `detail` aktualisiert statt ein zweiter Eintrag angelegt.
+
+`erstimport` hängt an `reviewed_at`, nicht an der Existenz einer `play_status`-Zeile: Seit Stufe 6 belegt der Sync den Status vor (4.2), fast jedes Release hat also eine Zeile. Die Ersteinrichtung zeigt die Vorbelegung und lässt sie bestätigen oder ändern. Ein im Spieldetail von Hand gesetzter Status zählt bereits als Durchsicht und erscheint nicht mehr als `erstimport`.
 
 Der Filter "nicht `am_spielen`" ist wichtig: bei einem Spiel, das du gerade aktiv zockst, kommen bei jedem Sync neue Trophäen dazu. Das ist keine Nachricht, sondern der Normalfall – es würde die Liste sonst zumüllen.
 
@@ -818,7 +824,7 @@ AND r.id NOT IN (SELECT release_id FROM plan_entry
 -- Trophäen und eigene Bewertung weichen ab. Nicht als Fehler behandeln,
 -- nur zur Durchsicht anzeigen.
 CREATE VIEW v_abweichungen AS
-SELECT g.title, r.platform, t.progress_pct, ps.status
+SELECT g.id AS game_id, r.id AS release_id, g.title, r.platform, t.progress_pct, ps.status
 FROM play_status ps
 JOIN release r ON r.id = ps.release_id
 JOIN game g ON g.id = r.game_id
@@ -849,8 +855,8 @@ DELETE /api/physical-copies/:id
 POST   /api/digital-entitlements
 DELETE /api/digital-entitlements/:id
 
-PUT    /api/releases/:id/play-status  Use Case 2: eigene Bewertung setzen
-GET    /api/deviations                v_abweichungen
+PUT    /api/releases/:id/play-status  Use Case 2: Body { status, begonnenAm?, beendetAm?, bewertung?, notiz? }; gilt als Durchsicht (8.1)
+GET    /api/deviations                v_abweichungen, mit spielId/releaseId für den Link ins Spieldetail
 
 GET    /api/trophies
 GET    /api/trophies/unmatched
@@ -902,7 +908,7 @@ POST   /api/settings/npsso
 GET    /api/stats
 ```
 
-**Filter auf `/api/games`:** `platform`, `owned` (physisch/digital/beide/keins), `played` (ja/nein), `platinum` (ja/nein/nichtverfuegbar), `playStatus` (ab Stufe 6), `physicalAvailable` (ja/nein/unbekannt), `search`, dazu `sort` (titel/zuletzt), `limit`, `offset`.
+**Filter auf `/api/games`:** `platform`, `owned` (physisch/digital/beide/keins), `played` (ja/nein), `platinum` (ja/nein/nichtverfuegbar), `playStatus` (die sieben Werte; ein Release ohne Zeile zählt als `nicht_gespielt`), `physicalAvailable` (ja/nein/unbekannt), `search`, dazu `sort` (titel/zuletzt), `limit`, `offset`.
 
 Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein Release alle Filter zugleich** erfüllt. `platform=PS4&owned=physisch` heisst also "hat eine PS4-Disc", nicht "hat irgendeine Disc und irgendein PS4-Release". Unbekannte Filterwerte werden ignoriert, nicht mit `400` beantwortet – ein alter Link soll die Liste zeigen, keine Fehlermeldung. Die Suche ist eine einfache Teilstringsuche im Titel, keine Suche über den Titelschlüssel.
 
@@ -915,8 +921,8 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Ansicht | Use Case | Inhalt |
 |---|---|---|
 | Dashboard | – | Kennzahlen je Plattform, Platin-Zähler, Backlog-Länge, letzter Sync, Warnung bei abgelaufenem NPSSO |
-| Sammlung | 1 | Kachelraster mit Covern, Filterleiste, Suche. Schnellerfassung je Release („+ Disc", „+ digital") mit Rückgängig direkt in der Kachel und Löschen am Kennzeichen – bei 431 Titeln entscheidet die Klickzahl, ob die Ersterfassung des Regals durchgezogen wird. „Spiel anlegen" für Titel ohne Trophäenliste. Bis Stufe 9 steht das Trophäensymbol an der Stelle des Covers |
-| Spieldetail | 1, 2, 7 | Releases, Exemplare (Zustand, Anleitung, Kaufdatum, Preis, EAN, Notiz), digitale Berechtigungen, Trophäen je Stufe, eigener Status, Preisverlauf je Kanal; Release hinzufügen und löschen, Spiel löschen |
+| Sammlung | 1 | Kachelraster mit Covern, Filterleiste, Suche. Schnellerfassung je Release („+ Disc", „+ digital") mit Rückgängig direkt in der Kachel, eigener Status je Release als Text und Filter und Löschen am Kennzeichen – bei 431 Titeln entscheidet die Klickzahl, ob die Ersterfassung des Regals durchgezogen wird. „Spiel anlegen" für Titel ohne Trophäenliste. Bis Stufe 9 steht das Trophäensymbol an der Stelle des Covers |
+| Spieldetail | 1, 2, 7 | Releases, Exemplare (Zustand, Anleitung, Kaufdatum, Preis, EAN, Notiz), digitale Berechtigungen; je Release „Trophäen (Sony)" und „Eigene Bewertung" (Status, Bewertung 1–10, Begonnen/Beendet, Notiz) nebeneinander, nie verrechnet; Preisverlauf je Kanal; Release hinzufügen und löschen, Spiel löschen |
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
 | Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden. Knopf "physisch nicht gewünscht"; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar |
 | Wunschliste | 4, 11 | Nach Rang sortiert, Favoriten-Filter, Erscheinungsdatum bei unveröffentlichten Titeln |
@@ -928,7 +934,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Ohne Zuordnung | 12 | Listenübergreifend, mit IGDB-Suchfeld zum Nachziehen |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |
 | Scannen | 1 | Serienerfassung nach Abschnitt 9 |
-| Einstellungen | – | NPSSO, Sync, Sync-Historie, offene Scans, Abweichungen, Gewichte der Rangformel, Export und Backup-Status |
+| Einstellungen | – | NPSSO, Sync, Sync-Historie, offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Gewichte der Rangformel, Export und Backup-Status |
 
 **Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den fünf Hauptansichten (Sammlung, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
 
@@ -1013,10 +1019,12 @@ Frontend und API teilen sich damit eine Origin: **kein CORS, ein Deploy-Pfad, ei
 **Worker und Datenbank:** GitHub Action mit `cloudflare/wrangler-action`, ausgelöst durch Push auf `main`. Die Reihenfolge der Schritte ist wichtiger als das Werkzeug:
 
 1. `wrangler d1 export` – Sicherung **vor** jeder Schemaänderung
-2. `wrangler d1 migrations apply --remote`
-3. `wrangler deploy`
+2. Sicherung prüfen: Der Dump schreibt eine `INSERT`-Zeile je Datensatz; die Zahlen werden je Tabelle gegen `COUNT(*)` der Datenbank gehalten. Weicht eine ab, **bricht der Job hier ab**, vor der Migration. Ins Log kommen nur Zahlen, nie Inhalt
+3. `wrangler d1 migrations apply --remote`
+4. Datenmigrationen protokollieren ihre Wirkung (seit 0006: Zahl der `play_status`-Zeilen neben der Erwartung), damit sie sich gegen eine bekannte Zahl halten lässt
+5. `wrangler deploy`
 
-Schritt 1 ist der Grund, warum das eine Action ist und kein Klick im Dashboard. Eine fehlerhafte Migration ist der wahrscheinlichste Weg, Daten zu verlieren, und der einzige Zeitpunkt, an dem ein frisches Backup wirklich zählt, ist die Sekunde davor.
+Schritt 1 ist der Grund, warum das eine Action ist und kein Klick im Dashboard. Eine fehlerhafte Migration ist der wahrscheinlichste Weg, Daten zu verlieren, und der einzige Zeitpunkt, an dem ein frisches Backup wirklich zählt, ist die Sekunde davor. Schritt 2 kam mit der ersten Migration, die Daten schreibt (Stufe 6): Ein Export, den niemand prüft, ist eine Sicherung nur dem Namen nach.
 
 Migrationen laufen **vor** dem Deployment, damit der neue Code nie auf ein altes Schema trifft. Umgekehrt gilt: Migrationen müssen abwärtskompatibel sein, weil der alte Worker in dem Moment noch läuft. Spalten hinzufügen ist unkritisch, Spalten umbenennen nicht – dafür braucht es zwei Deployments.
 

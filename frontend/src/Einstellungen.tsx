@@ -34,6 +34,7 @@ type SyncAntwort = {
   seitenGeholt: number
   titlesSeen: number | null
   offeneSeiten?: number
+  vorbelegt?: number
   weiter: boolean
   meldung?: string
 }
@@ -124,7 +125,8 @@ export function Einstellungen() {
           ? `Abruf: ${daten.offset} von ${daten.titlesSeen ?? '?'} Titeln …`
           : daten.weiter
             ? `Auswertung: noch ${daten.offeneSeiten ?? '?'} Seiten …`
-            : `Fertig: ${daten.titlesSeen ?? 0} Titel ausgewertet.`,
+            : `Fertig: ${daten.titlesSeen ?? 0} Titel ausgewertet.` +
+              (daten.vorbelegt ? ` ${daten.vorbelegt} Status vorbelegt.` : ''),
       )
       if (!daten.weiter) break
     }

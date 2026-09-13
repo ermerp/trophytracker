@@ -19,7 +19,7 @@ export class ApiFehler extends Error {
 
 export async function anfrage<T>(
   pfad: string,
-  init?: { methode?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; koerper?: unknown },
+  init?: { methode?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; koerper?: unknown },
 ): Promise<T> {
   const antwort = await fetch(pfad, {
     method: init?.methode ?? 'GET',
@@ -70,3 +70,34 @@ export const datum = (wert: string | null) =>
 
 export const euro = (cents: number | null) =>
   cents === null ? 'unbekannt' : (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
+
+export const PLAY_STATUS = [
+  'nicht_gespielt',
+  'am_spielen',
+  'pausiert',
+  'durchgespielt',
+  'komplettiert',
+  'abgebrochen',
+  'unentschieden',
+] as const
+export type PlayStatus = (typeof PLAY_STATUS)[number]
+
+export const STATUSTEXT: Record<PlayStatus, string> = {
+  nicht_gespielt: 'nicht gespielt',
+  am_spielen: 'am Spielen',
+  pausiert: 'pausiert',
+  durchgespielt: 'durchgespielt',
+  komplettiert: 'komplettiert',
+  abgebrochen: 'abgebrochen',
+  unentschieden: 'unentschieden',
+}
+
+export type Bewertung = {
+  releaseId: number
+  status: PlayStatus
+  begonnenAm: string | null
+  beendetAm: string | null
+  bewertung: number | null
+  notiz: string | null
+  geaendertAm: string
+}

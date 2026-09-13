@@ -14,12 +14,12 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 5 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 6 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
-erfassen – physische Exemplare und digitale Berechtigungen – und die Sammlung
-danach filtern (Use Case 1). Die eigene Bewertung (`play_status`) kommt in
-Stufe 6.
+erfassen (Use Case 1) und je Release die eigene Bewertung setzen – neben dem
+Trophäenstand, nie damit verrechnet (Use Case 2). Die Prüfliste für die
+Ersteinrichtung kommt in Stufe 7.
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -40,6 +40,9 @@ Was steht und in Betrieb nachgewiesen ist:
 | Spieldetail | Exemplare mit Zustand, Kaufdatum, Preis, EAN; digitale Quellen (Kauf, PS Plus, Testversion); Releases anlegen und löschen |
 | Besitz | Spiele ohne Trophäenliste von Hand anlegen, Dublettenwarnung über den Titelschlüssel |
 | Navigation | `react-router-dom`, Leiste unten (Handy) bzw. seitlich (Desktop), Filter in der URL |
+| Bewertung | Status, Bewertung 1–10, Begonnen/Beendet, Notiz je Release; Vorbelegung beim ersten Auftreten einer Trophäenliste, danach nie mehr automatisch angefasst |
+| Abweichungen | Trophäenstand und Bewertung passen nicht zusammen – zur Durchsicht in den Einstellungen |
+| Sicherung geprüft | Der Export wird vor der Migration gegen die Zeilenzahlen der Datenbank gehalten; Datenmigrationen protokollieren ihre Wirkung |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
@@ -287,9 +290,13 @@ Jeder Push auf `main` löst [`.github/workflows/deploy.yml`](.github/workflows/d
 aus. Die Reihenfolge ist der eigentliche Inhalt:
 
 1. `npm ci`, `npm test`, `npm run build`
-2. `wrangler d1 export` – **Sicherung vor jeder Schemaänderung**
+2. `wrangler d1 export` – **Sicherung vor jeder Schemaänderung**, anschliessend
+   geprüft: `INSERT`-Zeilen je Tabelle im Dump gegen `COUNT(*)` der Datenbank.
+   Weicht eine Zahl ab, bricht der Job vor der Migration ab. Nur Zahlen im Log
 3. `wrangler d1 migrations apply --remote`
-4. `wrangler deploy`
+4. Datenmigrationen protokollieren ihre Wirkung – seit 0006 die Zahl der
+   `play_status`-Zeilen neben der Erwartung (zugeordnete Listen mit Fortschritt)
+5. `wrangler deploy`
 
 Schritt 2 ist der Grund, warum das eine Action ist und kein Klick im Dashboard:
 Eine fehlerhafte Migration ist der wahrscheinlichste Weg, Daten zu verlieren,

@@ -1,0 +1,142 @@
+import type { PlayStatus } from "../domain/play-status";
+
+export type PlayStatusZeile = {
+	release_id: number;
+	status: PlayStatus;
+	started_at: string | null;
+	finished_at: string | null;
+	rating: number | null;
+	notes: string | null;
+	updated_at: string;
+};
+
+export type PlayStatusFelder = {
+	status: PlayStatus;
+	startedAt?: string | null;
+	finishedAt?: string | null;
+	rating?: number | null;
+	notes?: string | null;
+};
+
+export type AbweichungZeile = {
+	game_id: number;
+	release_id: number;
+	title: string;
+	platform: string;
+	progress_pct: number | null;
+	status: PlayStatus;
+};
+
+/**
+ * Eigene Bewertung (Abschnitt 4.2).
+ *
+ * Zwei Schreibpfade, streng getrennt:
+ *   setzen      - der Nutzer entscheidet; ueberschreibt immer
+ *   vorbelegen  - die einzige Automatik; schreibt nur, wo keine Zeile ist
+ *                 oder 'nicht_gespielt' steht, und ruehrt sonst nichts an
+ *
+ * Wer hier einen dritten automatischen Pfad ergaenzt, hebelt die Trennung
+ * von Fremddaten und eigener Bewertung aus.
+ */
+export class PlayStatusRepository {
+	constructor(private readonly db: D1Database) {}
+
+	async fuerRelease(releaseId: number): Promise<PlayStatusZeile | null> {
+		return this.db
+			.prepare(
+				"SELECT release_id, status, started_at, finished_at, rating, notes, updated_at " +
+					"FROM play_status WHERE release_id = ?",
+			)
+			.bind(releaseId)
+			.first<PlayStatusZeile>();
+	}
+
+	async fuerSpiel(gameId: number): Promise<PlayStatusZeile[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT release_id, status, started_at, finished_at, rating, notes, updated_at " +
+					"FROM play_status WHERE release_id IN (SELECT id FROM release WHERE game_id = ?)",
+			)
+			.bind(gameId)
+			.all<PlayStatusZeile>();
+		return results;
+	}
+
+	/**
+	 * Nutzerentscheidung. Setzt die Bewertung und gilt zugleich als
+	 * Durchsicht (Abschnitt 8.1): reviewed_* wird auf den aktuellen
+	 * Trophaeenstand gestempelt und ein offener Pruefeintrag entfernt - sonst
+	 * legte die Pruefliste dasselbe Spiel gleich noch einmal vor.
+	 *
+	 * Alles in einem Batch. Gibt false zurueck, wenn das Release fehlt.
+	 */
+	async setzen(releaseId: number, felder: PlayStatusFelder): Promise<PlayStatusZeile | null> {
+		const release = await this.db.prepare("SELECT 1 AS x FROM release WHERE id = ?").bind(releaseId).first();
+		if (!release) return null;
+
+		await this.db.batch([
+			this.db
+				.prepare(
+					"INSERT INTO play_status (release_id, status, started_at, finished_at, rating, notes) " +
+						"VALUES (?, ?, ?, ?, ?, ?) " +
+						"ON CONFLICT(release_id) DO UPDATE SET status = excluded.status, " +
+						"started_at = excluded.started_at, finished_at = excluded.finished_at, " +
+						"rating = excluded.rating, notes = excluded.notes, updated_at = datetime('now')",
+				)
+				.bind(
+					releaseId,
+					felder.status,
+					felder.startedAt ?? null,
+					felder.finishedAt ?? null,
+					felder.rating ?? null,
+					felder.notes ?? null,
+				),
+			this.db
+				.prepare(
+					"UPDATE trophy_progress SET " +
+						"reviewed_earned_total = earned_bronze + earned_silver + earned_gold + earned_platinum, " +
+						"reviewed_defined_total = defined_bronze + defined_silver + defined_gold + defined_platinum, " +
+						"reviewed_at = datetime('now') WHERE release_id = ?",
+				)
+				.bind(releaseId),
+			this.db.prepare("DELETE FROM review_queue WHERE release_id = ?").bind(releaseId),
+		]);
+
+		return this.fuerRelease(releaseId);
+	}
+
+	/**
+	 * Vorbelegung nach Abschnitt 4.2 - set-basiert, ein Statement.
+	 *
+	 * Schreibt fuer jede zugeordnete Liste mit Fortschritt eine Zeile, wenn
+	 * keine existiert, und ersetzt eine bestehende nur, wenn sie
+	 * 'nicht_gespielt' lautet (Risikotabelle, Abschnitt 17). Jeder andere
+	 * Wert ist eine Entscheidung des Nutzers und bleibt stehen - auch
+	 * 'am_spielen' bei inzwischen 100 %: das ist ein Fall fuer die
+	 * Pruefliste, nicht fuer eine stille Aenderung.
+	 *
+	 * Rueckgabe: Zahl der angelegten oder geaenderten Zeilen.
+	 */
+	async vorbelegen(): Promise<number> {
+		const ergebnis = await this.db
+			.prepare(
+				"INSERT INTO play_status (release_id, status) " +
+					"SELECT t.release_id, CASE WHEN t.progress_pct >= 100 THEN 'komplettiert' ELSE 'am_spielen' END " +
+					"FROM trophy_progress t WHERE t.release_id IS NOT NULL AND t.progress_pct > 0 " +
+					"ON CONFLICT(release_id) DO UPDATE SET status = excluded.status, updated_at = datetime('now') " +
+					"WHERE play_status.status = 'nicht_gespielt'",
+			)
+			.run();
+		return ergebnis.meta.changes ?? 0;
+	}
+
+	async abweichungen(): Promise<AbweichungZeile[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT game_id, release_id, title, platform, progress_pct, status " +
+					"FROM v_abweichungen ORDER BY title, platform",
+			)
+			.all<AbweichungZeile>();
+		return results;
+	}
+}

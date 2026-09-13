@@ -4,14 +4,18 @@ import {
   DISCTEXT,
   PLATINTEXT,
   PLATTFORMEN,
+  PLAY_STATUS,
   QUELLEN,
   QUELLENTEXT,
+  STATUSTEXT,
   ZUSTAENDE,
   anfrage,
   datum,
   euro,
+  type Bewertung,
   type DiscFassung,
   type Platin,
+  type PlayStatus,
   type Plattform,
   type Quelle,
   type Zustand,
@@ -20,8 +24,8 @@ import {
 /**
  * Spieldetail (Use Cases 1, 2, 7): Releases, Exemplare, Trophäen.
  *
- * Trophäenfortschritt und eigener Status stehen später nebeneinander, nie
- * verrechnet – die eigene Bewertung kommt in Stufe 6, Preise in Stufe 18/19.
+ * Trophäenfortschritt und eigene Bewertung stehen nebeneinander, nie
+ * verrechnet (Abschnitt 1). Preise kommen in Stufe 18/19.
  */
 
 type Stufen = { bronze: number; silber: number; gold: number; platin: number }
@@ -57,6 +61,7 @@ type Release = {
   discFassung: DiscFassung
   discQuelle: string | null
   trophaeen: Trophaeen | null
+  bewertung: Bewertung | null
   exemplare: Exemplar[]
   digital: Digital[]
 }
@@ -200,25 +205,38 @@ export function Spieldetail() {
           <p className="zeile">
             {DISCTEXT[r.discFassung]}
             {r.discQuelle && ` (${r.discQuelle})`}
-            {' · '}
-            <span title="Eigene Bewertung kommt in Stufe 6">eigener Status: noch nicht erfassbar</span>
           </p>
 
-          {r.trophaeen ? (
-            <p>
-              <strong>{r.trophaeen.fortschritt} %</strong> ·{' '}
-              <span className={`platin ${r.trophaeen.platin}`}>{PLATINTEXT[r.trophaeen.platin]}</span>
-              <span className="zeile">
-                {' '}· {r.trophaeen.erspielt.bronze}/{r.trophaeen.definiert.bronze} Bronze ·{' '}
-                {r.trophaeen.erspielt.silber}/{r.trophaeen.definiert.silber} Silber ·{' '}
-                {r.trophaeen.erspielt.gold}/{r.trophaeen.definiert.gold} Gold · zuletzt{' '}
-                {datum(r.trophaeen.zuletztGespielt)}
-                {r.trophaeen.rohTitel !== spiel.titel && ` · bei Sony: „${r.trophaeen.rohTitel}"`}
-              </span>
-            </p>
-          ) : (
-            <p className="zeile">keine Trophäenliste</p>
-          )}
+          <div className="nebeneinander">
+            <div>
+              <h3>Trophäen (Sony)</h3>
+              {r.trophaeen ? (
+                <p>
+                  <strong>{r.trophaeen.fortschritt} %</strong> ·{' '}
+                  <span className={`platin ${r.trophaeen.platin}`}>{PLATINTEXT[r.trophaeen.platin]}</span>
+                  <span className="zeile">
+                    {' '}· {r.trophaeen.erspielt.bronze}/{r.trophaeen.definiert.bronze} Bronze ·{' '}
+                    {r.trophaeen.erspielt.silber}/{r.trophaeen.definiert.silber} Silber ·{' '}
+                    {r.trophaeen.erspielt.gold}/{r.trophaeen.definiert.gold} Gold · zuletzt{' '}
+                    {datum(r.trophaeen.zuletztGespielt)}
+                    {r.trophaeen.rohTitel !== spiel.titel && ` · bei Sony: „${r.trophaeen.rohTitel}"`}
+                  </span>
+                </p>
+              ) : (
+                <p className="zeile">keine Trophäenliste</p>
+              )}
+            </div>
+            <div>
+              <h3>Eigene Bewertung</h3>
+              <BewertungForm
+                bewertung={r.bewertung}
+                laeuft={laeuft}
+                onSpeichern={(felder) =>
+                  tue(() => anfrage(`/api/releases/${r.id}/play-status`, { methode: 'PUT', koerper: felder }), 'Bewertung gespeichert.')
+                }
+              />
+            </div>
+          </div>
 
           <h3>Exemplare</h3>
           {r.exemplare.length === 0 && <p className="zeile">keine</p>}
@@ -449,5 +467,100 @@ function DigitalAnlegen({
         + digital
       </button>
     </p>
+  )
+}
+
+type BewertungFelder = {
+  status: PlayStatus
+  begonnenAm: string | null
+  beendetAm: string | null
+  bewertung: number | null
+  notiz: string | null
+}
+
+/**
+ * Eigene Bewertung je Release. Steht neben den Trophäen, nie darin
+ * verrechnet: Der Fortschritt kommt von Sony, der Status von dir.
+ */
+function BewertungForm({
+  bewertung: b,
+  laeuft,
+  onSpeichern,
+}: {
+  bewertung: Bewertung | null
+  laeuft: boolean
+  onSpeichern: (felder: BewertungFelder) => Promise<void>
+}) {
+  const [offen, setOffen] = useState(false)
+  const [status, setStatus] = useState<PlayStatus>(b?.status ?? 'nicht_gespielt')
+  const [begonnenAm, setBegonnenAm] = useState(b?.begonnenAm ?? '')
+  const [beendetAm, setBeendetAm] = useState(b?.beendetAm ?? '')
+  const [wertung, setWertung] = useState(b?.bewertung === null || b === null ? '' : String(b.bewertung))
+  const [notiz, setNotiz] = useState(b?.notiz ?? '')
+
+  async function speichern(ev: React.FormEvent) {
+    ev.preventDefault()
+    await onSpeichern({
+      status,
+      begonnenAm: begonnenAm || null,
+      beendetAm: beendetAm || null,
+      bewertung: wertung === '' ? null : Number(wertung),
+      notiz: notiz.trim() || null,
+    })
+    setOffen(false)
+  }
+
+  if (!offen) {
+    return (
+      <p>
+        {b ? (
+          <>
+            <strong>{STATUSTEXT[b.status]}</strong>
+            <span className="zeile">
+              {b.bewertung !== null && ` · ${b.bewertung}/10`}
+              {b.begonnenAm && ` · begonnen ${datum(b.begonnenAm)}`}
+              {b.beendetAm && ` · beendet ${datum(b.beendetAm)}`}
+              {b.notiz && ` · ${b.notiz}`}
+            </span>
+          </>
+        ) : (
+          <span className="zeile">kein Status</span>
+        )}{' '}
+        <button type="button" className="klein" disabled={laeuft} onClick={() => setOffen(true)}>
+          {b ? 'Ändern' : 'Setzen'}
+        </button>
+      </p>
+    )
+  }
+
+  return (
+    <form className="bewertung-form" onSubmit={speichern}>
+      <label>
+        Status{' '}
+        <select value={status} onChange={(ev) => setStatus(ev.target.value as PlayStatus)}>
+          {PLAY_STATUS.map((w) => <option key={w} value={w}>{STATUSTEXT[w]}</option>)}
+        </select>
+      </label>
+      <label>
+        Bewertung{' '}
+        <select value={wertung} onChange={(ev) => setWertung(ev.target.value)}>
+          <option value="">keine</option>
+          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}/10</option>)}
+        </select>
+      </label>
+      <label>
+        Begonnen <input type="date" value={begonnenAm} onChange={(ev) => setBegonnenAm(ev.target.value)} />
+      </label>
+      <label>
+        Beendet <input type="date" value={beendetAm} onChange={(ev) => setBeendetAm(ev.target.value)} />
+      </label>
+      <label>
+        Notiz <input type="text" value={notiz} onChange={(ev) => setNotiz(ev.target.value)} />
+      </label>
+      <p>
+        <button type="submit" disabled={laeuft}>Speichern</button>{' '}
+        <button type="button" onClick={() => setOffen(false)}>Abbrechen</button>
+      </p>
+    </form>
   )
 }

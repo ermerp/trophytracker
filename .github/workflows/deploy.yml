@@ -64,6 +64,41 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 export trophytracker --remote --output=backup.sql
 
+      # Ein Export, den niemand prueft, ist eine Sicherung nur dem Namen nach.
+      # Der Dump schreibt eine INSERT-Zeile je Datensatz; die Zahlen werden
+      # gegen COUNT(*) der Datenbank gehalten. Weicht eine ab, bricht der Job
+      # HIER ab - vor der Migration. Ins Log kommen nur Zahlen, nie Inhalt:
+      # der Dump enthaelt die Spielhistorie, und dieses Repository ist
+      # oeffentlich.
+      - name: Sicherung prüfen
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -s backup.sql || { echo "::error::backup.sql fehlt oder ist leer"; exit 1; }
+          echo "Dump: $(wc -c < backup.sql) Byte, $(grep -c 'INSERT INTO' backup.sql || true) INSERT-Zeilen"
+
+          tabellen="trophy_progress game release physical_copy digital_entitlement play_status"
+          abfrage=""
+          for t in $tabellen; do abfrage="$abfrage (SELECT COUNT(*) FROM $t) AS $t,"; done
+          zaehlung=$(npx wrangler d1 execute trophytracker --remote --json \
+            --command "SELECT ${abfrage%,}" | jq -c '.[0].results[0]')
+          echo "Datenbank: $zaehlung"
+
+          fehler=0
+          for t in $tabellen; do
+            in_db=$(echo "$zaehlung" | jq -r ".$t")
+            im_dump=$(grep -c "INSERT INTO \"$t\"" backup.sql || true)
+            if [ "$in_db" = "$im_dump" ]; then
+              echo "  $t: $in_db in DB, $im_dump im Dump"
+            else
+              echo "::error::$t: $in_db in DB, aber $im_dump im Dump"
+              fehler=1
+            fi
+          done
+          [ "$fehler" = 0 ] || { echo "::error::Sicherung unvollständig - keine Migration"; exit 1; }
+
       # Migrationen laufen VOR dem Deployment, damit neuer Code nie auf ein
       # altes Schema trifft. Umgekehrt muessen sie abwaertskompatibel sein,
       # weil in diesem Moment noch der alte Worker laeuft.
@@ -73,6 +108,21 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 migrations apply trophytracker --remote
+
+      # Datenmigrationen hinterlassen ihre Wirkung im Log, damit sie sich
+      # gegen eine bekannte Zahl halten laesst. Erwartung fuer play_status:
+      # jede zugeordnete Trophaeenliste mit Fortschritt > 0 (Abschnitt 4.2).
+      - name: Vorbelegung protokollieren
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute trophytracker --remote --json --command \
+            "SELECT (SELECT COUNT(*) FROM play_status) AS play_status,
+                    (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND progress_pct > 0) AS erwartet,
+                    (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL) AS zugeordnet" \
+            | jq -r '.[0].results[0] | "play_status: \(.play_status) Zeilen, erwartet mindestens \(.erwartet) (zugeordnete Listen mit Fortschritt) von \(.zugeordnet) zugeordneten Listen"'
 
       - name: Worker und Assets deployen
         uses: cloudflare/wrangler-action@v4

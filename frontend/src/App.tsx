@@ -1,4 +1,5 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { Abweichungen } from './Abweichungen'
 import { Einstellungen } from './Einstellungen'
 import { Navigation } from './Navigation'
 import { Sammlung } from './Sammlung'
@@ -44,6 +45,7 @@ function App() {
               <>
                 <h1>Einstellungen</h1>
                 <Einstellungen />
+                <Abweichungen />
                 <Werkzeuge />
               </>
             }
