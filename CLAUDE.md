@@ -59,6 +59,8 @@ PSN-Trophäentitel, Feed-Artikel und IGDB-Treffer werden **vorgeschlagen**, nich
 
 Beim Wunschlisten-Import gibt es keinen Freitext-Fallback. Zeilen ohne Treffer gehen in die IGDB-Suche. Ein Eintrag ohne Zuordnung entsteht nur auf ausdrückliche Anweisung des Nutzers.
 
+Vorschlagslisten sind **geordnet**, nicht in der Lieferreihenfolge der Quelle: Schlüsseltreffer, dann Hauptspiel-artige Typen vor DLC, dann die Plattform des Spiels (`ordneKandidaten`, Abschnitt 7.6). Zehn Skin-Pakete vor dem Hauptspiel sind kein Vorschlag – das war die erste Rückmeldung aus der Abnahme von Stufe 9.
+
 ### Zuordnungen müssen korrigierbar sein
 
 Was halb- oder vollautomatisch entsteht, muss sich in der Oberfläche zurücknehmen lassen: umbenennen, auftrennen, einzeln statt als Gruppe übernehmen. Sonst steht der Nutzer vor einem Ergebnis, das er als falsch erkennt und nicht ändern kann.
@@ -95,6 +97,8 @@ NPSSO, Refresh- und Access Token wandern ausschliesslich als `Geheimnis` (`src/d
 
 Daraus folgt: Die Antwort des PSN-Token-Endpunkts wird nie in `psn_raw_response` geschrieben. Dort landen ausschliesslich Trophäen-Seiten. `test/keine-lecks.spec.ts` prüft das über alle Routen, auch in den Fehlerpfaden.
 
+IGDB-Client-Secret und Twitch-Token nehmen denselben Weg. Das Token lebt nur im Speicher der Worker-Instanz, nie in D1 (Abschnitt 7.6). Fehlende IGDB-Secrets oder ein Ratenlimit betreffen ausschliesslich die IGDB-Routen (503), nie die übrige Anwendung.
+
 **Maschinen-Endpunkte tragen keine eigene Token-Prüfung.** `/api/export/*`, `/api/backup/*` und später `/api/imports/feed` laufen über ein Access Service Token; Access steht vor dem ganzen Worker. Kein Bearer-Token im Code — in Stufe 8 entschieden, begründet in Abschnitt 15.3.
 
 ### Rohdaten vor Normalisierung
@@ -103,17 +107,21 @@ PSN-Antworten werden zuerst unverändert in `psn_raw_response` geschrieben, dana
 
 Der Sync hat deshalb zwei Phasen (`psn_sync_run.phase`): erst `abruf`, dann `normalisierung`, beide mit begrenzter Arbeit je Aufruf. `POST /api/sync/normalize` setzt `normalized_at` zurück und lässt die Normalisierung erneut laufen — ohne PSN.
 
+Das gilt für PSN. IGDB-Antworten werden **nicht** roh abgelegt — offizielle Schnittstelle, klein, jederzeit neu abrufbar; `igdb_candidate` hält nur die normalisierten Kandidaten und ist deshalb `NICHT_EXPORTIERT`.
+
 ### Titelnormalisierung ist geteilte Logik
 
 `src/domain/titel.ts` hält `titelSchluessel` (aggressiv, nur zum Vergleichen) und `anzeigeTitel` (zurückhaltend, für `game.title`). Beide werden ab Stufe 9 auch für IGDB und ab Stufe 11 für den Wunschlisten-Import gebraucht — Änderungen dort wirken auf alle Abgleiche. `trophy_progress.title_name` bleibt immer der Rohwert von Sony.
 
-**`game.sort_title` ist abgeleitet und veraltet still**, wenn sich `titelSchluessel` ändert. Nach jeder Änderung an der Normalisierung `POST /api/games/schluessel-neu-berechnen` aufrufen — sonst findet die automatische Zuordnung über `sort_title` falsche oder gar keine Kandidaten. Die Ansicht „Sammlung prüfen" markiert veraltete Schlüssel.
+**`game.sort_title` ist abgeleitet und veraltet still**, wenn sich `titelSchluessel` ändert. Nach jeder Änderung an der Normalisierung `POST /api/games/schluessel-neu-berechnen` aufrufen — sonst findet die automatische Zuordnung über `sort_title` falsche oder gar keine Kandidaten. Die Ansicht „Sammlung prüfen" markiert veraltete Schlüssel. Wo der Titel ohnehin vorliegt, den Schlüssel frisch berechnen statt `sort_title` zu lesen; die Spalte ist nur für SQL-Lookups da.
 
 Gegen die echten 431 Titel abgesichert: Diakritika werden gefaltet (sonst wird „Ragnarök" zu „ragnar k"), nicht-lateinische Titel fallen auf den Anzeigenamen zurück (sonst wäre der Schlüssel leer), und ein hängendes „the" nach entfernter Edition wird abgeschnitten.
 
 ### Keine echten PSN-Daten als Testdaten
 
 Die Rohantworten in der Produktionsdatenbank wären perfektes Testmaterial und enthalten die vollständige Spielhistorie des Nutzers. Dieses Repository ist öffentlich. Testdaten werden deshalb nachgebaut (`test/trophy-fixtures.ts`), nie kopiert — dieselbe Regel wie beim Datenbank-Dump.
+
+Dasselbe gilt für die Wunschlisten des Nutzers in `wunschlisten/` (per `.gitignore` ausgeschlossen, nur die README ist drin) und für Messskripte gegen echte Daten: Sie bleiben im Scratchpad, ins Repository kommen nur Zahlen.
 
 ### Datenbankzugriff kapseln
 

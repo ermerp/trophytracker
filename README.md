@@ -62,7 +62,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Sicherung ausserhalb von Cloudflare | Wöchentliche GitHub Action legt `backup.sql` und `backup.json` im privaten Repo `trophytracker-backup` ab; Datum der letzten Sicherung in den Einstellungen, Warnung ab acht Tagen |
 | Export | Sieben CSV-Listen und die JSON-Vollsicherung, verlinkt in den Einstellungen |
 | Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
-| IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar |
+| IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar. **Abgenommen am 14.09.2026: 419 von 420 verknüpft**, eines bewusst abgelehnt (Vita-Wecker-App, IGDB kennt sie nicht) |
 | Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
@@ -322,7 +322,10 @@ GET  /api/igdb/search?q=&plattformen=  Suche mit Rückfällen, auch für Import 
 **Alte Wunschlisten** gehören als Textdateien in `wunschlisten/` (lokal,
 per `.gitignore` ausgeschlossen). Sie sind am 14.09.2026 gegen Sammlung und
 IGDB gemessen worden – 332 Zeilen, 20 schon in der Sammlung, 199 eindeutig,
-76 mit Kandidaten, 37 ohne Treffer; die Folgerungen für den Import stehen in
+76 mit Kandidaten, 37 ohne Treffer. Daraus ist `wunschlisten/wunschliste-bereinigt.txt`
+entstanden (tabulatorgetrennt: Datum, Titel, Plattform, Status, Original,
+Hinweis); der Import in Stufe 11 nimmt die rohen Jahresdateien und diese Form.
+Alles sind Wünsche, auch schon Gespieltes – Folgerungen in
 [Spezifikation 8.2](docs/spezifikation.md#82-wunschlisten-import-aus-textdateien-use-case-9).
 
 ## Zugriffsschutz
