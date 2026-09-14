@@ -55,10 +55,13 @@ export function KandidatenListe({
 
 export function IgdbSuche({
   vorgabe,
+  plattformen = [],
   onWahl,
   laeuft,
 }: {
   vorgabe: string
+  /** Plattformen des Spiels – passende Kandidaten stehen dann vorn. */
+  plattformen?: string[]
   onWahl: (k: IgdbKandidat) => void
   laeuft?: boolean
 }) {
@@ -73,7 +76,9 @@ export function IgdbSuche({
     setSucht(true)
     setFehler(null)
     try {
-      const a = await anfrage<{ treffer: IgdbKandidat[] }>(`/api/igdb/search?q=${encodeURIComponent(begriff.trim())}`)
+      const a = await anfrage<{ treffer: IgdbKandidat[] }>(
+        `/api/igdb/search?q=${encodeURIComponent(begriff.trim())}&plattformen=${encodeURIComponent(plattformen.join(','))}`,
+      )
       setTreffer(a.treffer)
     } catch (f) {
       setFehler(f instanceof Error ? f.message : 'Suche fehlgeschlagen.')

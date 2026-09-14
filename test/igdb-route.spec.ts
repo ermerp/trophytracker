@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createRepositories } from "../src/db";
 import { createApp } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
-import { igdbAbgleichSchritt, igdbAuffrischSchritt } from "../src/sync/igdb";
+import { igdbAbgleichSchritt, igdbAuffrischSchritt, kandidatenSuchen } from "../src/sync/igdb";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
 import { fakeFetch } from "./psn-fake";
 
@@ -103,11 +103,25 @@ describe("igdbAbgleichSchritt", () => {
 	});
 
 	it("zaehlt ein leeres Ergebnis als 'ohne Treffer' und sucht nicht erneut", async () => {
-		await spiel(1, "That's You!", "thats you", ["PS4"]);
+		await spiel(1, "Wake-up Club", "wake up club", ["PSVITA"]);
 		const { client, aufrufe } = fakeIgdb([[]]);
 		expect(await igdbAbgleichSchritt(repos(), client)).toMatchObject({ ohneTreffer: 1, nochOffen: 0 });
 		expect(await igdbAbgleichSchritt(repos(), client)).toMatchObject({ geprueft: 0 });
-		expect(aufrufe.filter((a) => a.url.includes("api.igdb.com"))).toHaveLength(1);
+		// Suche, gekuerzt ohne Plattform, Teilstring - mehr Rueckfaelle gibt es ohne Abweichung im Rohtitel nicht.
+		expect(aufrufe.filter((a) => a.url.includes("api.igdb.com"))).toHaveLength(3);
+	});
+
+	it("sortiert gespeicherte Kandidaten: Hauptspiel vor DLC, passende Plattform zuerst, hoechstens zehn", async () => {
+		await spiel(1, "Batman: Arkham Knight", "batman arkham knight", ["PS4"]);
+		const dlc = Array.from({ length: 12 }, (_, i) => spielRoh({ id: 100 + i, name: `Batman: Arkham Knight - Skin ${i}`, game_type: 13 }));
+		const haupt = spielRoh({ id: 7, name: "Batman: Arkham Knight", game_type: 0, platforms: [48] });
+		// Zwei Hauptspiele gleichen Namens auf derselben Plattform: mehrdeutig, kein Automatismus.
+		const haupt2 = spielRoh({ id: 8, name: "Batman: Arkham Knight", game_type: 0, platforms: [48] });
+		const { client } = fakeIgdb([[...dlc, haupt2, haupt]]);
+		expect(await igdbAbgleichSchritt(repos(), client)).toMatchObject({ vorgeschlagen: 1 });
+		const k = (await kandidaten(1)) as Array<{ igdb_id: number }>;
+		expect(k).toHaveLength(10);
+		expect(k.slice(0, 2).map((x) => x.igdb_id)).toEqual([8, 7]);
 	});
 
 	it("arbeitet in Schritten und meldet 'weiter'", async () => {
@@ -120,7 +134,7 @@ describe("igdbAbgleichSchritt", () => {
 	it("bricht beim Ratenlimit sauber ab - Erledigtes bleibt, der Rest wartet", async () => {
 		await spiel(1, "Eins", "eins", ["PS5"]);
 		await spiel(2, "Zwei", "zwei", ["PS5"]);
-		const { client } = fakeIgdb([[], new Response("", { status: 429 })]);
+		const { client } = fakeIgdb([[spielRoh({ name: "Eins" })], new Response("", { status: 429 })]);
 		const e = await igdbAbgleichSchritt(repos(), client, 5);
 		expect(e).toMatchObject({ status: "laufend", geprueft: 1, nochOffen: 1, weiter: true });
 		expect(e.meldung).toContain("Ratenlimit");
@@ -131,6 +145,29 @@ describe("igdbAbgleichSchritt", () => {
 		const { client } = fakeIgdb([new Response("interner Kram GEHEIM", { status: 500 })]);
 		const e = await igdbAbgleichSchritt(repos(), client);
 		expect(e).toMatchObject({ status: "fehler", weiter: false, meldung: "Der IGDB-Abruf ist fehlgeschlagen." });
+	});
+});
+
+describe("kandidatenSuchen: Rueckfaelle", () => {
+	it("nimmt das erste nicht-leere Ergebnis und zaehlt die Wege", async () => {
+		const leer: never[] = [];
+		const k = fakeIgdb([leer, [spielRoh({ name: "CastleStorm" })]]);
+		expect((await kandidatenSuchen(k.client, "CastleStorm - Complete Edition")).weg).toBe("kurz");
+		const bodies = k.aufrufe.filter((a) => a.url.includes("api.igdb.com")).map((a) => String(a.init?.body));
+		expect(bodies[0]).toContain('search "CastleStorm - Complete Edition"');
+		expect(bodies[1]).toContain('search "CastleStorm"');
+		expect(bodies[1]).not.toContain("where platforms");
+
+		const t = fakeIgdb([leer, leer, [spielRoh({ name: "That's You!" })]]);
+		expect((await kandidatenSuchen(t.client, "That's You!")).weg).toBe("teilstring");
+		expect(String(t.aufrufe.at(-1)?.init?.body)).toContain(`name ~ *"That's You!"*`);
+
+		// "OlliOlli2" schreibt IGDB ohne Leerzeichen: erst der Rohtitel findet es.
+		const o = fakeIgdb([leer, leer, leer, [spielRoh({ name: "OlliOlli2: Welcome to Olliwood" })]]);
+		expect((await kandidatenSuchen(o.client, "OlliOlli2: Welcome to Olliwood")).weg).toBe("teilstring_roh");
+		expect(String(o.aufrufe.at(-1)?.init?.body)).toContain(`name ~ *"OlliOlli2"*`);
+
+		expect((await kandidatenSuchen(fakeIgdb([leer]).client, "Nichts")).weg).toBe("keiner");
 	});
 });
 
@@ -253,7 +290,7 @@ describe("Routen", () => {
 				kritik: { wert: 91, anzahl: 18 },
 			},
 		]);
-		expect((await json(await a.request("/api/igdb/search?q=", {}, env))).body).toEqual({ treffer: [] });
+		expect((await json(await a.request("/api/igdb/search?q=", {}, env))).body).toEqual({ treffer: [], weg: "keiner" });
 	});
 
 	it("Abgleich, Pruefansicht, manuelle Verknuepfung und Loesen", async () => {
@@ -315,6 +352,28 @@ describe("Routen", () => {
 		expect((await post("/api/unmatched/spiel/abc/link", '{"igdbId":1}')).status).toBe(400);
 		expect((await post("/api/unmatched/spiel/99/link", '{"igdbId":1}')).status).toBe(404);
 		expect((await post("/api/unmatched/spiel/1/link", '{"igdbId":1}')).status).toBe(404);
+	});
+
+	it("erneut-suchen setzt nur Spiele zur Pruefung zurueck", async () => {
+		await spiel(1, "Offen", "offen", ["PS4"]);
+		await spiel(2, "Abgelehnt", "abgelehnt", ["PS4"]);
+		await spiel(3, "Verknuepft", "verknuepft", ["PS4"]);
+		const r = repos();
+		await r.igdb.kandidatenSetzen(1, [{ igdbId: 9, name: "X", slug: null, coverUrl: null, releaseDate: null, plattformen: [], typ: null, typId: null, criticScore: null, criticScoreCount: null, versionParent: null, parentGame: null }]);
+		await r.igdb.ablehnen(2);
+		await r.igdb.verknuepfen(3, { igdbId: 5, igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt", criticScore: null, criticScoreCount: null }, "manuell");
+
+		const a = app(fakeIgdb([[]]).client);
+		expect((await json(await a.request("/api/igdb/erneut-suchen", { method: "POST" }, env))).body).toEqual({ zurueckgesetzt: 1 });
+		expect(await kandidaten(1)).toEqual([]);
+		expect((await json(await a.request("/api/igdb/status", {}, env))).body).toMatchObject({ ungeprueft: 1, abgelehnt: 1, verknuepft: 1, zurPruefung: 0 });
+	});
+
+	it("GET /api/igdb/search sortiert nach Plattform des Spiels", async () => {
+		const a = app(fakeIgdb([[spielRoh({ id: 1, name: "Spiel", platforms: [9] }), spielRoh({ id: 2, name: "Spiel", platforms: [48] })]]).client);
+		const { body } = await json(await a.request("/api/igdb/search?q=Spiel&plattformen=PS4", {}, env));
+		expect(body.treffer.map((t: any) => t.igdbId)).toEqual([2, 1]);
+		expect(body.weg).toBe("suche");
 	});
 
 	it("ablehnen und suchen sind gespeicherte Entscheidungen", async () => {

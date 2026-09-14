@@ -56,6 +56,14 @@ export const IGDB_TYPEN: Record<number, string> = {
 export const NIE_EIN_SPIEL = [5, 12, 14] as const;
 const NIE_EIN_SPIEL_MENGE = new Set<number>(NIE_EIN_SPIEL);
 
+/**
+ * Typen, die ein eigenes Spiel mit eigener Trophaeenliste sein koennen. Sie
+ * stehen in der Kandidatenliste vor DLC, Erweiterungen, Episoden, Staffeln
+ * und Paketen - bei "Batman: Arkham Knight" liefert die Suche sonst zwoelf
+ * Skin-Pakete, bevor das Hauptspiel kommt.
+ */
+export const HAUPTSPIEL_ARTIG = new Set<number>([0, 3, 4, 8, 9, 10, 11]);
+
 /** Die Felder, die der Client bei jeder Anfrage anfordert. */
 export const IGDB_FELDER =
 	"name,slug,cover.image_id,first_release_date,aggregated_rating,aggregated_rating_count," +
@@ -202,6 +210,32 @@ export function eindeutigerTreffer(
 	return engere.length === 1 ? engere[0] : null;
 }
 
+/**
+ * Reihenfolge der Kandidaten fuer die Pruefansicht und die Suche:
+ * Schluesseltreffer zuerst, dann Hauptspiel-artige Typen vor DLC, dann
+ * Kandidaten mit passender Plattform, innerhalb dessen die Reihenfolge von
+ * IGDB. Aendert nichts an der Auswahl fuer die automatische Verknuepfung.
+ */
+export function ordneKandidaten(
+	schluessel: string,
+	plattformenDesSpiels: readonly string[],
+	kandidaten: readonly IgdbKandidat[],
+): IgdbKandidat[] {
+	const rang = (k: IgdbKandidat, i: number): number[] => [
+		titelSchluessel(k.name) === schluessel ? 0 : 1,
+		k.typId !== null && HAUPTSPIEL_ARTIG.has(k.typId) ? 0 : 1,
+		plattformenDesSpiels.length === 0 || k.plattformen.some((p) => plattformenDesSpiels.includes(p)) ? 0 : 1,
+		i,
+	];
+	return kandidaten
+		.map((k, i) => ({ k, r: rang(k, i) }))
+		.sort((a, b) => {
+			for (let j = 0; j < a.r.length; j++) if (a.r[j] !== b.r[j]) return a.r[j] - b.r[j];
+			return 0;
+		})
+		.map((x) => x.k);
+}
+
 /** Die Spalten, die eine Verknuepfung oder Auffrischung in `game` schreibt. */
 export type IgdbMetadaten = {
 	igdbId: number;
@@ -253,6 +287,16 @@ export function suchbegriff(titel: string): string {
 		.replace(/\s*\(\d{4}\)\s*$/, "")
 		.replace(/([A-Za-z])(\d)/g, "$1 $2")
 		.trim();
+}
+
+/**
+ * Gekuerzter Begriff fuer den Rueckfall, wenn die Suche leer bleibt: alles
+ * ab " - ", ":" oder "/" faellt weg. "CastleStorm - Complete Edition" wird
+ * "CastleStorm", "Type:Rider" wird "Type" - IGDB findet beides erst so.
+ * Ein Bindestrich im Wort ("Wake-up Club") bleibt stehen.
+ */
+export function kurzbegriff(begriff: string): string {
+	return begriff.replace(/(\s+-\s+|:|\/).*$/, "").trim();
 }
 
 export function heuteIso(jetzt = new Date()): string {

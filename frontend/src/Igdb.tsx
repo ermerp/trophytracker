@@ -73,6 +73,24 @@ export function Igdb() {
     }
   }
 
+  /** Offene Spiele zurueck in die Suche - etwa nach einer verbesserten Regel. */
+  async function erneutSuchen() {
+    if (!status || !confirm(`${status.zurPruefung} Spiele zur Prüfung erneut bei IGDB suchen? Verknüpfungen und Ablehnungen bleiben.`)) return
+    setLaeuft(true)
+    setMeldung(null)
+    try {
+      const a = await anfrage<{ zurueckgesetzt: number }>('/api/igdb/erneut-suchen', { methode: 'POST' })
+      setFortschritt(`${a.zurueckgesetzt} Spiele zurückgesetzt.`)
+      await statusLaden()
+    } catch (f) {
+      setMeldung(f instanceof Error ? f.message : 'Zurücksetzen fehlgeschlagen.')
+      setLaeuft(false)
+      return
+    }
+    setLaeuft(false)
+    await abgleichen()
+  }
+
   async function auffrischen() {
     setLaeuft(true)
     setMeldung(null)
@@ -120,10 +138,14 @@ export function Igdb() {
       </button>{' '}
       <button type="button" onClick={auffrischen} disabled={laeuft || !status?.zugangsdaten || status.verknuepft === 0}>
         Metadaten auffrischen
+      </button>{' '}
+      <button type="button" onClick={erneutSuchen} disabled={laeuft || !status?.zugangsdaten || status.zurPruefung === 0}>
+        Offene erneut suchen
       </button>
       <p className="zeile">
         „Auffrischen" holt Wertung, Cover und Datum für die 50 am längsten nicht aktualisierten
-        Spiele erneut.
+        Spiele erneut. „Offene erneut suchen" wiederholt die Suche für alle Spiele zur Prüfung –
+        sinnvoll, wenn die Suchregel besser geworden ist.
       </p>
       {fortschritt && <p>{fortschritt}</p>}
       {meldung && <p role="alert">{meldung}</p>}
