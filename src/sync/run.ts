@@ -191,7 +191,7 @@ export async function normalisierungsSchritt(
 		const vorbelegt = await repos.playStatus.vorbelegen();
 		// Abschnitt 8.1: Der Sync schreibt nur in die Warteschlange, nie einen
 		// Status. Stufe 7 kennt nur 'erstimport'.
-		const eingereiht = await repos.review.einreihen();
+		const { eingereiht } = await repos.review.einreihen();
 
 		const gesamt = await repos.trophies.anzahl();
 		await repos.sync.abschliessen(laufId, gesamt);

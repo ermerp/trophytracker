@@ -460,11 +460,18 @@ ul.digital {
   background: rgba(60, 140, 90, 0.8);
 }
 
+/*
+ * Feste Mindesthoehe: Ein zweizeiliger Titel darf die Knoepfe nicht nach
+ * unten schieben. Wer mehrere hundert Eintraege durchgeht, zielt blind auf
+ * dieselbe Stelle - eine springende Knopfreihe fuehrt zu Fehlklicks, und
+ * eine Fehlentscheidung faellt erst Wochen spaeter auf.
+ */
 .pruefkarte {
   display: flex;
   gap: 1.2rem;
   align-items: flex-start;
   margin-bottom: 1.2rem;
+  min-height: 9.5rem;
 }
 
 .pruefkarte .bild {
@@ -534,6 +541,8 @@ ul.digital {
   .pruefkarte {
     gap: 0.8rem;
     margin-bottom: 0.8rem;
+    /* Deckt auch einen dreizeiligen Titel ab, ohne dass die Knoepfe wandern. */
+    min-height: 12.5rem;
   }
 
   .pruefkarte .bild {
@@ -543,7 +552,8 @@ ul.digital {
   }
 
   .pruefkarte h2 {
-    font-size: 1.1rem;
+    font-size: 1rem;
+    line-height: 1.3;
     margin: 0.1rem 0 0.4rem;
   }
 
