@@ -138,12 +138,29 @@ jobs:
           Refresh-Token liegen AES-GCM-verschluesselt in D1, der Schluessel als
           Cloudflare Secret.
 
-          Wiederherstellung:
+          ## Wiederherstellung
+
+          **`backup.sql` laesst sich NICHT unveraendert einspielen.** `d1 export`
+          schreibt die Tabellen in sqlite_master-Reihenfolge; nach dem Neuaufbau
+          von `release` in Migration 0003 steht sie dort hinter den neun
+          Tabellen, die auf sie verweisen. Ein direkter Import scheitert mit
+          `no such table: main.release` (gemessen am 14.09.2026).
+
+          Der Dump muss vorher umgeordnet werden. Das Skript dafuer liegt im
+          Haupt-Repository:
 
           ```
           npx wrangler d1 create trophytracker-restore
-          npx wrangler d1 execute trophytracker-restore --remote --file=backup.sql
+          node scripts/wiederherstellung-vorbereiten.mjs backup.sql restore.sql
+          npx wrangler d1 execute trophytracker-restore --remote --file=restore.sql
+          npx wrangler d1 execute trophytracker-restore --remote --command "PRAGMA foreign_key_check"
           ```
+
+          Der letzte Befehl muss **leer** bleiben: Der Import laeuft mit
+          abgeschalteter Fremdschluesselpruefung, erst er belegt den Bestand.
+
+          Der vollstaendige Ablauf mit Zeilenzahl-Vergleich steht in der README
+          des Haupt-Repositories unter "Wiederherstellung".
           ENDE
 
           git config user.name "trophytracker-backup"

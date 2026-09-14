@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 18 – Backup ins private Repository und CSV-Export; Maschinen-Endpunkte laufen über Access Service Token.*
+*Version 19 – Wiederherstellung geprobt: Der Dump lässt sich nicht unverändert einspielen, die Umordnung ist Teil des Ablaufs.*
 
 ## 1. Use Cases
 
@@ -1010,18 +1010,30 @@ Das Datum der letzten erfolgreichen Sicherung steht in den Einstellungen; bis es
 
 ### 14.3 Wiederherstellung
 
-Der Ablauf gehört in die README, nicht nur in den Kopf:
+**Der Dump lässt sich nicht unverändert einspielen.** Das ist das Ergebnis der Probe vom 14.09.2026 und der Grund, warum dieser Abschnitt länger ist als der eine Befehl, der hier früher stand.
+
+**Der Befund.** `wrangler d1 execute --file=backup.sql` gegen eine frische Datenbank scheitert mit
 
 ```
-wrangler d1 create trophytracker-restore
-wrangler d1 execute trophytracker-restore --remote --file=backup.sql
+no such table: main.release
 ```
 
-Danach die Binding-ID in der Wrangler-Konfiguration umstellen und deployen. **Einmal testweise durchspielen**, solange nichts kaputt ist – ein ungetestetes Backup ist eine Vermutung.
+`d1 export` schreibt die Tabellen in der Reihenfolge von `sqlite_master`. Migration 0003 hat `release` neu aufgebaut – `release_neu` anlegen, alte Tabelle droppen, umbenennen –, wodurch ihr Eintrag dort ans Ende rutschte. Im Dump entsteht `release` deshalb erst in Zeile 1515, während schon in Zeile 467 `INSERT INTO "physical_copy"` läuft und die Tabelle für die Fremdschlüsselprüfung braucht. **Neun Tabellen verweisen auf `release`.**
 
-Die Probe gilt als bestanden, wenn die Zeilenzahlen aller Tabellen der wiederhergestellten Datenbank denen der Produktion entsprechen. Datum, Dumpgrösse und die Tabelle „Tabelle | Produktion | Wiederhergestellt" gehören in die README.
+Der Fehler steckte seit Stufe 3 im Backup und wäre ohne die Probe erst im Ernstfall aufgefallen. Jeder künftige Tabellen-Neuaufbau erzeugt ihn erneut – der Neuaufbau ist SQLites Standardweg für Constraint-Änderungen (siehe die Regel zu Views in `CLAUDE.md`).
 
-> **Offen: in Stufe 8 durchzuführen.** Die Probe ist noch nicht gelaufen. Bis sie es ist, gilt Stufe 8 als „gebaut, Probe ausstehend" – die Abnahme hängt an ihr und am Klartext-Nachweis aus 14.5.
+**Die Lösung** steht als `scripts/dump-ordnen.mjs` im Repository, nicht als Anleitung: Der Ernstfall ist der schlechteste Moment, sich eine Reihenfolge zusammenzusuchen. Zwei Teile:
+
+1. **Schema vor Daten.** Alle `CREATE TABLE` zuerst. Ein Fremdschlüssel auf eine noch nicht existierende Tabelle ist beim Anlegen erlaubt; SQLite löst ihn erst beim Zugriff auf.
+2. **Fremdschlüsselprüfung während des Imports aus**, danach `PRAGMA foreign_key_check` über den fertigen Bestand. Die `INSERT`-Anweisungen bleiben in Dump-Reihenfolge, also Kinder vor Eltern. Sie topologisch zu sortieren wäre die Alternative – sie müsste aber bei jedem Schemawandel nachgezogen werden, und geprüft würde am Ende dasselbe. Der Nachlauf prüft es in einem Schritt und über *alle* Beziehungen.
+
+Indizes und Views kommen zum Schluss: Sie stehen auf Tabellen, die dann existieren, und ein Index über leere Tabellen aufzubauen und anschliessend zu füllen ist der langsamere Weg.
+
+Der vollständige Ablauf mit Befehlen steht in der README. Er endet nicht beim Einspielen, sondern beim Vergleich: Zeilenzahlen aller Tabellen gegen die Produktion, `foreign_key_check` ohne Treffer, Views und Indizes vollzählig.
+
+**Probe durchgeführt am 14.09.2026.** Dump 910.717 Byte, 1.762 `INSERT`-Anweisungen, 17 Tabellen, 3.632 geschriebene Zeilen. Alle 17 Tabellen, 7 Views und 18 Indizes stimmen mit der Produktion überein; `PRAGMA foreign_key_check` meldet null Verletzungen. Einzige Abweichung: `app_setting` 6 gegen 4 – der Dump entstand um 09:24:57, der Backup-Vermerk schrieb `backup_letzter_erfolg_am` und `backup_letzter_commit` acht Sekunden später. Die Tabelle steht in der README.
+
+`scripts/dump-ordnen.mjs` ist durch `test/dump-ordnen.spec.ts` abgedeckt – einschliesslich der Fälle, an denen eine naive Zerlegung scheitert: Semikolon im Spieltitel, maskiertes Hochkomma (`'Assassin''s Creed'`), Semikolon im Kommentar.
 
 ### 14.4 CSV-Export
 
@@ -1062,7 +1074,9 @@ Der Dump wandert wöchentlich in ein Git-Repository, und was einmal in einem Git
 2. **Skript gegen den echten Dump.** `scripts/dump-pruefen.sh` läuft in der Backup-Action **und** im Deploy-Job. Es schlägt fehl, wenn `access_token`, `refresh_token`, `"npsso"` oder `npsso=` in einer `INSERT`-Zeile vorkommt, wenn die `psn_credentials`-Zeile einen Wert trägt, der weder Zeitstempel noch gültiges Base64 ist, oder wenn einer dieser Werte **64 Zeichen** lang ist – die Länge eines NPSSO. Die Längenprüfung ist die eigentliche: Ein NPSSO besteht aus Buchstaben und Ziffern, ist also selbst gültiges Base64 und dekodiert zu 48 Byte, die wie Zufall aussehen; eine Prüfung auf druckbare Zeichen im Dekodat läuft daran vorbei. Chiffrat sind 108 Zeichen, ein IV 16. Ins Log kommen nur Zahlen.
 3. **Menschliche Gegenprobe.** Der Nutzer sucht im privaten Repo einmal selbst nach seinem NPSSO. Null Treffer ist der einzige Beweis, den niemand anders führen kann.
 
-> **Offen: Schicht 3 steht noch aus.** Bis sie erfolgt ist, gilt Stufe 8 als „gebaut, Probe ausstehend".
+**Durchgeführt am 14.09.2026**, alle drei Schichten: Der Test läuft über jede Tabelle, `scripts/dump-pruefen.sh` bestand im Backup-Lauf (vier Base64-Werte mit 108/16/72/16 Zeichen, keiner 64), und die Suche im privaten Repo nach den ersten Zeichen des NPSSO ergab `backup.sql:0` und `backup.json:0`.
+
+Als Zugabe eine Prüfung, die *ohne* Kenntnis des Wertes auskommt und deshalb wiederholbar ist: Ein NPSSO ist 64 alphanumerische Zeichen. Im gesamten Dump gibt es **keine** solche Zeichenkette – und die eine 64-Zeichen-Kette, die es gibt, steht in `psn_raw_response`, enthält Leerzeichen und Satzzeichen und ist ein Spieltitel aus einer Sony-Antwort.
 
 ---
 
@@ -1260,7 +1274,8 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 | Fehlerhafte Migration | Datenverlust | Export als erster Schritt jedes Deploy-Jobs, Migrationen abwärtskompatibel halten |
 | D1-Tageslimit für gelesene Zeilen erreicht | Anwendung bis Mitternacht UTC tot | Indizes auf allen Fremdschlüsseln, `test/lesekosten.spec.ts` als Wächter, `rows_read_24h` in `wrangler d1 info` beobachten (Abschnitt 2) |
 | Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht in den Einstellungen, Warnung im Hinweisblock ab acht Tagen (14.2) |
-| Wiederherstellung nie geprobt | Backup unbrauchbar | Ablauf in der README, einmal testweise durchgespielt |
+| Wiederherstellung nie geprobt | Backup unbrauchbar | Probe am 14.09.2026 durchgeführt – sie fand einen echten Fehler (14.3). Ablauf und Ergebnis in der README |
+| Dump nicht einspielbar nach Tabellen-Neuaufbau | Backup nur scheinbar brauchbar | `scripts/dump-ordnen.mjs` ordnet Schema vor Daten, `PRAGMA foreign_key_check` prüft danach (14.3); `test/dump-ordnen.spec.ts` hält die Zerlegung fest |
 | Kritikerwertung fehlt | Rang verzerrt | `COALESCE(critic_score, 70)` – unbewertete Titel werden weder bevorzugt noch bestraft |
 | Rangformel passt nicht | Umbauwunsch | Nur Bestandteile gespeichert, Gewichte in `app_setting` verstellbar |
 | AWIN-Freigabe abgelehnt | Kein Feed, keine Gebrauchtpreise | Stufen 1–12 sind unabhängig |

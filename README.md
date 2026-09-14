@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 8 gebaut, Abnahme ausstehend** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 8 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -25,10 +25,11 @@ Datenbestand – und ab hier steckt darin Arbeit, die PlayStation nicht
 zurückliefert. Stufe 8 sichert ihn wöchentlich ins private Repository und
 liefert den CSV-Export (Use Case 13).
 
-> **Zwei Abnahmen stehen noch aus** (siehe [Sicherung](#sicherung)):
-> die menschliche Gegenprobe, dass im Dump kein NPSSO im Klartext steht,
-> und die einmal durchgespielte Wiederherstellung. Bis beide erfolgt sind,
-> gilt Stufe 8 als „gebaut, Probe ausstehend".
+> **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
+> Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
+> [Wiederherstellung](#wiederherstellung) ist einmal durchgespielt — sie hat
+> dabei einen echten Fehler gefunden: Der Dump liess sich nicht unverändert
+> einspielen. Behoben, geprüft, dokumentiert.
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -59,6 +60,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Sicherung ausserhalb von Cloudflare | Wöchentliche GitHub Action legt `backup.sql` und `backup.json` im privaten Repo `trophytracker-backup` ab; Datum der letzten Sicherung in den Einstellungen, Warnung ab acht Tagen |
 | Export | Sieben CSV-Listen und die JSON-Vollsicherung, verlinkt in den Einstellungen |
 | Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
+| Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
@@ -336,6 +338,20 @@ eines zurückziehen lässt, ohne das andere zu treffen.
 | `claude-code` | Prüfungen gegen die Produktion nach einem Deploy | `.dev.vars` (lokal, gitignored) |
 | `github-backup` | Backup-Action ab Stufe 8 | GitHub Secrets `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` |
 
+Dazu ein **GitHub**-Token, der mit Cloudflare nichts zu tun hat:
+
+| Token | Wofür | Geltungsbereich | Liegt |
+|---|---|---|---|
+| `claude-code-actions` | Workflow-Läufe und Logs lesen, Workflows auslösen | Fine-grained PAT, nur `ermerp/trophytracker`, **Actions: Read and write** + Metadata | `~/.config/gh/hosts.yml` (lokal, via `gh auth login`) |
+
+Bewusst **ohne** Zugriff auf `trophytracker-backup`: Dort liegt die vollständige
+Sammlung, und zum Lesen von Workflow-Logs braucht es sie nicht. Läuft im
+September 2027 ab.
+
+> `gh run view --log` liefert in gh 2.46 nichts (bekannter Fehler beim
+> Entpacken des Log-Archivs, stiller Exit 0). Der API-Weg funktioniert:
+> `gh api repos/ermerp/trophytracker/actions/jobs/<job-id>/logs`
+
 Ein Service-Token-Secret beginnt mit `cfast_` und wird nur beim Anlegen
 angezeigt. Läuft es ab (Voreinstellung ein Jahr), scheitern die Aufrufe mit
 einer **302 auf die Login-Seite – nicht mit 401**. Die Backup-Action prüft
@@ -444,6 +460,10 @@ Service Token. Ein eigener Testworkflow erübrigt sich: Stimmt eines von beiden
 nicht, scheitert schon Schritt 2 oder der Klon in Schritt 5 – und zwar bevor
 irgendetwas geschrieben wird.
 
+**Erster Lauf am 14.09.2026**, 26 Sekunden: `backup.sql` 910.717 Byte mit 1.762
+`INSERT`-Zeilen, `backup.json` 569.884 Byte mit 14 Tabellen, Schemastand
+`0009`. Zeilenabgleich und Klartext-Prüfung bestanden, Commit `e0b8569`.
+
 **Inhalt des Backup-Repos**
 
 | Datei | Inhalt |
@@ -453,6 +473,9 @@ irgendetwas geschrieben wird.
 
 Zwei Formate mit Absicht: Der Dump ist die technisch exakte Sicherung, das JSON
 bleibt auswertbar, auch wenn es dieses Projekt eines Tages nicht mehr gibt.
+
+`backup.sql` lässt sich **nicht unverändert** einspielen — warum und was
+stattdessen zu tun ist, steht unter [Wiederherstellung](#wiederherstellung).
 
 **Ob es läuft.** Die Einstellungen zeigen „Letzte Sicherung: … (Commit …)".
 Bleibt sie länger als acht Tage aus oder gab es nie eine, steht eine Warnung im
@@ -475,7 +498,14 @@ Ziffern, ist also selbst gültiges Base64 und dekodiert zu 48 Byte, die wie
 Zufall aussehen – eine Prüfung auf druckbare Zeichen läuft daran vorbei
 (gemessen, nicht vermutet). Die Länge nicht: Chiffrat sind 108 Zeichen, ein IV 16.
 
-> **Offen: Die menschliche Gegenprobe steht noch aus.**
+**Am 14.09.2026 durchgeführt, alle drei Schichten.** Die Suche im privaten Repo
+nach den ersten Zeichen des NPSSO ergab `backup.sql:0` und `backup.json:0`.
+
+Als wiederholbare Zugabe eine Prüfung, die *ohne* Kenntnis des Wertes auskommt:
+Ein NPSSO ist 64 alphanumerische Zeichen — im gesamten Dump gibt es keine
+solche Zeichenkette. Die eine 64-Zeichen-Kette, die es gibt, steht in
+`psn_raw_response`, enthält Leerzeichen und Satzzeichen und ist ein Spieltitel
+aus einer Sony-Antwort.
 
 ## Export
 
@@ -502,51 +532,121 @@ Beziehungen zwischen den Tabellen gehen dabei verloren. Dafür ist der Dump da.
 
 ## Wiederherstellung
 
-Einmal testweise durchspielen, solange nichts kaputt ist – ein ungetestetes
-Backup ist eine Vermutung.
+**Der Dump lässt sich nicht unverändert einspielen.** Das ist gemessen, nicht
+vermutet: Die Probe am 14.09.2026 scheiterte beim ersten Versuch mit
+`no such table: main.release`.
 
-1. `backup.sql` aus `trophytracker-backup` holen (beliebiger Commit – Git hat
-   jeden Wochenstand)
-2. Probedatenbank anlegen und einspielen:
+Grund: `d1 export` schreibt die Tabellen in der Reihenfolge von `sqlite_master`.
+Migration 0003 hat `release` neu aufgebaut, wodurch ihr Eintrag dort ans Ende
+rutschte — im Dump entsteht sie erst in Zeile 1515, während schon in Zeile 467
+`INSERT INTO "physical_copy"` läuft und die Tabelle für die
+Fremdschlüsselprüfung braucht. Neun Tabellen verweisen auf `release`. Der
+Fehler steckte seit Stufe 3 im Backup und wäre ohne die Probe erst im Ernstfall
+aufgefallen.
 
-   ```bash
-   npx wrangler d1 create trophytracker-restore
-   npx wrangler d1 execute trophytracker-restore --remote --file=backup.sql
-   ```
+Deshalb ordnet `scripts/dump-ordnen.mjs` den Dump um: Schema vor Daten,
+Fremdschlüsselprüfung während des Imports aus, danach `PRAGMA foreign_key_check`
+über den fertigen Bestand. Als Skript und nicht als Anleitung — der Ernstfall
+ist der schlechteste Moment, sich eine Reihenfolge zusammenzusuchen.
 
-3. Zeilenzahlen gegen die Produktion halten:
+### Ablauf
 
-   ```bash
-   for db in trophytracker trophytracker-restore; do
-     npx wrangler d1 execute "$db" --remote --json --command \
-       "SELECT (SELECT COUNT(*) FROM game) AS game,
-               (SELECT COUNT(*) FROM release) AS release,
-               (SELECT COUNT(*) FROM trophy_progress) AS trophy_progress,
-               (SELECT COUNT(*) FROM play_status) AS play_status,
-               (SELECT COUNT(*) FROM physical_copy) AS physical_copy,
-               (SELECT COUNT(*) FROM digital_entitlement) AS digital_entitlement,
-               (SELECT COUNT(*) FROM plan_entry) AS plan_entry,
-               (SELECT COUNT(*) FROM review_queue) AS review_queue"
-   done
-   ```
+**1. Dump holen** — beliebiger Commit, Git hat jeden Wochenstand:
 
-4. Im Ernstfall: `database_id` in `wrangler.jsonc` auf die neue Datenbank
-   umstellen und deployen. Bei der blossen Probe stattdessen die Probedatenbank
-   wieder löschen (`npx wrangler d1 delete trophytracker-restore`).
+```bash
+git clone git@github.com:ermerp/trophytracker-backup.git
+```
 
-> **Offen: Die Probe ist noch nicht gelaufen.** Datum, Dumpgrösse und die
-> Tabelle „Tabelle | Produktion | Wiederhergestellt" kommen hierher, sobald
-> sie es ist.
+**2. Datenbank anlegen und Dump vorbereiten:**
+
+```bash
+npx wrangler d1 create trophytracker-restore
+node scripts/wiederherstellung-vorbereiten.mjs \
+  ../trophytracker-backup/backup.sql /tmp/restore.sql
+```
+
+Das Skript gibt nur Zahlen aus (Anweisungen, Tabellen, `INSERT`-Zeilen) — ein
+Dump trägt die vollständige Sammlung, und dieses Repository ist öffentlich.
+
+**3. Einspielen:**
+
+```bash
+npx wrangler d1 execute trophytracker-restore --remote --file=/tmp/restore.sql
+```
+
+**4. Prüfen — das gehört zum Ablauf, nicht dahinter.** Der Import lief mit
+abgeschalteter Fremdschlüsselprüfung; ob der Bestand stimmt, sagt erst dieser
+Schritt:
+
+```bash
+npx wrangler d1 execute trophytracker-restore --remote \
+  --command "PRAGMA foreign_key_check"            # muss leer bleiben
+
+for db in trophytracker trophytracker-restore; do
+  echo "== $db"
+  npx wrangler d1 execute "$db" --remote --json --command \
+    "SELECT (SELECT COUNT(*) FROM game) AS game,
+            (SELECT COUNT(*) FROM \"release\") AS release,
+            (SELECT COUNT(*) FROM trophy_progress) AS trophy_progress,
+            (SELECT COUNT(*) FROM play_status) AS play_status,
+            (SELECT COUNT(*) FROM physical_copy) AS physical_copy,
+            (SELECT COUNT(*) FROM digital_entitlement) AS digital_entitlement,
+            (SELECT COUNT(*) FROM plan_entry) AS plan_entry,
+            (SELECT COUNT(*) FROM review_queue) AS review_queue,
+            (SELECT COUNT(*) FROM app_setting) AS app_setting,
+            (SELECT COUNT(*) FROM sqlite_master WHERE type='view') AS views,
+            (SELECT COUNT(*) FROM sqlite_master WHERE type='index') AS indizes"
+done
+```
+
+**5. Im Ernstfall** die `database_id` in `wrangler.jsonc` auf die neue Datenbank
+umstellen und deployen. **Bei der blossen Probe** stattdessen aufräumen:
+
+```bash
+npx wrangler d1 delete trophytracker-restore
+```
+
+> ⚠️ Den Namen zweimal lesen. Das ist der einzige Schritt im ganzen Vorgang,
+> bei dem ein Tippfehler tatsächlich Schaden anrichtet.
+
+### Ergebnis der Probe vom 14.09.2026
+
+Dump 910.717 Byte, 1.762 `INSERT`-Anweisungen, 17 Tabellen, 3.632 geschriebene
+Zeilen. `PRAGMA foreign_key_check`: **null Verletzungen**.
+
+| Tabelle | Produktion | Wiederhergestellt |
+|---|---|---|
+| game | 420 | 420 |
+| release | 431 | 431 |
+| trophy_progress | 431 | 431 |
+| play_status | 431 | 431 |
+| physical_copy | 2 | 2 |
+| digital_entitlement | 2 | 2 |
+| plan_entry | 24 | 24 |
+| review_queue | 0 | 0 |
+| ean_mapping, unresolved_scan, market_offer, price_snapshot | 0 | 0 |
+| psn_sync_run | 1 | 1 |
+| psn_raw_response | 5 | 5 |
+| psn_credentials | 1 | 1 |
+| d1_migrations | 9 | 9 |
+| app_setting | 6 | **4** |
+| Views | 7 | 7 |
+| Indizes | 18 | 18 |
+
+Die Abweichung bei `app_setting` ist erklärt und kein Mangel: Der Dump entstand
+um 09:24:57 UTC, der Backup-Vermerk schrieb `backup_letzter_erfolg_am` und
+`backup_letzter_commit` acht Sekunden später. Genau diese beiden Schlüssel
+fehlen, alle vier Gewichte der Rangformel sind da.
 
 Zusätzlich bietet Cloudflare `wrangler d1 time-travel` zum Zurückstellen auf
 einen Zeitpunkt. Das hilft gegen Bedienfehler, aber nicht gegen ein verlorenes
-Konto – dafür ist der wöchentliche Export in das private Repository zuständig.
+Konto — dafür ist der wöchentliche Export in das private Repository zuständig.
 
 ## Aufbau
 
 ```
 migrations/    nummerierte SQL-Dateien, laufen genau einmal
-scripts/       Prüfskripte, die Deploy- und Backup-Action gemeinsam nutzen
+scripts/       Prüfskripte für Deploy und Backup, dazu die Wiederherstellung
 src/index.ts   Hono-App, hängt Repositories je Anfrage ein
 src/api/       Route-Module
 src/db/        Repository-Schicht – der einzige Ort mit D1-Zugriff
