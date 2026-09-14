@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 9 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 10 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -24,8 +24,9 @@ Trophäenlisten sind bewertet, die Warteschlange ist leer. Damit steht der
 Datenbestand – und ab hier steckt darin Arbeit, die PlayStation nicht
 zurückliefert. Stufe 8 sichert ihn wöchentlich ins private Repository und
 liefert den CSV-Export (Use Case 13). Stufe 9 holt Cover, Kritikerwertung und
-Erscheinungsdatum von IGDB – die Grundlage für Wunschliste, Import und
-Rangformel in den Stufen 10 bis 13.
+Erscheinungsdatum von IGDB; Stufe 10 baut darauf die Wunschliste mit Favoriten,
+Priorität und Rang (Use Case 4) – die erste der vier Absichts-Listen, deren
+Routen und Repository auch To-Do, Backlog und Kaufliste tragen werden.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -42,7 +43,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 18 Tabellen, 7 Views, zehn Migrationen |
+| Schema | 18 Tabellen, 7 Views, elf Migrationen |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
@@ -63,14 +64,19 @@ Was steht und in Betrieb nachgewiesen ist:
 | Export | Sieben CSV-Listen und die JSON-Vollsicherung, verlinkt in den Einstellungen |
 | Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
 | IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar. **Abgenommen am 14.09.2026: 419 von 420 verknüpft**, eines bewusst abgelehnt (Vita-Wecker-App, IGDB kennt sie nicht) |
-| Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer |
+| Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer (Stand vor Migration 0011, seitdem 20 Indizes) |
+| Wunschliste | Eigene Ansicht in der Leiste: nach Rang sortiert (berechnet, nie gespeichert), Favoriten-Filter, Priorität 1–5, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche als Spiel ohne Release, Freitext nur ausdrücklich; im Spieldetail je Spiel oder je Plattform, die Plattform bleibt standardmäßig leer. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat |
+| Rangformel | Gewichte in den Einstellungen verstellbar; `src/domain/rang.ts` ist die eine Stelle für die Formel |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 10 – `plan_entry`, Wunschliste, Favoriten** (Use Case 4).
-Die Wunschliste braucht Cover und Erscheinungsdatum aus Stufe 9 und die
-Rangformel-Gewichte aus `app_setting`; beides liegt bereit.
+**Als Nächstes: Stufe 11 – Wunschlisten-Import mit Suche, Ansicht „Ohne
+Zuordnung"** (Use Cases 9 und 12). Die Routen `/api/plans` und die IGDB-Suche
+mit dem Knopf „Ohne IGDB-Eintrag übernehmen" stehen seit Stufe 10; der Import
+setzt darauf auf und nimmt die rohen Jahresdateien wie die bereinigte Liste
+(`wunschlisten/wunschliste-bereinigt.txt`, lokal) an – Befunde in
+[Abschnitt 8.2](docs/spezifikation.md#82-wunschlisten-import-aus-textdateien-use-case-9).
 
 ## Architektur in einem Absatz
 
@@ -592,6 +598,28 @@ Ein NPSSO ist 64 alphanumerische Zeichen — im gesamten Dump gibt es keine
 solche Zeichenkette. Die eine 64-Zeichen-Kette, die es gibt, steht in
 `psn_raw_response`, enthält Leerzeichen und Satzzeichen und ist ein Spieltitel
 aus einer Sony-Antwort.
+
+## Wunschliste und Absichten
+
+Wunschliste, To-Do, Backlog und Kaufliste liegen in einer Tabelle `plan_entry`
+([Abschnitt 5](docs/spezifikation.md#5-datenmodell--absichten-use-cases-4-5-6));
+Stufe 10 bedient die Wunschliste, die Routen kennen alle vier Arten:
+
+```
+GET    /api/plans?kind=wunsch&status=offen|alle&sort=rang|titel|angelegt&favorit=1
+POST   /api/plans        { art, spielId | releaseId | igdbId | titel, prioritaet?, favorit?, notiz? }
+PATCH  /api/plans/:id    Teilmenge von { prioritaet, favorit, notiz, status, art }
+DELETE /api/plans/:id
+```
+
+Der Rang wird bei jeder Abfrage aus Kritikerwertung, Priorität und Favorit mit
+den Gewichten aus den Einstellungen berechnet und nie gespeichert. Ein Wunsch
+aus der IGDB-Suche legt ein Spiel **ohne Release** an – es erscheint nicht in
+der Sammlung, weil ein Wunsch kein Besitz ist, wohl aber im Spieldetail. Die
+Plattform bleibt leer, solange keine gewählt wird; ein Standardwert wäre eine
+Behauptung. Ein Wunsch am Spiel und einer an einem seiner Releases sind zwei
+verschiedene Aussagen und blockieren sich nicht; nur dasselbe Ziel derselben
+Art antwortet mit `409`.
 
 ## Export
 

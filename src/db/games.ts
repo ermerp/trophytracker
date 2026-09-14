@@ -348,18 +348,27 @@ aeenliste haengt
 			.bind(neu.id, releaseId)
 			.run();
 
-		// Ein Spiel ohne Releases hat keinen Zweck mehr.
-		const rest = await this.db
-			.prepare("SELECT COUNT(*) AS n FROM release WHERE game_id = ?")
-			.bind(altesSpiel)
-			.first<{ n: number }>();
-
-		const leer = (rest?.n ?? 0) === 0;
-		if (leer) {
-			await this.db.prepare("DELETE FROM game WHERE id = ?").bind(altesSpiel).run();
-		}
-
+		const leer = await this.leeresSpielLoeschen(altesSpiel);
 		return { gameId: neu.id, altesSpielGeloescht: leer };
+	}
+
+	/**
+	 * Ein Spiel ohne Releases hat keinen Zweck mehr - ausser es traegt eine
+	 * offene Absicht (Stufe 10): Ein Wunsch aus der IGDB-Suche haengt am
+	 * Spiel und hat nie ein Release gehabt. Wer probeweise eines anlegt und
+	 * wieder entfernt, darf den Wunsch nicht per CASCADE verlieren.
+	 * Gibt zurueck, ob geloescht wurde.
+	 */
+	private async leeresSpielLoeschen(gameId: number): Promise<boolean> {
+		const ergebnis = await this.db
+			.prepare(
+				"DELETE FROM game WHERE id = ? " +
+					"AND NOT EXISTS (SELECT 1 FROM release WHERE game_id = game.id) " +
+					"AND NOT EXISTS (SELECT 1 FROM plan_entry WHERE game_id = game.id AND status = 'offen')",
+			)
+			.bind(gameId)
+			.run();
+		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 
 	/**
@@ -577,6 +586,35 @@ aeenliste haengt
 		return { gameId: spiel.id, releaseId: release.id };
 	}
 
+	/**
+	 * Spiel aus einem IGDB-Treffer anlegen - ohne Release (Stufe 10).
+	 *
+	 * Ein Wunsch braucht weder Release noch Plattform (8.4); eine geratene
+	 * Plattform waere eine Behauptung, die der Nutzer nie aufgestellt hat.
+	 * Das Spiel erscheint deshalb nicht in der Sammlung (spieleListe verlangt
+	 * ein Release), wohl aber im Spieldetail. Die IGDB-Metadaten schreibt der
+	 * Aufrufer ueber IgdbRepository.verknuepfen.
+	 */
+	async spielOhneRelease(titel: string): Promise<number> {
+		const spiel = await this.db
+			.prepare("INSERT INTO game (title, sort_title) VALUES (?, ?) RETURNING id")
+			.bind(titel, titelSchluessel(titel))
+			.first<{ id: number }>();
+		if (!spiel) throw new Error("Spiel konnte nicht angelegt werden.");
+		return spiel.id;
+	}
+
+	/** Spiel mit dieser IGDB-Id, damit ein Wunsch ein vorhandenes Spiel wiederverwendet. */
+	async spielNachIgdbId(igdbId: number): Promise<number | null> {
+		const r = await this.db.prepare("SELECT id FROM game WHERE igdb_id = ?").bind(igdbId).first<{ id: number }>();
+		return r?.id ?? null;
+	}
+
+	async spielExistiert(id: number): Promise<boolean> {
+		const r = await this.db.prepare("SELECT 1 AS x FROM game WHERE id = ?").bind(id).first();
+		return r !== null;
+	}
+
 	/** Spiele mit gleichem Titelschluessel, fuer die Dublettenwarnung beim Anlegen. */
 	async spieleNachSchluessel(
 		schluessel: string,
@@ -629,7 +667,8 @@ aeenliste haengt
 	 * Die Trophaeenliste bleibt erhalten und faellt per ON DELETE SET NULL in
 	 * die Zuordnung zurueck. Herkunft der alten Zuordnung wird geloescht, sonst
 	 * truege eine offene Liste eine matched_source. Exemplare kaskadieren.
-	 * Ein Spiel ohne Releases wird mit entfernt, wie bei releaseAbtrennen.
+	 * Ein Spiel ohne Releases wird mit entfernt, wie bei releaseAbtrennen -
+	 * es sei denn, eine offene Absicht haengt daran (leeresSpielLoeschen).
 	 */
 	async releaseLoeschen(
 		releaseId: number,
@@ -650,15 +689,7 @@ aeenliste haengt
 			this.db.prepare("DELETE FROM release WHERE id = ?").bind(releaseId),
 		]);
 
-		const rest = await this.db
-			.prepare("SELECT COUNT(*) AS n FROM release WHERE game_id = ?")
-			.bind(release.game_id)
-			.first<{ n: number }>();
-		const leer = (rest?.n ?? 0) === 0;
-		if (leer) {
-			await this.db.prepare("DELETE FROM game WHERE id = ?").bind(release.game_id).run();
-		}
-
+		const leer = await this.leeresSpielLoeschen(release.game_id);
 		return { spielGeloescht: leer, listeFreigegeben: (freigabe.meta.changes ?? 0) > 0 };
 	}
 

@@ -57,12 +57,18 @@ export function IgdbSuche({
   vorgabe,
   plattformen = [],
   onWahl,
+  onOhneTreffer,
   laeuft,
 }: {
   vorgabe: string
   /** Plattformen des Spiels – passende Kandidaten stehen dann vorn. */
   plattformen?: string[]
   onWahl: (k: IgdbKandidat) => void
+  /**
+   * Freitext ohne IGDB-Eintrag übernehmen (8.2). Der Knopf erscheint erst,
+   * nachdem eine Suche gelaufen ist: kein Fallback, eine Entscheidung.
+   */
+  onOhneTreffer?: (begriff: string) => void
   laeuft?: boolean
 }) {
   const [begriff, setBegriff] = useState(vorgabe)
@@ -104,6 +110,14 @@ export function IgdbSuche({
       {fehler && <p role="alert">{fehler}</p>}
       {treffer && treffer.length === 0 && <p className="zeile">Nichts gefunden – anderen Begriff versuchen.</p>}
       {treffer && <KandidatenListe kandidaten={treffer} onWahl={onWahl} laeuft={laeuft || sucht} />}
+      {treffer && onOhneTreffer && begriff.trim() !== '' && (
+        <p className="zeile">
+          Nicht dabei?{' '}
+          <button type="button" className="klein" disabled={laeuft || sucht} onClick={() => onOhneTreffer(begriff.trim())}>
+            Ohne IGDB-Eintrag übernehmen: „{begriff.trim()}"
+          </button>
+        </p>
+      )}
     </div>
   )
 }
