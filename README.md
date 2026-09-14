@@ -291,6 +291,21 @@ abgesichert werden – Access Service Token oder eigenes Bearer-Token –
 Backup-Action der erste dieser Endpunkte tatsächlich existiert. Siehe
 [Abschnitt 15.3](docs/spezifikation.md#153-zugriffsschutz).
 
+**Eingerichtet sind bereits zwei Access Service Tokens** (Zero Trust → Access →
+Service Auth → Service Tokens). Sie hängen an einer eigenen Richtlinie der
+Anwendung mit der Aktion *Service Auth*; Aufrufe senden `CF-Access-Client-Id`
+und `CF-Access-Client-Secret` als Header und umgehen damit den Browser-Login,
+ohne die Richtlinie für Personen aufzuweichen.
+
+| Token | Wofür | Werte liegen |
+|---|---|---|
+| `claude-code` | Prüfungen gegen die Produktion nach einem Deploy | `.dev.vars` (lokal, gitignored) |
+| `github-backup` | Backup-Action ab Stufe 8 | GitHub Secrets `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` |
+
+Ein Service-Token-Secret beginnt mit `cfast_` und wird nur beim Anlegen
+angezeigt. Läuft es ab (Voreinstellung ein Jahr), scheitern die Aufrufe mit
+einer 302 auf die Login-Seite – nicht mit 401.
+
 ## Deployment
 
 Jeder Push auf `main` löst [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
@@ -321,6 +336,35 @@ Er sichert diesen einen Lauf ab. Die dauerhafte Sicherung ins private Repository
 `trophytracker-backup` kommt in Stufe 8.
 
 Pull Requests durchlaufen Tests und Build, deployen aber nicht.
+
+**Nach einem Deploy zeigt ein offener Tab noch die alte Fassung.** Das Frontend
+hat bis Stufe 17 (PWA) keine Aktualisierungslogik: einmal hart neu laden
+(Strg+F5; auf dem Handy Tab schließen und neu öffnen). Ob die neue Fassung
+ausgeliefert wird, lässt sich am Asset-Hash prüfen – der Name von
+`/assets/index-*.js` in der ausgelieferten Seite muss dem in `frontend/dist`
+entsprechen.
+
+## Wenn die Anwendung mit 500 antwortet
+
+Häufigste Ursache ist das Tageslimit des D1-Free-Tier: 5 Millionen **gelesene**
+Zeilen (gescannte, nicht zurückgegebene). Prüfen:
+
+```bash
+npx wrangler d1 info trophytracker    # rows_read_24h - rollierendes 24-h-Fenster,
+                                      # nicht der Tageszähler
+npx wrangler d1 execute trophytracker --remote --command "SELECT 1"
+```
+
+Meldet die zweite Abfrage `code: 7500`, ist das Limit erreicht. Es wird um
+**Mitternacht UTC** zurückgesetzt; abgewiesene Abfragen werden nicht nachgeholt,
+die gespeicherten Daten bleiben unberührt. Bis dahin ist auch kein Deploy
+möglich, weil die Sicherungsprüfung selbst liest.
+
+Vorbeugung ist Sache des Entwurfs: Jeder Fremdschlüssel hat einen Index
+(Migration 0008), und `test/lesekosten.spec.ts` misst die heißen Abfragen gegen
+einen Bestand in Produktionsgröße. Zum Vergleich: Eine Sammlungsseite liest rund
+2 000 Zeilen, ein Prüflisten-Eintrag rund 3 000; ein kompletter Durchgang durch
+430 Einträge kostete rund eine Million.
 
 ## Wiederherstellung
 
