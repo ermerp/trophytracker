@@ -49,6 +49,9 @@ type Spiel = {
   id: number
   titel: string
   bild: string | null
+  /** true: `bild` ist das IGDB-Cover (Hochformat), sonst das Trophäensymbol. */
+  cover: boolean
+  kritik: number | null
   zuletztGespielt: string | null
   releases: Release[]
 }
@@ -315,7 +318,7 @@ export function Sammlung() {
           <ul className="kacheln">
             {daten.spiele.map((s) => (
               <li key={s.id} className="kachel">
-                <Link to={`/spiel/${s.id}`} className="bild">
+                <Link to={`/spiel/${s.id}`} className={s.cover ? 'bild cover' : 'bild'}>
                   {s.bild ? (
                     <img src={s.bild} alt="" loading="lazy" />
                   ) : (

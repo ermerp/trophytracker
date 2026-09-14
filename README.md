@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 8 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 9 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -23,7 +23,9 @@ Die Prüfliste führt einmal durch den ganzen Bestand (Use Case 8, vorerst nur
 Trophäenlisten sind bewertet, die Warteschlange ist leer. Damit steht der
 Datenbestand – und ab hier steckt darin Arbeit, die PlayStation nicht
 zurückliefert. Stufe 8 sichert ihn wöchentlich ins private Repository und
-liefert den CSV-Export (Use Case 13).
+liefert den CSV-Export (Use Case 13). Stufe 9 holt Cover, Kritikerwertung und
+Erscheinungsdatum von IGDB – die Grundlage für Wunschliste, Import und
+Rangformel in den Stufen 10 bis 13.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -40,7 +42,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 17 Tabellen, 7 Views, neun Migrationen; Stufe 8 braucht keine |
+| Schema | 18 Tabellen, 7 Views, zehn Migrationen |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
@@ -60,15 +62,15 @@ Was steht und in Betrieb nachgewiesen ist:
 | Sicherung ausserhalb von Cloudflare | Wöchentliche GitHub Action legt `backup.sql` und `backup.json` im privaten Repo `trophytracker-backup` ab; Datum der letzten Sicherung in den Einstellungen, Warnung ab acht Tagen |
 | Export | Sieben CSV-Listen und die JSON-Vollsicherung, verlinkt in den Einstellungen |
 | Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
+| IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar |
 | Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 9 – IGDB-Anbindung** (Cover statt Trophäensymbol, Suche,
-Kritikerwertung, Erscheinungsdaten). Sie ist die Grundlage für die Stufen 10 bis
-13. Twitch/IGDB-Zugangsdaten liegen bereits in `.dev.vars`; das Twitch-Token
-gilt rund 61 Tage und muss ab Stufe 9 selbst erneuert werden.
+**Als Nächstes: Stufe 10 – `plan_entry`, Wunschliste, Favoriten** (Use Case 4).
+Die Wunschliste braucht Cover und Erscheinungsdatum aus Stufe 9 und die
+Rangformel-Gewichte aus `app_setting`; beides liegt bereit.
 
 ## Architektur in einem Absatz
 
@@ -167,25 +169,31 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
    eigene Repository hinaus. Gegen das Vergessen steht die Altersanzeige in den
    Einstellungen – siehe [Sicherung](#sicherung).
 
-   Dazu ein **Cloudflare Secret** (nicht GitHub):
+   Dazu **Cloudflare Secrets** (nicht GitHub):
 
-   | Secret | Wofür |
-   |---|---|
-   | `NPSSO_KEY` | Schlüssel für die Verschlüsselung von NPSSO und Refresh-Token in D1 |
+   | Secret | Wofür | Ab Stufe |
+   |---|---|---|
+   | `NPSSO_KEY` | Schlüssel für die Verschlüsselung von NPSSO und Refresh-Token in D1 | 2 |
+   | `IGDB_CLIENT_ID` | Twitch-Anwendung für IGDB, siehe [IGDB-Anbindung](#igdb-anbindung) | 9 |
+   | `IGDB_CLIENT_SECRET` | dieselbe Anwendung, Secret-Teil | 9 |
 
    ```bash
    openssl rand -base64 32              # 32 Byte, Base64
    npx wrangler secret put NPSSO_KEY    # produktiv
+   npx wrangler secret put IGDB_CLIENT_ID
+   npx wrangler secret put IGDB_CLIENT_SECRET
    ```
 
-   Lokal gehört derselbe Wert in `.dev.vars` (siehe `.dev.vars.example`).
+   Lokal gehören dieselben Werte in `.dev.vars` (siehe `.dev.vars.example`).
+   Fehlen die IGDB-Werte, läuft die Anwendung trotzdem – nur die IGDB-Routen
+   antworten mit 503, und die Einstellungen zeigen den Hinweis.
 
 5. **Zugriffsschutz einrichten** – siehe unten.
 
 6. **Geheimnisse für die externen Anbindungen** kommen als Cloudflare Secrets
    dazu, sobald die jeweilige Stufe erreicht ist (NPSSO und PSN-Refresh-Token ab
-   Stufe 2, IGDB/Twitch ab Stufe 9, AWIN-Feed-URL ab Stufe 18). Lokal gehören sie
-   in `.dev.vars`, niemals ins Repository.
+   Stufe 2, IGDB/Twitch ab Stufe 9 – siehe oben –, AWIN-Feed-URL ab Stufe 18).
+   Lokal gehören sie in `.dev.vars`, niemals ins Repository.
 
 ## PlayStation-Anbindung
 
@@ -246,6 +254,62 @@ korrigiert und erneut ausgeführt, statt die Daten neu von Sony zu holen.
 Läuft das NPSSO ab, ist das kein Fehlerfall, sondern ein regulärer Zustand:
 `status` wird `abgelaufen`, vorhandene Daten bleiben stehen, und in den
 Einstellungen lässt sich ein neues NPSSO eintragen.
+
+## IGDB-Anbindung
+
+Cover, Kritikerwertung (`aggregated_rating`) und Erscheinungsdatum kommen von
+[IGDB](https://www.igdb.com), einer offiziellen, kostenlosen Schnittstelle
+([Spezifikation 7.6](docs/spezifikation.md#76-igdb-abgleich-stufe-9)).
+
+**Zugang einrichten.** IGDB läuft über eine Twitch-Anwendung:
+
+1. Unter https://dev.twitch.tv/console/apps eine Anwendung anlegen (Kategorie
+   „Application Integration", OAuth-Redirect `http://localhost`; er wird nicht
+   benutzt)
+2. Client-ID und ein Client-Secret erzeugen
+3. Beide als Cloudflare Secrets setzen (siehe [Einrichtung](#einrichtung-eines-eigenen-kontos))
+   und lokal in `.dev.vars` eintragen
+
+Das App-Token (rund 60 Tage gültig) holt sich der Worker selbst per
+Client-Credentials und hält es im Speicher der Instanz; bei Ablauf oder einem
+401 von IGDB erneuert er es. Es steht nirgends in der Datenbank. IGDB erlaubt
+vier Anfragen je Sekunde – der Client hält 260 ms Abstand.
+
+**Abgleich.** In den Einstellungen unter „IGDB" stehen die Zähler und der Knopf
+„Abgleich starten". Ein Aufruf sucht für acht Spiele; die Oberfläche ruft
+weiter, bis nichts mehr offen ist – 420 Spiele dauern rund zwei Minuten.
+Automatisch verknüpft wird nur ein **eindeutiger** Treffer: genau ein
+Kandidat mit demselben Titelschlüssel, Editionen und Bundles zählen nicht
+gegen das Hauptspiel, Plattformen müssen sich decken. Alles andere landet mit
+seinen Kandidaten in der **IGDB-Zuordnung** (Werkzeug in den Einstellungen):
+Kandidat antippen, anders suchen oder „Gibt es bei IGDB nicht" – jede
+Entscheidung ist sofort gespeichert. Der Hinweisblock in der Sammlung zeigt,
+wie viele Spiele noch warten.
+
+Gegen die echten 420 Titel gemessen, bevor die Regel gebaut wurde: 372
+eindeutig, 5 echt mehrdeutig, 32 mit passenden Kandidaten, 11 ohne Treffer,
+keine Fehlzuordnung in der Stichprobe. Sonys Schreibweisen („Velocity2X") und
+deine Jahreszusätze („God of War (2018)") werden nur für die Suche bereinigt;
+die Unterscheidung gleichnamiger Spiele übernimmt der Plattformabgleich.
+
+**Korrigieren.** Im Spieldetail zeigt der Block „IGDB" Wertung, Datum und
+Herkunft der Verknüpfung mit Link zu igdb.com. „Anderen Eintrag wählen" öffnet
+die Suche, „Verknüpfung lösen" entfernt alles, was von IGDB kam. Eine von
+Hand gesetzte Kritikerwertung (`critic_source = 'manuell'`, ab einer späteren
+Stufe) überschreibt IGDB nie.
+
+**Auffrischen.** „Metadaten auffrischen" holt für die 50 am längsten nicht
+aktualisierten Spiele Wertung, Cover und Datum in einer Anfrage erneut.
+Kritikerwertungen ändern sich mit jeder Rezension; Stufe 17 hängt den Schritt
+an den Cron.
+
+```
+GET  /api/igdb/status            Zähler und ob Zugangsdaten hinterlegt sind
+POST /api/igdb/abgleich          ein Schritt, { weiter } solange etwas offen ist
+POST /api/igdb/auffrischen       50 Spiele in einer IGDB-Anfrage
+GET  /api/igdb/offen             Prüfansicht mit Kandidaten
+GET  /api/igdb/search?q=         Suche, auch für Import und Nachpflege (Stufe 11)
+```
 
 ## Zugriffsschutz
 
@@ -655,7 +719,9 @@ scripts/       Prüfskripte für Deploy und Backup, dazu die Wiederherstellung
 src/index.ts   Hono-App, hängt Repositories je Anfrage ein
 src/api/       Route-Module
 src/db/        Repository-Schicht – der einzige Ort mit D1-Zugriff
-src/domain/    reine Logik ohne Datenbank, z. B. die Gewichte der Rangformel
+src/domain/    reine Logik ohne Datenbank, z. B. Titelnormalisierung, IGDB-Abgleichregel
+src/psn/       PSN-Client (inoffiziell), src/igdb/ der IGDB-Client (Twitch-Token)
+src/sync/      Trophäen-Sync und IGDB-Abgleich in begrenzten Schritten
 frontend/      React + Vite, wird als Static Assets mit dem Worker ausgeliefert
 ```
 

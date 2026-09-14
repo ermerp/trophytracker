@@ -124,3 +124,41 @@ export const AKTIONSTEXT: Record<ReviewAktion, string> = {
 }
 
 export type ReviewFortschritt = { offen: number; erledigt: number; gesamt: number; unentschieden: number }
+
+/** Ein IGDB-Treffer, wie /api/igdb/search und die Prüfansicht ihn liefern (Stufe 9). */
+export type IgdbKandidat = {
+  igdbId: number
+  name: string
+  slug: string | null
+  cover: string | null
+  erscheinungsdatum: string | null
+  plattformen: string[]
+  typ: string | null
+  kritik: { wert: number; anzahl: number | null } | null
+}
+
+export type IgdbStatus = {
+  zugangsdaten: boolean
+  gesamt: number
+  verknuepft: number
+  zurPruefung: number
+  ungeprueft: number
+  abgelehnt: number
+  letzteAktualisierung: string | null
+}
+
+export type ReleaseStatus = 'erschienen' | 'angekuendigt' | 'unbekannt'
+
+export const RELEASE_STATUS_TEXT: Record<ReleaseStatus, string> = {
+  erschienen: 'erschienen',
+  angekuendigt: 'angekündigt',
+  unbekannt: 'unbekannt',
+}
+
+export const igdbLink = (slug: string | null) => (slug ? `https://www.igdb.com/games/${slug}` : null)
+
+/** Zeitstempel aus D1 (`datetime('now')`, UTC ohne Zone) oder ISO – als Datum und Uhrzeit. */
+export const zeitpunkt = (wert: string | null) =>
+  wert ? new Date(wert.replace(' ', 'T') + (/Z|[+-]\d\d:\d\d$/.test(wert) ? '' : 'Z')).toLocaleString('de-DE') : 'unbekannt'
+
+export const KRITIKQUELLE: Record<string, string> = { igdb: 'IGDB', opencritic: 'OpenCritic', manuell: 'von Hand' }

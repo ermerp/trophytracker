@@ -1,6 +1,8 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { Abweichungen } from './Abweichungen'
 import { Einstellungen } from './Einstellungen'
+import { Igdb } from './Igdb'
+import { IgdbZuordnung } from './IgdbZuordnung'
 import { Navigation } from './Navigation'
 import { Pruefliste } from './Pruefliste'
 import { Sammlung } from './Sammlung'
@@ -26,6 +28,7 @@ function Werkzeuge() {
       <ul>
         <li><Link to="/pruefliste">Prüfliste</Link> – Trophäenbestand einmal durchgehen, danach nur Änderungen</li>
         <li><Link to="/zuordnung">Zuordnung</Link> – Trophäenlisten zu Spielen und Releases machen</li>
+        <li><Link to="/igdb">IGDB-Zuordnung</Link> – Spiele ohne eindeutigen IGDB-Treffer nachziehen</li>
         <li><Link to="/pruefen">Sammlung prüfen</Link> – alle Zuordnungen als Tabelle</li>
         <li><Link to="/trophaeen">Trophäen</Link> – die Rohliste von Sony</li>
       </ul>
@@ -49,6 +52,7 @@ function App() {
               <>
                 <h1>Einstellungen</h1>
                 <Einstellungen />
+                <Igdb />
                 <Sicherung />
                 <Abweichungen />
                 <Werkzeuge />
@@ -56,6 +60,7 @@ function App() {
             }
           />
           <Route path="/zuordnung" element={<Zuordnung />} />
+          <Route path="/igdb" element={<IgdbZuordnung />} />
           <Route path="/pruefen" element={<SammlungPruefen />} />
           <Route path="/trophaeen" element={<Trophaeen />} />
           <Route path="*" element={<Navigate to="/sammlung" replace />} />

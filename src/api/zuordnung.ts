@@ -13,6 +13,7 @@ import { istPlayStatus } from "../domain/play-status";
 import { istErlaubtePlattform, titelSchluessel } from "../domain/titel";
 import type { AppEnv } from "../types";
 import { platinAus } from "./antwort";
+import { igdbAntwort, kritikAntwort } from "./igdb";
 import { exemplarAntwort } from "./ownership";
 import { bewertungAntwort } from "./releases";
 
@@ -187,6 +188,8 @@ export const gameRoutes = new Hono<AppEnv>()
 				id: z.id,
 				titel: z.title,
 				bild: z.cover_url ?? z.icon_url,
+				cover: z.cover_url !== null,
+				kritik: z.critic_score,
 				zuletztGespielt: z.zuletzt_gespielt,
 				releases: (releasesJeSpiel.get(z.id) ?? []).map(releaseAntwort),
 			})),
@@ -349,6 +352,10 @@ export const gameRoutes = new Hono<AppEnv>()
 			titel: detail.spiel.title,
 			bild: detail.spiel.cover_url ?? detail.releases.find((r) => r.icon_url)?.icon_url ?? null,
 			igdbId: detail.spiel.igdb_id,
+			igdb: igdbAntwort(detail.spiel),
+			kritik: kritikAntwort(detail.spiel),
+			erscheinungsdatum: detail.spiel.release_date,
+			releaseStatus: detail.spiel.release_status,
 			releases: detail.releases.map((r) => ({
 				id: r.id,
 				plattform: r.platform,

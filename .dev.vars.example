@@ -4,3 +4,8 @@
 # Schluessel fuer die Verschluesselung von NPSSO und Refresh-Token in D1.
 # Erzeugen mit: openssl rand -base64 32
 NPSSO_KEY=
+
+# IGDB ueber eine Twitch-Anwendung (dev.twitch.tv/console/apps), ab Stufe 9.
+# Produktiv: npx wrangler secret put IGDB_CLIENT_ID / IGDB_CLIENT_SECRET
+IGDB_CLIENT_ID=
+IGDB_CLIENT_SECRET=

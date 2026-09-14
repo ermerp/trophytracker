@@ -19,7 +19,14 @@ import {
   type Plattform,
   type Quelle,
   type Zustand,
+  KRITIKQUELLE,
+  RELEASE_STATUS_TEXT,
+  igdbLink,
+  zeitpunkt,
+  type IgdbKandidat,
+  type ReleaseStatus,
 } from './api'
+import { IgdbSuche, datumOderUnbekannt } from './IgdbSuche'
 
 /**
  * Spieldetail (Use Cases 1, 2, 7): Releases, Exemplare, Trophäen.
@@ -66,7 +73,29 @@ type Release = {
   digital: Digital[]
 }
 
-type Spiel = { id: number; titel: string; bild: string | null; igdbId: number | null; releases: Release[] }
+type IgdbZustand = {
+  id: number | null
+  slug: string | null
+  quelle: 'automatisch' | 'manuell' | null
+  verknuepftAm: string | null
+  aktualisiertAm: string | null
+  gesuchtAm: string | null
+  abgelehntAm: string | null
+}
+
+type Kritik = { wert: number; anzahl: number | null; quelle: string | null; standVom: string | null }
+
+type Spiel = {
+  id: number
+  titel: string
+  bild: string | null
+  igdbId: number | null
+  igdb: IgdbZustand
+  kritik: Kritik | null
+  erscheinungsdatum: string | null
+  releaseStatus: ReleaseStatus
+  releases: Release[]
+}
 
 export function Spieldetail() {
   const { id } = useParams()
@@ -75,6 +104,7 @@ export function Spieldetail() {
   const [fehler, setFehler] = useState<string | null>(null)
   const [meldung, setMeldung] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
+  const [igdbSuche, setIgdbSuche] = useState(false)
 
   const laden = useCallback(async () => {
     try {
@@ -102,6 +132,29 @@ export function Spieldetail() {
     } finally {
       setLaeuft(false)
     }
+  }
+
+  /** IGDB-Eintrag von Hand wählen – Quelle 'manuell', Metadaten kommen mit. */
+  async function igdbWaehlen(k: IgdbKandidat) {
+    if (!spiel) return
+    setIgdbSuche(false)
+    await tue(() => anfrage(`/api/unmatched/spiel/${spiel.id}/link`, { methode: 'POST', koerper: { igdbId: k.igdbId } }), `Mit „${k.name}" verknüpft.`)
+  }
+
+  async function igdbLoesen() {
+    if (!spiel || !confirm('IGDB-Verknüpfung lösen? Cover, Wertung und Datum von IGDB werden entfernt.')) return
+    await tue(() => anfrage(`/api/unmatched/spiel/${spiel.id}/link`, { methode: 'DELETE' }), 'Verknüpfung gelöst.')
+  }
+
+  async function igdbAblehnen() {
+    if (!spiel) return
+    await tue(() => anfrage(`/api/unmatched/spiel/${spiel.id}/ablehnen`, { methode: 'POST' }), 'Als „kein IGDB-Eintrag" gespeichert.')
+  }
+
+  async function igdbDochSuchen() {
+    if (!spiel) return
+    await tue(() => anfrage(`/api/unmatched/spiel/${spiel.id}/suchen`, { methode: 'POST' }))
+    setIgdbSuche(true)
   }
 
   async function umbenennen(titel: string) {
@@ -171,7 +224,7 @@ export function Spieldetail() {
       <p><button type="button" onClick={() => navigate(-1)}>← Zurück</button></p>
 
       <header className="detailkopf">
-        {spiel.bild && <img src={spiel.bild} alt="" width={96} height={96} />}
+        {spiel.bild && <img src={spiel.bild} alt="" className={spiel.igdb.id !== null ? 'cover' : undefined} width={96} height={96} />}
         <div>
           <input
             type="text"
@@ -185,14 +238,85 @@ export function Spieldetail() {
               else e.target.value = spiel.titel
             }}
           />
-          <p className="zeile">
-            {spiel.releases.length} Release(s)
-            {spiel.igdbId === null && ' · ohne IGDB-Zuordnung (Stufe 9)'}
-          </p>
+          <p className="zeile">{spiel.releases.length} Release(s)</p>
         </div>
       </header>
 
       {meldung && <p role="status">{meldung}</p>}
+
+      <section className="igdb-block">
+        <h2>IGDB</h2>
+        {spiel.igdb.id !== null ? (
+          <>
+            <table>
+              <tbody>
+                <tr>
+                  <td>Kritikerwertung</td>
+                  <td>
+                    {spiel.kritik
+                      ? `${spiel.kritik.wert} von 100 (${spiel.kritik.anzahl ?? '?'} Wertungen, ${KRITIKQUELLE[spiel.kritik.quelle ?? ''] ?? 'Quelle unbekannt'})`
+                      : 'unbekannt'}
+                  </td>
+                </tr>
+                <tr>
+                  <td>Erscheinungsdatum</td>
+                  <td>
+                    {datumOderUnbekannt(spiel.erscheinungsdatum)}
+                    {spiel.releaseStatus !== 'unbekannt' && ` · ${RELEASE_STATUS_TEXT[spiel.releaseStatus]}`}
+                  </td>
+                </tr>
+                <tr>
+                  <td>Verknüpfung</td>
+                  <td>
+                    {spiel.igdb.quelle === 'automatisch' ? 'automatisch' : 'von Hand'}
+                    {spiel.igdb.verknuepftAm && ` am ${zeitpunkt(spiel.igdb.verknuepftAm)}`}
+                    {igdbLink(spiel.igdb.slug) && (
+                      <>
+                        {' · '}
+                        <a href={igdbLink(spiel.igdb.slug)!} target="_blank" rel="noreferrer">bei IGDB ansehen</a>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="knopfzeile">
+              <button type="button" className="klein" onClick={() => setIgdbSuche(!igdbSuche)} disabled={laeuft}>
+                {igdbSuche ? 'Suche schließen' : 'Anderen Eintrag wählen'}
+              </button>
+              <button type="button" className="klein" onClick={igdbLoesen} disabled={laeuft}>
+                Verknüpfung lösen
+              </button>
+            </div>
+          </>
+        ) : spiel.igdb.abgelehntAm ? (
+          <>
+            <p className="zeile">Als „gibt es bei IGDB nicht" gespeichert ({zeitpunkt(spiel.igdb.abgelehntAm)}).</p>
+            <button type="button" className="klein" onClick={igdbDochSuchen} disabled={laeuft}>
+              Doch suchen
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="zeile">
+              {spiel.igdb.gesuchtAm ? (
+                <>Ohne eindeutigen Treffer – Kandidaten stehen in der <Link to="/igdb">IGDB-Zuordnung</Link>, oder hier suchen.</>
+              ) : (
+                <>Noch nicht bei IGDB gesucht. Der Abgleich läuft in den <Link to="/einstellungen">Einstellungen</Link>, oder hier suchen.</>
+              )}
+            </p>
+            <div className="knopfzeile">
+              <button type="button" className="klein" onClick={() => setIgdbSuche(!igdbSuche)} disabled={laeuft}>
+                {igdbSuche ? 'Suche schließen' : 'Bei IGDB suchen'}
+              </button>
+              <button type="button" className="klein" onClick={igdbAblehnen} disabled={laeuft}>
+                Gibt es bei IGDB nicht
+              </button>
+            </div>
+          </>
+        )}
+        {igdbSuche && <IgdbSuche vorgabe={spiel.titel} onWahl={igdbWaehlen} laeuft={laeuft} />}
+      </section>
 
       {spiel.releases.map((r) => (
         <section key={r.id} className="release-block">

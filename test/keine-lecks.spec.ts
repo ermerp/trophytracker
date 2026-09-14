@@ -3,22 +3,26 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createApp } from "../src/index";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
+import { erstelleIgdbClient } from "../src/igdb/client";
 import { erstellePsnClient } from "../src/psn/client";
+import { spielRoh } from "./igdb-fake";
 import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophySeite } from "./psn-fake";
 
 /**
  * Dichtheitspruefung.
  *
- * Weder NPSSO noch Refresh- oder Access Token duerfen jemals in einer
- * API-Antwort oder im Log auftauchen - auch nicht gekuerzt. Der Test faehrt
- * jede Route an, auch in den Fehlerfaellen, und sucht in allen Ausgaben nach
- * Markierungswerten.
+ * Weder NPSSO noch Refresh- oder Access Token noch IGDB-Client-Secret oder
+ * Twitch-Token duerfen jemals in einer API-Antwort oder im Log auftauchen -
+ * auch nicht gekuerzt. Der Test faehrt jede Route an, auch in den
+ * Fehlerfaellen, und sucht in allen Ausgaben nach Markierungswerten.
  */
 
 const MARKIERUNGEN = {
 	npsso: "MARKIERUNG-NPSSO-7f3a91",
 	refresh: "MARKIERUNG-REFRESH-2b8c04",
 	access: "MARKIERUNG-ACCESS-e51d67",
+	igdbSecret: "MARKIERUNG-IGDBSECRET-9c1d22",
+	twitchToken: "MARKIERUNG-TWITCH-4e7a08",
 };
 
 const ALLE = Object.values(MARKIERUNGEN);
@@ -52,6 +56,60 @@ function psnMarkiert() {
 	);
 }
 
+const IGDB_ZUGANG = { clientId: "igdb-client-id", clientSecret: new Geheimnis(MARKIERUNGEN.igdbSecret) };
+
+/** IGDB-Client mit markiertem Token, Erfolgspfad. */
+function igdbMarkiert() {
+	return erstelleIgdbClient(
+		IGDB_ZUGANG,
+		fakeFetch([
+			[/id\.twitch\.tv/, () => jsonAntwort({ access_token: MARKIERUNGEN.twitchToken, expires_in: 5000000 })],
+			[/api\.igdb\.com/, () => jsonAntwort([spielRoh()])],
+		]).fetch,
+		async () => {},
+	);
+}
+
+/** IGDB-Client, bei dem Twitch und IGDB die Markierungen im Fehlertext zurueckwerfen. */
+function igdbKaputt(status: number) {
+	return erstelleIgdbClient(
+		IGDB_ZUGANG,
+		fakeFetch([
+			[/id\.twitch\.tv/, () => jsonAntwort({ message: `abgelehnt ${MARKIERUNGEN.igdbSecret}` }, 403)],
+			[/api\.igdb\.com/, () => new Response(`Fehler ${MARKIERUNGEN.twitchToken}`, { status })],
+		]).fetch,
+		async () => {},
+	);
+}
+
+/** IGDB-Client, bei dem Twitch das Token liefert, IGDB aber scheitert. */
+function igdbAbrufKaputt(status: number) {
+	return erstelleIgdbClient(
+		IGDB_ZUGANG,
+		fakeFetch([
+			[/id\.twitch\.tv/, () => jsonAntwort({ access_token: MARKIERUNGEN.twitchToken, expires_in: 5000000 })],
+			[/api\.igdb\.com/, () => new Response(`Fehler ${MARKIERUNGEN.twitchToken}`, { status })],
+		]).fetch,
+		async () => {},
+	);
+}
+
+const IGDB_ROUTEN = (app: ReturnType<typeof createApp>) => [
+	ruf(app, "/api/igdb/search?q=bloodborne"),
+	ruf(app, "/api/igdb/status"),
+	ruf(app, "/api/igdb/offen"),
+	ruf(app, "/api/igdb/abgleich", { method: "POST" }),
+	ruf(app, "/api/igdb/auffrischen", { method: "POST" }),
+	ruf(app, "/api/unmatched/spiel/1/link", {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ igdbId: 1001 }),
+	}),
+	ruf(app, "/api/unmatched/spiel/1/link", { method: "DELETE" }),
+	ruf(app, "/api/unmatched/spiel/1/ablehnen", { method: "POST" }),
+	ruf(app, "/api/unmatched/spiel/1/suchen", { method: "POST" }),
+];
+
 /** PSN-Client, der ueberall scheitert - fuer die Fehlerpfade. */
 function psnKaputt() {
 	return erstellePsnClient(
@@ -76,6 +134,9 @@ beforeEach(async () => {
 		env.DB.prepare("DELETE FROM psn_raw_response"),
 		env.DB.prepare("DELETE FROM psn_sync_run"),
 		env.DB.prepare("DELETE FROM psn_credentials"),
+		env.DB.prepare("DELETE FROM igdb_candidate"),
+		env.DB.prepare("DELETE FROM game"),
+		env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (1, 'Bloodborne', 'bloodborne')"),
 	]);
 });
 
@@ -99,7 +160,8 @@ describe("Dichtheitsprüfung", () => {
 	});
 
 	it("gibt auf keiner Route ein Geheimnis heraus - Erfolgspfad", async () => {
-		const app = createApp(psnMarkiert);
+		const igdb = igdbMarkiert();
+		const app = createApp(psnMarkiert, () => igdb);
 
 		const antworten = [
 			await ruf(app, "/api/settings/npsso", {
@@ -147,11 +209,22 @@ describe("Dichtheitsprüfung", () => {
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({ zeitpunkt: "2026-09-14T03:17:00Z", commit: "abc1234" }),
 			}),
+			...(await Promise.all(IGDB_ROUTEN(app))),
 		];
 
 		for (const text of antworten) {
 			expect(istDicht(text), `Leck in: ${text.slice(0, 200)}`).toMatchObject({ dicht: true });
 		}
+	});
+
+	it("gibt auf keiner IGDB-Route ein Geheimnis heraus - Fehlerpfade", async () => {
+		for (const igdb of [igdbKaputt(500), igdbAbrufKaputt(500), igdbAbrufKaputt(429), igdbAbrufKaputt(401)]) {
+			const app = createApp(psnKaputt, () => igdb);
+			for (const text of await Promise.all(IGDB_ROUTEN(app))) {
+				expect(istDicht(text), `Leck in: ${text.slice(0, 200)}`).toMatchObject({ dicht: true });
+			}
+		}
+		expect(istDicht(ausgabe.join("\n"))).toMatchObject({ dicht: true });
 	});
 
 	it("gibt auf keiner Route ein Geheimnis heraus - Fehlerpfade", async () => {
@@ -213,13 +286,15 @@ describe("Dichtheitsprüfung", () => {
 	 * eine kuenftige Migration anlegt, ist damit automatisch mitgeprueft.
 	 */
 	it("legt in KEINER Tabelle der Datenbank Klartext ab", async () => {
-		const app = createApp(psnMarkiert);
+		const igdb = igdbMarkiert();
+		const app = createApp(psnMarkiert, () => igdb);
 		await ruf(app, "/api/settings/npsso", {
 			method: "POST",
 			headers: { "content-type": "application/json" },
 			body: JSON.stringify({ npsso: MARKIERUNGEN.npsso }),
 		});
 		await ruf(app, "/api/sync", { method: "POST" });
+		await ruf(app, "/api/igdb/abgleich", { method: "POST" });
 
 		const { results: tabellen } = await env.DB.prepare(
 			"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' " +

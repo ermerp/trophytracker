@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 19 – Wiederherstellung geprobt: Der Dump lässt sich nicht unverändert einspielen, die Umordnung ist Teil des Ablaufs.*
+*Version 20 – IGDB-Anbindung (Stufe 9): Abgleich in Schritten, nur eindeutige Treffer automatisch, Prüfansicht für den Rest; gegen die echten 420 Titel gemessen.*
 
 ## 1. Use Cases
 
@@ -93,7 +93,36 @@ CREATE TABLE game (
   critic_source      TEXT,              -- 'igdb' | 'opencritic' | 'manuell'
   critic_updated_at  TEXT,
 
+  -- Buchführung des IGDB-Abgleichs (7.6, Migration 0010). Kein Statusfeld:
+  -- die Zustände sind aus den Zeitstempeln ableitbar.
+  igdb_slug           TEXT,             -- für den Link auf igdb.com
+  igdb_checked_at     TEXT,             -- letzte Suche bei IGDB
+  igdb_matched_at     TEXT,
+  igdb_matched_source TEXT CHECK (igdb_matched_source IN ('automatisch','manuell')),
+  igdb_declined_at    TEXT,             -- Nutzer: "gibt es bei IGDB nicht"
+  igdb_synced_at      TEXT,             -- letzte Übernahme der Metadaten
+
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Kandidaten einer IGDB-Suche ohne eindeutigen Treffer, für die Prüfansicht
+-- (7.6). Abgeleitet und jederzeit neu abrufbar, deshalb nicht in backup.json;
+-- die Entscheidungen des Nutzers stehen in game.
+CREATE TABLE igdb_candidate (
+  id           INTEGER PRIMARY KEY,
+  game_id      INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
+  igdb_id      INTEGER NOT NULL,
+  name         TEXT NOT NULL,
+  slug         TEXT,
+  cover_url    TEXT,
+  release_date TEXT,
+  platforms    TEXT,                    -- "PS3,PS4", nur die vier eigenen
+  game_type    TEXT,                    -- Anzeigetext: 'Hauptspiel', 'DLC', 'Remake', ...
+  critic_score INTEGER,
+  critic_score_count INTEGER,
+  position     INTEGER NOT NULL,        -- Reihenfolge der IGDB-Antwort
+  fetched_at   TEXT NOT NULL,
+  UNIQUE (game_id, igdb_id)
 );
 
 -- Ein Spiel auf einer konkreten Plattform.
@@ -559,7 +588,38 @@ Sale-Preise werden mit `is_sale = 1` markiert, damit ein Rabattzeitraum den Verl
 
 **OpenCritic** betreibt eine öffentliche API und rechnet mit einem einfachen arithmetischen Mittel statt Metacritics undurchsichtiger Gewichtung. Als optionale Zweitquelle sinnvoll, als Pflichtabhängigkeit nicht nötig.
 
-Abruf zusammen mit den übrigen IGDB-Metadaten, nicht als eigener Job. `critic_source` hält fest, woher der Wert stammt, damit ein späterer Quellenwechsel nachvollziehbar bleibt.
+Abruf zusammen mit den übrigen IGDB-Metadaten, nicht als eigener Job. `critic_source` hält fest, woher der Wert stammt, damit ein späterer Quellenwechsel nachvollziehbar bleibt. Der Abgleich schreibt `critic_*` nur, wenn `critic_source` leer ist oder `'igdb'` lautet – ein von Hand gesetzter Wert überlebt jede Auffrischung.
+
+## 7.6 IGDB-Abgleich (Stufe 9)
+
+**Zugang.** IGDB läuft über eine Twitch-Anwendung: Client-ID und Client-Secret ergeben per Client-Credentials ein App-Token, das rund 60 Tage gilt. Beide Werte liegen als Cloudflare Secrets `IGDB_CLIENT_ID` und `IGDB_CLIENT_SECRET`. Das Token wird **im Speicher der Worker-Instanz** gehalten, nicht in D1: Es rotiert nicht, ist an die Client-ID gebunden und jederzeit neu erzeugbar – ein neues Isolate holt es sich, ein 401 von IGDB erneuert es genau einmal. Client-Secret und Token laufen als `Geheimnis` (7.1); die Antwort des Token-Endpunkts wird nie protokolliert oder gespeichert. Fehlen die Secrets, antworten nur die Routen mit 503, die IGDB tatsächlich anfragen – die Anwendung bleibt ohne IGDB benutzbar.
+
+**Ratenlimit.** IGDB erlaubt vier Anfragen je Sekunde. Der Client hält zwischen zwei Anfragen mindestens 260 ms Abstand (Wartezeit zählt nicht als CPU); ein 429 beendet den laufenden Schritt sauber, die Oberfläche ruft später erneut.
+
+**Abgleich in Schritten.** `POST /api/igdb/abgleich` sucht je Aufruf für acht Spiele, bei denen noch nie gesucht wurde (`igdb_id IS NULL AND igdb_checked_at IS NULL AND igdb_declined_at IS NULL`), in der Reihenfolge ihrer Id. Der Fortschritt steht in `igdb_checked_at`; die Oberfläche ruft, solange `weiter` zurückkommt – dasselbe Muster wie beim Trophäen-Sync (Abschnitt 2). Die Suche ist auf die PlayStation-Plattformen eingeschränkt (IGDB-IDs 9, 46, 48, 167; PSVR 165 und PSVR2 390 zählen als PS4 und PS5) und schließt Mods, Forks und Updates schon in der Abfrage aus – für „Genshin Impact" bestanden sonst alle zehn Treffer aus Updates.
+
+**Suchbegriff.** `suchbegriff(title)` (`src/domain/igdb.ts`) bereinigt nur für die Anfrage, nie für den Schlüssel: ein Jahr in Klammern aus der Umbenennung durch den Nutzer („God of War (2018)") fällt weg, an Wörter geklebte Ziffern werden getrennt („Velocity2X" → „Velocity 2X"; IGDB findet nur diese Schreibweise).
+
+**Eindeutiger Treffer.** Die Regel aus 7.2, auf IGDB übertragen: Automatisch verknüpft wird nur, wenn **genau ein** Kandidat denselben Titelschlüssel trägt wie der bereinigte Suchbegriff. Der Schlüssel wird dabei frisch aus dem Titel berechnet, nicht aus `sort_title` gelesen – die Spalte ist abgeleitet und veraltet still. Drei Verfeinerungen aus der Messung gegen die echten Titel:
+
+- Editionen verweisen mit `version_parent` auf ihr Hauptspiel; ist das Hauptspiel selbst Kandidat, zählt die Edition nicht als zweiter Treffer.
+- Ein Bundle gleichen Namens (GTA V als Paket mit GTA Online) zählt nicht gegen das Hauptspiel; nur ohne anderes bleibt es selbst Kandidat.
+- Nennt der Kandidat Plattformen und das Spiel hat Releases, muss sich mindestens eine decken. Ein Kandidat ohne Plattformangabe wird nicht ausgeschlossen – fehlende Daten sind kein Gegenbeweis. Genau diese Prüfung löst „God of War (2018)" (PS4) und „God of War (2005)" (PS3) beide richtig auf.
+
+Alles andere landet mit seinen Kandidaten in `igdb_candidate` und wartet in der Prüfansicht. **Gemessen am 14.09.2026 gegen die 420 Spiele der Produktion:** 372 eindeutig, 5 echt mehrdeutig (etwa MediEvil als Remake oder Portierung, Tekken 6), 32 mit Kandidaten ohne Schlüsseltreffer (Abkürzungen, römische Ziffern, fehlende Untertitel), 11 ohne Treffer. In der Stichprobe aller automatischen Treffer keine Fehlzuordnung. Die Messung lief als Skript außerhalb des Repositories; ins Repository kamen nur die Zahlen.
+
+**Was eine Verknüpfung schreibt.** `igdb_id`, `igdb_slug`, `cover_url` (264 × 374, `t_cover_big`), `release_date` aus `first_release_date`, `release_status` daraus abgeleitet (Datum in der Zukunft → `angekuendigt`, keines → `unbekannt`, nie `erschienen` ohne Datum), `critic_score` (gerundetes `aggregated_rating`) und `critic_score_count` mit `critic_source = 'igdb'`, dazu `igdb_matched_at`, `igdb_matched_source` und `igdb_synced_at`.
+
+**Entscheidungen des Nutzers, alle gespeichert und alle korrigierbar** (CLAUDE.md):
+
+- Kandidat übernehmen oder über die eingebaute Suche einen anderen Eintrag wählen → Verknüpfung mit `igdb_matched_source = 'manuell'`; die Metadaten kommen mit einer Anfrage nach Id.
+- „Gibt es bei IGDB nicht" → `igdb_declined_at`; das Spiel verlässt Abgleich und Prüfansicht. „Doch suchen" nimmt es zurück.
+- Verknüpfung lösen → alles, was von IGDB kam, wird entfernt (Cover, Datum, Status zurück auf `unbekannt`, Wertung nur bei Quelle `'igdb'`); `igdb_checked_at` wird NULL, der nächste Abgleich sucht erneut.
+- Umbenennen eines unverknüpften, nicht abgelehnten Spiels setzt `igdb_checked_at` zurück: Der neue Titel ist meist genau die Korrektur, mit der IGDB den Eintrag findet.
+
+**Auffrischen.** `POST /api/igdb/auffrischen` holt für die 50 am längsten nicht aktualisierten verknüpften Spiele Wertung, Cover und Datum in **einer** Anfrage (`where id = (…)`) erneut. Kritikerwertungen ändern sich mit jeder neuen Rezension; Stufe 17 hängt den Schritt an den Cron.
+
+**Offen, in späteren Stufen zu entscheiden:** `physical_source = 'igdb'` (Abschnitt 3) wird in Stufe 9 nicht gesetzt – IGDB unterscheidet Disc und Download nicht zuverlässig; Stufe 14/18. Ob abgelehnte Spiele in `v_ohne_igdb` und damit in der Ansicht „Ohne Zuordnung" erscheinen sollen, entscheidet Stufe 11; die View ist unverändert.
 
 ---
 
@@ -640,7 +700,7 @@ Einträge ohne IGDB-Zuordnung haben kein Cover, keine Kritikerwertung und kein E
 
 Eine Ansicht in den Einstellungen sammelt sie listenübergreifend – aus Wunschliste, To-Do, Backlog und Sammlung gleichermassen – mit demselben IGDB-Suchfeld zum Nachziehen.
 
-Der Aufwand ist gering, weil die Suche aus 8.2 wiederverwendet wird. Falls der Fall in der Praxis nie auftritt, kostet die Ansicht nichts; falls doch, hast du keinen Weg, ihn sonst zu finden.
+Der Aufwand ist gering, weil die Suche aus 8.2 wiederverwendet wird – seit Stufe 9 existiert sie als Komponente `IgdbSuche` im Spieldetail und in der IGDB-Zuordnung (7.6). Falls der Fall in der Praxis nie auftritt, kostet die Ansicht nichts; falls doch, hast du keinen Weg, ihn sonst zu finden.
 
 ### 8.4 Unveröffentlichte Titel (Use Case 11)
 
@@ -900,9 +960,16 @@ GET    /api/review/queue              v_review_offen, paginiert (limit, offset);
 POST   /api/review/:releaseId/decide  Body: { aktion } – sieben Aktionen aus 8.1; Antwort mit status, planAngelegt, nochOffen
 GET    /api/review/progress           { offen, erledigt, gesamt, unentschieden } – unentschieden ist die zweite Runde
 
-GET    /api/igdb/search?q=            Eingebaute Suche für Import und Nachpflege
-GET    /api/unmatched                 v_ohne_igdb
-POST   /api/unmatched/:quelle/:id/link  Body: { igdbId }
+GET    /api/igdb/search?q=            Eingebaute Suche für Spieldetail, Prüfansicht, Import und Nachpflege (7.6)
+GET    /api/igdb/status               { zugangsdaten, gesamt, verknuepft, zurPruefung, ungeprueft, abgelehnt, letzteAktualisierung }
+GET    /api/igdb/offen                Prüfansicht: Spiele ohne eindeutigen Treffer mit Kandidaten (limit, offset)
+POST   /api/igdb/abgleich             ein Schritt: acht Spiele; { geprueft, verknuepft, vorgeschlagen, ohneTreffer, nochOffen, weiter }
+POST   /api/igdb/auffrischen          ein Schritt: 50 verknüpfte Spiele in einer IGDB-Anfrage
+GET    /api/unmatched                 v_ohne_igdb (Stufe 11)
+POST   /api/unmatched/:quelle/:id/link  Body: { igdbId } – Quelle 'spiel' seit Stufe 9, 'plan_*' ab Stufe 11
+DELETE /api/unmatched/spiel/:id/link  Verknüpfung lösen; nimmt alles zurück, was von IGDB kam
+POST   /api/unmatched/spiel/:id/ablehnen  "Gibt es bei IGDB nicht" – gespeicherte Entscheidung
+POST   /api/unmatched/spiel/:id/suchen    Ablehnung zurücknehmen; der nächste Abgleich sucht erneut
 
 POST   /api/imports/wishlist/parse    Body: { text } → Trefferliste zur Durchsicht
 POST   /api/imports/wishlist/confirm  Body: { entries[] } → schreibt plan_entry
@@ -946,9 +1013,10 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Ansicht | Use Case | Inhalt |
 |---|---|---|
 | Dashboard | – | Kennzahlen je Plattform, Platin-Zähler, Backlog-Länge, letzter Sync, Warnung bei abgelaufenem NPSSO; offene Prüfliste mit Anzahl **und daneben die Anzahl der `unentschieden`-Einträge mit Link auf die gefilterte Sammlung** – sonst verschwindet die zweite Runde aus dem Blick, sobald die Prüfliste leer ist |
-| Sammlung | 1 | Kachelraster mit Covern, Filterleiste, Suche. Schnellerfassung je Release („+ Disc", „+ digital") mit Rückgängig direkt in der Kachel, eigener Status je Release als Text und Filter und Löschen am Kennzeichen – bei 431 Titeln entscheidet die Klickzahl, ob die Ersterfassung des Regals durchgezogen wird. „Spiel anlegen" für Titel ohne Trophäenliste. Bis Stufe 9 steht das Trophäensymbol an der Stelle des Covers |
-| Spieldetail | 1, 2, 7 | Releases, Exemplare (Zustand, Anleitung, Kaufdatum, Preis, EAN, Notiz), digitale Berechtigungen; je Release „Trophäen (Sony)" und „Eigene Bewertung" (Status, Bewertung 1–10, Begonnen/Beendet, Notiz) nebeneinander, nie verrechnet; Preisverlauf je Kanal; Release hinzufügen und löschen, Spiel löschen |
+| Sammlung | 1 | Kachelraster mit Covern, Filterleiste, Suche. Schnellerfassung je Release („+ Disc", „+ digital") mit Rückgängig direkt in der Kachel, eigener Status je Release als Text und Filter und Löschen am Kennzeichen – bei 431 Titeln entscheidet die Klickzahl, ob die Ersterfassung des Regals durchgezogen wird. „Spiel anlegen" für Titel ohne Trophäenliste. Seit Stufe 9 das IGDB-Cover im Hochformat; das Trophäensymbol bleibt Rückfall, solange eine Verknüpfung fehlt |
+| Spieldetail | 1, 2, 7 | Releases, Exemplare (Zustand, Anleitung, Kaufdatum, Preis, EAN, Notiz), digitale Berechtigungen; je Release „Trophäen (Sony)" und „Eigene Bewertung" (Status, Bewertung 1–10, Begonnen/Beendet, Notiz) nebeneinander, nie verrechnet; Preisverlauf je Kanal; Release hinzufügen und löschen, Spiel löschen. Block „IGDB" (seit Stufe 9): Kritikerwertung mit Anzahl und Quelle, Erscheinungsdatum und Status, Herkunft der Verknüpfung, Link zu igdb.com; „Anderen Eintrag wählen", „Verknüpfung lösen", ohne Verknüpfung Suche und „Gibt es bei IGDB nicht" |
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
+| IGDB-Zuordnung | – | Spiele ohne eindeutigen IGDB-Treffer als Liste mit Seiten: Kandidaten (Cover, Jahr, Typ, Plattformen, Wertung) zum Übernehmen, „Anders suchen" mit vorbelegtem Begriff, „Gibt es bei IGDB nicht". Eine Liste, kein Ein-Spiel-pro-Bildschirm: Nichts erzwingt eine Reihenfolge, Ausgelassenes bleibt stehen (7.6) |
 | Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden. Knopf "physisch nicht gewünscht"; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar |
 | Wunschliste | 4, 11 | Nach Rang sortiert, Favoriten-Filter, Erscheinungsdatum bei unveröffentlichten Titeln |
 | To-Do | 5a | Kurz und manuell sortierbar (Drag-and-drop) |
@@ -959,13 +1027,13 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Ohne Zuordnung | 12 | Listenübergreifend, mit IGDB-Suchfeld zum Nachziehen |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |
 | Scannen | 1 | Serienerfassung nach Abschnitt 9 |
-| Einstellungen | – | NPSSO, Sync, Sync-Historie, offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Gewichte der Rangformel, Export und Backup-Status |
+| Einstellungen | – | NPSSO, Sync, Sync-Historie, IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Gewichte der Rangformel, Export und Backup-Status |
 
 **Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den fünf Hauptansichten (Sammlung, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
 
-Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/pruefen`, `/trophaeen`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen; Zuordnung, Sammlung prüfen und Trophäen hängen als Werkzeuge an den Einstellungen. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
+Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/igdb`, `/pruefen`, `/trophaeen`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen; Zuordnung, IGDB-Zuordnung, Sammlung prüfen und Trophäen hängen als Werkzeuge an den Einstellungen. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
 
-Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste), nicht zugeordnete Trophäenlisten und seit Stufe 8 eine **überfällige Sicherung** (mehr als acht Tage oder noch nie, siehe 14.2), jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
+Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste), nicht zugeordnete Trophäenlisten, seit Stufe 8 eine **überfällige Sicherung** (mehr als acht Tage oder noch nie, siehe 14.2) und seit Stufe 9 Spiele, die noch nicht bei IGDB gesucht wurden oder auf die IGDB-Zuordnung warten – jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
 
 **Darstellungsregeln**
 
@@ -1106,6 +1174,8 @@ Benötigte GitHub Secrets:
 | `CF_ACCESS_CLIENT_SECRET` | Service Token `github-backup` (15.3) | 8 | **nach einem Jahr** |
 
 Die drei ablaufenden Werte sind der wahrscheinlichste Grund, aus dem die Sicherung eines Tages unbemerkt ausbleibt. Genau dagegen steht die Altersanzeige aus 14.2.
+
+Dazu Cloudflare Secrets am Worker (nicht GitHub): `NPSSO_KEY` (Stufe 2) sowie `IGDB_CLIENT_ID` und `IGDB_CLIENT_SECRET` (Stufe 9, aus der Twitch-Entwicklerkonsole; laufen nicht ab, das daraus abgeleitete Token erneuert der Worker selbst, siehe 7.6).
 
 **Was im öffentlichen Repo unbedenklich ist:** `account_id` und `database_id` in der Wrangler-Konfiguration. Das sind Bezeichner, keine Zugangsdaten – ohne authentifizierten Kontozugriff nutzlos.
 
@@ -1279,6 +1349,10 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 | Wiederherstellung nie geprobt | Backup unbrauchbar | Probe am 14.09.2026 durchgeführt – sie fand einen echten Fehler (14.3). Ablauf und Ergebnis in der README |
 | Dump nicht einspielbar nach Tabellen-Neuaufbau | Backup nur scheinbar brauchbar | `scripts/dump-ordnen.mjs` ordnet Schema vor Daten, `PRAGMA foreign_key_check` prüft danach (14.3); `test/dump-ordnen.spec.ts` hält die Zerlegung fest |
 | Kritikerwertung fehlt | Rang verzerrt | `COALESCE(critic_score, 70)` – unbewertete Titel werden weder bevorzugt noch bestraft |
+| IGDB-Treffer falsch | Falsches Cover, falsche Wertung im Rang | Nur eindeutige Treffer automatisch, gegen die echten Titel gemessen (7.6); Herkunft in `igdb_matched_source`; jede Verknüpfung im Spieldetail lösbar oder austauschbar |
+| Twitch-Token läuft ab | IGDB-Abfragen scheitern | Client-Credentials-Token im Speicher, Erneuerung bei Ablauf oder 401 ohne Zutun (7.6) |
+| IGDB-Ratenlimit | Abgleich bricht ab | 260 ms Abstand je Anfrage, acht Spiele je Aufruf, 429 beendet den Schritt sauber und die Oberfläche ruft erneut |
+| IGDB-Zugangsdaten fehlen | Kein Cover, keine Wertung | Nur die IGDB-Routen antworten 503, alles andere läuft; Hinweis in den Einstellungen |
 | Rangformel passt nicht | Umbauwunsch | Nur Bestandteile gespeichert, Gewichte in `app_setting` verstellbar |
 | AWIN-Freigabe abgelehnt | Kein Feed, keine Gebrauchtpreise | Stufen 1–12 sind unabhängig |
 | Feed kennt Titel nicht | Physisch-Status und Preis fehlen | Status bleibt `unbekannt`, niemals automatisch `nein` |
