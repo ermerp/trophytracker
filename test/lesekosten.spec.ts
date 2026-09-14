@@ -1,5 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, it, expect, beforeAll } from "vitest";
+import { EXPORT_TABELLEN } from "../src/db/export";
 
 /**
  * Zeilenlese-Kosten der heissen Abfragen.
@@ -99,5 +100,56 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(releasesDerSeite).toBeLessThan(5_000);
 		expect(pruefliste).toBeLessThan(10_000);
 		expect(uebersicht).toBeLessThan(20_000);
+	});
+
+	/**
+	 * Export (Stufe 8). Er laeuft einmal die Woche, darf aber trotzdem nicht
+	 * quadratisch werden: Ein Vollexport ohne Indizes waere derselbe Fehler
+	 * wie die Sammlungsansicht vom 13.09.2026, nur seltener sichtbar.
+	 *
+	 * Anspruch: jede Tabelle genau einmal gelesen. Bei 430 Listen sind das
+	 * rund 1.300 Fachzeilen; alles deutlich darueber heisst, dass irgendwo
+	 * ein Scan je Zeile steckt.
+	 */
+	it("misst den Export", async () => {
+		const sammlungCsv = await zeilenGelesen(
+			`SELECT g.title, r.platform, r.physical_release_status,
+			        (SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare,
+			        (SELECT GROUP_CONCAT(d.source) FROM digital_entitlement d WHERE d.release_id = r.id) AS digital,
+			        t.progress_pct, t.defined_platinum, t.earned_platinum, t.last_played_at,
+			        ps.status, ps.rating
+			 FROM release r
+			 JOIN game g ON g.id = r.game_id
+			 LEFT JOIN trophy_progress t ON t.release_id = r.id
+			 LEFT JOIN play_status ps ON ps.release_id = r.id
+			 ORDER BY g.sort_title, r.platform`,
+		);
+		const trophaeenCsv = await zeilenGelesen(
+			`SELECT t.title_name, t.platform, g.title, t.progress_pct, t.release_id
+			 FROM trophy_progress t
+			 LEFT JOIN release r ON r.id = t.release_id
+			 LEFT JOIN game g ON g.id = r.game_id
+			 ORDER BY t.title_name`,
+		);
+
+		// Tabellenliste aus der Konstante, nicht abgeschrieben: kommt eine
+		// Tabelle dazu, misst dieser Test sie automatisch mit.
+		const ergebnisse = await env.DB.batch(
+			EXPORT_TABELLEN.map((t) => env.DB.prepare(`SELECT * FROM ${t} ORDER BY rowid`)),
+		);
+		const backupJson = ergebnisse.reduce((summe, r) => summe + (r.meta.rows_read ?? 0), 0);
+
+		console.info({ sammlungCsv, trophaeenCsv, backupJson });
+
+		expect(sammlungCsv).toBeLessThan(10_000);
+		expect(trophaeenCsv).toBeLessThan(10_000);
+		expect(backupJson).toBeLessThan(10_000);
+	});
+
+	it("beantwortet die Exportrouten bei 430 Listen", async () => {
+		for (const pfad of ["/api/export/backup.json", "/api/export/sammlung.csv", "/api/export/trophaeen.csv"]) {
+			const antwort = await SELF.fetch(`${B}${pfad}`);
+			expect(antwort.status, pfad).toBe(200);
+		}
 	});
 });

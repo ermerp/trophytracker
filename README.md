@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 7 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 8 gebaut, Abnahme ausstehend** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -22,7 +22,13 @@ Die Prüfliste führt einmal durch den ganzen Bestand (Use Case 8, vorerst nur
 `erstimport`). **Die Ersteinrichtung ist am 14.09.2026 durchlaufen:** alle 431
 Trophäenlisten sind bewertet, die Warteschlange ist leer. Damit steht der
 Datenbestand – und ab hier steckt darin Arbeit, die PlayStation nicht
-zurückliefert. Stufe 8 sichert ihn ins private Repository.
+zurückliefert. Stufe 8 sichert ihn wöchentlich ins private Repository und
+liefert den CSV-Export (Use Case 13).
+
+> **Zwei Abnahmen stehen noch aus** (siehe [Sicherung](#sicherung)):
+> die menschliche Gegenprobe, dass im Dump kein NPSSO im Klartext steht,
+> und die einmal durchgespielte Wiederherstellung. Bis beide erfolgt sind,
+> gilt Stufe 8 als „gebaut, Probe ausstehend".
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -33,7 +39,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 16 Tabellen, 7 Views, acht Migrationen |
+| Schema | 17 Tabellen, 7 Views, neun Migrationen; Stufe 8 braucht keine |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
@@ -47,12 +53,20 @@ Was steht und in Betrieb nachgewiesen ist:
 | Abweichungen | Trophäenstand und Bewertung passen nicht zusammen – zur Durchsicht in den Einstellungen |
 | Prüfliste | Ein Spiel pro Bildschirm, sieben Aktionen (Tasten 1–7), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung. 100 % wird nicht vorgelegt, sondern still gestempelt |
 | Datenbestand | 431 Trophäenlisten, 420 Spiele; bewertet: 167 komplettiert, 119 abgebrochen, 118 durchgespielt, 25 pausiert, 2 am Spielen |
-| Offene Posten | Hinweisblock in der Sammlung: Prüfliste, `unentschieden`, nicht zugeordnete Listen – bis es das Dashboard gibt |
+| Offene Posten | Hinweisblock in der Sammlung: Prüfliste, `unentschieden`, nicht zugeordnete Listen, überfällige Sicherung – bis es das Dashboard gibt |
 | Sicherung geprüft | Der Export wird vor der Migration gegen die Zeilenzahlen der Datenbank gehalten; Datenmigrationen protokollieren ihre Wirkung |
 | Lesekosten | Indizes auf allen Fremdschlüsseln; `test/lesekosten.spec.ts` misst die heißen Abfragen gegen 430 Listen (D1 Free Tier: 5 Mio. gelesene Zeilen/Tag) |
+| Sicherung ausserhalb von Cloudflare | Wöchentliche GitHub Action legt `backup.sql` und `backup.json` im privaten Repo `trophytracker-backup` ab; Datum der letzten Sicherung in den Einstellungen, Warnung ab acht Tagen |
+| Export | Sieben CSV-Listen und die JSON-Vollsicherung, verlinkt in den Einstellungen |
+| Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
+
+**Als Nächstes: Stufe 9 – IGDB-Anbindung** (Cover statt Trophäensymbol, Suche,
+Kritikerwertung, Erscheinungsdaten). Sie ist die Grundlage für die Stufen 10 bis
+13. Twitch/IGDB-Zugangsdaten liegen bereits in `.dev.vars`; das Twitch-Token
+gilt rund 61 Tage und muss ab Stufe 9 selbst erneuert werden.
 
 ## Architektur in einem Absatz
 
@@ -136,11 +150,20 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
 
 4. **GitHub Secrets** hinterlegen (Settings → Secrets and variables → Actions):
 
-   | Secret | Wofür | Ab Stufe |
-   |---|---|---|
-   | `CLOUDFLARE_API_TOKEN` | Deploy-Action | 0 |
-   | `CLOUDFLARE_ACCOUNT_ID` | Deploy-Action | 0 |
-   | `BACKUP_REPO_TOKEN` | Fine-grained PAT, nur auf das private Backup-Repo | 8 |
+   | Secret | Wofür | Ab Stufe | Läuft ab |
+   |---|---|---|---|
+   | `CLOUDFLARE_API_TOKEN` | Deploy- und Backup-Action | 0 | nein |
+   | `CLOUDFLARE_ACCOUNT_ID` | Deploy- und Backup-Action | 0 | nein |
+   | `BACKUP_REPO_TOKEN` | Fine-grained PAT, nur auf das private Backup-Repo | 8 | **nach einem Jahr** |
+   | `CF_ACCESS_CLIENT_ID` | Service Token `github-backup` für die Backup-Action | 8 | **nach einem Jahr** |
+   | `CF_ACCESS_CLIENT_SECRET` | dasselbe Token, Secret-Teil | 8 | **nach einem Jahr** |
+
+   Die drei ablaufenden Werte sind der wahrscheinlichste Grund, aus dem die
+   Sicherung eines Tages unbemerkt ausbleibt. `BACKUP_REPO_TOKEN` ist ein
+   Fine-grained PAT mit **Contents: Read and write** ausschliesslich auf
+   `trophytracker-backup`; der Standard-`GITHUB_TOKEN` reicht nicht über das
+   eigene Repository hinaus. Gegen das Vergessen steht die Altersanzeige in den
+   Einstellungen – siehe [Sicherung](#sicherung).
 
    Dazu ein **Cloudflare Secret** (nicht GitHub):
 
@@ -284,18 +307,29 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://trophytracker.<subdomain>.work
 
 ### Maschinen-Endpunkte
 
-`POST /api/imports/feed` und `GET /api/export/backup.json` werden von GitHub
-Actions aufgerufen und können keinen Browser-Login durchlaufen. Wie sie
-abgesichert werden – Access Service Token oder eigenes Bearer-Token –
-**ist noch nicht entschieden und wird in Stufe 8 festgelegt**, wenn mit der
-Backup-Action der erste dieser Endpunkte tatsächlich existiert. Siehe
+`GET /api/export/backup.json`, `POST /api/backup/vermerk` und später
+`POST /api/imports/feed` werden von GitHub Actions aufgerufen und können keinen
+Browser-Login durchlaufen.
+
+**Entschieden in Stufe 8: Access Service Token.** Der Alternativweg – diese
+Pfade von Access ausnehmen und mit einem eigenen Bearer-Token absichern – ist
+**verworfen**. Ausschlaggebend war eine Randbedingung, keine Geschmacksfrage:
+Die Richtlinie hängt am Worker und schützt ihn als Ganzes, einzelne Pfade
+lassen sich davon nicht ausnehmen. Der Bearer-Weg bräuchte deshalb eine
+hostnamenbasierte Access-Anwendung und damit eine eigene Domain – genau die
+Voraussetzung, die dieses Projekt sonst nicht hat. Dazu käme ein zweites
+Geheimnis, das leaken kann, für dieselbe Frage.
+
+**Folge: Der Worker trägt keine eigene Token-Prüfung.** `/api/export/*` und
+`/api/backup/*` sind gewöhnliche Routen; Access steht davor. Siehe
 [Abschnitt 15.3](docs/spezifikation.md#153-zugriffsschutz).
 
-**Eingerichtet sind bereits zwei Access Service Tokens** (Zero Trust → Access →
+**Eingerichtet sind zwei Access Service Tokens** (Zero Trust → Access →
 Service Auth → Service Tokens). Sie hängen an einer eigenen Richtlinie der
 Anwendung mit der Aktion *Service Auth*; Aufrufe senden `CF-Access-Client-Id`
 und `CF-Access-Client-Secret` als Header und umgehen damit den Browser-Login,
-ohne die Richtlinie für Personen aufzuweichen.
+ohne die Richtlinie für Personen aufzuweichen. Zwei statt einem, damit sich
+eines zurückziehen lässt, ohne das andere zu treffen.
 
 | Token | Wofür | Werte liegen |
 |---|---|---|
@@ -304,7 +338,17 @@ ohne die Richtlinie für Personen aufzuweichen.
 
 Ein Service-Token-Secret beginnt mit `cfast_` und wird nur beim Anlegen
 angezeigt. Läuft es ab (Voreinstellung ein Jahr), scheitern die Aufrufe mit
-einer 302 auf die Login-Seite – nicht mit 401.
+einer **302 auf die Login-Seite – nicht mit 401**. Die Backup-Action prüft
+deshalb nicht nur den Statuscode, sondern auch den Inhalt der Antwort: eine
+HTML-Loginseite ist kein JSON.
+
+Beispielaufruf gegen die Produktion:
+
+```bash
+curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+        -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+  https://trophytracker.<subdomain>.workers.dev/api/backup/status
+```
 
 ## Deployment
 
@@ -313,12 +357,18 @@ aus. Die Reihenfolge ist der eigentliche Inhalt:
 
 1. `npm ci`, `npm test`, `npm run build`
 2. `wrangler d1 export` – **Sicherung vor jeder Schemaänderung**, anschliessend
-   geprüft: `INSERT`-Zeilen je Tabelle im Dump gegen `COUNT(*)` der Datenbank.
-   Weicht eine Zahl ab, bricht der Job vor der Migration ab. Nur Zahlen im Log
-3. `wrangler d1 migrations apply --remote`
-4. Datenmigrationen protokollieren ihre Wirkung – `play_status` (0006) und
+   geprüft (`scripts/sicherung-pruefen.sh`): `INSERT`-Zeilen je Tabelle im Dump
+   gegen `COUNT(*)` der Datenbank. Weicht eine Zahl ab, bricht der Job vor der
+   Migration ab. Nur Zahlen im Log
+3. `scripts/dump-pruefen.sh` – der Dump darf weder NPSSO noch Refresh- oder
+   Access Token im Klartext enthalten
+4. `wrangler d1 migrations apply --remote`
+5. Datenmigrationen protokollieren ihre Wirkung – `play_status` (0006) und
    `review_queue` (0007), jeweils neben der Erwartung
-5. `wrangler deploy`
+6. `wrangler deploy`
+
+Beide Prüfskripte liegen in `scripts/`, weil die Backup-Action dieselben
+benutzt. Zwei Kopien derselben Prüfung wären zwei Kopien, die auseinanderlaufen.
 
 Schritt 2 ist der Grund, warum das eine Action ist und kein Klick im Dashboard:
 Eine fehlerhafte Migration ist der wahrscheinlichste Weg, Daten zu verlieren,
@@ -333,7 +383,7 @@ umbenennen braucht zwei Deployments.
 Der Dump aus Schritt 2 wird bewusst **nicht** als Workflow-Artifact hochgeladen –
 Artifacts eines öffentlichen Repositories sind über den Run-Link herunterladbar.
 Er sichert diesen einen Lauf ab. Die dauerhafte Sicherung ins private Repository
-`trophytracker-backup` kommt in Stufe 8.
+`trophytracker-backup` ist ein eigener Workflow, siehe [Sicherung](#sicherung).
 
 Pull Requests durchlaufen Tests und Build, deployen aber nicht.
 
@@ -366,18 +416,127 @@ einen Bestand in Produktionsgröße. Zum Vergleich: Eine Sammlungsseite liest ru
 2 000 Zeilen, ein Prüflisten-Eintrag rund 3 000; ein kompletter Durchgang durch
 430 Einträge kostete rund eine Million.
 
+## Sicherung
+
+Time Travel und `d1 export` liegen beim selben Anbieter wie die Datenbank.
+Gegen einen Bedienfehler helfen sie, gegen ein verlorenes Cloudflare-Konto
+nicht. Deshalb legt [`.github/workflows/backup.yml`](.github/workflows/backup.yml)
+eine Kopie **ausserhalb** ab: im privaten Repository `trophytracker-backup`.
+
+**Wann.** Sonntags um 03:17 UTC – bewusst nicht zur vollen Stunde, dort staut
+GitHub die Cron-Jobs aller Repositories. Von Hand startbar über Actions →
+„Sicherung" → *Run workflow*.
+
+**Was der Lauf tut**
+
+1. `wrangler d1 export --remote` → `backup.sql`
+2. `GET /api/export/backup.json` mit dem Service Token `github-backup`;
+   enthält die Antwort keine Spiele, bricht der Lauf ab – **vor** jedem Schreiben
+3. `scripts/sicherung-pruefen.sh`: `INSERT`-Zeilen je Tabelle gegen `COUNT(*)`
+4. `scripts/dump-pruefen.sh`: kein NPSSO, kein Refresh- oder Access Token im
+   Klartext
+5. beide Dateien und eine kurze `README.md` ins private Repo, **Commit nur bei
+   Änderung**
+6. `POST /api/backup/vermerk` – auch bei einem Lauf ohne Änderung
+
+Der erste manuelle Lauf ist zugleich der Verbindungstest für Repo, PAT und
+Service Token. Ein eigener Testworkflow erübrigt sich: Stimmt eines von beiden
+nicht, scheitert schon Schritt 2 oder der Klon in Schritt 5 – und zwar bevor
+irgendetwas geschrieben wird.
+
+**Inhalt des Backup-Repos**
+
+| Datei | Inhalt |
+|---|---|
+| `backup.sql` | vollständiger D1-Dump, zum Wiedereinspielen |
+| `backup.json` | die 14 Fachtabellen als lesbare Zweitform – ohne `psn_credentials`, `psn_raw_response` und `d1_migrations` |
+
+Zwei Formate mit Absicht: Der Dump ist die technisch exakte Sicherung, das JSON
+bleibt auswertbar, auch wenn es dieses Projekt eines Tages nicht mehr gibt.
+
+**Ob es läuft.** Die Einstellungen zeigen „Letzte Sicherung: … (Commit …)".
+Bleibt sie länger als acht Tage aus oder gab es nie eine, steht eine Warnung im
+Hinweisblock der Sammlung. Acht statt sieben Tage, weil der Lauf wöchentlich
+ist – ein Tag Luft verhindert eine Warnung, die sonst jede Woche von allein
+erscheint. Der wahrscheinlichste Grund für ein stilles Ausbleiben sind die drei
+Secrets, die nach einem Jahr ablaufen (siehe [Secrets](#einrichtung-eines-eigenen-kontos)).
+
+**Kein NPSSO im Dump.** Der Dump landet dauerhaft in einem Git-Verlauf, deshalb
+drei Schichten statt einer:
+
+| Schicht | Wo | Was sie prüft |
+|---|---|---|
+| Test mit Markierung | `test/keine-lecks.spec.ts` | speichert ein markiertes NPSSO, fährt einen Sync und liest danach **jede** Tabelle aus `sqlite_master` – inhaltlich dasselbe wie ein `d1 export` |
+| Skript gegen den Dump | `scripts/dump-pruefen.sh`, in Backup- **und** Deploy-Job | verbotene Bezeichner in `INSERT`-Zeilen; jeder Wert in `psn_credentials` ist Zeitstempel, Statuswort oder Base64 – und **nie 64 Zeichen lang**, der Länge eines NPSSO |
+| Menschliche Gegenprobe | einmal, von Hand | im privaten Repo nach den ersten Zeichen des eigenen NPSSO suchen. Null Treffer ist der einzige Beweis, den kein Skript führen kann |
+
+Die Längenprüfung ist die eigentliche: Ein NPSSO besteht aus Buchstaben und
+Ziffern, ist also selbst gültiges Base64 und dekodiert zu 48 Byte, die wie
+Zufall aussehen – eine Prüfung auf druckbare Zeichen läuft daran vorbei
+(gemessen, nicht vermutet). Die Länge nicht: Chiffrat sind 108 Zeichen, ein IV 16.
+
+> **Offen: Die menschliche Gegenprobe steht noch aus.**
+
+## Export
+
+Die Einstellungen verlinken sieben CSV-Listen und die JSON-Vollsicherung:
+
+```
+GET /api/export/sammlung.csv     GET /api/export/kauf.csv
+GET /api/export/wunsch.csv       GET /api/export/luecken.csv
+GET /api/export/todo.csv         GET /api/export/trophaeen.csv
+GET /api/export/backlog.csv      GET /api/export/backup.json
+```
+
+CSV mit **Semikolon** als Trennzeichen, **BOM** am Anfang und **CRLF** als
+Zeilenende – alles drei wegen Excel im deutschen Gebietsschema: Mit Komma als
+Feldtrenner zerfällt „12,99" in zwei Spalten, und ohne BOM wird aus „Ragnarök"
+ein „RagnarÃ¶k".
+
+**Ein leeres Feld bedeutet „unbekannt"** – nie „0" und nie „–". Werte, die
+tatsächlich *den Wert* „unbekannt" tragen (Disc-Fassung), stehen als Wort da.
+Spaltenlisten: [Abschnitt 14.4](docs/spezifikation.md#144-csv-export).
+
+CSV ist zum Auswerten und Weitergeben gedacht, **nicht als Sicherung**: Die
+Beziehungen zwischen den Tabellen gehen dabei verloren. Dafür ist der Dump da.
+
 ## Wiederherstellung
 
 Einmal testweise durchspielen, solange nichts kaputt ist – ein ungetestetes
 Backup ist eine Vermutung.
 
-```bash
-npx wrangler d1 create trophytracker-restore
-npx wrangler d1 execute trophytracker-restore --remote --file=backup.sql
-```
+1. `backup.sql` aus `trophytracker-backup` holen (beliebiger Commit – Git hat
+   jeden Wochenstand)
+2. Probedatenbank anlegen und einspielen:
 
-Danach die `database_id` in `wrangler.jsonc` auf die neue Datenbank umstellen und
-deployen.
+   ```bash
+   npx wrangler d1 create trophytracker-restore
+   npx wrangler d1 execute trophytracker-restore --remote --file=backup.sql
+   ```
+
+3. Zeilenzahlen gegen die Produktion halten:
+
+   ```bash
+   for db in trophytracker trophytracker-restore; do
+     npx wrangler d1 execute "$db" --remote --json --command \
+       "SELECT (SELECT COUNT(*) FROM game) AS game,
+               (SELECT COUNT(*) FROM release) AS release,
+               (SELECT COUNT(*) FROM trophy_progress) AS trophy_progress,
+               (SELECT COUNT(*) FROM play_status) AS play_status,
+               (SELECT COUNT(*) FROM physical_copy) AS physical_copy,
+               (SELECT COUNT(*) FROM digital_entitlement) AS digital_entitlement,
+               (SELECT COUNT(*) FROM plan_entry) AS plan_entry,
+               (SELECT COUNT(*) FROM review_queue) AS review_queue"
+   done
+   ```
+
+4. Im Ernstfall: `database_id` in `wrangler.jsonc` auf die neue Datenbank
+   umstellen und deployen. Bei der blossen Probe stattdessen die Probedatenbank
+   wieder löschen (`npx wrangler d1 delete trophytracker-restore`).
+
+> **Offen: Die Probe ist noch nicht gelaufen.** Datum, Dumpgrösse und die
+> Tabelle „Tabelle | Produktion | Wiederhergestellt" kommen hierher, sobald
+> sie es ist.
 
 Zusätzlich bietet Cloudflare `wrangler d1 time-travel` zum Zurückstellen auf
 einen Zeitpunkt. Das hilft gegen Bedienfehler, aber nicht gegen ein verlorenes
@@ -387,6 +546,7 @@ Konto – dafür ist der wöchentliche Export in das private Repository zuständ
 
 ```
 migrations/    nummerierte SQL-Dateien, laufen genau einmal
+scripts/       Prüfskripte, die Deploy- und Backup-Action gemeinsam nutzen
 src/index.ts   Hono-App, hängt Repositories je Anfrage ein
 src/api/       Route-Module
 src/db/        Repository-Schicht – der einzige Ort mit D1-Zugriff

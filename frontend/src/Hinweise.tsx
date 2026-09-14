@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { anfrage, type ReviewFortschritt } from './api'
+import type { Sicherungsstand } from './Sicherung'
 
 /**
  * Offene Posten – übernimmt die Rolle des Dashboards (Abschnitt 13), bis es
@@ -13,12 +14,14 @@ export function Hinweise() {
   const [params] = useSearchParams()
   const [review, setReview] = useState<ReviewFortschritt | null>(null)
   const [listenOffen, setListenOffen] = useState(0)
+  const [sicherung, setSicherung] = useState<Sicherungsstand | null>(null)
 
   useEffect(() => {
     anfrage<ReviewFortschritt>('/api/review/progress').then(setReview).catch(() => {})
     anfrage<{ listenOffen: number }>('/api/zuordnung/offen?limit=1')
       .then((a) => setListenOffen(a.listenOffen))
       .catch(() => {})
+    anfrage<Sicherungsstand>('/api/backup/status').then(setSicherung).catch(() => {})
   }, [])
 
   const zeilen: React.ReactNode[] = []
@@ -43,6 +46,25 @@ export function Hinweise() {
       <li key="zuordnung">
         <strong>{listenOffen}</strong> Trophäenlisten sind noch nicht zugeordnet.{' '}
         <Link to="/zuordnung">Zuordnung</Link>
+      </li>,
+    )
+  }
+
+  // Abschnitt 14.2: „Ein Backup, von dem man nicht weiss, ob es laeuft, ist
+  // kein Backup." Acht Tage, nicht sieben: Der Lauf ist woechentlich, ein Tag
+  // Luft verhindert eine Warnung, die jeden Samstag von allein erscheint.
+  if (sicherung && sicherung.letzterErfolgAm === null) {
+    zeilen.push(
+      <li key="sicherung">
+        Noch <strong>keine Sicherung</strong> – die Daten liegen nur bei Cloudflare.{' '}
+        <Link to="/einstellungen">Einstellungen</Link>
+      </li>,
+    )
+  } else if (sicherung?.tageSeit != null && sicherung.tageSeit > 8) {
+    zeilen.push(
+      <li key="sicherung">
+        Die letzte Sicherung ist <strong>{sicherung.tageSeit} Tage</strong> alt.{' '}
+        <Link to="/einstellungen">Einstellungen</Link>
       </li>,
     )
   }

@@ -579,3 +579,15 @@ ul.digital {
     display: none;
   }
 }
+
+/* --- Stufe 8: Sicherung und Export --- */
+
+.exportliste {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+}
+
+.exportliste li {
+  padding: 0.15rem 0;
+}
