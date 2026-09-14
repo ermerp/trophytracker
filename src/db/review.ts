@@ -48,19 +48,42 @@ export class ReviewRepository {
 	) {}
 
 	/**
-	 * erstimport = zugeordnet und noch nie durchgesehen (reviewed_at IS NULL).
+	 * erstimport = zugeordnet, noch nie durchgesehen (reviewed_at IS NULL)
+	 * und **unter 100 %**.
+	 *
+	 * 100 % heisst: alle Trophaeen des Hauptspiels und aller DLC erspielt.
+	 * Da gibt es nichts zu entscheiden, der Status steht aus der Vorbelegung
+	 * schon auf 'komplettiert'. Solche Titel werden deshalb still gestempelt
+	 * statt vorgelegt - das erste Statement unten. Der Stempel ist kein
+	 * Urteil, sondern der Referenzpunkt: Erhoeht spaeter ein DLC die
+	 * Trophaeenzahl, faellt der Titel unter 100 % und die
+	 * Aenderungserkennung (Stufe 13) legt ihn vor. Ohne Stempel gaebe es
+	 * dafuer keinen Vergleichswert.
+	 *
 	 * Nicht "keine play_status-Zeile": seit Stufe 6 belegt der Sync den
 	 * Status vor, fast jedes Release hat also eine. Idempotent.
 	 */
-	async einreihen(): Promise<number> {
-		const ergebnis = await this.db
-			.prepare(
+	async einreihen(): Promise<{ eingereiht: number; alsKomplettGestempelt: number }> {
+		const [gestempelt, eingereiht] = await this.db.batch([
+			this.db.prepare(
+				"UPDATE trophy_progress SET " +
+					"reviewed_earned_total = earned_bronze + earned_silver + earned_gold + earned_platinum, " +
+					"reviewed_defined_total = defined_bronze + defined_silver + defined_gold + defined_platinum, " +
+					"reviewed_at = datetime('now') " +
+					"WHERE release_id IS NOT NULL AND reviewed_at IS NULL AND progress_pct >= 100",
+			),
+			// Nach dem Stempeln tragen die 100-%-Titel reviewed_at und fallen
+			// hier von selbst heraus - keine zweite Bedingung noetig.
+			this.db.prepare(
 				"INSERT OR IGNORE INTO review_queue (release_id, reason) " +
 					"SELECT t.release_id, 'erstimport' FROM trophy_progress t " +
 					"WHERE t.release_id IS NOT NULL AND t.reviewed_at IS NULL",
-			)
-			.run();
-		return ergebnis.meta.changes ?? 0;
+			),
+		]);
+		return {
+			eingereiht: eingereiht.meta.changes ?? 0,
+			alsKomplettGestempelt: gestempelt.meta.changes ?? 0,
+		};
 	}
 
 	async naechste(limit: number, offset: number): Promise<ReviewZeile[]> {

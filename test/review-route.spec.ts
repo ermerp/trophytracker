@@ -38,8 +38,10 @@ async function release(id: number, pct: number): Promise<number> {
 beforeEach(async () => {
 	await leeren();
 	await release(1, 30);
-	await release(2, 100);
+	await release(2, 95);
 	await release(3, 75);
+	// 100 % kommt nicht in die Warteschlange (8.1), zaehlt aber bei "gesamt" mit.
+	await release(4, 100);
 	await repos().playStatus.vorbelegen();
 	await repos().review.einreihen();
 });
@@ -57,13 +59,19 @@ describe("GET /api/review/queue", () => {
 			grund: "erstimport",
 			grundText: "Zum ersten Mal gesehen",
 			bild: "https://beispiel.invalid/2.png",
-			fortschritt: 100,
-			platin: "erspielt",
-			erspielt: { bronze: 9, silber: 0, gold: 0, platin: 1 },
+			fortschritt: 95,
+			platin: "offen",
+			erspielt: { bronze: 9, silber: 0, gold: 0, platin: 0 },
 			definiert: { bronze: 20, silber: 0, gold: 0, platin: 1 },
 			zuletztGespielt: "2025-01-01T00:00:00Z",
-			aktuellerStatus: "komplettiert",
+			aktuellerStatus: "am_spielen",
 		});
+	});
+
+	it("laesst einen 100-%-Titel aus - er ist komplettiert, da ist nichts zu entscheiden", async () => {
+		const a = await hole("/api/review/queue?limit=10");
+		expect(a.eintraege.map((e: any) => e.releaseId)).not.toContain(4);
+		expect(await hole("/api/review/progress")).toMatchObject({ offen: 3, erledigt: 1, gesamt: 4 });
 	});
 
 	it("blaettert", async () => {
@@ -74,7 +82,7 @@ describe("GET /api/review/queue", () => {
 
 describe("GET /api/review/progress", () => {
 	it("zaehlt", async () => {
-		expect(await hole("/api/review/progress")).toEqual({ offen: 3, erledigt: 0, gesamt: 3, unentschieden: 0 });
+		expect(await hole("/api/review/progress")).toEqual({ offen: 3, erledigt: 1, gesamt: 4, unentschieden: 0 });
 	});
 });
 
@@ -85,7 +93,7 @@ describe("POST /api/review/:releaseId/decide", () => {
 		expect(await antwort.json()).toEqual({
 			releaseId: 2,
 			aktion: "unveraendert",
-			status: "komplettiert",
+			status: "am_spielen",
 			planAngelegt: false,
 			nochOffen: 2,
 		});

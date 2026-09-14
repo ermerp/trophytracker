@@ -38,6 +38,34 @@ const offen = async () =>
 beforeEach(leeren);
 
 describe("einreihen", () => {
+	it("legt 100 % nicht vor, sondern stempelt es als durchgesehen", async () => {
+		await release(1, 100);
+		await release(2, 95);
+
+		const e = await repos().review.einreihen();
+		expect(e).toEqual({ eingereiht: 1, alsKomplettGestempelt: 1 });
+
+		const { results } = await env.DB.prepare("SELECT release_id FROM review_queue").all();
+		expect(results).toEqual([{ release_id: 2 }]);
+
+		// Der Stempel ist der Referenzpunkt fuer die Aenderungserkennung.
+		const t = await env.DB.prepare(
+			"SELECT reviewed_earned_total, reviewed_defined_total, reviewed_at FROM trophy_progress WHERE release_id = 1",
+		).first<{ reviewed_earned_total: number; reviewed_defined_total: number; reviewed_at: string | null }>();
+		expect(t).toMatchObject({ reviewed_earned_total: 5, reviewed_defined_total: 11 });
+		expect(t?.reviewed_at).not.toBeNull();
+
+		// play_status bleibt unberuehrt - dort steht die Vorbelegung.
+		expect(await status(1)).toBeNull();
+	});
+
+	it("legt einen 100-%-Titel auch beim zweiten Lauf nicht vor", async () => {
+		await release(1, 100);
+		await repos().review.einreihen();
+		expect(await repos().review.einreihen()).toEqual({ eingereiht: 0, alsKomplettGestempelt: 0 });
+		expect(await offen()).toBe(0);
+	});
+
 	it("reiht zugeordnete, nie durchgesehene Listen als erstimport ein", async () => {
 		await release(1, 45);
 		await release(2, 0);
@@ -48,7 +76,7 @@ describe("einreihen", () => {
 				"VALUES ('NPWR9', 'trophy', 'Offen', 'PS4', 80, '2026-01-01')",
 		).run(); // nicht zugeordnet
 
-		expect(await repos().review.einreihen()).toBe(2);
+		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 2 });
 		const { results } = await env.DB.prepare("SELECT release_id, reason FROM review_queue ORDER BY release_id").all();
 		expect(results).toEqual([
 			{ release_id: 1, reason: "erstimport" },
@@ -58,14 +86,14 @@ describe("einreihen", () => {
 
 	it("ist idempotent", async () => {
 		await release(1, 45);
-		expect(await repos().review.einreihen()).toBe(1);
-		expect(await repos().review.einreihen()).toBe(0);
+		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 1 });
+		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 0 });
 	});
 
 	it("laesst ein manuell bewertetes Release aus", async () => {
 		await release(1, 45);
 		await repos().playStatus.setzen(1, { status: "abgebrochen" });
-		expect(await repos().review.einreihen()).toBe(0);
+		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 0 });
 	});
 });
 
@@ -100,11 +128,17 @@ describe("entscheiden", () => {
 		const r = await offenerFall(100);
 		expect(await status(r)).toBe("komplettiert");
 
+		// 100 % wird nicht mehr eingereiht; den Eintrag hier von Hand
+		// anlegen, wie ihn Stufe 13 bei einer DLC-Aenderung erzeugen wuerde.
+		await env.DB.prepare("INSERT OR IGNORE INTO review_queue (release_id, reason) VALUES (?, 'erstimport')")
+			.bind(r)
+			.run();
+
 		const e = await repos().review.entscheiden(r, "unveraendert");
 		expect(e).toEqual({ status: "komplettiert", planAngelegt: false });
 		expect(await status(r)).toBe("komplettiert");
 		expect(await offen()).toBe(0);
-		expect(await repos().review.einreihen()).toBe(0);
+		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 0 });
 	});
 
 	it.each([["auf_todo", "todo"], ["ins_backlog", "backlog"]] as const)(

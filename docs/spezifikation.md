@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 15 – Zeilenlese-Grenze von D1: Indizes auf allen Fremdschlüsseln, Lesekosten-Test. Prüfliste auf dem Handy ohne Scrollen.*
+*Version 16 – Prüfliste: 100 % wird nicht mehr vorgelegt; Handy-Bedienung ohne Scrollen und ohne springende Knöpfe.*
 
 ## 1. Use Cases
 
@@ -584,7 +584,7 @@ CREATE TABLE review_queue (
 
 | Bedingung | Reason |
 |---|---|
-| `reviewed_at IS NULL` – noch nie durchgesehen | `erstimport` |
+| `reviewed_at IS NULL` und `progress_pct < 100` – noch nie durchgesehen, nicht komplett | `erstimport` |
 | `earned_total` gestiegen, Status ist gesetzt und nicht `am_spielen` | `neue_trophaeen` |
 | `defined_total` gestiegen | `dlc_erweitert` |
 
@@ -592,7 +592,9 @@ Der Sync **schreibt nur in die Warteschlange**, er ändert nie einen Status. Ste
 
 `erstimport` hängt an `reviewed_at`, nicht an der Existenz einer `play_status`-Zeile: Seit Stufe 6 belegt der Sync den Status vor (4.2), fast jedes Release hat also eine Zeile. Die Ersteinrichtung zeigt die Vorbelegung und lässt sie bestätigen oder ändern. Ein im Spieldetail von Hand gesetzter Status zählt bereits als Durchsicht und erscheint nicht mehr als `erstimport`.
 
-**Auslöser der Einreihung.** `ReviewRepository.einreihen` (ein `INSERT OR IGNORE … SELECT`) läuft am Ende jeder Normalisierung – direkt nach der Vorbelegung – und nach jeder Zuordnung, manuell wie automatisch. Den Bestand hat Migration 0007 einmalig eingereiht; der Deploy-Job protokolliert die Zeilenzahl. Stufe 7 kennt nur `erstimport`; `neue_trophaeen` und `dlc_erweitert` füllt die Änderungserkennung in Stufe 13.
+**100 % wird nicht vorgelegt.** Ein Titel mit 100 % hat alle Trophäen des Hauptspiels *und* aller DLC – er ist komplettiert, und die Vorbelegung (4.2) hat den Status bereits gesetzt. Da gibt es nichts zu entscheiden, und eine Prüfliste, die Unstrittiges vorlegt, verbraucht die Geduld, die für die strittigen Fälle gebraucht wird. Solche Titel werden deshalb **still als durchgesehen gestempelt** statt eingereiht: `reviewed_*` bekommt den aktuellen Stand, `play_status` bleibt unberührt. Der Stempel ist kein Urteil, sondern der Referenzpunkt – erhöht später ein DLC die Trophäenzahl, fällt der Titel unter 100 % und die Änderungserkennung (Stufe 13) legt ihn vor. Ohne Stempel gäbe es dafür keinen Vergleichswert. Beim Bestand betraf das rund ein Viertel aller Einträge.
+
+**Auslöser der Einreihung.** `ReviewRepository.einreihen` (stempeln und einreihen in einem Batch) läuft am Ende jeder Normalisierung – direkt nach der Vorbelegung – und nach jeder Zuordnung, manuell wie automatisch. Den Bestand hat Migration 0007 einmalig eingereiht, Migration 0009 die 100-%-Titel wieder herausgenommen; der Deploy-Job protokolliert beide Zahlen. Stufe 7 kennt nur `erstimport`; `neue_trophaeen` und `dlc_erweitert` füllt die Änderungserkennung in Stufe 13.
 
 Der Filter "nicht `am_spielen`" ist wichtig: bei einem Spiel, das du gerade aktiv zockst, kommen bei jedem Sync neue Trophäen dazu. Das ist keine Nachricht, sondern der Normalfall – es würde die Liste sonst zumüllen.
 
@@ -948,7 +950,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | To-Do | 5a | Kurz und manuell sortierbar (Drag-and-drop) |
 | Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
 | Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert nach Rang, mit Herkunftskennzeichnung |
-| Prüfliste | 8 | Ein Spiel pro Bildschirm, sieben Aktionen mit Tastenkürzeln 1–7, Grund und Vorher-Nachher, aktueller (vorbelegter) Status, Fortschrittsanzeige „noch n von m"; jederzeit verlassen, jede Entscheidung ist schon gespeichert. **Auf dem Handy müssen alle sieben Knöpfe ohne Scrollen sichtbar sein** (zweispaltig, kompakte Karte) – die Ansicht wird bei der Ersteinrichtung mehrere hundert Mal hintereinander bedient. Eine Zeile stellt klar: „Du bewertest den Spielstand, nicht den Besitz." |
+| Prüfliste | 8 | Ein Spiel pro Bildschirm, sieben Aktionen mit Tastenkürzeln 1–7, Grund und Vorher-Nachher, aktueller (vorbelegter) Status, Fortschrittsanzeige „noch n von m"; jederzeit verlassen, jede Entscheidung ist schon gespeichert. **Auf dem Handy müssen alle sieben Knöpfe ohne Scrollen sichtbar sein** (zweispaltig, kompakte Karte) – die Ansicht wird bei der Ersteinrichtung mehrere hundert Mal hintereinander bedient. **Die Knopfreihe steht immer an derselben Stelle**, unabhängig von der Titellänge (feste Mindesthöhe der Karte): Wer blind auf dieselbe Position zielt, trifft sonst bei einem zweizeiligen Titel daneben, und eine Fehlentscheidung fällt erst Wochen später auf. Eine Zeile stellt klar: „Du bewertest den Spielstand, nicht den Besitz." |
 | Wunschliste importieren | 9 | Textfeld oder Datei, dreigeteilte Trefferliste, IGDB-Suche für Zeilen ohne Treffer |
 | Ohne Zuordnung | 12 | Listenübergreifend, mit IGDB-Suchfeld zum Nachziehen |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |
