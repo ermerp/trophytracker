@@ -19,8 +19,10 @@ Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
 Die Prüfliste führt einmal durch den ganzen Bestand (Use Case 8, vorerst nur
-`erstimport`) – danach steht der Datenbestand. Stufe 8 sichert ihn ins
-private Repository.
+`erstimport`). **Die Ersteinrichtung ist am 14.09.2026 durchlaufen:** alle 431
+Trophäenlisten sind bewertet, die Warteschlange ist leer. Damit steht der
+Datenbestand – und ab hier steckt darin Arbeit, die PlayStation nicht
+zurückliefert. Stufe 8 sichert ihn ins private Repository.
 
 Was steht und in Betrieb nachgewiesen ist:
 
@@ -43,7 +45,8 @@ Was steht und in Betrieb nachgewiesen ist:
 | Navigation | `react-router-dom`, Leiste unten (Handy) bzw. seitlich (Desktop), Filter in der URL |
 | Bewertung | Status, Bewertung 1–10, Begonnen/Beendet, Notiz je Release; Vorbelegung beim ersten Auftreten einer Trophäenliste, danach nie mehr automatisch angefasst |
 | Abweichungen | Trophäenstand und Bewertung passen nicht zusammen – zur Durchsicht in den Einstellungen |
-| Prüfliste | Ein Spiel pro Bildschirm, sieben Aktionen (Tasten 1–7), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung |
+| Prüfliste | Ein Spiel pro Bildschirm, sieben Aktionen (Tasten 1–7), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung. 100 % wird nicht vorgelegt, sondern still gestempelt |
+| Datenbestand | 431 Trophäenlisten, 420 Spiele; bewertet: 167 komplettiert, 119 abgebrochen, 118 durchgespielt, 25 pausiert, 2 am Spielen |
 | Offene Posten | Hinweisblock in der Sammlung: Prüfliste, `unentschieden`, nicht zugeordnete Listen – bis es das Dashboard gibt |
 | Sicherung geprüft | Der Export wird vor der Migration gegen die Zeilenzahlen der Datenbank gehalten; Datenmigrationen protokollieren ihre Wirkung |
 | Lesekosten | Indizes auf allen Fremdschlüsseln; `test/lesekosten.spec.ts` misst die heißen Abfragen gegen 430 Listen (D1 Free Tier: 5 Mio. gelesene Zeilen/Tag) |
