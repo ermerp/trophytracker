@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 16 – Prüfliste: 100 % wird nicht mehr vorgelegt; Handy-Bedienung ohne Scrollen und ohne springende Knöpfe.*
+*Version 17 – Statuswechsel im Spieldetail legt keine Liste an; Serienansichten ohne Scrollen und mit fester Knopfposition.*
 
 ## 1. Use Cases
 
@@ -258,6 +258,8 @@ Die Vorbelegung ist ein set-basiertes Statement (`PlayStatusRepository.vorbelege
 Alle übrigen Abweichungen zwischen Trophäen und Bewertung werden angezeigt, nicht korrigiert. `durchgespielt` bei 20 % Trophäenfortschritt ist ein gültiger Zustand – Story beendet, Sammelaufgaben liegen gelassen.
 
 **Manuell setzen = durchgesehen.** `PUT /api/releases/:id/play-status` setzt Status, Start- und Enddatum, Bewertung (1–10) und Notiz. Wer den Status im Spieldetail setzt, hat das Spiel gesehen: Der Aufruf stempelt zugleich `reviewed_*` auf den aktuellen Trophäenstand und löscht einen offenen `review_queue`-Eintrag (8.1) – sonst legte die Prüfliste dasselbe Spiel gleich noch einmal vor.
+
+Anders als die Prüfliste legt der Aufruf aber **keinen `plan_entry` an**: „Auf To-Do" und „Ins Backlog" sind Entscheidungen der Triage (8.1), das Spieldetail setzt nur die Bewertung. Ein Release kann deshalb `pausiert` sein, ohne auf einer Liste zu stehen – das ist kein Fehlzustand, den ein späterer Abgleich reparieren dürfte.
 
 ---
 
@@ -969,6 +971,7 @@ Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dess
 - Trophäenfortschritt und eigener Status stehen immer nebeneinander, nie ineinander verrechnet.
 - Bei unveröffentlichten Titeln steht das Erscheinungsdatum an der Stelle, wo sonst der Preis steht – nicht "0 €" und nicht "nicht verfügbar".
 - Store-Preis und Gebrauchtpreis werden getrennt beschriftet.
+- Ansichten, die **in Serie** bedient werden – Prüfliste (Use Case 8), Import-Durchsicht (Use Case 9), Serienerfassung beim Scannen (Abschnitt 9.1) –, müssen auf dem Handy ohne Scrollen bedienbar sein, und ihre Bedienelemente stehen unabhängig von der Inhaltslänge an derselben Stelle (feste Mindesthöhe statt mitwachsender Karte). Wer hundertfach blind auf dieselbe Position tippt, trifft sonst bei einem längeren Titel daneben – und eine Fehlentscheidung fällt erst Wochen später auf.
 
 **PWA:** Manifest und Service Worker, Sammlungsdaten für Offline-Lesezugriff cachen.
 
