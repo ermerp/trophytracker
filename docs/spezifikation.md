@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 20 – IGDB-Anbindung (Stufe 9): Abgleich in Schritten, nur eindeutige Treffer automatisch, Prüfansicht für den Rest; gegen die echten 420 Titel gemessen.*
+*Version 21 – IGDB-Nachbesserung aus der ersten Abnahme: Kandidaten sortiert (Hauptspiel vor DLC, passende Plattform zuerst), Rückfallsuchen für Titel ohne Treffer, „Offene erneut suchen".*
 
 ## 1. Use Cases
 
@@ -600,6 +600,10 @@ Abruf zusammen mit den übrigen IGDB-Metadaten, nicht als eigener Job. `critic_s
 
 **Suchbegriff.** `suchbegriff(title)` (`src/domain/igdb.ts`) bereinigt nur für die Anfrage, nie für den Schlüssel: ein Jahr in Klammern aus der Umbenennung durch den Nutzer („God of War (2018)") fällt weg, an Wörter geklebte Ziffern werden getrennt („Velocity2X" → „Velocity 2X"; IGDB findet nur diese Schreibweise).
 
+**Rückfälle, nur wenn die Suche leer bleibt** (`kandidatenSuchen`, `src/sync/igdb.ts`; trifft 11 von 420 Titeln, kostet also fast nichts): erst der gekürzte Begriff – alles ab „ - ", „:" oder „/" fällt weg („CastleStorm - Complete Edition" → „CastleStorm", „Type:Rider" → „Type") – ohne Plattformfilter, weil manche IGDB-Einträge keine Plattform nennen; dann IGDBs Teilstringsuche über den Namen (`name ~ *"…"*`), der einzige Weg zu „That's You!" oder „We Were Here Too"; zuletzt dieselbe Teilstringsuche mit dem unbereinigten Titel, weil IGDB „OlliOlli2" ohne Leerzeichen schreibt. Was danach noch fehlt (aus der ersten Abnahme: „Poker Night at the Inventory 2", „TownsmenVR", „Wake-up Club"), kennt IGDB unter keiner Schreibweise – das bleibt „Gibt es bei IGDB nicht" oder eine Suche von Hand.
+
+**Reihenfolge der Kandidaten** (`ordneKandidaten`): Die Suche holt 30 Treffer statt 10, weil bei DLC-reichen Titeln das Hauptspiel sonst gar nicht im Ergebnis steht („Batman: Arkham Knight" an Position 13 hinter zwölf Skin-Paketen, „For Honor" an 23). Gespeichert und angezeigt werden die ersten zehn nach dieser Ordnung: Schlüsseltreffer zuerst, dann Hauptspiel-artige Typen (Hauptspiel, Bundle, eigenständige Erweiterung, Remake, Remaster, erweitertes Spiel, Portierung) vor DLC, Erweiterung, Episode, Staffel und Paket, dann Kandidaten mit einer Plattform des Spiels, innerhalb dessen IGDBs Reihenfolge. Die eingebaute Suche (`GET /api/igdb/search`) nutzt dieselben Rückfälle und dieselbe Ordnung; `plattformen=PS4,PS5` gibt ihr die Plattformen mit – ab Stufe 11 auch aus der Wunschliste, wenn dort eine Plattform neben dem Titel steht. Die Ordnung ändert nichts an der automatischen Verknüpfung.
+
 **Eindeutiger Treffer.** Die Regel aus 7.2, auf IGDB übertragen: Automatisch verknüpft wird nur, wenn **genau ein** Kandidat denselben Titelschlüssel trägt wie der bereinigte Suchbegriff. Der Schlüssel wird dabei frisch aus dem Titel berechnet, nicht aus `sort_title` gelesen – die Spalte ist abgeleitet und veraltet still. Drei Verfeinerungen aus der Messung gegen die echten Titel:
 
 - Editionen verweisen mit `version_parent` auf ihr Hauptspiel; ist das Hauptspiel selbst Kandidat, zählt die Edition nicht als zweiter Treffer.
@@ -616,6 +620,7 @@ Alles andere landet mit seinen Kandidaten in `igdb_candidate` und wartet in der 
 - „Gibt es bei IGDB nicht" → `igdb_declined_at`; das Spiel verlässt Abgleich und Prüfansicht. „Doch suchen" nimmt es zurück.
 - Verknüpfung lösen → alles, was von IGDB kam, wird entfernt (Cover, Datum, Status zurück auf `unbekannt`, Wertung nur bei Quelle `'igdb'`); `igdb_checked_at` wird NULL, der nächste Abgleich sucht erneut.
 - Umbenennen eines unverknüpften, nicht abgelehnten Spiels setzt `igdb_checked_at` zurück: Der neue Titel ist meist genau die Korrektur, mit der IGDB den Eintrag findet.
+- „Offene erneut suchen" (`POST /api/igdb/erneut-suchen`) setzt alle Spiele zur Prüfung zurück in den Abgleich und verwirft ihre Kandidaten – für den Fall, dass die Suchregel besser geworden ist. Verknüpfungen und Ablehnungen bleiben unberührt.
 
 **Auffrischen.** `POST /api/igdb/auffrischen` holt für die 50 am längsten nicht aktualisierten verknüpften Spiele Wertung, Cover und Datum in **einer** Anfrage (`where id = (…)`) erneut. Kritikerwertungen ändern sich mit jeder neuen Rezension; Stufe 17 hängt den Schritt an den Cron.
 
@@ -960,11 +965,12 @@ GET    /api/review/queue              v_review_offen, paginiert (limit, offset);
 POST   /api/review/:releaseId/decide  Body: { aktion } – sieben Aktionen aus 8.1; Antwort mit status, planAngelegt, nochOffen
 GET    /api/review/progress           { offen, erledigt, gesamt, unentschieden } – unentschieden ist die zweite Runde
 
-GET    /api/igdb/search?q=            Eingebaute Suche für Spieldetail, Prüfansicht, Import und Nachpflege (7.6)
+GET    /api/igdb/search?q=&plattformen=  Eingebaute Suche mit Rückfällen und Ordnung (7.6), für Spieldetail, Prüfansicht, Import und Nachpflege
 GET    /api/igdb/status               { zugangsdaten, gesamt, verknuepft, zurPruefung, ungeprueft, abgelehnt, letzteAktualisierung }
 GET    /api/igdb/offen                Prüfansicht: Spiele ohne eindeutigen Treffer mit Kandidaten (limit, offset)
 POST   /api/igdb/abgleich             ein Schritt: acht Spiele; { geprueft, verknuepft, vorgeschlagen, ohneTreffer, nochOffen, weiter }
 POST   /api/igdb/auffrischen          ein Schritt: 50 verknüpfte Spiele in einer IGDB-Anfrage
+POST   /api/igdb/erneut-suchen        alle Spiele zur Prüfung zurück in den Abgleich; { zurueckgesetzt }
 GET    /api/unmatched                 v_ohne_igdb (Stufe 11)
 POST   /api/unmatched/:quelle/:id/link  Body: { igdbId } – Quelle 'spiel' seit Stufe 9, 'plan_*' ab Stufe 11
 DELETE /api/unmatched/spiel/:id/link  Verknüpfung lösen; nimmt alles zurück, was von IGDB kam
@@ -1027,7 +1033,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Ohne Zuordnung | 12 | Listenübergreifend, mit IGDB-Suchfeld zum Nachziehen |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |
 | Scannen | 1 | Serienerfassung nach Abschnitt 9 |
-| Einstellungen | – | NPSSO, Sync, Sync-Historie, IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Gewichte der Rangformel, Export und Backup-Status |
+| Einstellungen | – | NPSSO, Sync, Sync-Historie, IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen", „Offene erneut suchen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Gewichte der Rangformel, Export und Backup-Status |
 
 **Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den fünf Hauptansichten (Sammlung, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
 

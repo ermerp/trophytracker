@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
 	apicalypseText,
 	eindeutigerTreffer,
+	kurzbegriff,
 	metadatenAus,
 	normalisiereTreffer,
+	ordneKandidaten,
 	normalisiereTrefferliste,
 	releaseStatusAus,
 	suchbegriff,
@@ -145,6 +147,32 @@ describe("eindeutigerTreffer", () => {
 		// Fehlende Daten sind kein Gegenbeweis.
 		expect(eindeutigerTreffer("darksiders ii", ["PS4"], [kandidat({ name: "Darksiders II", plattformen: [] })])?.igdbId).toBe(1);
 		expect(eindeutigerTreffer("darksiders ii", [], [ps3])?.igdbId).toBe(1);
+	});
+});
+
+describe("ordneKandidaten", () => {
+	it("Schluesseltreffer, dann Hauptspiel-artige, dann passende Plattform, dann IGDB-Reihenfolge", () => {
+		const k = [
+			kandidat({ igdbId: 1, name: "Batman: Arkham Knight - Skin", typId: 13, plattformen: ["PS4"] }),
+			kandidat({ igdbId: 2, name: "Batman: Arkham Knight - Season Pass", typId: 3, plattformen: ["PS4"] }),
+			kandidat({ igdbId: 3, name: "Batman: Arkham Knight - Premium", typId: 3, plattformen: ["PS3"] }),
+			kandidat({ igdbId: 4, name: "Batman: Arkham Knight", typId: 0, plattformen: ["PS4"] }),
+			kandidat({ igdbId: 5, name: "Batman: Arkham Knight - Story Pack", typId: 1, plattformen: ["PS4"] }),
+		];
+		expect(ordneKandidaten("batman arkham knight", ["PS4"], k).map((x) => x.igdbId)).toEqual([4, 2, 3, 1, 5]);
+		// Ohne Plattformen des Spiels zaehlt nur Schluessel und Typ.
+		expect(ordneKandidaten("batman arkham knight", [], k).map((x) => x.igdbId)).toEqual([4, 2, 3, 1, 5]);
+		expect(ordneKandidaten("etwas anderes", ["PS3"], k).map((x) => x.igdbId)).toEqual([3, 2, 4, 1, 5]);
+	});
+});
+
+describe("kurzbegriff", () => {
+	it("schneidet ab ' - ', ':' und '/', laesst Bindestriche im Wort stehen", () => {
+		expect(kurzbegriff("CastleStorm - Complete Edition")).toBe("CastleStorm");
+		expect(kurzbegriff("Type:Rider")).toBe("Type");
+		expect(kurzbegriff("Dead by Daylight 1/3")).toBe("Dead by Daylight 1");
+		expect(kurzbegriff("Wake-up Club")).toBe("Wake-up Club");
+		expect(kurzbegriff("Island Saver")).toBe("Island Saver");
 	});
 });
 

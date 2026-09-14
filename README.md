@@ -286,6 +286,13 @@ Kandidat antippen, anders suchen oder „Gibt es bei IGDB nicht" – jede
 Entscheidung ist sofort gespeichert. Der Hinweisblock in der Sammlung zeigt,
 wie viele Spiele noch warten.
 
+Die Kandidaten stehen sortiert: Schlüsseltreffer zuerst, dann Hauptspiele,
+Remakes und Remaster vor DLC und Paketen, dann die Plattform des Spiels. Bleibt
+die Suche leer, greifen Rückfälle (gekürzter Begriff, ohne Plattformfilter,
+Teilstringsuche) – Details in [Spezifikation 7.6](docs/spezifikation.md#76-igdb-abgleich-stufe-9).
+„Offene erneut suchen" schickt alle Spiele zur Prüfung noch einmal durch die
+Suche, wenn die Regel besser geworden ist.
+
 Gegen die echten 420 Titel gemessen, bevor die Regel gebaut wurde: 372
 eindeutig, 5 echt mehrdeutig, 32 mit passenden Kandidaten, 11 ohne Treffer,
 keine Fehlzuordnung in der Stichprobe. Sonys Schreibweisen („Velocity2X") und
@@ -308,8 +315,12 @@ GET  /api/igdb/status            Zähler und ob Zugangsdaten hinterlegt sind
 POST /api/igdb/abgleich          ein Schritt, { weiter } solange etwas offen ist
 POST /api/igdb/auffrischen       50 Spiele in einer IGDB-Anfrage
 GET  /api/igdb/offen             Prüfansicht mit Kandidaten
-GET  /api/igdb/search?q=         Suche, auch für Import und Nachpflege (Stufe 11)
+POST /api/igdb/erneut-suchen     offene Spiele zurück in den Abgleich
+GET  /api/igdb/search?q=&plattformen=  Suche mit Rückfällen, auch für Import und Nachpflege (Stufe 11)
 ```
+
+**Alte Wunschlisten** gehören als Textdateien in `wunschlisten/` (lokal,
+per `.gitignore` ausgeschlossen); Stufe 11 misst den Import daran.
 
 ## Zugriffsschutz
 

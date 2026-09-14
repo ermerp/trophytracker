@@ -2,12 +2,14 @@ import type { Repositories } from "../db";
 import {
 	eindeutigerTreffer,
 	heuteIso,
+	kurzbegriff,
 	metadatenAus,
 	normalisiereTrefferliste,
+	ordneKandidaten,
 	suchbegriff,
 	type IgdbKandidat,
 } from "../domain/igdb";
-import { plattformenAus, titelSchluessel } from "../domain/titel";
+import { anzeigeTitel, plattformenAus, titelSchluessel } from "../domain/titel";
 import {
 	IgdbAuthError,
 	IgdbKonfigError,
@@ -30,6 +32,50 @@ import {
 
 export const SPIELE_JE_AUFRUF = 8;
 export const AUFFRISCHEN_JE_AUFRUF = 50;
+/** Mehr Kandidaten liest niemand durch; die Sortierung bringt das Passende nach vorn. */
+export const KANDIDATEN_JE_SPIEL = 10;
+
+export type Suchweg = "suche" | "kurz" | "teilstring" | "teilstring_roh" | "keiner";
+
+/**
+ * Suche mit Rueckfaellen. Die erste Suche reicht fuer 409 von 420 Titeln;
+ * nur wenn sie leer bleibt, folgen bis zu drei weitere Anfragen:
+ *
+ * 1. gekuerzter Begriff ohne Plattformfilter - "CastleStorm - Complete
+ *    Edition" findet IGDB erst als "CastleStorm", und manche Eintraege
+ *    nennen gar keine Plattform
+ * 2. Teilstringsuche ueber den Namen - der einzige Weg zu "That's You!"
+ *    oder "We Were Here Too"
+ * 3. dieselbe Teilstringsuche mit dem unbereinigten Titel - "OlliOlli2"
+ *    schreibt IGDB ohne Leerzeichen, der Suchbegriff traegt eines
+ *
+ * Der Aufrufer sortiert; hier zaehlt nur, ueberhaupt etwas zu finden.
+ */
+export async function kandidatenSuchen(
+	igdb: IgdbClient,
+	titel: string,
+): Promise<{ kandidaten: IgdbKandidat[]; begriff: string; weg: Suchweg }> {
+	const begriff = suchbegriff(titel);
+	let kandidaten = normalisiereTrefferliste(await igdb.suche(begriff));
+	if (kandidaten.length > 0) return { kandidaten, begriff, weg: "suche" };
+
+	const kurz = kurzbegriff(begriff);
+	if (kurz !== "") {
+		kandidaten = normalisiereTrefferliste(await igdb.suche(kurz, { nurPlayStation: false }));
+		if (kandidaten.length > 0) return { kandidaten, begriff, weg: "kurz" };
+
+		kandidaten = normalisiereTrefferliste(await igdb.nameEnthaelt(kurz));
+		if (kandidaten.length > 0) return { kandidaten, begriff, weg: "teilstring" };
+	}
+
+	const roh = kurzbegriff(anzeigeTitel(titel));
+	if (roh !== "" && roh !== kurz) {
+		kandidaten = normalisiereTrefferliste(await igdb.nameEnthaelt(roh));
+		if (kandidaten.length > 0) return { kandidaten, begriff, weg: "teilstring_roh" };
+	}
+
+	return { kandidaten: [], begriff, weg: "keiner" };
+}
 
 export type AbgleichErgebnis = {
 	status: "erfolg" | "laufend" | "fehler";
@@ -56,19 +102,22 @@ export async function igdbAbgleichSchritt(
 
 	try {
 		for (const spiel of spiele) {
-			const begriff = suchbegriff(spiel.title);
-			const kandidaten = normalisiereTrefferliste(await igdb.suche(begriff));
+			const { kandidaten, begriff } = await kandidatenSuchen(igdb, spiel.title);
 			const plattformen = plattformenAus(spiel.plattformen ?? "");
 			// Schluessel frisch aus dem bereinigten Titel, nicht aus sort_title:
 			// Die Spalte ist abgeleitet und veraltet still (CLAUDE.md), und der
 			// bereinigte Begriff traegt weder Jahr noch angeklebte Ziffern.
-			const treffer = eindeutigerTreffer(titelSchluessel(begriff), plattformen, kandidaten);
+			const schluessel = titelSchluessel(begriff);
+			const treffer = eindeutigerTreffer(schluessel, plattformen, kandidaten);
 
 			if (treffer) {
 				await repos.igdb.verknuepfen(spiel.id, metadatenAus(treffer, heute), "automatisch");
 				verknuepft++;
 			} else {
-				await repos.igdb.kandidatenSetzen(spiel.id, kandidaten);
+				await repos.igdb.kandidatenSetzen(
+					spiel.id,
+					ordneKandidaten(schluessel, plattformen, kandidaten).slice(0, KANDIDATEN_JE_SPIEL),
+				);
 				if (kandidaten.length === 0) ohneTreffer++;
 				else vorgeschlagen++;
 			}

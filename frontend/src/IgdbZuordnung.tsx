@@ -120,7 +120,7 @@ export function IgdbZuordnung() {
                     Gibt es bei IGDB nicht
                   </button>
                 </div>
-                {suche === s.id && <IgdbSuche vorgabe={s.titel} onWahl={(k) => verknuepfen(s, k)} laeuft={laeuft === s.id} />}
+                {suche === s.id && <IgdbSuche vorgabe={s.titel} plattformen={s.plattformen} onWahl={(k) => verknuepfen(s, k)} laeuft={laeuft === s.id} />}
               </li>
             ))}
           </ul>

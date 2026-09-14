@@ -315,7 +315,7 @@ export function Spieldetail() {
             </div>
           </>
         )}
-        {igdbSuche && <IgdbSuche vorgabe={spiel.titel} onWahl={igdbWaehlen} laeuft={laeuft} />}
+        {igdbSuche && <IgdbSuche vorgabe={spiel.titel} plattformen={spiel.releases.map((r) => r.plattform)} onWahl={igdbWaehlen} laeuft={laeuft} />}
       </section>
 
       {spiel.releases.map((r) => (

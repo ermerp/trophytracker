@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import type { SpielDetail } from "../db/games";
 import type { KandidatZeile } from "../db/igdb";
-import { heuteIso, metadatenAus, normalisiereTrefferliste, type IgdbKandidat } from "../domain/igdb";
+import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, type IgdbKandidat } from "../domain/igdb";
+import { plattformenAus, titelSchluessel } from "../domain/titel";
 import { IgdbKonfigError } from "../igdb/client";
-import { igdbAbgleichSchritt, igdbAuffrischSchritt, meldungFuer } from "../sync/igdb";
+import { igdbAbgleichSchritt, igdbAuffrischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
 import type { AppEnv } from "../types";
 
 /**
@@ -69,14 +70,20 @@ function ohneZugang(c: { json: (o: unknown, s: 503) => Response }) {
 }
 
 export const igdbRoutes = new Hono<AppEnv>()
-	/** Eingebaute Suche fuer Spieldetail, Pruefansicht und spaeter den Import (8.2). */
+	/**
+	 * Eingebaute Suche fuer Spieldetail, Pruefansicht und spaeter den Import
+	 * (8.2). Dieselben Rueckfaelle und dieselbe Reihenfolge wie im Abgleich;
+	 * `plattformen=PS4,PS5` zieht passende Kandidaten nach vorn.
+	 */
 	.get("/search", async (c) => {
 		if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
 		const q = (c.req.query("q") ?? "").trim();
-		if (q === "") return c.json({ treffer: [] });
+		if (q === "") return c.json({ treffer: [], weg: "keiner" });
+		const plattformen = plattformenAus(c.req.query("plattformen") ?? "");
 		try {
-			const treffer = normalisiereTrefferliste(await c.var.igdb.suche(q));
-			return c.json({ treffer: treffer.map(kandidatAntwort) });
+			const { kandidaten, begriff, weg } = await kandidatenSuchen(c.var.igdb, q);
+			const treffer = ordneKandidaten(titelSchluessel(begriff), plattformen, kandidaten);
+			return c.json({ treffer: treffer.map(kandidatAntwort), weg });
 		} catch (fehler) {
 			return c.json({ fehler: meldungFuer(fehler) }, 502);
 		}
@@ -122,6 +129,16 @@ export const igdbRoutes = new Hono<AppEnv>()
 		if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
 		const ergebnis = await igdbAbgleichSchritt(c.var.repos, c.var.igdb);
 		return c.json(ergebnis, ergebnis.status === "fehler" ? 502 : 200);
+	})
+
+	/**
+	 * Alle Spiele zur Pruefung zurueck in den Abgleich - nach einer besseren
+	 * Suchregel, damit die gespeicherten Kandidaten nicht veralten. Fasst
+	 * weder Verknuepfungen noch Ablehnungen an.
+	 */
+	.post("/erneut-suchen", async (c) => {
+		const zurueckgesetzt = await c.var.repos.igdb.offeneZuruecksetzen();
+		return c.json({ zurueckgesetzt });
 	})
 
 	.post("/auffrischen", async (c) => {

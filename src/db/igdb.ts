@@ -223,6 +223,19 @@ export class IgdbRepository {
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 
+	/** Alle Spiele zur Pruefung zurueck in die Suche (nach einer neuen Suchregel). */
+	async offeneZuruecksetzen(): Promise<number> {
+		const [update] = await this.db.batch([
+			this.db.prepare(
+				`UPDATE game SET igdb_checked_at = NULL WHERE ${IgdbRepository.ZUR_PRUEFUNG}`,
+			),
+			this.db.prepare(
+				"DELETE FROM igdb_candidate WHERE game_id IN (SELECT id FROM game WHERE igdb_id IS NULL AND igdb_checked_at IS NULL)",
+			),
+		]);
+		return update.meta.changes ?? 0;
+	}
+
 	/**
 	 * Verknuepfung loesen. Nimmt alles zurueck, was von IGDB kam - Cover,
 	 * Datum, Wertung (nur bei Quelle 'igdb') - und gibt das Spiel wieder in

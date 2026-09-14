@@ -130,15 +130,31 @@ export function erstelleIgdbClient(
 		},
 
 		/**
-		 * Volltextsuche, auf PlayStation-Plattformen eingeschraenkt. Mods,
-		 * Forks und Updates fallen schon hier heraus (siehe NIE_EIN_SPIEL).
+		 * Volltextsuche. Mods, Forks und Updates fallen schon hier heraus
+		 * (siehe NIE_EIN_SPIEL). Standardmaessig auf PlayStation-Plattformen
+		 * eingeschraenkt; der Rueckfall sucht ohne diese Einschraenkung, weil
+		 * IGDB bei manchen Eintraegen gar keine Plattform nennt.
+		 *
+		 * 30 Treffer statt 10: Bei DLC-reichen Titeln steht das Hauptspiel
+		 * sonst gar nicht im Ergebnis (Batman: Arkham Knight an Position 13,
+		 * For Honor an 23). Die Reihenfolge stellt ordneKandidaten her.
 		 */
-		async suche(begriff: string, limit = 10): Promise<IgdbSpielRoh[]> {
+		async suche(begriff: string, optionen: { limit?: number; nurPlayStation?: boolean } = {}): Promise<IgdbSpielRoh[]> {
 			const text = apicalypseText(begriff);
 			if (text === "") return [];
-			return abfrage(
-				`search "${text}"; fields ${IGDB_FELDER}; where ${plattformFilter} & ${typFilter}; limit ${limit};`,
-			);
+			const filter = optionen.nurPlayStation === false ? typFilter : `${plattformFilter} & ${typFilter}`;
+			return abfrage(`search "${text}"; fields ${IGDB_FELDER}; where ${filter}; limit ${optionen.limit ?? 30};`);
+		},
+
+		/**
+		 * Teilstringsuche ueber den Namen - ein anderer Weg als die
+		 * Volltextsuche und der einzige, der "That's You!" oder "We Were Here
+		 * Too" findet. Nur als Rueckfall, weil sie kein Ranking kennt.
+		 */
+		async nameEnthaelt(text: string, limit = 30): Promise<IgdbSpielRoh[]> {
+			const sauber = apicalypseText(text).replace(/\*/g, "");
+			if (sauber === "") return [];
+			return abfrage(`fields ${IGDB_FELDER}; where name ~ *"${sauber}"* & ${typFilter}; limit ${limit};`);
 		},
 
 		/** Bis zu 50 Spiele nach ID - eine Anfrage fuer das Auffrischen. */

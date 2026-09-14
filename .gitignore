@@ -180,3 +180,7 @@ frontend/dist/
 
 # WSL-Artefakte aus Windows-Downloads
 *:Zone.Identifier
+
+# Alte Wunschlisten des Nutzers, nur lokal (Stufe 11 misst den Import daran).
+wunschlisten/*
+!wunschlisten/README.md
