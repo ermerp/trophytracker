@@ -5,6 +5,9 @@ interface __BaseEnv_Env {
 	DB: D1Database;
 	ASSETS: Fetcher;
 	NPSSO_KEY: string;
+	/** IGDB/Twitch-Zugangsdaten, als Cloudflare Secrets (Stufe 9). Optional: ohne sie laeuft die App ohne IGDB. */
+	IGDB_CLIENT_ID?: string;
+	IGDB_CLIENT_SECRET?: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -17,7 +20,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NPSSO_KEY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NPSSO_KEY" | "IGDB_CLIENT_ID" | "IGDB_CLIENT_SECRET">> {}
 }
 
 // Begin runtime types

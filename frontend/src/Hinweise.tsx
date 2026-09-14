@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { anfrage, type ReviewFortschritt } from './api'
+import { anfrage, type IgdbStatus, type ReviewFortschritt } from './api'
 import type { Sicherungsstand } from './Sicherung'
 
 /**
@@ -15,6 +15,7 @@ export function Hinweise() {
   const [review, setReview] = useState<ReviewFortschritt | null>(null)
   const [listenOffen, setListenOffen] = useState(0)
   const [sicherung, setSicherung] = useState<Sicherungsstand | null>(null)
+  const [igdb, setIgdb] = useState<IgdbStatus | null>(null)
 
   useEffect(() => {
     anfrage<ReviewFortschritt>('/api/review/progress').then(setReview).catch(() => {})
@@ -22,6 +23,7 @@ export function Hinweise() {
       .then((a) => setListenOffen(a.listenOffen))
       .catch(() => {})
     anfrage<Sicherungsstand>('/api/backup/status').then(setSicherung).catch(() => {})
+    anfrage<IgdbStatus>('/api/igdb/status').then(setIgdb).catch(() => {})
   }, [])
 
   const zeilen: React.ReactNode[] = []
@@ -46,6 +48,25 @@ export function Hinweise() {
       <li key="zuordnung">
         <strong>{listenOffen}</strong> Trophäenlisten sind noch nicht zugeordnet.{' '}
         <Link to="/zuordnung">Zuordnung</Link>
+      </li>,
+    )
+  }
+
+  // Abschnitt 7.6: Der Abgleich ist ein Handgriff in den Einstellungen, die
+  // Zuordnung eine eigene Ansicht - beides nur, solange etwas offen ist.
+  if (igdb && igdb.zugangsdaten && igdb.ungeprueft > 0) {
+    zeilen.push(
+      <li key="igdb-abgleich">
+        <strong>{igdb.ungeprueft}</strong> Spiele wurden noch nicht bei IGDB gesucht.{' '}
+        <Link to="/einstellungen">Abgleich starten</Link>
+      </li>,
+    )
+  }
+  if (igdb && igdb.zurPruefung > 0) {
+    zeilen.push(
+      <li key="igdb-pruefung">
+        <strong>{igdb.zurPruefung}</strong> Spiele warten auf die IGDB-Zuordnung.{' '}
+        <Link to="/igdb">IGDB-Zuordnung</Link>
       </li>,
     )
   }

@@ -22,6 +22,9 @@
  *   abrufbar. Der SQL-Dump aus `d1 export` hat sie ohnehin.
  * - `d1_migrations` - Wranglers eigene Buchfuehrung, kommt beim
  *   Wiedereinspielen aus dem Dump.
+ * - `igdb_candidate` - Suchergebnisse von IGDB fuer die Pruefansicht,
+ *   abgeleitet und jederzeit neu abrufbar. Die Entscheidungen des Nutzers
+ *   (Verknuepfung, Ablehnung) stehen in `game` und werden gesichert.
  */
 export const EXPORT_TABELLEN = [
 	"game",
@@ -41,7 +44,12 @@ export const EXPORT_TABELLEN = [
 ] as const;
 
 /** Tabellen, die es gibt und die absichtlich nicht exportiert werden. */
-export const NICHT_EXPORTIERT = ["psn_credentials", "psn_raw_response", "d1_migrations"] as const;
+export const NICHT_EXPORTIERT = [
+	"psn_credentials",
+	"psn_raw_response",
+	"d1_migrations",
+	"igdb_candidate",
+] as const;
 
 export type Exporttabelle = (typeof EXPORT_TABELLEN)[number];
 

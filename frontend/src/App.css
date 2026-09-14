@@ -591,3 +591,125 @@ ul.digital {
 .exportliste li {
   padding: 0.15rem 0;
 }
+
+/* ---------------------------------------------------------------------------
+ * IGDB (Stufe 9): Cover in der Kachel, Kandidatenlisten, Pruefansicht
+ * ------------------------------------------------------------------------- */
+
+/* IGDB-Cover sind Hochformat (264 x 374); das Trophaeensymbol bleibt quadratisch. */
+.kachel .bild.cover {
+  aspect-ratio: 264 / 374;
+  max-height: none;
+}
+
+.kachel .bild.cover img {
+  object-fit: cover;
+}
+
+.detailkopf img.cover {
+  width: 96px;
+  height: 136px;
+  object-fit: cover;
+}
+
+.knopfzeile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.igdb-block table {
+  margin-bottom: 0.5rem;
+}
+
+.suchzeile {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.suchzeile input {
+  flex: 1 1 12rem;
+  font: inherit;
+  min-width: 0;
+}
+
+.kandidaten {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.kandidat {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+}
+
+.kandidat-bild {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 4.25rem;
+  background: rgba(128, 128, 128, 0.12);
+  border-radius: 4px;
+  overflow: hidden;
+  color: rgba(128, 128, 128, 0.7);
+}
+
+.kandidat-bild img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.kandidat-text {
+  min-width: 0;
+}
+
+.kandidat-text .zeile {
+  display: block;
+}
+
+.offene-liste {
+  list-style: none;
+  padding: 0;
+}
+
+.offen-block {
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 6px;
+  padding: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.offen-kopf {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.offen-kopf img {
+  border-radius: 4px;
+  flex: none;
+}
+
+@media (max-width: 600px) {
+  .kandidat {
+    grid-template-columns: 3rem 1fr;
+  }
+
+  .kandidat button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

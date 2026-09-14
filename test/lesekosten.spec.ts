@@ -146,6 +146,59 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(backupJson).toBeLessThan(10_000);
 	});
 
+	/**
+	 * IGDB-Abgleich (Stufe 9). Der Abgleich laeuft in rund 55 Aufrufen ueber
+	 * alle Spiele; jeder Aufruf waehlt die naechsten acht aus, und die
+	 * Pruefansicht liest ihre Seite samt Kandidaten. Beides darf je Aufruf
+	 * nur die Groessenordnung der game-Tabelle lesen.
+	 */
+	it("misst den IGDB-Abgleich und die Pruefansicht", async () => {
+		// Haelfte der Spiele wartet auf die Pruefung, mit je drei Kandidaten.
+		await env.DB.prepare("UPDATE game SET igdb_checked_at = datetime('now') WHERE id % 2 = 0").run();
+		const einfuegen = env.DB.prepare(
+			"INSERT INTO igdb_candidate (game_id, igdb_id, name, position, fetched_at) VALUES (?, ?, ?, ?, datetime('now'))",
+		);
+		const anweisungen: D1PreparedStatement[] = [];
+		for (let i = 2; i <= ANZAHL; i += 2) {
+			for (let k = 0; k < 3; k++) anweisungen.push(einfuegen.bind(i, i * 10 + k, `Kandidat ${i}-${k}`, k));
+		}
+		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
+
+		const naechste = await zeilenGelesen(
+			`SELECT g.id, g.title, g.sort_title,
+			  (SELECT GROUP_CONCAT(r.platform) FROM release r WHERE r.game_id = g.id) AS plattformen
+			 FROM game g WHERE igdb_id IS NULL AND igdb_checked_at IS NULL AND igdb_declined_at IS NULL
+			 ORDER BY g.id LIMIT 8`,
+		);
+		const offenSeite = await zeilenGelesen(
+			`SELECT g.id, g.title, g.sort_title, g.igdb_checked_at,
+			  (SELECT GROUP_CONCAT(r.platform) FROM release r WHERE r.game_id = g.id) AS plattformen,
+			  (SELECT t.icon_url FROM trophy_progress t JOIN release r2 ON r2.id = t.release_id
+			    WHERE r2.game_id = g.id AND t.icon_url IS NOT NULL ORDER BY r2.platform DESC LIMIT 1) AS icon_url
+			 FROM game g WHERE igdb_id IS NULL AND igdb_checked_at IS NOT NULL AND igdb_declined_at IS NULL
+			 ORDER BY g.sort_title LIMIT 20 OFFSET 0`,
+		);
+		const kandidatenDerSeite = await zeilenGelesen(
+			`SELECT game_id, igdb_id, name, position FROM igdb_candidate
+			 WHERE game_id IN (${Array.from({ length: 20 }, (_, i) => (i + 1) * 2).join(",")}) ORDER BY game_id, position`,
+		);
+		const zaehlung = await zeilenGelesen(
+			"SELECT COUNT(*) AS gesamt, SUM(igdb_id IS NOT NULL) AS verknuepft, MAX(igdb_synced_at) FROM game",
+		);
+
+		console.info({ naechste, offenSeite, kandidatenDerSeite, zaehlung });
+
+		expect(naechste).toBeLessThan(2_000);
+		expect(offenSeite).toBeLessThan(5_000);
+		expect(kandidatenDerSeite).toBeLessThan(500);
+		expect(zaehlung).toBeLessThan(1_000);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM igdb_candidate"),
+			env.DB.prepare("UPDATE game SET igdb_checked_at = NULL"),
+		]);
+	});
+
 	it("beantwortet die Exportrouten bei 430 Listen", async () => {
 		for (const pfad of ["/api/export/backup.json", "/api/export/sammlung.csv", "/api/export/trophaeen.csv"]) {
 			const antwort = await SELF.fetch(`${B}${pfad}`);

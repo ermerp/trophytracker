@@ -87,8 +87,9 @@ export type SpielZeile = {
 	title: string;
 	sort_title: string;
 	cover_url: string | null;
-	/** Trophaeensymbol als Stand-in fuer das Cover, bis Stufe 9 IGDB bringt. */
+	/** Trophaeensymbol als Rueckfall, wenn IGDB kein Cover liefert oder die Zuordnung fehlt. */
 	icon_url: string | null;
+	critic_score: number | null;
 	zuletzt_gespielt: string | null;
 };
 
@@ -115,9 +116,18 @@ export type SpielDetail = {
 		sort_title: string;
 		cover_url: string | null;
 		igdb_id: number | null;
+		igdb_slug: string | null;
+		igdb_matched_at: string | null;
+		igdb_matched_source: "automatisch" | "manuell" | null;
+		igdb_checked_at: string | null;
+		igdb_declined_at: string | null;
+		igdb_synced_at: string | null;
 		release_date: string | null;
-		release_status: string;
+		release_status: "erschienen" | "angekuendigt" | "unbekannt";
 		critic_score: number | null;
+		critic_score_count: number | null;
+		critic_source: string | null;
+		critic_updated_at: string | null;
 		created_at: string;
 	};
 	releases: Array<{
@@ -285,10 +295,20 @@ export class GamesRepository {
 		return { geprueft: results.length, geaendert: zuAendern.length };
 	}
 
-	/** Titel aendern. sort_title wird neu abgeleitet. */
+	/**
+	 * Titel aendern. sort_title wird neu abgeleitet.
+	 *
+	 * Ein Spiel ohne IGDB-Verknuepfung, das der Nutzer nicht abgelehnt hat,
+	 * verliert seinen Suchstempel: Der neue Titel ist meist genau die
+	 * Korrektur, mit der IGDB den Eintrag findet (Abschnitt 7.6).
+	 */
 	async umbenennen(id: number, titel: string): Promise<boolean> {
 		const ergebnis = await this.db
-			.prepare("UPDATE game SET title = ?, sort_title = ? WHERE id = ?")
+			.prepare(
+				"UPDATE game SET title = ?, sort_title = ?, " +
+					"igdb_checked_at = CASE WHEN igdb_id IS NULL AND igdb_declined_at IS NULL THEN NULL ELSE igdb_checked_at END " +
+					"WHERE id = ?",
+			)
 			.bind(titel, titelSchluessel(titel), id)
 			.run();
 		return (ergebnis.meta.changes ?? 0) > 0;
@@ -475,7 +495,7 @@ aeenliste haengt
 			this.db.prepare(`SELECT COUNT(*) AS n ${woher}${sucheBedingung}`).bind(...werte),
 			this.db
 				.prepare(
-					`SELECT g.id, g.title, g.sort_title, g.cover_url,
+					`SELECT g.id, g.title, g.sort_title, g.cover_url, g.critic_score,
 					        (SELECT t3.icon_url FROM trophy_progress t3 JOIN release r3 ON r3.id = t3.release_id
 					          WHERE r3.game_id = g.id AND t3.icon_url IS NOT NULL ORDER BY r3.platform DESC LIMIT 1) AS icon_url,
 					        ${zuletzt} AS zuletzt_gespielt
@@ -511,8 +531,9 @@ aeenliste haengt
 	async spielDetail(id: number): Promise<SpielDetail | null> {
 		const spiel = await this.db
 			.prepare(
-				"SELECT id, title, sort_title, cover_url, igdb_id, release_date, release_status, " +
-					"critic_score, created_at FROM game WHERE id = ?",
+				"SELECT id, title, sort_title, cover_url, igdb_id, igdb_slug, igdb_matched_at, igdb_matched_source, " +
+					"igdb_checked_at, igdb_declined_at, igdb_synced_at, release_date, release_status, " +
+					"critic_score, critic_score_count, critic_source, critic_updated_at, created_at FROM game WHERE id = ?",
 			)
 			.bind(id)
 			.first<SpielDetail["spiel"]>();
