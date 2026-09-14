@@ -138,6 +138,15 @@ describe("Dichtheitsprüfung", () => {
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({ aktion: "unveraendert" }),
 			}),
+			await ruf(app, "/api/export/backup.json"),
+			await ruf(app, "/api/export/sammlung.csv"),
+			await ruf(app, "/api/export/trophaeen.csv"),
+			await ruf(app, "/api/backup/status"),
+			await ruf(app, "/api/backup/vermerk", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ zeitpunkt: "2026-09-14T03:17:00Z", commit: "abc1234" }),
+			}),
 		];
 
 		for (const text of antworten) {
@@ -165,6 +174,13 @@ describe("Dichtheitsprüfung", () => {
 				headers: { "content-type": "application/json" },
 				body: "kaputt",
 			}),
+			await ruf(app, "/api/export/backup.json"),
+			await ruf(app, "/api/export/quatsch.csv"),
+			await ruf(app, "/api/backup/vermerk", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: "kaputt",
+			}),
 		];
 
 		for (const text of antworten) {
@@ -187,7 +203,16 @@ describe("Dichtheitsprüfung", () => {
 		expect(istDicht(ausgabe.join("\n"))).toMatchObject({ dicht: true });
 	});
 
-	it("legt in der Datenbank keinen Klartext ab", async () => {
+	/**
+	 * Inhaltlich dasselbe wie `wrangler d1 export`, nur ohne Wrangler: jede
+	 * Tabelle der Datenbank vollstaendig gelesen und serialisiert. Was hier
+	 * nicht auftaucht, steht auch im Dump nicht - und der Dump landet ab
+	 * Stufe 8 woechentlich im privaten Backup-Repo (Abschnitt 14.2).
+	 *
+	 * Bewusst ueber sqlite_master statt ueber eine Liste: Eine Tabelle, die
+	 * eine kuenftige Migration anlegt, ist damit automatisch mitgeprueft.
+	 */
+	it("legt in KEINER Tabelle der Datenbank Klartext ab", async () => {
 		const app = createApp(psnMarkiert);
 		await ruf(app, "/api/settings/npsso", {
 			method: "POST",
@@ -196,11 +221,34 @@ describe("Dichtheitsprüfung", () => {
 		});
 		await ruf(app, "/api/sync", { method: "POST" });
 
-		const zugang = await env.DB.prepare("SELECT * FROM psn_credentials").first();
-		const roh = await env.DB.prepare("SELECT payload FROM psn_raw_response").all();
-		const fehler = await env.DB.prepare("SELECT error_message FROM psn_sync_run").all();
+		const { results: tabellen } = await env.DB.prepare(
+			"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' " +
+				"AND name NOT LIKE '_cf_%' ORDER BY name",
+		).all<{ name: string }>();
+		expect(tabellen.length).toBeGreaterThan(10);
 
-		expect(istDicht(JSON.stringify({ zugang, roh, fehler }))).toMatchObject({ dicht: true });
+		for (const { name } of tabellen) {
+			const { results } = await env.DB.prepare(`SELECT * FROM ${name}`).all();
+			expect(istDicht(JSON.stringify(results)), `Leck in Tabelle ${name}`).toMatchObject({
+				dicht: true,
+			});
+		}
+	});
+
+	it("gibt in backup.json kein Geheimnis heraus", async () => {
+		const app = createApp(psnMarkiert);
+		await ruf(app, "/api/settings/npsso", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ npsso: MARKIERUNGEN.npsso }),
+		});
+		await ruf(app, "/api/sync", { method: "POST" });
+
+		const sicherung = await ruf(app, "/api/export/backup.json");
+		expect(istDicht(sicherung)).toMatchObject({ dicht: true });
+		// Gegenprobe: Die Chiffrate sind gar nicht erst dabei.
+		expect(sicherung).not.toContain("npsso_ciphertext");
+		expect(sicherung).not.toContain("psn_raw_response");
 	});
 
 	it("speichert ein ungueltiges NPSSO nicht", async () => {

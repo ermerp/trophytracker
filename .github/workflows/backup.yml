@@ -1,0 +1,185 @@
+name: Sicherung
+
+# Woechentliche Kopie ausserhalb von Cloudflare (Abschnitt 14.2).
+#
+# Time Travel und "d1 export" liegen beim selben Anbieter wie die Datenbank.
+# Gegen ein verlorenes Konto helfen sie nicht - dieser Job legt die Kopie
+# deshalb in ein privates GitHub-Repository.
+#
+# Zwei Formate mit Absicht: backup.sql zum Wiedereinspielen, backup.json als
+# lesbare Zweitform, die auch dann noch auswertbar ist, wenn es dieses Projekt
+# nicht mehr gibt.
+
+on:
+  schedule:
+    # Sonntag 03:17 UTC. Bewusst nicht zur vollen Stunde: dort stauen sich
+    # die Cron-Jobs aller Repositories, und GitHub verzoegert entsprechend.
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Zwei gleichzeitige Laeufe wuerden sich beim Push ins Backup-Repo in die
+# Quere kommen. Anstellen statt abbrechen.
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+env:
+  APP_URL: https://trophytracker.philipp-ermer-bvb.workers.dev
+  BACKUP_REPO: ermerp/trophytracker-backup
+
+jobs:
+  sichern:
+    name: Dump und JSON ins private Repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: mkdir -p export
+
+      - name: SQL-Dump erzeugen
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 export trophytracker --remote --output=export/backup.sql
+
+      # Der Worker steht hinter Cloudflare Access (Abschnitt 15.3). Eine
+      # Action kann keinen Browser-Login durchlaufen, deshalb das Service
+      # Token 'github-backup' - derselbe Mechanismus wie fuer Personen, nur
+      # ohne Browser. Kein zweites Geheimnis im Worker.
+      #
+      # Laeuft das Token ab, antwortet Access mit 302 auf die Login-Seite,
+      # nicht mit 401. Deshalb -f (scheitert bei >= 400) UND die
+      # Plausibilitaetspruefung darunter: eine HTML-Loginseite ist kein JSON.
+      - name: JSON-Export holen
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 3 --retry-delay 5 \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -o export/backup.json \
+            "$APP_URL/api/export/backup.json"
+
+          jq -e '.tabellen.game | length > 0' export/backup.json > /dev/null \
+            || { echo "::error::backup.json enthält keine Spiele - Abbruch vor dem Commit"; exit 1; }
+
+          # Gegenprobe zur Tabellenliste in src/db/export.ts: Zugangsdaten und
+          # Rohantworten duerfen gar nicht erst im JSON stehen.
+          jq -e '.tabellen | has("psn_credentials") or has("psn_raw_response") | not' \
+            export/backup.json > /dev/null \
+            || { echo "::error::backup.json enthält Zugangsdaten oder Rohantworten"; exit 1; }
+
+          echo "Zeilen je Tabelle:"
+          jq -r '.tabellen | to_entries[] | "  \(.key): \(.value | length)"' export/backup.json
+          echo "Schemastand: $(jq -r '.schemaVersion' export/backup.json)"
+
+      # Dieselbe Pruefung wie im Deploy-Job: INSERT-Zeilen je Tabelle gegen
+      # COUNT(*) der Datenbank. Ein unvollstaendiger Dump darf gar nicht erst
+      # committet werden - er wuerde den letzten guten ueberschreiben.
+      - name: Sicherung prüfen
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: scripts/sicherung-pruefen.sh export/backup.sql trophytracker
+
+      # Abnahmekriterium A: kein NPSSO, kein Refresh- oder Access Token im
+      # Klartext. Hier ist der Punkt, an dem es zaehlt - danach liegt die
+      # Datei dauerhaft in einem Git-Verlauf.
+      - name: Dump auf Klartext prüfen
+        run: scripts/dump-pruefen.sh export/backup.sql
+
+      # Der Fine-grained PAT reicht ausschliesslich auf das private Repo.
+      # Nicht GITHUB_TOKEN: der kommt nicht ueber dieses Repository hinaus.
+      - name: Ins private Repository schreiben
+        id: commit
+        env:
+          BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Der Token steckt in der URL; GitHub maskiert Secrets im Log.
+          # --depth 1, weil der Verlauf hier jede Woche um einen Dump waechst
+          # und dieser Job ihn nicht braucht.
+          url="https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/${BACKUP_REPO}.git"
+          git clone --depth 1 "$url" ziel || git clone "$url" ziel
+
+          cd ziel
+          # Ein frisch angelegtes Repository hat noch keinen Commit und damit
+          # keinen Branch. symbolic-ref taugt fuer beide Faelle: Es zeigt HEAD
+          # auf main, ob der Branch nun schon existiert oder erst entsteht.
+          git rev-parse --verify HEAD >/dev/null 2>&1 || git symbolic-ref HEAD refs/heads/main
+
+          cp ../export/backup.sql ../export/backup.json .
+          cat > README.md <<'ENDE'
+          # trophytracker-backup
+
+          Woechentliche Sicherung von [trophytracker](https://github.com/ermerp/trophytracker).
+          Geschrieben von `.github/workflows/backup.yml` dort, nicht von Hand.
+
+          | Datei | Inhalt |
+          |---|---|
+          | `backup.sql` | vollstaendiger D1-Dump, zum Wiedereinspielen |
+          | `backup.json` | dieselben Daten als lesbare Zweitform, ohne Rohantworten und Zugangsdaten |
+
+          **Dieses Repository ist privat und muss es bleiben.** Es enthaelt die
+          vollstaendige Spielhistorie. Zugangsdaten stehen nicht darin: NPSSO und
+          Refresh-Token liegen AES-GCM-verschluesselt in D1, der Schluessel als
+          Cloudflare Secret.
+
+          Wiederherstellung:
+
+          ```
+          npx wrangler d1 create trophytracker-restore
+          npx wrangler d1 execute trophytracker-restore --remote --file=backup.sql
+          ```
+          ENDE
+
+          git config user.name "trophytracker-backup"
+          git config user.email "actions@github.com"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Unverändert - kein Commit"
+            echo "commit=" >> "$GITHUB_OUTPUT"
+          else
+            git commit -q -m "Sicherung $(date -u +%Y-%m-%d)"
+            git push -q origin HEAD:main
+            hash=$(git rev-parse --short HEAD)
+            echo "Commit $hash"
+            echo "commit=$hash" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "backup.sql: $(wc -c < backup.sql) Byte"
+          echo "backup.json: $(wc -c < backup.json) Byte"
+
+      # Ein Backup, von dem man nicht weiss, ob es laeuft, ist kein Backup
+      # (Abschnitt 14.2). Auch ein Lauf ohne Commit wird vermerkt: "geprueft,
+      # nichts Neues" heisst, dass die Sicherung lief.
+      - name: Erfolg in der App vermerken
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          COMMIT: ${{ steps.commit.outputs.commit }}
+        run: |
+          set -euo pipefail
+          koerper=$(jq -nc --arg z "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg c "$COMMIT" \
+            '{zeitpunkt: $z} + (if $c == "" then {} else {commit: $c} end)')
+          curl -fsS --retry 3 --retry-delay 5 -X POST \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H "content-type: application/json" \
+            -d "$koerper" \
+            "$APP_URL/api/backup/vermerk"
+          echo

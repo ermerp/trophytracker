@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 17 – Statuswechsel im Spieldetail legt keine Liste an; Serienansichten ohne Scrollen und mit fester Knopfposition.*
+*Version 18 – Backup ins private Repository und CSV-Export; Maschinen-Endpunkte laufen über Access Service Token.*
 
 ## 1. Use Cases
 
@@ -907,8 +907,10 @@ POST   /api/unmatched/:quelle/:id/link  Body: { igdbId }
 POST   /api/imports/wishlist/parse    Body: { text } → Trefferliste zur Durchsicht
 POST   /api/imports/wishlist/confirm  Body: { entries[] } → schreibt plan_entry
 
-GET    /api/export/:liste.csv         sammlung|wunsch|todo|backlog|kauf|luecken|trophaeen
-GET    /api/export/backup.json        Vollsicherung, nur für Maschinenzugriff (Verfahren: Stufe 8)
+GET    /api/export/:liste.csv         sammlung|wunsch|todo|backlog|kauf|luecken|trophaeen; Semikolon und BOM (14.4)
+GET    /api/export/backup.json        Vollsicherung: die 14 Fachtabellen, ohne Rohantworten und Zugangsdaten (14.2)
+GET    /api/backup/status             { letzterErfolgAm, letzterCommit, tageSeit }
+POST   /api/backup/vermerk            Body: { zeitpunkt (ISO), commit? } – die Backup-Action meldet ihren Lauf
 
 GET    /api/upcoming                  v_erscheint_bald
 GET    /api/settings/weights          Rangformel-Gewichte
@@ -935,7 +937,7 @@ GET    /api/stats
 
 Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein Release alle Filter zugleich** erfüllt. `platform=PS4&owned=physisch` heisst also "hat eine PS4-Disc", nicht "hat irgendeine Disc und irgendein PS4-Release". Unbekannte Filterwerte werden ignoriert, nicht mit `400` beantwortet – ein alter Link soll die Liste zeigen, keine Fehlermeldung. Die Suche ist eine einfache Teilstringsuche im Titel, keine Suche über den Titelschlüssel.
 
-**Zugriffsschutz:** siehe Abschnitt 15.3. Kurz: eine Access-Richtlinie am Worker – da Frontend und API derselbe Worker sind, deckt sie beides in einem ab. Wie die Maschinen-Endpunkte (`/api/imports/feed`, `/api/export/backup.json`) abgesichert werden, die keinen Browser-Login durchlaufen können, ist **in Stufe 8 zu entscheiden**.
+**Zugriffsschutz:** siehe Abschnitt 15.3. Kurz: eine Access-Richtlinie am Worker – da Frontend und API derselbe Worker sind, deckt sie beides in einem ab. Die Maschinen-Endpunkte (`/api/imports/feed`, `/api/export/backup.json`, `/api/backup/vermerk`) laufen seit Stufe 8 über ein **Access Service Token** und tragen deshalb **keine eigene Token-Prüfung im Worker** (Entscheidung in 15.3).
 
 ---
 
@@ -963,7 +965,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 
 Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/pruefen`, `/trophaeen`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen; Zuordnung, Sammlung prüfen und Trophäen hängen als Werkzeuge an den Einstellungen. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
 
-Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste) und nicht zugeordnete Trophäenlisten, jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
+Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste), nicht zugeordnete Trophäenlisten und seit Stufe 8 eine **überfällige Sicherung** (mehr als acht Tage oder noch nie, siehe 14.2), jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
 
 **Darstellungsregeln**
 
@@ -988,17 +990,23 @@ Beides liegt beim selben Anbieter wie die Datenbank. Gegen einen Bedienfehler hi
 
 ### 14.2 Wöchentliche Sicherung ausserhalb von Cloudflare
 
-Eine GitHub Action läuft wöchentlich und legt eine Kopie in einem **privaten** Repository ab:
+`.github/workflows/backup.yml` läuft sonntags um 03:17 UTC – bewusst nicht zur vollen Stunde, dort staut GitHub die Cron-Jobs – und ist zusätzlich über `workflow_dispatch` von Hand auslösbar. Die Kopie landet im **privaten** Repository `trophytracker-backup`:
 
 1. `wrangler d1 export --remote --output=backup.sql`
-2. Dump committen, wenn er sich geändert hat
-3. Zusätzlich `GET /api/export/backup.json` als lesbare Zweitform
+2. `GET /api/export/backup.json` mit dem Service Token `github-backup` holen; enthält die Antwort keine Spiele, bricht der Lauf hier ab – vor jedem Schreiben
+3. Dump prüfen: `scripts/sicherung-pruefen.sh` hält die `INSERT`-Zeilen je Tabelle gegen `COUNT(*)` der Datenbank, `scripts/dump-pruefen.sh` prüft ihn auf Klartext-Zugangsdaten. Beide Skripte benutzt auch der Deploy-Job (15.2), damit es nur eine Prüfung gibt
+4. Beide Dateien und eine kurze `README.md` ins private Repo kopieren und **nur bei Änderung** committen
+5. `POST /api/backup/vermerk` mit Zeitpunkt und Commit – auch bei einem Lauf ohne Änderung
 
 Kostenlos, versioniert, unabhängig vom Cloudflare-Konto. Git liefert die Historie mit, du kannst also auf jeden beliebigen Wochenstand zurück.
 
 Zwei Formate mit Absicht: Der SQL-Dump ist die technisch exakte Sicherung zum Wiedereinspielen (`wrangler d1 execute --file=backup.sql`). Die JSON-Fassung bleibt lesbar und auswertbar, auch wenn es das Projekt eines Tages nicht mehr gibt – bei einer privaten Sammlung mit jahrelanger Historie ist das der eigentliche Wert.
 
-Das Dashboard zeigt das Datum der letzten erfolgreichen Sicherung. Ein Backup, von dem man nicht weiss, ob es läuft, ist kein Backup.
+**Umfang von `backup.json`:** `{ exportiertAm, schemaVersion, tabellen }` mit den **14 Fachtabellen** `game`, `release`, `physical_copy`, `digital_entitlement`, `trophy_progress`, `play_status`, `plan_entry`, `review_queue`, `ean_mapping`, `unresolved_scan`, `market_offer`, `price_snapshot`, `app_setting`, `psn_sync_run`. Nicht dabei sind `psn_credentials` (Chiffrate und IVs), `psn_raw_response` (Rohdaten, gross, im SQL-Dump ohnehin enthalten) und `d1_migrations` (Wranglers Buchführung). `schemaVersion` ist der Name der höchsten angewendeten Migration. Die Liste steht als `EXPORT_TABELLEN` in `src/db/export.ts`; ein Test hält fest, dass **jede** Tabelle der Datenbank entweder exportiert oder ausdrücklich ausgenommen ist – eine Tabelle aus einer künftigen Migration kann so nicht stillschweigend ungesichert mitfahren.
+
+**Der Vermerk steht in `app_setting`**, unter `backup_letzter_erfolg_am` und `backup_letzter_commit`. Kein eigenes Feld und keine eigene Tabelle: Es sind zwei Werte, die beim Wiedereinspielen mitkommen sollen. Ein Lauf ohne Commit gilt als Erfolg – „geprüft, nichts Neues" heisst, dass die Sicherung lief, nicht dass sie ausfiel.
+
+Das Datum der letzten erfolgreichen Sicherung steht in den Einstellungen; bis es das Dashboard gibt, warnt der Hinweisblock der Sammlungsansicht (Abschnitt 13) bei **mehr als acht Tagen** oder wenn noch nie gesichert wurde. Acht statt sieben, weil der Lauf wöchentlich ist: Ein Tag Luft verhindert eine Warnung, die sonst jede Woche von allein erscheint. Ein Backup, von dem man nicht weiss, ob es läuft, ist kein Backup.
 
 ### 14.3 Wiederherstellung
 
@@ -1011,11 +1019,50 @@ wrangler d1 execute trophytracker-restore --remote --file=backup.sql
 
 Danach die Binding-ID in der Wrangler-Konfiguration umstellen und deployen. **Einmal testweise durchspielen**, solange nichts kaputt ist – ein ungetestetes Backup ist eine Vermutung.
 
+Die Probe gilt als bestanden, wenn die Zeilenzahlen aller Tabellen der wiederhergestellten Datenbank denen der Produktion entsprechen. Datum, Dumpgrösse und die Tabelle „Tabelle | Produktion | Wiederhergestellt" gehören in die README.
+
+> **Offen: in Stufe 8 durchzuführen.** Die Probe ist noch nicht gelaufen. Bis sie es ist, gilt Stufe 8 als „gebaut, Probe ausstehend" – die Abnahme hängt an ihr und am Klartext-Nachweis aus 14.5.
+
 ### 14.4 CSV-Export
 
-`GET /api/export/:liste.csv` für Sammlung, Wunschliste, To-Do, Backlog, Kaufliste, Lücken und Trophäen. Jeweils die Ansicht, die auch die Oberfläche zeigt, mit Kopfzeile und Semikolon als Trennzeichen für Excel im deutschen Gebietsschema.
+`GET /api/export/:liste.csv` für Sammlung, Wunschliste, To-Do, Backlog, Kaufliste, Lücken und Trophäen. Jeweils die Ansicht, die auch die Oberfläche zeigt, mit Kopfzeile und Semikolon als Trennzeichen für Excel im deutschen Gebietsschema. Eine unbekannte Liste beantwortet die Route mit `404`.
+
+**Drei Festlegungen, alle wegen Excel** (`src/domain/csv.ts`, geprüft in `test/csv.spec.ts`):
+
+- **Semikolon** als Trennzeichen. Im deutschen Gebietsschema ist das Komma das Dezimaltrennzeichen; mit Komma als Feldtrenner zerfällt „12,99" in zwei Spalten.
+- **BOM** (`\ufeff`) am Anfang. Ohne sie liest Excel die Datei als Windows-1252, und aus „Ragnarök" wird „RagnarÃ¶k".
+- **CRLF** als Zeilenende, wie RFC 4180 es vorsieht. Felder werden nur dann in `"` gesetzt, wenn sie `;`, `"` oder einen Zeilenumbruch enthalten; ein `"` im Feld wird verdoppelt.
+
+**Ein leeres Feld bedeutet „unbekannt"** – nie „0", nie „–". Das ist die CSV-Entsprechung der Darstellungsregel aus Abschnitt 13. Werte, die tatsächlich *den Wert* „unbekannt" tragen (`physical_release_status`), stehen dagegen als Wort in der Spalte. Geldbeträge gehen ohne Währungszeichen und ohne Tausenderpunkt heraus (`12,99`), damit Excel die Spalte als Zahl liest.
+
+**Spalten**
+
+| Liste | Kopfzeile |
+|---|---|
+| `sammlung` (eine Zeile je Release) | Titel; Plattform; Disc-Fassung; Exemplare; Digital; Fortschritt %; Platin; Status; Bewertung; Zuletzt gespielt |
+| `trophaeen` | Rohtitel; Plattform(en); Titel (zugeordnet); Fortschritt %; Bronze erspielt; Bronze definiert; Silber erspielt; Silber definiert; Gold erspielt; Gold definiert; Platin erspielt; Platin definiert; Zuletzt gespielt; Zugeordnet |
+| `wunsch`, `todo`, `backlog`, `kauf` | Titel; Plattform; Priorität; Favorit; Position; Notiz; Herkunft; Status; Angelegt am |
+| `luecken` | Titel; Plattform; Fortschritt %; Platin erspielt; Status; Bester Gebrauchtpreis; Verworfen |
+
+„Platin" in `sammlung` ist dreiwertig als Text (`erspielt` / `offen` / `nicht vorgesehen`) – 93 der 431 Listen haben gar keine Platin-Trophäe, dort wäre „offen" falsch. In `trophaeen` und `luecken` stehen stattdessen die Zahlen beziehungsweise das binäre `hat_platin` der View; die Spalte heisst dort deshalb „Platin erspielt" und behauptet nichts über Verfügbarkeit.
+
+`Status` bleibt leer, wenn es **keine** `play_status`-Zeile gibt. Die Sammlungsansicht behandelt sie beim Filtern als `nicht_gespielt`; im Export wäre das eine Behauptung statt einer Angabe.
+
+Die Trophäen-Zahlen stehen als **getrennte Spalten** je Metall („Bronze erspielt", „Bronze definiert"), nicht als „12/20" in einem Feld: CSV ist zum Auswerten gedacht, und „12/20" lässt sich nicht summieren.
+
+Die Spalte `Verworfen` in `luecken` kommt bis Stufe 14 aus einer Unterabfrage auf `plan_entry` (Abschnitt 5.3) und nicht aus der View – `v_luecken` bekommt sie erst mit der Lückenansicht.
 
 CSV ist für Auswertung und Weitergabe gedacht, nicht als Sicherung: Beziehungen zwischen den Tabellen gehen dabei verloren. Dafür ist der Dump aus 14.2 zuständig.
+
+### 14.5 Nachweis, dass keine Zugangsdaten im Dump stehen
+
+Der Dump wandert wöchentlich in ein Git-Repository, und was einmal in einem Git-Verlauf steht, bleibt dort. NPSSO und Refresh-Token liegen deshalb AES-GCM-verschlüsselt in D1 (Abschnitt 7.1) – aber „liegt verschlüsselt vor" ist eine Behauptung, bis sie geprüft ist. Drei Schichten, weil der Klartext demjenigen, der die Prüfung baut, weder bekannt ist noch sein darf:
+
+1. **Test mit Markierung.** `test/keine-lecks.spec.ts` speichert ein markiertes NPSSO, fährt einen Sync und liest danach **jede** Tabelle aus `sqlite_master` vollständig aus. Inhaltlich dasselbe wie ein `d1 export`, nur ohne Wrangler. Eine Tabelle aus einer künftigen Migration ist damit automatisch mitgeprüft. Dazu ein Fall für `GET /api/export/backup.json`.
+2. **Skript gegen den echten Dump.** `scripts/dump-pruefen.sh` läuft in der Backup-Action **und** im Deploy-Job. Es schlägt fehl, wenn `access_token`, `refresh_token`, `"npsso"` oder `npsso=` in einer `INSERT`-Zeile vorkommt, wenn die `psn_credentials`-Zeile einen Wert trägt, der weder Zeitstempel noch gültiges Base64 ist, oder wenn einer dieser Werte **64 Zeichen** lang ist – die Länge eines NPSSO. Die Längenprüfung ist die eigentliche: Ein NPSSO besteht aus Buchstaben und Ziffern, ist also selbst gültiges Base64 und dekodiert zu 48 Byte, die wie Zufall aussehen; eine Prüfung auf druckbare Zeichen im Dekodat läuft daran vorbei. Chiffrat sind 108 Zeichen, ein IV 16. Ins Log kommen nur Zahlen.
+3. **Menschliche Gegenprobe.** Der Nutzer sucht im privaten Repo einmal selbst nach seinem NPSSO. Null Treffer ist der einzige Beweis, den niemand anders führen kann.
+
+> **Offen: Schicht 3 steht noch aus.** Bis sie erfolgt ist, gilt Stufe 8 als „gebaut, Probe ausstehend".
 
 ---
 
@@ -1032,6 +1079,18 @@ Die Trennung ist nicht optional. Der Dump aus Abschnitt 14 enthält die vollstä
 
 Die Backup-Action bekommt einen **Fine-grained Personal Access Token**, dessen Geltungsbereich ausschliesslich das private Repo umfasst. Nicht den Standard-`GITHUB_TOKEN`, der reicht nicht über das eigene Repository hinaus.
 
+Benötigte GitHub Secrets:
+
+| Secret | Wofür | Ab Stufe | Läuft ab |
+|---|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Deploy- und Backup-Action | 0 | nein |
+| `CLOUDFLARE_ACCOUNT_ID` | Deploy- und Backup-Action | 0 | nein |
+| `BACKUP_REPO_TOKEN` | Fine-grained PAT, nur auf `trophytracker-backup` | 8 | **nach einem Jahr** |
+| `CF_ACCESS_CLIENT_ID` | Service Token `github-backup` (15.3) | 8 | **nach einem Jahr** |
+| `CF_ACCESS_CLIENT_SECRET` | Service Token `github-backup` (15.3) | 8 | **nach einem Jahr** |
+
+Die drei ablaufenden Werte sind der wahrscheinlichste Grund, aus dem die Sicherung eines Tages unbemerkt ausbleibt. Genau dagegen steht die Altersanzeige aus 14.2.
+
 **Was im öffentlichen Repo unbedenklich ist:** `account_id` und `database_id` in der Wrangler-Konfiguration. Das sind Bezeichner, keine Zugangsdaten – ohne authentifizierten Kontozugriff nutzlos.
 
 **Was dort niemals hingehört:** NPSSO und PSN-Refresh-Token, IGDB/Twitch-Zugangsdaten, AWIN-Feed-URLs (die enthalten die Publisher-ID), das API-Bearer-Token, der Cloudflare-API-Token. Alles davon liegt als Cloudflare Secret beziehungsweise GitHub Secret. `.dev.vars`, `.wrangler/` und `*.sql` gehören in die `.gitignore` – letzteres mit der Ausnahme `!migrations/*.sql`. Ohne diese Ausnahme würden die Migrationen mit ignoriert, und die Deploy-Action liefe gegen ein leeres Verzeichnis.
@@ -1045,16 +1104,19 @@ Frontend und API teilen sich damit eine Origin: **kein CORS, ein Deploy-Pfad, ei
 **Worker und Datenbank:** GitHub Action mit `cloudflare/wrangler-action`, ausgelöst durch Push auf `main`. Die Reihenfolge der Schritte ist wichtiger als das Werkzeug:
 
 1. `wrangler d1 export` – Sicherung **vor** jeder Schemaänderung
-2. Sicherung prüfen: Der Dump schreibt eine `INSERT`-Zeile je Datensatz; die Zahlen werden je Tabelle gegen `COUNT(*)` der Datenbank gehalten. Weicht eine ab, **bricht der Job hier ab**, vor der Migration. Ins Log kommen nur Zahlen, nie Inhalt
-3. `wrangler d1 migrations apply --remote`
-4. Datenmigrationen protokollieren ihre Wirkung (0006: `play_status`, 0007: `review_queue`, jeweils neben der Erwartung), damit sie sich gegen eine bekannte Zahl halten lässt
-5. `wrangler deploy`
+2. Sicherung prüfen (`scripts/sicherung-pruefen.sh`): Der Dump schreibt eine `INSERT`-Zeile je Datensatz; die Zahlen werden je Tabelle gegen `COUNT(*)` der Datenbank gehalten. Weicht eine ab, **bricht der Job hier ab**, vor der Migration. Ins Log kommen nur Zahlen, nie Inhalt
+3. Dump auf Klartext prüfen (`scripts/dump-pruefen.sh`, 14.5)
+4. `wrangler d1 migrations apply --remote`
+5. Datenmigrationen protokollieren ihre Wirkung (0006: `play_status`, 0007: `review_queue`, jeweils neben der Erwartung), damit sie sich gegen eine bekannte Zahl halten lässt
+6. `wrangler deploy`
+
+Beide Prüfskripte liegen in `scripts/`, weil die Backup-Action (14.2) dieselben benutzt. Zwei Kopien derselben Prüfung wären zwei Kopien, die auseinanderlaufen.
 
 Schritt 1 ist der Grund, warum das eine Action ist und kein Klick im Dashboard. Eine fehlerhafte Migration ist der wahrscheinlichste Weg, Daten zu verlieren, und der einzige Zeitpunkt, an dem ein frisches Backup wirklich zählt, ist die Sekunde davor. Schritt 2 kam mit der ersten Migration, die Daten schreibt (Stufe 6): Ein Export, den niemand prüft, ist eine Sicherung nur dem Namen nach.
 
 Migrationen laufen **vor** dem Deployment, damit der neue Code nie auf ein altes Schema trifft. Umgekehrt gilt: Migrationen müssen abwärtskompatibel sein, weil der alte Worker in dem Moment noch läuft. Spalten hinzufügen ist unkritisch, Spalten umbenennen nicht – dafür braucht es zwei Deployments.
 
-Benötigte GitHub Secrets: `CLOUDFLARE_API_TOKEN` (Berechtigungen auf Workers Scripts und D1 beschränkt, dazu Account Settings lesend – keine Zone- und keine Pages-Berechtigung) und `CLOUDFLARE_ACCOUNT_ID`. `BACKUP_REPO_TOKEN` kommt erst mit der Backup-Action in Stufe 8 dazu.
+Benötigte GitHub Secrets: siehe die Tabelle in 15.1. `CLOUDFLARE_API_TOKEN` ist auf Workers Scripts und D1 beschränkt, dazu Account Settings lesend – keine Zone- und keine Pages-Berechtigung.
 
 ### 15.3 Zugriffsschutz
 
@@ -1089,14 +1151,19 @@ Ergebnis: Der Login steht vor der App, nicht darin. Ohne gültige Sitzung erreic
 
 Eine dokumentierte Einschränkung: Worker-Level-Access unterstützt keine WebSockets – Upgrade-Anfragen scheitern mit 403. Für dieses Projekt ohne Belang.
 
-**Ausnahmen für Maschinen.** Die GitHub Actions (Feed-Import, Backup-Export) können keinen Browser-Login durchlaufen. Zwei Wege:
+**Ausnahmen für Maschinen.** Die GitHub Actions (Feed-Import, Backup-Export) können keinen Browser-Login durchlaufen. Zwei Wege standen zur Wahl:
 
 - Access Service Token für die Action, oder
 - diese Pfade von Access ausnehmen und mit einem eigenen Bearer-Token absichern
 
-Das Service Token ist sauberer, weil dann alles über einen Mechanismus läuft. Das Bearer-Token ist einfacher einzurichten. **Die Entscheidung ist in Stufe 8 zu treffen**, wenn mit der Backup-Action der erste Maschinen-Endpunkt tatsächlich existiert, und gehört dann in die README.
+**Entschieden in Stufe 8: Access Service Token.** Der zweite Weg ist **verworfen**. Ausschlaggebend war nicht die Eleganz, sondern eine Randbedingung: Die Richtlinie hängt am Worker und schützt ihn als Ganzes – einzelne Pfade lassen sich davon nicht ausnehmen. Ein Bearer-Token-Pfad bräuchte deshalb eine hostnamenbasierte Access-Anwendung und damit eine eigene Domain, also genau die Voraussetzung, die 15.3 sonst ausdrücklich nicht hat. Dazu käme ein zweites Geheimnis, das leaken kann, für dieselbe Frage.
 
-Eine Randbedingung ist durch die Richtlinie am Worker hinzugekommen: Sie schützt den Worker als Ganzes, einzelne Pfade lassen sich davon nicht ausnehmen. Der zweite Weg bräuchte deshalb eine hostnamenbasierte Access-Anwendung und damit eine eigene Domain. Das Service Token ist damit der wahrscheinliche Ausgang – entschieden ist es aber nicht.
+Folgen:
+
+- Es gibt ein eigenes Service Token `github-backup` an der Access-Richtlinie, getrennt von dem, mit dem die Produktion nach einem Deploy geprüft wird. Getrennt, damit sich eines zurückziehen lässt, ohne das andere zu treffen.
+- Die Action sendet `CF-Access-Client-Id` und `CF-Access-Client-Secret` als Header.
+- **Der Worker trägt keine eigene Token-Prüfung.** `/api/export/*` und `/api/backup/*` sind gewöhnliche Routen; Access steht davor.
+- Ein abgelaufenes Service Token äussert sich als `302` auf die Login-Seite, nicht als `401`. Die Action prüft deshalb zusätzlich den Inhalt der Antwort, nicht nur den Status – eine HTML-Loginseite ist kein JSON.
 
 **Falls Access nicht eingerichtet wird**, bleibt das Bearer-Token die Mindestanforderung – aber dann gehört ein Hinweis in die README, dass die Anwendung öffentlich erreichbar ist und ihre Sicherheit an einem einzigen Geheimnis hängt.
 
@@ -1187,10 +1254,12 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 | Prüfliste läuft voll | Wird ignoriert und damit nutzlos | Aktiv gespielte Titel erzeugen keine Einträge, "unverändert lassen" setzt den Referenzpunkt neu |
 | Cloudflare-Konto weg | Totalverlust | Wöchentlicher Export in ein privates GitHub-Repository, ausserhalb von Cloudflare |
 | Backup landet im öffentlichen Repo | Sammlung öffentlich lesbar | Getrennte Repos, Fine-grained Token nur auf das private, `*.sql` in `.gitignore` (Ausnahme `!migrations/*.sql`), Dump nie als Workflow-Artifact |
-| Bearer-Token geleakt | Fremdzugriff auf die Daten | Access-Richtlinie am Worker davor; Absicherung der Maschinen-Endpunkte in Stufe 8 zu entscheiden |
+| Bearer-Token geleakt | Fremdzugriff auf die Daten | Access-Richtlinie am Worker davor; kein Bearer-Token im Worker – Maschinen-Endpunkte laufen über ein Access Service Token (15.3) |
+| Zugangsdaten im Backup-Repo | NPSSO im Git-Verlauf, dauerhaft | Verschlüsselt in D1; `scripts/dump-pruefen.sh` in Backup- und Deploy-Job, Test über alle Tabellen, menschliche Gegenprobe (14.5) |
+| Service Token oder PAT laufen ab | Sicherung bleibt unbemerkt aus | Altersanzeige in den Einstellungen und Warnung im Hinweisblock ab acht Tagen (14.2); Ablaufdaten in 15.1 |
 | Fehlerhafte Migration | Datenverlust | Export als erster Schritt jedes Deploy-Jobs, Migrationen abwärtskompatibel halten |
 | D1-Tageslimit für gelesene Zeilen erreicht | Anwendung bis Mitternacht UTC tot | Indizes auf allen Fremdschlüsseln, `test/lesekosten.spec.ts` als Wächter, `rows_read_24h` in `wrangler d1 info` beobachten (Abschnitt 2) |
-| Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht auf dem Dashboard |
+| Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht in den Einstellungen, Warnung im Hinweisblock ab acht Tagen (14.2) |
 | Wiederherstellung nie geprobt | Backup unbrauchbar | Ablauf in der README, einmal testweise durchgespielt |
 | Kritikerwertung fehlt | Rang verzerrt | `COALESCE(critic_score, 70)` – unbewertete Titel werden weder bevorzugt noch bestraft |
 | Rangformel passt nicht | Umbauwunsch | Nur Bestandteile gespeichert, Gewichte in `app_setting` verstellbar |

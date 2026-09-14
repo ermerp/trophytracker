@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { deviationRoutes } from "./api/deviations";
+import { backupRoutes, exportRoutes } from "./api/export";
 import { digitalEntitlementRoutes, physicalCopyRoutes } from "./api/ownership";
 import { psnRoutes } from "./api/psn";
 import { releaseRoutes } from "./api/releases";
@@ -46,6 +47,8 @@ export function createApp(psnFactory: () => PsnClient = () => erstellePsnClient(
 	app.route("/api/releases", releaseRoutes);
 	app.route("/api/deviations", deviationRoutes);
 	app.route("/api/review", reviewRoutes);
+	app.route("/api/export", exportRoutes);
+	app.route("/api/backup", backupRoutes);
 	app.route("/api/physical-copies", physicalCopyRoutes);
 	app.route("/api/digital-entitlements", digitalEntitlementRoutes);
 	app.route("/api", psnRoutes);

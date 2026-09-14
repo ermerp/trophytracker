@@ -5,6 +5,7 @@ import { Navigation } from './Navigation'
 import { Pruefliste } from './Pruefliste'
 import { Sammlung } from './Sammlung'
 import { SammlungPruefen } from './SammlungPruefen'
+import { Sicherung } from './Sicherung'
 import { Spieldetail } from './Spieldetail'
 import { Trophaeen } from './Trophaeen'
 import { Zuordnung } from './Zuordnung'
@@ -48,6 +49,7 @@ function App() {
               <>
                 <h1>Einstellungen</h1>
                 <Einstellungen />
+                <Sicherung />
                 <Abweichungen />
                 <Werkzeuge />
               </>

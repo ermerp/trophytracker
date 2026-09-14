@@ -1,4 +1,5 @@
 import { CredentialsRepository } from "./credentials";
+import { ExportRepository } from "./export";
 import { GamesRepository } from "./games";
 import { OwnershipRepository } from "./ownership";
 import { PlayStatusRepository } from "./play-status";
@@ -25,6 +26,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		ownership: new OwnershipRepository(db),
 		playStatus,
 		review: new ReviewRepository(db, playStatus),
+		export: new ExportRepository(db),
 	};
 }
 

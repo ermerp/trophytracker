@@ -32,7 +32,11 @@ describe("Verschluesselung", () => {
 
 	it("scheitert bei manipuliertem Chiffretext", async () => {
 		const daten = await verschluesseln(new Geheimnis("npsso-abc"), KEY);
-		const kaputt = { ...daten, chiffre: `A${daten.chiffre.slice(1)}` };
+		// Erstes Zeichen garantiert veraendern: Ein festes "A" waere in einem
+		// von 64 Laeufen schon das vorhandene Zeichen gewesen - der Test haette
+		// dann unveraenderte Daten geprueft und zufaellig rot gemeldet.
+		const erstes = daten.chiffre[0] === "A" ? "B" : "A";
+		const kaputt = { ...daten, chiffre: `${erstes}${daten.chiffre.slice(1)}` };
 
 		await expect(entschluesseln(kaputt, KEY)).rejects.toThrow(CryptoError);
 	});
