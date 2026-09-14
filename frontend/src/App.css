@@ -713,3 +713,79 @@ ul.digital {
     justify-self: start;
   }
 }
+
+/* Wunschliste (Stufe 10) */
+.wunsch-kopf {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+
+.wunsch-kopf .bild {
+  width: 4.5rem;
+  min-width: 4.5rem;
+  aspect-ratio: 264 / 374;
+  max-height: none;
+  font-size: 1.5rem;
+  margin-bottom: 0;
+}
+
+.kachel.erledigt {
+  opacity: 0.6;
+}
+
+button.stern {
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0 0.3rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: rgba(128, 128, 128, 0.8);
+}
+
+button.stern.aktiv {
+  color: #d99a00;
+}
+
+button.notiz {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px dashed rgba(128, 128, 128, 0.4);
+  background: none;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: text;
+  white-space: pre-wrap;
+}
+
+.notizfeld {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.notizfeld input {
+  flex: 1;
+  min-width: 8rem;
+  font: inherit;
+}
+
+.gewichte {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.gewichte input {
+  width: 5rem;
+  font: inherit;
+}
+
+.wunsch-block .knopfzeile {
+  align-items: center;
+}

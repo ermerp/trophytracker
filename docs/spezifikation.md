@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 23 – Entscheidungen des Nutzers zu den Wunschlisten (alles Wünsche, auch schon Gespieltes) und IGDB als Physisch-Quelle für Stufe 14 (`external_games.media`, gemessen: 109 von 419).*
+*Version 24 – Stufe 10: Wunschliste mit Favoriten und Rang; Spiele ohne Release (Wunsch aus IGDB), Duplikatregel für Absichten, Wunschliste in der Navigationsleiste, Migration 0011.*
 
 ## 1. Use Cases
 
@@ -60,6 +60,9 @@ gespielt"). Seit Migration 0008 trägt jeder Fremdschlüssel einen Index; diesel
 2 000 bis 5 000 Zeilen. `test/lesekosten.spec.ts` misst die heißen Abfragen gegen einen Bestand in
 Produktionsgröße und hält Obergrenzen fest. Regel: Wer eine Tabelle mit `REFERENCES` anlegt, legt
 den Index in derselben Migration an; korrelierte Unterabfragen laufen nur über indizierte Spalten.
+Migration 0011 holt den in 0008 übersehenen Index auf `plan_entry.game_id` nach (bis Stufe 10 hing
+kein Eintrag an einem Spiel) und legt einen auf `game.igdb_id` an; die Wunschliste liest bei 300
+Wünschen rund 900 Zeilen, die Absichten eines Spiels sechs.
 
 **Cron Trigger helfen dagegen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für
 normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz muss deshalb aus dem
@@ -188,7 +191,15 @@ demselben `sort_title`, antwortet die Route mit `409` und den Kandidaten, und de
 ob er dort ein Release anhängt oder mit `trotzdem` ein zweites Spiel anlegt. `DELETE` auf Release
 oder Spiel gibt anhängende Trophäenlisten in die Zuordnung zurück (`release_id`, `matched_at` und
 `matched_source` werden NULL); Exemplare und Berechtigungen kaskadieren. Bleibt ein Spiel ohne
-Release, wird es mit gelöscht.
+Release, wird es mit gelöscht – **es sei denn, eine offene Absicht hängt daran** (`plan_entry` mit
+`game_id` und `status = 'offen'`): Sonst verschwände ein Wunsch per CASCADE, sobald ein probeweise
+angelegtes Release wieder entfernt wird.
+
+**Spiel ohne Release (seit Stufe 10).** Ein Wunsch aus der IGDB-Suche legt ein Spiel mit den
+IGDB-Metadaten an, aber **ohne Release**: Ein Wunsch braucht weder Release noch Plattform (8.4), und
+eine geratene Plattform wäre eine Behauptung, die der Nutzer nie aufgestellt hat. Solche Spiele
+erscheinen nicht in der Sammlung – die Liste verlangt ein Release, und ein Wunsch ist kein Besitz –,
+wohl aber im Spieldetail. Gibt es bereits ein Spiel mit derselben `igdb_id`, wird es wiederverwendet.
 
 ---
 
@@ -341,6 +352,20 @@ CREATE INDEX idx_plan_offen ON plan_entry(kind, status, position);
 
 Diese Übergänge werden vorgeschlagen, nicht erzwungen. Beim Erfassen einer Disc erscheint ein Hinweis "Stand auf deiner Kaufliste – erledigt setzen und ins Backlog übernehmen?".
 
+**Anlegen und Duplikate (Stufe 10, Entscheidungen des Nutzers vom 14.09.2026).** Ein Eintrag von Hand
+hat `origin = 'manuell'` und genau eine Quelle: ein Spiel (`game_id`), ein Release (`release_id`),
+ein IGDB-Treffer (legt bei Bedarf das Spiel an, Abschnitt 3) oder Freitext (`title_raw`). Freitext
+entsteht nur über den ausdrücklichen Knopf nach einer IGDB-Suche (8.2) – kein Fallback, eine
+Entscheidung; er hat weder Cover noch Rang (8.3).
+
+- **Die Plattform darf leer bleiben und fällt nie auf einen Standardwert.** Ein Wunsch am Spiel
+  sagt „das Spiel", ein Wunsch am Release sagt „diese Fassung". Ein geratenes PS5 bei einem
+  angekündigten Titel wäre eine Aussage, die nie getroffen wurde.
+- **Ein offener Eintrag am Spiel und einer an einem seiner Releases sind kein Duplikat**, sondern
+  zwei verschiedene Aussagen; sie blockieren sich nicht. Ein zweiter offener Eintrag **derselben Art
+  an genau demselben Ziel** ist eines und wird mit `409` abgewiesen. Erledigte und verworfene
+  Einträge blockieren nichts – ein Sinneswandel ist ein Feld-Update auf `offen`, kein Neuanlegen.
+
 ### 5.1 Priorität und Favorit
 
 Zwei getrennte Felder, weil sie zwei verschiedene Fragen beantworten:
@@ -389,6 +414,8 @@ score = (COALESCE(critic_score, 70) / 100.0) * w_critic
 ```
 
 `COALESCE(critic_score, 70)` ist bewusst gewählt: ein Spiel ohne Wertung soll weder bevorzugt noch bestraft werden. Ein `0` würde unbewertete Titel dauerhaft ans Listenende drücken.
+
+Die Formel steht als pure Funktion in `src/domain/rang.ts` und wird in der Route gerechnet, nicht in SQL: Das Repository liefert die Bestandteile, die Route holt die Gewichte aus `app_setting` und sortiert. Seit Stufe 10 sortiert die Wunschliste danach, Stufe 15 nutzt dieselbe Funktion für die Kaufliste; die Gewichte sind seit Stufe 10 in den Einstellungen verstellbar. Einträge ohne Spiel (Freitext) haben keinen Rang und stehen am Ende (8.3). Die Oberfläche zeigt den Rang als Zahl von 0 bis 100.
 
 Später kommt der Preis als vierter Faktor hinzu und liefert eine Sortierung nach "viel Spiel pro Euro". Bis dahin bleibt `w_price` auf 0.
 
@@ -713,7 +740,7 @@ Ein Eintrag ohne IGDB-Zuordnung entsteht **nur auf ausdrückliche Anweisung** ("
 
 ### 8.3 Nachpflege fehlender Metadaten (Use Case 12)
 
-Einträge ohne IGDB-Zuordnung haben kein Cover, keine Kritikerwertung und kein Erscheinungsdatum. Sie funktionieren in allen Listen, fallen aber aus der Rangberechnung heraus.
+Einträge ohne IGDB-Zuordnung haben kein Cover, keine Kritikerwertung und kein Erscheinungsdatum. Sie funktionieren in allen Listen, fallen aber aus der Rangberechnung heraus (seit Stufe 10: `rang = null`, am Listenende).
 
 Eine Ansicht in den Einstellungen sammelt sie listenübergreifend – aus Wunschliste, To-Do, Backlog und Sammlung gleichermassen – mit demselben IGDB-Suchfeld zum Nachziehen.
 
@@ -939,7 +966,7 @@ WHERE (ps.status IN ('durchgespielt','komplettiert') AND COALESCE(t.progress_pct
 
 ```
 GET    /api/games                     Liste mit Filtern
-GET    /api/games/:id                 Detail: Releases, Copies, Trophäen, Status, Preise
+GET    /api/games/:id                 Detail: Releases, Copies, Trophäen, Status, Preise; seit Stufe 10 `plaene` (offene Absichten am Spiel und seinen Releases)
 POST   /api/games                     Body: { titel, plattform, trotzdem? } – 409 mit Kandidaten bei gleichem Titelschlüssel
 PATCH  /api/games/:id
 DELETE /api/games/:id                 Trophäenlisten zurück in die Zuordnung
@@ -967,10 +994,12 @@ GET    /api/zuordnung/offen            Gruppenvorschläge, seitenweise
 POST   /api/zuordnung/gruppe           Gruppe bestätigen: ein Spiel, mehrere Releases
 POST   /api/zuordnung/liste/:npCommId  Einzelne Liste einem Release zuordnen
 
-GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen&sort=rang
-POST   /api/plans
-PATCH  /api/plans/:id                 inkl. kind-Wechsel, status, is_favorite
-PUT    /api/plans/reorder             Body: { kind, orderedIds } – To-Do-Reihenfolge
+GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=rang|titel|angelegt&favorit=1
+                                      { gewichte, sortierung, eintraege[] }; Rang je Eintrag berechnet (5.2), null ohne Spiel
+POST   /api/plans                     Body: { art, spielId | releaseId | igdbId | titel, prioritaet?, favorit?, notiz? } – genau eine Quelle;
+                                      igdbId legt bei Bedarf ein Spiel ohne Release an; 409 mit eintragId bei offenem Duplikat (Abschnitt 5)
+PATCH  /api/plans/:id                 Teilmenge von { prioritaet, favorit, notiz, status, art }; Statuswechsel setzt resolved_at
+PUT    /api/plans/reorder             Body: { kind, orderedIds } – To-Do-Reihenfolge (Stufe 12)
 DELETE /api/plans/:id
 
 GET    /api/review/queue              v_review_offen, paginiert (limit, offset); ein Eintrag je Bildschirm
@@ -1036,7 +1065,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
 | IGDB-Zuordnung | – | Spiele ohne eindeutigen IGDB-Treffer als Liste mit Seiten: Kandidaten (Cover, Jahr, Typ, Plattformen, Wertung) zum Übernehmen, „Anders suchen" mit vorbelegtem Begriff, „Gibt es bei IGDB nicht". Eine Liste, kein Ein-Spiel-pro-Bildschirm: Nichts erzwingt eine Reihenfolge, Ausgelassenes bleibt stehen (7.6) |
 | Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden. Knopf "physisch nicht gewünscht"; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar |
-| Wunschliste | 4, 11 | Nach Rang sortiert, Favoriten-Filter, Erscheinungsdatum bei unveröffentlichten Titeln |
+| Wunschliste | 4, 11 | Nach Rang sortiert (auch Titel, zuletzt angelegt), Favoriten-Filter, erledigte und verworfene standardmäßig ausgeblendet; je Eintrag Cover, Plattform (oder „ohne Plattform"), Kritikerwertung, Rang, Favorit-Stern, Priorität 1–5, Notiz, erledigt/verworfen/wieder öffnen, entfernen; Erscheinungsdatum statt Preis bei angekündigten Titeln. „Wunsch hinzufügen" über die IGDB-Suche (legt ein Spiel ohne Release an), Freitext nur über „Ohne IGDB-Eintrag übernehmen" nach einer Suche; Rückgängig direkt nach dem Anlegen. Im Spieldetail ein Block „Wunschliste": auf die Liste setzen, Plattform wählbar und standardmäßig leer |
 | To-Do | 5a | Kurz und manuell sortierbar (Drag-and-drop) |
 | Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
 | Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert nach Rang, mit Herkunftskennzeichnung |
@@ -1045,11 +1074,11 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Ohne Zuordnung | 12 | Listenübergreifend, mit IGDB-Suchfeld zum Nachziehen |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |
 | Scannen | 1 | Serienerfassung nach Abschnitt 9 |
-| Einstellungen | – | NPSSO, Sync, Sync-Historie, IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen", „Offene erneut suchen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Gewichte der Rangformel, Export und Backup-Status |
+| Einstellungen | – | NPSSO, Sync, Sync-Historie, Gewichte der Rangformel (seit Stufe 10), IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen", „Offene erneut suchen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Gewichte der Rangformel, Export und Backup-Status |
 
-**Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den fünf Hauptansichten (Sammlung, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
+**Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den sechs Hauptansichten (Sammlung, Wunschliste, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Die Wunschliste kam mit Stufe 10 in die Leiste (Entscheidung des Nutzers vom 14.09.2026): Sie wird oft bedient, und ein Umweg über die Einstellungen wäre für die häufigste Liste der falsche Platz. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
 
-Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/igdb`, `/pruefen`, `/trophaeen`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen; Zuordnung, IGDB-Zuordnung, Sammlung prüfen und Trophäen hängen als Werkzeuge an den Einstellungen. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
+Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/wunschliste`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/igdb`, `/pruefen`, `/trophaeen`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen, seit Stufe 10 die Wunschliste; Zuordnung, IGDB-Zuordnung, Sammlung prüfen und Trophäen hängen als Werkzeuge an den Einstellungen. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
 
 Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste), nicht zugeordnete Trophäenlisten, seit Stufe 8 eine **überfällige Sicherung** (mehr als acht Tage oder noch nie, siehe 14.2) und seit Stufe 9 Spiele, die noch nicht bei IGDB gesucht wurden oder auf die IGDB-Zuordnung warten – jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
 

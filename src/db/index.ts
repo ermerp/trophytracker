@@ -3,6 +3,7 @@ import { ExportRepository } from "./export";
 import { GamesRepository } from "./games";
 import { IgdbRepository } from "./igdb";
 import { OwnershipRepository } from "./ownership";
+import { PlanRepository } from "./plan";
 import { PlayStatusRepository } from "./play-status";
 import { ReviewRepository } from "./review";
 import { SettingsRepository } from "./settings";
@@ -26,6 +27,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		games: new GamesRepository(db),
 		igdb: new IgdbRepository(db),
 		ownership: new OwnershipRepository(db),
+		plan: new PlanRepository(db),
 		playStatus,
 		review: new ReviewRepository(db, playStatus),
 		export: new ExportRepository(db),

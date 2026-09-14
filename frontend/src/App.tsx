@@ -1,6 +1,7 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { Abweichungen } from './Abweichungen'
 import { Einstellungen } from './Einstellungen'
+import { Gewichte } from './Gewichte'
 import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
 import { Navigation } from './Navigation'
@@ -10,6 +11,7 @@ import { SammlungPruefen } from './SammlungPruefen'
 import { Sicherung } from './Sicherung'
 import { Spieldetail } from './Spieldetail'
 import { Trophaeen } from './Trophaeen'
+import { Wunschliste } from './Wunschliste'
 import { Zuordnung } from './Zuordnung'
 import './App.css'
 
@@ -45,6 +47,7 @@ function App() {
           <Route path="/" element={<Navigate to="/sammlung" replace />} />
           <Route path="/sammlung" element={<Sammlung />} />
           <Route path="/spiel/:id" element={<Spieldetail />} />
+          <Route path="/wunschliste" element={<Wunschliste />} />
           <Route path="/pruefliste" element={<Pruefliste />} />
           <Route
             path="/einstellungen"
@@ -52,6 +55,7 @@ function App() {
               <>
                 <h1>Einstellungen</h1>
                 <Einstellungen />
+                <Gewichte />
                 <Igdb />
                 <Sicherung />
                 <Abweichungen />

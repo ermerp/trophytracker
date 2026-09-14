@@ -162,3 +162,50 @@ export const zeitpunkt = (wert: string | null) =>
   wert ? new Date(wert.replace(' ', 'T') + (/Z|[+-]\d\d:\d\d$/.test(wert) ? '' : 'Z')).toLocaleString('de-DE') : 'unbekannt'
 
 export const KRITIKQUELLE: Record<string, string> = { igdb: 'IGDB', opencritic: 'OpenCritic', manuell: 'von Hand' }
+
+/** Absichten (Abschnitt 5, ab Stufe 10): eine Tabelle, vier Listen. */
+export const PLAN_ARTEN = ['wunsch', 'todo', 'backlog', 'kauf'] as const
+export type PlanArt = (typeof PLAN_ARTEN)[number]
+
+export const PLAN_ARTTEXT: Record<PlanArt, string> = {
+  wunsch: 'Wunschliste',
+  todo: 'To-Do',
+  backlog: 'Backlog',
+  kauf: 'Kaufliste',
+}
+
+export type PlanStatus = 'offen' | 'erledigt' | 'verworfen'
+
+export const PLAN_STATUSTEXT: Record<PlanStatus, string> = {
+  offen: 'offen',
+  erledigt: 'erledigt',
+  verworfen: 'verworfen',
+}
+
+export type PlanEintrag = {
+  id: number
+  art: PlanArt
+  status: PlanStatus
+  titel: string
+  /** null nur bei Freitext ohne Zuordnung. */
+  spielId: number | null
+  releaseId: number | null
+  plattform: Plattform | null
+  bild: string | null
+  kritik: number | null
+  erscheinungsdatum: string | null
+  releaseStatus: ReleaseStatus | null
+  prioritaet: number
+  favorit: boolean
+  notiz: string | null
+  herkunft: string | null
+  angelegtAm: string
+  erledigtAm: string | null
+  /** Bei der Abfrage berechnet (5.2); null ohne Spiel. */
+  rang: number | null
+}
+
+export type Gewichte = { w_critic: number; w_priority: number; w_favorite: number; w_price: number }
+
+/** Rang als Prozentzahl, wie die Kritikerwertung – 0 bis 100 statt 0,00 bis 1,00. */
+export const rangText = (rang: number | null) => (rang === null ? '–' : String(Math.round(rang * 100)))

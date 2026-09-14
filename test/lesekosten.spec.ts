@@ -199,6 +199,52 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		]);
 	});
 
+	it("misst die Wunschliste und die Absichten eines Spiels (Stufe 10)", async () => {
+		// 300 Wuensche wie nach dem Import (8.2): zwei Drittel am Spiel, ein
+		// Drittel am Release, dazu ein paar erledigte und Freitext.
+		await env.DB.prepare("DELETE FROM plan_entry").run();
+		const amSpiel = env.DB.prepare("INSERT INTO plan_entry (kind, game_id, origin) VALUES ('wunsch', ?, 'import')");
+		const amRelease = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('wunsch', ?, 'import')");
+		const anweisungen: D1PreparedStatement[] = [];
+		for (let i = 1; i <= 300; i++) anweisungen.push(i % 3 === 0 ? amRelease.bind(i) : amSpiel.bind(i));
+		anweisungen.push(env.DB.prepare("INSERT INTO plan_entry (kind, title_raw, origin) VALUES ('wunsch', 'Freitext', 'manuell')"));
+		anweisungen.push(env.DB.prepare("UPDATE plan_entry SET status = 'erledigt' WHERE id % 10 = 0"));
+		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
+
+		const auswahl = `SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position, pe.priority,
+			  pe.is_favorite, pe.note, pe.origin, pe.status, pe.created_at, pe.resolved_at,
+			  COALESCE(g.title, pe.title_raw) AS titel, g.id AS spiel_id, r.platform,
+			  g.cover_url, g.critic_score, g.release_date, g.release_status
+			 FROM plan_entry pe
+			 LEFT JOIN release r ON r.id = pe.release_id
+			 LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id) `;
+		const wunschliste = await zeilenGelesen(auswahl + "WHERE pe.kind = ? AND pe.status = ? ORDER BY pe.id", "wunsch", "offen");
+		const fuerSpiel = await zeilenGelesen(
+			auswahl +
+				"WHERE pe.status = 'offen' AND (pe.game_id = ? OR pe.release_id IN (SELECT id FROM release WHERE game_id = ?)) ORDER BY pe.id",
+			200,
+			200,
+		);
+		const duplikat = await zeilenGelesen(
+			"SELECT id FROM plan_entry WHERE kind = ? AND status = 'offen' AND release_id = ?",
+			"wunsch",
+			3,
+		);
+		const nachIgdb = await zeilenGelesen("SELECT id FROM game WHERE igdb_id = ?", 1001);
+
+		console.info({ wunschliste, fuerSpiel, duplikat, nachIgdb });
+
+		// Je Eintrag ein Index-Lookup auf release und game: rund drei Zeilen je Wunsch.
+		expect(wunschliste).toBeLessThan(2_000);
+		expect(fuerSpiel).toBeLessThan(50);
+		expect(duplikat).toBeLessThan(50);
+		expect(nachIgdb).toBeLessThan(50);
+
+		const antwort = await SELF.fetch(`${B}/api/plans?kind=wunsch`);
+		expect(antwort.status).toBe(200);
+		await env.DB.prepare("DELETE FROM plan_entry").run();
+	});
+
 	it("beantwortet die Exportrouten bei 430 Listen", async () => {
 		for (const pfad of ["/api/export/backup.json", "/api/export/sammlung.csv", "/api/export/trophaeen.csv"]) {
 			const antwort = await SELF.fetch(`${B}${pfad}`);

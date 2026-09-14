@@ -346,6 +346,8 @@ export const gameRoutes = new Hono<AppEnv>()
 		const bewertungen = new Map(
 			(await c.var.repos.playStatus.fuerSpiel(id)).map((b) => [b.release_id, b] as const),
 		);
+		// Offene Absichten (Stufe 10): am Spiel oder an einem seiner Releases.
+		const plaene = await c.var.repos.plan.offeneFuerSpiel(id);
 
 		return c.json({
 			id: detail.spiel.id,
@@ -356,6 +358,15 @@ export const gameRoutes = new Hono<AppEnv>()
 			kritik: kritikAntwort(detail.spiel),
 			erscheinungsdatum: detail.spiel.release_date,
 			releaseStatus: detail.spiel.release_status,
+			plaene: plaene.map((p) => ({
+				id: p.id,
+				art: p.kind,
+				releaseId: p.release_id,
+				plattform: p.platform,
+				prioritaet: p.priority,
+				favorit: p.is_favorite === 1,
+				notiz: p.note,
+			})),
 			releases: detail.releases.map((r) => ({
 				id: r.id,
 				plattform: r.platform,

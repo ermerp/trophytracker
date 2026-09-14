@@ -106,6 +106,11 @@ const IGDB_ROUTEN = (app: ReturnType<typeof createApp>) => [
 		body: JSON.stringify({ igdbId: 1001 }),
 	}),
 	ruf(app, "/api/unmatched/spiel/1/link", { method: "DELETE" }),
+	ruf(app, "/api/plans", {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ art: "wunsch", igdbId: 1001 }),
+	}),
 	ruf(app, "/api/unmatched/spiel/1/ablehnen", { method: "POST" }),
 	ruf(app, "/api/unmatched/spiel/1/suchen", { method: "POST" }),
 ];
@@ -192,6 +197,18 @@ describe("Dichtheitsprüfung", () => {
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({ status: "am_spielen" }),
 			}),
+			await ruf(app, "/api/plans?kind=wunsch&status=alle"),
+			await ruf(app, "/api/plans", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ art: "wunsch", titel: "Arbeitstitel" }),
+			}),
+			await ruf(app, "/api/plans/1", {
+				method: "PATCH",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ favorit: true }),
+			}),
+			await ruf(app, "/api/plans/1", { method: "DELETE" }),
 			await ruf(app, "/api/deviations"),
 			await ruf(app, "/api/review/queue"),
 			await ruf(app, "/api/review/progress"),
