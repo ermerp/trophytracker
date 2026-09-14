@@ -72,15 +72,31 @@ export function Pruefliste() {
       setLaeuft(true)
       setMeldung(null)
       try {
-        await anfrage(`/api/review/${eintrag.releaseId}/decide`, { methode: 'POST', koerper: { aktion } })
-        await laden()
+        // Nur die Warteschlange neu holen: Die Fortschrittszahlen stehen
+        // schon in der Antwort. Ein zusaetzliches /progress je Entscheidung
+        // kostet bei 430 Einträgen rund 1.700 gelesene Zeilen - über einen
+        // ganzen Durchgang die Hälfte des gesamten Leseaufwands.
+        const a = await anfrage<{ nochOffen: number }>(`/api/review/${eintrag.releaseId}/decide`, {
+          methode: 'POST',
+          koerper: { aktion },
+        })
+        setFortschritt((f) =>
+          f && {
+            ...f,
+            offen: a.nochOffen,
+            erledigt: f.erledigt + 1,
+            unentschieden: f.unentschieden + (aktion === 'ueberspringen' ? 1 : 0),
+          },
+        )
+        const q = await anfrage<Queue>('/api/review/queue?limit=1')
+        setEintrag(q.eintraege[0] ?? null)
       } catch (fehler) {
         setMeldung(fehler instanceof Error ? fehler.message : 'Entscheidung fehlgeschlagen.')
       } finally {
         setLaeuft(false)
       }
     },
-    [eintrag, laeuft, laden],
+    [eintrag, laeuft],
   )
 
   // Tastenkürzel 1–7, nicht in Eingabefeldern.
@@ -101,9 +117,10 @@ export function Pruefliste() {
       <h1>Prüfliste</h1>
       <p>
         noch <strong>{fortschritt.offen}</strong> von {fortschritt.gesamt}
-        <span className="zeile"> · Tasten 1–7 entscheiden</span>{' '}
+        <span className="zeile nur-desktop"> · Tasten 1–7 entscheiden</span>{' '}
         <Link to="/sammlung">Beenden</Link>
       </p>
+      <p className="zeile hinweiszeile">Du bewertest den Spielstand, nicht den Besitz.</p>
       <div className="fortschrittsbalken" aria-hidden="true">
         <div style={{ width: `${fortschritt.gesamt ? (100 * (fortschritt.gesamt - fortschritt.offen)) / fortschritt.gesamt : 0}%` }} />
       </div>

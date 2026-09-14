@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 15 – Zeilenlese-Grenze von D1: Indizes auf allen Fremdschlüsseln, Lesekosten-Test.*
+*Version 15 – Zeilenlese-Grenze von D1: Indizes auf allen Fremdschlüsseln, Lesekosten-Test. Prüfliste auf dem Handy ohne Scrollen.*
 
 ## 1. Use Cases
 
@@ -948,7 +948,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | To-Do | 5a | Kurz und manuell sortierbar (Drag-and-drop) |
 | Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
 | Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert nach Rang, mit Herkunftskennzeichnung |
-| Prüfliste | 8 | Ein Spiel pro Bildschirm, sieben Aktionen mit Tastenkürzeln 1–7, Grund und Vorher-Nachher, aktueller (vorbelegter) Status, Fortschrittsanzeige „noch n von m"; jederzeit verlassen, jede Entscheidung ist schon gespeichert |
+| Prüfliste | 8 | Ein Spiel pro Bildschirm, sieben Aktionen mit Tastenkürzeln 1–7, Grund und Vorher-Nachher, aktueller (vorbelegter) Status, Fortschrittsanzeige „noch n von m"; jederzeit verlassen, jede Entscheidung ist schon gespeichert. **Auf dem Handy müssen alle sieben Knöpfe ohne Scrollen sichtbar sein** (zweispaltig, kompakte Karte) – die Ansicht wird bei der Ersteinrichtung mehrere hundert Mal hintereinander bedient. Eine Zeile stellt klar: „Du bewertest den Spielstand, nicht den Besitz." |
 | Wunschliste importieren | 9 | Textfeld oder Datei, dreigeteilte Trefferliste, IGDB-Suche für Zeilen ohne Treffer |
 | Ohne Zuordnung | 12 | Listenübergreifend, mit IGDB-Suchfeld zum Nachziehen |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |

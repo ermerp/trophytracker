@@ -443,6 +443,10 @@ ul.digital {
   margin-bottom: 0.2rem;
 }
 
+.hinweiszeile {
+  margin: 0.2rem 0 0.5rem;
+}
+
 .fortschrittsbalken {
   height: 0.4rem;
   background: rgba(128, 128, 128, 0.2);
@@ -494,9 +498,10 @@ ul.digital {
 }
 
 .aktionen button {
-  flex: 1 1 10rem;
+  flex: 1 1 11rem;
   padding: 0.7rem 0.9rem;
   text-align: left;
+  white-space: nowrap;
 }
 
 .aktionen kbd {
@@ -510,12 +515,57 @@ ul.digital {
   text-align: center;
 }
 
+/*
+ * Auf dem Handy muss die Pruefliste ohne Scrollen bedienbar sein: Sie wird
+ * bei der Ersteinrichtung mehrere hundert Mal hintereinander benutzt, und
+ * einmal Scrollen je Entscheidung ist der Unterschied zwischen "geht" und
+ * "macht man nicht zu Ende". Bild klein neben dem Text, Knoepfe zweispaltig.
+ */
 @media (max-width: 30rem) {
+  .prueflisten-kopf h1 {
+    font-size: 1.4rem;
+    margin: 0;
+  }
+
+  .fortschrittsbalken {
+    margin-bottom: 0.8rem;
+  }
+
   .pruefkarte {
-    flex-direction: column;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .pruefkarte .bild {
+    width: 4.5rem;
+    height: 4.5rem;
+    font-size: 1.8rem;
+  }
+
+  .pruefkarte h2 {
+    font-size: 1.1rem;
+    margin: 0.1rem 0 0.4rem;
+  }
+
+  /* Absaetze eng fuehren, damit der letzte Knopf ueber der Falz bleibt. */
+  .pruefkarte p {
+    margin: 0.25rem 0;
+  }
+
+  .aktionen {
+    gap: 0.4rem;
   }
 
   .aktionen button {
-    flex-basis: 100%;
+    flex: 1 1 calc(50% - 0.2rem);
+    padding: 0.6rem 0.5rem;
+    font-size: 0.9rem;
+    /* In der halben Spalte darf "Unveraendert lassen" umbrechen. */
+    white-space: normal;
+  }
+
+  /* Tastenkuerzel gibt es auf dem Handy nicht - die Zeile spart Platz. */
+  .nur-desktop {
+    display: none;
   }
 }
