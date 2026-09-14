@@ -35,11 +35,19 @@ export const AUFFRISCHEN_JE_AUFRUF = 50;
 /** Mehr Kandidaten liest niemand durch; die Sortierung bringt das Passende nach vorn. */
 export const KANDIDATEN_JE_SPIEL = 10;
 
-export type Suchweg = "suche" | "kurz" | "teilstring" | "teilstring_roh" | "keiner";
+export type Suchweg = "suche" | "suche+exakt" | "kurz" | "teilstring" | "teilstring_roh" | "keiner";
 
 /**
- * Suche mit Rueckfaellen. Die erste Suche reicht fuer 409 von 420 Titeln;
- * nur wenn sie leer bleibt, folgen bis zu drei weitere Anfragen:
+ * Suche mit Rueckfaellen.
+ *
+ * Trifft nach der Volltextsuche kein Kandidat den Schluessel, kommt eine
+ * exakte Namensabfrage dazu und wird eingemischt: IGDBs Volltextsuche
+ * uebergeht "THE FINALS" und liefert Final Fantasy, waehrend der exakte
+ * Name sofort trifft. Das ist eine Anfrage mehr fuer die rund 50 Spiele
+ * ohne Schluesseltreffer, nicht fuer alle.
+ *
+ * Bleibt die Volltextsuche ganz leer (11 von 420 Titeln), folgen bis zu
+ * drei weitere Anfragen:
  *
  * 1. gekuerzter Begriff ohne Plattformfilter - "CastleStorm - Complete
  *    Edition" findet IGDB erst als "CastleStorm", und manche Eintraege
@@ -56,8 +64,20 @@ export async function kandidatenSuchen(
 	titel: string,
 ): Promise<{ kandidaten: IgdbKandidat[]; begriff: string; weg: Suchweg }> {
 	const begriff = suchbegriff(titel);
+	const schluessel = titelSchluessel(begriff);
 	let kandidaten = normalisiereTrefferliste(await igdb.suche(begriff));
-	if (kandidaten.length > 0) return { kandidaten, begriff, weg: "suche" };
+	if (kandidaten.length > 0) {
+		if (kandidaten.some((k) => titelSchluessel(k.name) === schluessel)) {
+			return { kandidaten, begriff, weg: "suche" };
+		}
+		const exakt = normalisiereTrefferliste(await igdb.nameExakt(begriff));
+		const bekannt = new Set(kandidaten.map((k) => k.igdbId));
+		return {
+			kandidaten: [...exakt.filter((k) => !bekannt.has(k.igdbId)), ...kandidaten],
+			begriff,
+			weg: exakt.length > 0 ? "suche+exakt" : "suche",
+		};
+	}
 
 	const kurz = kurzbegriff(begriff);
 	if (kurz !== "") {

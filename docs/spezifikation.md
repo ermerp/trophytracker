@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 21 – IGDB-Nachbesserung aus der ersten Abnahme: Kandidaten sortiert (Hauptspiel vor DLC, passende Plattform zuerst), Rückfallsuchen für Titel ohne Treffer, „Offene erneut suchen".*
+*Version 22 – IGDB: exakte Namensabfrage, wenn kein Treffer den Schlüssel trifft („THE FINALS", umbenannte Einträge wie „Rainbow Six Siege"); Wunschlisten gegen Sammlung und IGDB gemessen, Befunde für Stufe 11 in 8.2.*
 
 ## 1. Use Cases
 
@@ -600,6 +600,8 @@ Abruf zusammen mit den übrigen IGDB-Metadaten, nicht als eigener Job. `critic_s
 
 **Suchbegriff.** `suchbegriff(title)` (`src/domain/igdb.ts`) bereinigt nur für die Anfrage, nie für den Schlüssel: ein Jahr in Klammern aus der Umbenennung durch den Nutzer („God of War (2018)") fällt weg, an Wörter geklebte Ziffern werden getrennt („Velocity2X" → „Velocity 2X"; IGDB findet nur diese Schreibweise).
 
+**Exakte Namensabfrage.** Trifft nach der Volltextsuche kein Kandidat den Schlüssel, fragt der Abgleich zusätzlich exakt nach dem Namen (`name ~ "…"`, Groß-/Kleinschreibung egal) und mischt das Ergebnis vorn ein. IGDBs Volltextsuche übergeht „THE FINALS" und liefert Final Fantasy, während der exakte Name sofort trifft; und in der Handsuche findet „Rainbow Six Siege" damit das Grundspiel, das IGDB ohne „Tom Clancy's" führt und das die Volltextsuche hinter dreißig Editionen versteckt. Eine Anfrage mehr für die rund 50 Spiele ohne Schlüsseltreffer, nicht für alle.
+
 **Rückfälle, nur wenn die Suche leer bleibt** (`kandidatenSuchen`, `src/sync/igdb.ts`; trifft 11 von 420 Titeln, kostet also fast nichts): erst der gekürzte Begriff – alles ab „ - ", „:" oder „/" fällt weg („CastleStorm - Complete Edition" → „CastleStorm", „Type:Rider" → „Type") – ohne Plattformfilter, weil manche IGDB-Einträge keine Plattform nennen; dann IGDBs Teilstringsuche über den Namen (`name ~ *"…"*`), der einzige Weg zu „That's You!" oder „We Were Here Too"; zuletzt dieselbe Teilstringsuche mit dem unbereinigten Titel, weil IGDB „OlliOlli2" ohne Leerzeichen schreibt. Was danach noch fehlt (aus der ersten Abnahme: „Poker Night at the Inventory 2", „TownsmenVR", „Wake-up Club"), kennt IGDB unter keiner Schreibweise – das bleibt „Gibt es bei IGDB nicht" oder eine Suche von Hand.
 
 **Reihenfolge der Kandidaten** (`ordneKandidaten`): Die Suche holt 30 Treffer statt 10, weil bei DLC-reichen Titeln das Hauptspiel sonst gar nicht im Ergebnis steht („Batman: Arkham Knight" an Position 13 hinter zwölf Skin-Paketen, „For Honor" an 23). Gespeichert und angezeigt werden die ersten zehn nach dieser Ordnung: Schlüsseltreffer zuerst, dann Hauptspiel-artige Typen (Hauptspiel, Bundle, eigenständige Erweiterung, Remake, Remaster, erweitertes Spiel, Portierung) vor DLC, Erweiterung, Episode, Staffel und Paket, dann Kandidaten mit einer Plattform des Spiels, innerhalb dessen IGDBs Reihenfolge. Die eingebaute Suche (`GET /api/igdb/search`) nutzt dieselben Rückfälle und dieselbe Ordnung; `plattformen=PS4,PS5` gibt ihr die Plattformen mit – ab Stufe 11 auch aus der Wunschliste, wenn dort eine Plattform neben dem Titel steht. Die Ordnung ändert nichts an der automatischen Verknüpfung.
@@ -698,6 +700,14 @@ Eingabe: Datei-Upload oder Einfügen in ein Textfeld, ein Titel pro Zeile. Leerz
 **Zeilen ohne Treffer werden nicht stillschweigend als Freitext übernommen.** Sie landen in einem Nachbearbeitungsschritt mit einem eingebauten IGDB-Suchfeld: Suchbegriff anpassen, Treffer auswählen, fertig. Titel aus Textdateien sind abgekürzt, falsch geschrieben und mehrdeutig – eine Suche mit korrigierbarer Eingabe löst das, ein automatischer Fallback erzeugt nur Datenmüll.
 
 Ein Eintrag ohne IGDB-Zuordnung entsteht **nur auf ausdrückliche Anweisung** ("trotzdem übernehmen"). Das ist der richtige Weg für Titel, die IGDB nicht kennt – etwa sehr frühe Ankündigungen –, aber es ist eine bewusste Entscheidung, kein Nebeneffekt.
+
+**Befunde aus den echten Wunschlisten (gemessen am 14.09.2026, vor Stufe 11).** Zwölf Textdateien mit 332 Titelzeilen, gegen `game` und IGDB mit dem Suchweg aus 7.6 gemessen: 20 treffen über den Titelschlüssel ein Spiel der Sammlung, 199 sind bei IGDB eindeutig, 76 haben Kandidaten ohne eindeutigen Treffer, 37 finden nichts. Was der Import daraus können muss:
+
+- **Form der Dateien:** eine Datei je Jahr mit Überschriften `-Januar` … `-Dezember` (Erscheinungsmonat, teils geschätzt), dazu eine Datei mit Abschnitten `PS4` / `PS3`. Vier Dateien mit BOM, eine in Windows-1252, alle mit CRLF. Der Parser nimmt Jahr aus dem Dateinamen und Monat aus der Überschrift als **ungefähres Erscheinungsdatum** mit, die Plattform aus dem Abschnitt; Schreibfehler in Überschriften („-Oktiber", „- August") dürfen nicht als Titel durchgehen.
+- **Das Datum entscheidet Mehrdeutigkeiten.** Gleichnamige Spiele sind in den Listen häufig – „Layers of Fear" 2016 und das Remake 2023, „Resident Evil 2", „DOOM", „Oblivion" –, und der Monat aus der Liste liegt meist im richtigen Jahr. Ein Kandidat, dessen `first_release_date` im selben oder angrenzenden Jahr liegt, wird bevorzugt; das ist die Ergänzung zum Plattformabgleich aus 7.6.
+- **Doppelungen** (10 von 332): derselbe Titel in zwei Jahren ist meist eine Verschiebung („Iron Harvest" 2020 → 2021) und wird einmal übernommen, mit dem späteren Datum; manchmal ist es ein anderes Spiel („Judgment" 2019, „Lost Judgment" 2021) – dann zeigt die Durchsicht beide.
+- **Ohne Treffer** sind vor allem Tippfehler („Assasins", „Yakusa", „Devip May Cry"), deutsche Titel („Mittelerde: Schatten des Krieges", „Der Pate"), Sammelzeilen („Mass Effect 1+2+3", „Yakuza 1-4", „Dark Souls Trilogie") und Arbeitstitel. Genau dafür ist das korrigierbare Suchfeld da; ein automatischer Freitext-Fallback würde hier nur Müll erzeugen.
+- **Schon in der Sammlung:** 20 Zeilen treffen ein vorhandenes Spiel. Die Durchsicht zeigt sie als vierte Gruppe („bereits vorhanden") statt sie als Wunsch anzulegen – der Nutzer entscheidet, ob daraus ein To-Do wird.
 
 ### 8.3 Nachpflege fehlender Metadaten (Use Case 12)
 

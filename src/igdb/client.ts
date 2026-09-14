@@ -147,6 +147,18 @@ export function erstelleIgdbClient(
 		},
 
 		/**
+		 * Exakter Name, Gross-/Kleinschreibung egal. IGDBs Volltextsuche
+		 * uebergeht "THE FINALS" (liefert Final Fantasy) - die exakte Abfrage
+		 * findet es. Ergaenzt die Volltextsuche, wenn kein Kandidat den
+		 * Schluessel trifft.
+		 */
+		async nameExakt(text: string, limit = 10): Promise<IgdbSpielRoh[]> {
+			const sauber = apicalypseText(text).replace(/\*/g, "");
+			if (sauber === "") return [];
+			return abfrage(`fields ${IGDB_FELDER}; where name ~ "${sauber}" & ${typFilter}; limit ${limit};`);
+		},
+
+		/**
 		 * Teilstringsuche ueber den Namen - ein anderer Weg als die
 		 * Volltextsuche und der einzige, der "That's You!" oder "We Were Here
 		 * Too" findet. Nur als Rueckfall, weil sie kein Ranking kennt.
