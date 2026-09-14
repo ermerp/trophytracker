@@ -51,6 +51,8 @@ Dasselbe gilt für Zuordnungen: Ein einmal gesetztes `trophy_progress.release_id
 
 Das gilt auch in der Oberfläche: fehlende Preise und unbekannte Werte werden als "unbekannt" angezeigt, nie als "0", "–" oder "nicht verfügbar".
 
+Im CSV-Export ist ein **leeres Feld** die Entsprechung davon (Abschnitt 14.4): Das Wort in einer Zahlenspalte wäre dort der schlechtere Weg.
+
 ### Kein vollautomatisches Matching
 
 PSN-Trophäentitel, Feed-Artikel und IGDB-Treffer werden **vorgeschlagen**, nicht stillschweigend zugeordnet. Nur ein eindeutiger Treffer mit hoher Ähnlichkeit darf automatisch zugeordnet werden; alles andere landet in einer Zuordnungsansicht.
@@ -92,6 +94,8 @@ D1 zählt **gelesene Zeilen** (Scans, nicht Ergebniszeilen), und der Free Tier e
 NPSSO, Refresh- und Access Token wandern ausschliesslich als `Geheimnis` (`src/domain/secret.ts`) durch den Code. `toString()` und `toJSON()` redigieren, der Klartext ist nur über `.offenlegen()` erreichbar. Sie dürfen **nie** in einer API-Antwort, einer Fehlermeldung oder im Log erscheinen, auch nicht gekürzt — `observability.logs` ist eingeschaltet, was einmal drin steht, bleibt liegen.
 
 Daraus folgt: Die Antwort des PSN-Token-Endpunkts wird nie in `psn_raw_response` geschrieben. Dort landen ausschliesslich Trophäen-Seiten. `test/keine-lecks.spec.ts` prüft das über alle Routen, auch in den Fehlerpfaden.
+
+**Maschinen-Endpunkte tragen keine eigene Token-Prüfung.** `/api/export/*`, `/api/backup/*` und später `/api/imports/feed` laufen über ein Access Service Token; Access steht vor dem ganzen Worker. Kein Bearer-Token im Code — in Stufe 8 entschieden, begründet in Abschnitt 15.3.
 
 ### Rohdaten vor Normalisierung
 
@@ -145,9 +149,9 @@ Das Repository ist öffentlich, das Backup-Repository ist privat. Ein Datenbank-
   Offene Entscheidungen bleiben ausdrücklich als offen markiert ("in Stufe N zu
   entscheiden"), statt stillschweigend geschlossen zu werden.
 - **Vor größeren Aufgaben einen Plan vorlegen**, insbesondere bei allem, was Migrationen oder externe Schnittstellen berührt.
-- **Migrationen abwärtskompatibel halten.** Sie laufen vor dem Deployment, der alte Worker läuft in dem Moment noch. Spalten hinzufügen ist unkritisch, Umbenennen braucht zwei Deployments.
+- **Migrationen abwärtskompatibel halten.** Sie laufen vor dem Deployment, der alte Worker läuft in dem Moment noch. Spalten hinzufügen ist unkritisch, Umbenennen braucht zwei Deployments. Eine neue Tabelle gehört zugleich in `EXPORT_TABELLEN` oder `NICHT_EXPORTIERT` (`src/db/export.ts`), sonst fährt sie ungesichert mit.
 - **Datenmigrationen weisen ihre Wirkung nach.** Schreibt oder löscht eine Migration Zeilen, prüft der Deploy-Job vorher die Sicherung (INSERT-Zeilen im Dump gegen `COUNT(*)` der Datenbank, Abbruch vor der Migration bei Abweichung) und protokolliert danach die betroffene Zeilenzahl neben der Erwartung. Nur Zahlen ins Log, nie Inhalt — das Repository ist öffentlich. Die Zahlen gehören auch in den Bericht an den Nutzer.
-- **Nach jedem Deploy die Produktion selbst prüfen.** Ein grüner Action-Lauf beweist nur, dass die Schritte durchliefen — nicht, dass die neue Fassung ankommt. Die betroffenen Routen und den Asset-Hash des ausgelieferten Frontends über den Access Service Token abrufen (`CF-Access-Client-Id` / `-Secret`, Werte in `.dev.vars`) und das Ergebnis berichten, statt den Nutzer im Browser nachsehen zu lassen.
+- **Nach jedem Deploy die Produktion selbst prüfen.** Ein grüner Action-Lauf beweist nur, dass die Schritte durchliefen — nicht, dass die neue Fassung ankommt. Die betroffenen Routen und den Asset-Hash des ausgelieferten Frontends über den Access Service Token abrufen (`CF-Access-Client-Id` / `-Secret`, Werte in `.dev.vars`) und das Ergebnis berichten, statt den Nutzer im Browser nachsehen zu lassen. Workflow-Läufe und ihre Logs liest `gh` (Token `claude-code-actions`, nur Actions auf diesem Repo): `gh run list`, und für das Log `gh api repos/ermerp/trophytracker/actions/jobs/<job-id>/logs` — `gh run view --log` liefert in Version 2.46 stillschweigend nichts.
 - **Views mit ihren Basistabellen zusammen ändern.** Fasst eine Migration eine Tabelle an, auf der eine View steht, wird die View in **derselben** Migration gedroppt und neu angelegt. Gemessen gegen SQLite 3.46.1: `RENAME COLUMN` schreibt die View-Definition selbst um, aber ein Tabellen-Neuaufbau (`DROP TABLE` + `RENAME TO`) und `DROP COLUMN` scheitern laut mit `error in view …`. Der Neuaufbau ist SQLites Standardweg für jede Constraint- oder Typänderung — ohne vorheriges Droppen der Views ist er schlicht nicht ausführbar, und in der Pipeline wäre das ein roter Deploy mit halb angewendeter Migration.
 - **Views listen ihre Spalten explizit auf, nie `SELECT *`.** Das ist der eine Fall, in dem SQLite still danebengreift: Bei `SELECT *` wächst die Ergebnismenge nach einem `ADD COLUMN` lautlos mit, während die Definition in `sqlite_master` unverändert bleibt. Ein Test in `test/migration.spec.ts` hält die Regel fest.
 - **Seeds immer als `INSERT OR IGNORE`.** Nicht wegen Idempotenz — Migrationen laufen wegen der `d1_migrations`-Buchführung ohnehin nur einmal —, sondern damit ein erneuter Lauf einen vom Nutzer angepassten Wert niemals zurücksetzt. Kein `CREATE TABLE IF NOT EXISTS`: das verdeckt ein abweichendes Schema, und lautes Scheitern ist dort das bessere Verhalten.

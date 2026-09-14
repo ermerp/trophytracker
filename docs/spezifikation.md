@@ -1008,6 +1008,8 @@ Zwei Formate mit Absicht: Der SQL-Dump ist die technisch exakte Sicherung zum Wi
 
 Das Datum der letzten erfolgreichen Sicherung steht in den Einstellungen; bis es das Dashboard gibt, warnt der Hinweisblock der Sammlungsansicht (Abschnitt 13) bei **mehr als acht Tagen** oder wenn noch nie gesichert wurde. Acht statt sieben, weil der Lauf wöchentlich ist: Ein Tag Luft verhindert eine Warnung, die sonst jede Woche von allein erscheint. Ein Backup, von dem man nicht weiss, ob es läuft, ist kein Backup.
 
+**Eine Ausfallursache, die kein rotes Log hinterlässt:** GitHub deaktiviert geplante Workflows in Repositories, die 60 Tage lang keine Aktivität hatten, und schickt dem Besitzer eine E-Mail. Das trifft zu, sobald das Projekt fertig ist und niemand mehr committet – also genau dann, wenn die Sicherung am wichtigsten wird. Dagegen hilft kein Workflow, sondern nur die Altersanzeige. Sie ist der Grund, warum es sie gibt.
+
 ### 14.3 Wiederherstellung
 
 **Der Dump lässt sich nicht unverändert einspielen.** Das ist das Ergebnis der Probe vom 14.09.2026 und der Grund, warum dieser Abschnitt länger ist als der eine Befehl, der hier früher stand.
@@ -1273,7 +1275,7 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 | Service Token oder PAT laufen ab | Sicherung bleibt unbemerkt aus | Altersanzeige in den Einstellungen und Warnung im Hinweisblock ab acht Tagen (14.2); Ablaufdaten in 15.1 |
 | Fehlerhafte Migration | Datenverlust | Export als erster Schritt jedes Deploy-Jobs, Migrationen abwärtskompatibel halten |
 | D1-Tageslimit für gelesene Zeilen erreicht | Anwendung bis Mitternacht UTC tot | Indizes auf allen Fremdschlüsseln, `test/lesekosten.spec.ts` als Wächter, `rows_read_24h` in `wrangler d1 info` beobachten (Abschnitt 2) |
-| Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht in den Einstellungen, Warnung im Hinweisblock ab acht Tagen (14.2) |
+| Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht in den Einstellungen, Warnung im Hinweisblock ab acht Tagen; GitHub schaltet den Zeitplan nach 60 Tagen ohne Repo-Aktivität ab (14.2) |
 | Wiederherstellung nie geprobt | Backup unbrauchbar | Probe am 14.09.2026 durchgeführt – sie fand einen echten Fehler (14.3). Ablauf und Ergebnis in der README |
 | Dump nicht einspielbar nach Tabellen-Neuaufbau | Backup nur scheinbar brauchbar | `scripts/dump-ordnen.mjs` ordnet Schema vor Daten, `PRAGMA foreign_key_check` prüft danach (14.3); `test/dump-ordnen.spec.ts` hält die Zerlegung fest |
 | Kritikerwertung fehlt | Rang verzerrt | `COALESCE(critic_score, 70)` – unbewertete Titel werden weder bevorzugt noch bestraft |

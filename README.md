@@ -484,6 +484,11 @@ ist – ein Tag Luft verhindert eine Warnung, die sonst jede Woche von allein
 erscheint. Der wahrscheinlichste Grund für ein stilles Ausbleiben sind die drei
 Secrets, die nach einem Jahr ablaufen (siehe [Secrets](#einrichtung-eines-eigenen-kontos)).
 
+Der zweite: **GitHub deaktiviert geplante Workflows nach 60 Tagen ohne
+Repo-Aktivität** und schickt dir eine E-Mail. Wieder anschalten ist ein Klick
+unter Actions. Das trifft zu, sobald am Projekt nicht mehr gearbeitet wird –
+also genau dann, wenn die Sicherung am wichtigsten ist.
+
 **Kein NPSSO im Dump.** Der Dump landet dauerhaft in einem Git-Verlauf, deshalb
 drei Schichten statt einer:
 
