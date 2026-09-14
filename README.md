@@ -320,7 +320,10 @@ GET  /api/igdb/search?q=&plattformen=  Suche mit Rückfällen, auch für Import 
 ```
 
 **Alte Wunschlisten** gehören als Textdateien in `wunschlisten/` (lokal,
-per `.gitignore` ausgeschlossen); Stufe 11 misst den Import daran.
+per `.gitignore` ausgeschlossen). Sie sind am 14.09.2026 gegen Sammlung und
+IGDB gemessen worden – 332 Zeilen, 20 schon in der Sammlung, 199 eindeutig,
+76 mit Kandidaten, 37 ohne Treffer; die Folgerungen für den Import stehen in
+[Spezifikation 8.2](docs/spezifikation.md#82-wunschlisten-import-aus-textdateien-use-case-9).
 
 ## Zugriffsschutz
 

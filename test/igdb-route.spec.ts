@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createRepositories } from "../src/db";
 import { createApp } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
+import { eindeutigerTreffer } from "../src/domain/igdb";
 import { igdbAbgleichSchritt, igdbAuffrischSchritt, kandidatenSuchen } from "../src/sync/igdb";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
 import { fakeFetch } from "./psn-fake";
@@ -168,6 +169,21 @@ describe("kandidatenSuchen: Rueckfaelle", () => {
 		expect(String(o.aufrufe.at(-1)?.init?.body)).toContain(`name ~ *"OlliOlli2"*`);
 
 		expect((await kandidatenSuchen(fakeIgdb([leer]).client, "Nichts")).weg).toBe("keiner");
+	});
+
+	it("fragt exakt nach dem Namen, wenn kein Treffer den Schluessel trifft, und mischt ihn vorn ein", async () => {
+		const ff = [spielRoh({ id: 1, name: "Final Fantasy XIV Online" }), spielRoh({ id: 2, name: "Final Fantasy VII Rebirth", game_type: 8 })];
+		const f = fakeIgdb([ff, [spielRoh({ id: 3, name: "The Finals", platforms: [48, 167] }), spielRoh({ id: 1, name: "Final Fantasy XIV Online" })]]);
+		const e = await kandidatenSuchen(f.client, "THE FINALS");
+		expect(e.weg).toBe("suche+exakt");
+		expect(e.kandidaten.map((k) => k.igdbId)).toEqual([3, 1, 2]);
+		expect(String(f.aufrufe.at(-1)?.init?.body)).toContain('name ~ "THE FINALS"');
+		expect(eindeutigerTreffer("the finals", ["PS5"], e.kandidaten)?.igdbId).toBe(3);
+
+		// Trifft schon die Suche den Schluessel, gibt es keine zweite Anfrage.
+		const g = fakeIgdb([[spielRoh({ id: 9, name: "Bloodborne" })]]);
+		expect((await kandidatenSuchen(g.client, "Bloodborne")).weg).toBe("suche");
+		expect(g.aufrufe.filter((a) => a.url.includes("api.igdb.com"))).toHaveLength(1);
 	});
 });
 
