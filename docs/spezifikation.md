@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 22 – IGDB: exakte Namensabfrage, wenn kein Treffer den Schlüssel trifft („THE FINALS", umbenannte Einträge wie „Rainbow Six Siege"); Wunschlisten gegen Sammlung und IGDB gemessen, Befunde für Stufe 11 in 8.2.*
+*Version 23 – Entscheidungen des Nutzers zu den Wunschlisten (alles Wünsche, auch schon Gespieltes) und IGDB als Physisch-Quelle für Stufe 14 (`external_games.media`, gemessen: 109 von 419).*
 
 ## 1. Use Cases
 
@@ -626,7 +626,7 @@ Alles andere landet mit seinen Kandidaten in `igdb_candidate` und wartet in der 
 
 **Auffrischen.** `POST /api/igdb/auffrischen` holt für die 50 am längsten nicht aktualisierten verknüpften Spiele Wertung, Cover und Datum in **einer** Anfrage (`where id = (…)`) erneut. Kritikerwertungen ändern sich mit jeder neuen Rezension; Stufe 17 hängt den Schritt an den Cron.
 
-**Offen, in späteren Stufen zu entscheiden:** `physical_source = 'igdb'` (Abschnitt 3) wird in Stufe 9 nicht gesetzt – IGDB unterscheidet Disc und Download nicht zuverlässig; Stufe 14/18. Ob abgelehnte Spiele in `v_ohne_igdb` und damit in der Ansicht „Ohne Zuordnung" erscheinen sollen, entscheidet Stufe 11; die View ist unverändert.
+**Physische Fassung aus IGDB – für Stufe 14 entschieden.** IGDB führt unter `external_games` Händler- und Store-Einträge je Spiel mit `media` (1 = digital, 2 = physisch) und `platform`; gemessen am 14.09.2026 gegen die 419 verknüpften Spiele: 273 haben Einträge, **109 einen physischen** (überwiegend Amazon-Artikelnummern), 22 einen digitalen. Stufe 14 setzt daraus `physical_release_status = 'ja'` mit `physical_source = 'igdb'`, wenn ein physischer Eintrag zu einer Plattform des Releases existiert – und **nur** `ja`: Fehlen sagt nichts, `nein` bleibt Handarbeit (Abschnitt 3). Der AWIN-Feed (7.3, Stufe 18) ist die zweite Quelle; beide dürfen ein `nein` des Nutzers nicht überschreiben. Ob abgelehnte Spiele in `v_ohne_igdb` und damit in der Ansicht „Ohne Zuordnung" erscheinen sollen, entscheidet Stufe 11; die View ist unverändert.
 
 ---
 
@@ -707,7 +707,9 @@ Ein Eintrag ohne IGDB-Zuordnung entsteht **nur auf ausdrückliche Anweisung** ("
 - **Das Datum entscheidet Mehrdeutigkeiten.** Gleichnamige Spiele sind in den Listen häufig – „Layers of Fear" 2016 und das Remake 2023, „Resident Evil 2", „DOOM", „Oblivion" –, und der Monat aus der Liste liegt meist im richtigen Jahr. Ein Kandidat, dessen `first_release_date` im selben oder angrenzenden Jahr liegt, wird bevorzugt; das ist die Ergänzung zum Plattformabgleich aus 7.6.
 - **Doppelungen** (10 von 332): derselbe Titel in zwei Jahren ist meist eine Verschiebung („Iron Harvest" 2020 → 2021) und wird einmal übernommen, mit dem späteren Datum; manchmal ist es ein anderes Spiel („Judgment" 2019, „Lost Judgment" 2021) – dann zeigt die Durchsicht beide.
 - **Ohne Treffer** sind vor allem Tippfehler („Assasins", „Yakusa", „Devip May Cry"), deutsche Titel („Mittelerde: Schatten des Krieges", „Der Pate"), Sammelzeilen („Mass Effect 1+2+3", „Yakuza 1-4", „Dark Souls Trilogie") und Arbeitstitel. Genau dafür ist das korrigierbare Suchfeld da; ein automatischer Freitext-Fallback würde hier nur Müll erzeugen.
-- **Schon in der Sammlung:** 20 Zeilen treffen ein vorhandenes Spiel. Die Durchsicht zeigt sie als vierte Gruppe („bereits vorhanden") statt sie als Wunsch anzulegen – der Nutzer entscheidet, ob daraus ein To-Do wird.
+- **Schon in der Sammlung:** 20 Zeilen treffen ein vorhandenes Spiel. **Entscheidung des Nutzers (14.09.2026): Sie bleiben Wünsche.** Ein digital gespieltes Spiel auf der Wunschliste heißt „physisch besitzen wollen" – das ist genau die Lücke aus Use Case 3. Der Import legt sie also als `wunsch` an, mit `release_id` des vorhandenen Releases statt nur `game_id`, und die Durchsicht kennzeichnet sie („schon gespielt, Wunsch bleibt") statt sie auszusortieren.
+- **Alle Dateien sind Wunschlisten**, auch die ältere ohne Jahresgliederung: `kind = 'wunsch'` für jede Zeile, kein Backlog-Import. Sammelzeilen („Mass Effect 1+2+3", „Overlord + 2") meinen mehrere Spiele; der Nutzer trennt sie in der Durchsicht, der Import rät nicht.
+- **Bereinigte Fassung.** Aus der Messung ist eine zusammengeführte Liste entstanden (`wunschlisten/wunschliste-bereinigt.txt`, lokal; Tabulator-getrennt: Datum, Titel, Plattform, Status, Original, Hinweis). 330 Zeilen wurden 318 – Doppelte zusammengeführt, das spätere Datum gewinnt –, davon 20 in der Sammlung, 198 eindeutig (6 davon erst über das Jahr aus der Liste), 65 zu prüfen, 35 unbekannt. Der Import in Stufe 11 nimmt beides an: die rohen Jahresdateien und diese Form.
 
 ### 8.3 Nachpflege fehlender Metadaten (Use Case 12)
 
