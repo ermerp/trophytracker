@@ -11,13 +11,18 @@ import {
   type ImportLauf,
   type ImportSeite,
   type ImportZeile,
+  type PlanEintrag,
 } from './api'
 import { IgdbSuche, KandidatenListe } from './IgdbSuche'
 
 /**
  * Wunschliste importieren (Use Case 9, Abschnitt 8.2).
  *
- * Ein Lauf je Datei; der Zustand liegt in der Datenbank. Der Abgleich läuft
+ * Ein Lauf je Datei; der Zustand liegt in der Datenbank. Jede Zeile bekommt
+ * beim Abgleich die neueste Plattform des Treffers vorgeschlagen, änderbar im
+ * Dropdown vor der Übernahme (Entscheidung des Nutzers vom 15.09.2026); bei
+ * Zeilen zur Durchsicht gilt „neueste des Treffers", bis etwas gewählt ist.
+ * Der Abgleich läuft
  * in Schritten (acht Zeilen je Aufruf), solange `weiter` zurückkommt – wie
  * beim IGDB-Abgleich. Danach die Durchsicht in drei Blöcken: Eindeutige und
  * schon vorhandene Spiele als ein Block mit einem Knopf, Einzelentscheidung
@@ -265,10 +270,10 @@ function ImportLaufAnsicht({ id }: { id: number }) {
     }
   }
 
-  async function entscheiden(zeile: ImportZeile, koerper: Record<string, unknown>, erfolg: (z: ImportZeile) => string) {
+  async function entscheiden(zeile: ImportZeile, koerper: Record<string, unknown>, erfolg: (z: ImportZeile & { wunsch?: PlanEintrag | null }) => string) {
     setMeldung(null)
     try {
-      const z = await anfrage<ImportZeile>(`/api/imports/wishlist/${id}/zeilen/${zeile.id}/entscheiden`, { methode: 'POST', koerper })
+      const z = await anfrage<ImportZeile & { wunsch?: PlanEintrag | null }>(`/api/imports/wishlist/${id}/zeilen/${zeile.id}/entscheiden`, { methode: 'POST', koerper })
       setHinweis(erfolg(z))
       setEben(z.entscheidung === 'offen' ? null : z)
       await aktualisieren()
@@ -279,7 +284,7 @@ function ImportLaufAnsicht({ id }: { id: number }) {
   }
 
   const uebernehmenIgdb = (zeile: ImportZeile, k: IgdbKandidat, plattform: string) =>
-    entscheiden(zeile, { aktion: 'igdb', igdbId: k.igdbId, plattform }, () => `„${zeile.titel}" → ${k.name}${plattform ? ` (${plattform})` : ''} auf die Wunschliste gesetzt.`)
+    entscheiden(zeile, { aktion: 'igdb', igdbId: k.igdbId, plattform }, (z) => `„${zeile.titel}" → ${k.name} (${z.wunsch?.plattform ?? 'ohne Plattform'}) auf die Wunschliste gesetzt.`)
 
   const ueberspringen = (zeile: ImportZeile) => entscheiden(zeile, { aktion: 'ueberspringen' }, () => `„${zeile.titel}" übersprungen.`)
 
@@ -310,6 +315,16 @@ function ImportLaufAnsicht({ id }: { id: number }) {
     }
   }
 
+  async function plattformSetzen(zeile: ImportZeile, plattform: string) {
+    setMeldung(null)
+    try {
+      await anfrage(`/api/imports/wishlist/${id}/zeilen/${zeile.id}`, { methode: 'PATCH', koerper: { plattform } })
+      setVersion((v) => v + 1)
+    } catch (f) {
+      setMeldung(f instanceof Error ? f.message : 'Plattform ändern fehlgeschlagen.')
+    }
+  }
+
   async function umbenennen(zeile: ImportZeile, titel: string) {
     setMeldung(null)
     try {
@@ -325,7 +340,7 @@ function ImportLaufAnsicht({ id }: { id: number }) {
 
   const z = lauf.zaehler
   const beschaeftigt = abgleich.laeuft || uebernahme.laeuft
-  const aktionen: ZeilenAktionen = { uebernehmenIgdb, ueberspringen, zuruecknehmen, freitext, aufteilen, umbenennen, beschaeftigt }
+  const aktionen: ZeilenAktionen = { uebernehmenIgdb, ueberspringen, zuruecknehmen, freitext, aufteilen, umbenennen, plattformSetzen, beschaeftigt }
 
   return (
     <>
@@ -369,8 +384,9 @@ function ImportLaufAnsicht({ id }: { id: number }) {
         <section className="import-block">
           <h2>Eindeutig und in der Sammlung</h2>
           <p className="zeile">
-            {z.klar} Zeilen treffen ein Spiel der Sammlung, ein schon angelegtes Spiel oder genau einen IGDB-Eintrag. Ein Spiel, das du
-            digital gespielt hast, bleibt ein Wunsch – „physisch besitzen wollen" ist genau die Lücke.
+            {z.klar} Zeilen treffen ein Spiel der Sammlung, ein schon angelegtes Spiel oder genau einen IGDB-Eintrag. Die Plattform ist
+            mit der neuesten des Treffers vorbelegt und in der Liste änderbar. Ein Spiel, das du digital gespielt hast, bleibt ein Wunsch –
+            „physisch besitzen wollen" ist genau die Lücke.
           </p>
           <div className="knopfzeile">
             <button type="button" onClick={() => void uebernehmen()} disabled={beschaeftigt}>
@@ -426,6 +442,7 @@ type ZeilenAktionen = {
   freitext: (zeile: ImportZeile, begriff: string) => Promise<void>
   aufteilen: (zeile: ImportZeile, titel: string[]) => Promise<void>
   umbenennen: (zeile: ImportZeile, titel: string) => Promise<void>
+  plattformSetzen: (zeile: ImportZeile, plattform: string) => Promise<void>
   beschaeftigt: boolean
 }
 
@@ -490,8 +507,8 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
   const [teilText, setTeilText] = useState(zeile.titel)
   const [umbenennen, setUmbenennen] = useState(false)
   const [neuerTitel, setNeuerTitel] = useState(zeile.titel)
-  // '' heißt „ohne Plattform" – vorbelegt mit dem, was die Liste sagt, nie mit einer geratenen.
-  const [plattform, setPlattform] = useState<string>(zeile.plattform ?? '')
+  // Zur Durchsicht: 'auto' = neueste des gewählten Treffers, solange die Zeile keine Plattform hat; '' = ohne.
+  const [plattform, setPlattform] = useState<string>(zeile.plattform ?? 'auto')
 
   const gewaehlt = zeile.igdbId !== null ? zeile.kandidaten.find((k) => k.igdbId === zeile.igdbId) : undefined
   const beschaeftigt = aktionen.beschaeftigt
@@ -503,7 +520,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
         <>
           {TREFFERTEXT[zeile.treffer]}:{' '}
           {zeile.spielId !== null ? <Link to={`/spiel/${zeile.spielId}`}>{zeile.spielTitel}</Link> : zeile.spielTitel}
-          {zeile.releasePlattform ? ` (${zeile.releasePlattform})` : zeile.plattform ? ` (${zeile.plattform}, Release entsteht)` : ' (am Spiel)'}
+          {zeile.plattform ? (zeile.releasePlattform === zeile.plattform ? ` (${zeile.plattform})` : ` (${zeile.plattform}, Release entsteht)`) : ' (am Spiel, ohne Plattform)'}
           {zeile.treffer === 'sammlung' && ' – schon gespielt, Wunsch bleibt'}
         </>
       )
@@ -541,10 +558,22 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
         <label className="zeile">
           Plattform{' '}
           <select value={plattform} onChange={(e) => setPlattform(e.target.value)} disabled={beschaeftigt}>
-            <option value="">ohne Plattform</option>
+            <option value="auto">neueste des Treffers</option>
             {PLATTFORMEN.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
+            <option value="">ohne Plattform</option>
+          </select>
+        </label>
+      )}
+      {offen && !unklar && (
+        <label className="zeile">
+          Plattform{' '}
+          <select value={zeile.plattform ?? ''} onChange={(e) => void aktionen.plattformSetzen(zeile, e.target.value)} disabled={beschaeftigt}>
+            {PLATTFORMEN.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+            <option value="">ohne Plattform</option>
           </select>
         </label>
       )}
@@ -579,7 +608,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
       {offen && suche && (
         <IgdbSuche
           vorgabe={zeile.titel}
-          plattformen={plattform ? [plattform] : []}
+          plattformen={plattform && plattform !== 'auto' ? [plattform] : []}
           onWahl={(k) => void aktionen.uebernehmenIgdb(zeile, k, plattform)}
           onOhneTreffer={(begriff) => void aktionen.freitext(zeile, begriff)}
           laeuft={beschaeftigt}

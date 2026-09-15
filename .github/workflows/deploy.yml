@@ -96,6 +96,7 @@ jobs:
       # gegen eine bekannte Zahl halten laesst.
       #   play_status  (0006): jede zugeordnete Liste mit Fortschritt > 0 (4.2)
       #   review_queue (0007): jede zugeordnete Liste, nie durchgesehen (8.1)
+      #   app_setting  (0013): die vier Gewichte der Rangformel geloescht, erwartet 0
       - name: Datenmigrationen protokollieren
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -108,12 +109,14 @@ jobs:
                     (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND progress_pct > 0) AS ps_erwartet,
                     (SELECT COUNT(*) FROM review_queue) AS review_queue,
                     (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND reviewed_at IS NULL) AS rq_erwartet,
-                    (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND progress_pct >= 100 AND reviewed_at IS NOT NULL) AS komplett" \
+                    (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND progress_pct >= 100 AND reviewed_at IS NOT NULL) AS komplett,
+                    (SELECT COUNT(*) FROM app_setting WHERE key LIKE 'w\_%' ESCAPE '\\') AS gewichte" \
             | jq -r '.[0].results[0] |
                 "zugeordnete Listen: \(.zugeordnet)",
                 "play_status: \(.play_status) Zeilen, erwartet mindestens \(.ps_erwartet) (zugeordnete Listen mit Fortschritt)",
                 "review_queue: \(.review_queue) Zeilen, erwartet \(.rq_erwartet) (zugeordnete Listen, nie durchgesehen, unter 100 %)",
-                "davon nicht vorgelegt, weil 100 %: \(.komplett)"'
+                "davon nicht vorgelegt, weil 100 %: \(.komplett)",
+                "app_setting: \(.gewichte) Gewichte der Rangformel, erwartet 0 (Migration 0013)"'
 
       - name: Worker und Assets deployen
         uses: cloudflare/wrangler-action@v4

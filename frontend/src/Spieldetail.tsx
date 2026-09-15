@@ -24,6 +24,7 @@ import {
   RELEASE_STATUS_TEXT,
   type PlanArt,
   igdbLink,
+  neuestePlattform,
   zeitpunkt,
   type IgdbKandidat,
   type ReleaseStatus,
@@ -93,7 +94,6 @@ type Plan = {
   art: PlanArt
   releaseId: number | null
   plattform: Plattform | null
-  prioritaet: number
   favorit: boolean
   notiz: string | null
 }
@@ -121,7 +121,9 @@ export function Spieldetail() {
   const [igdbSuche, setIgdbSuche] = useState(false)
   // '' heisst "ohne Plattform" - der Wunsch haengt dann am Spiel, nicht an einem
   // Release. Mit Plattform legt der Server das Release an, falls es fehlt.
-  const [wunschPlattform, setWunschPlattform] = useState('')
+  // null = noch nicht angefasst, dann gilt die neueste Plattform des Spiels.
+  const [wunschWahl, setWunschWahl] = useState<string | null>(null)
+  const wunschPlattform = wunschWahl ?? neuestePlattform((spiel?.releases ?? []).map((r) => r.plattform))
 
   const laden = useCallback(async () => {
     try {
@@ -137,16 +139,13 @@ export function Spieldetail() {
   }, [laden])
 
   /**
-   * Wunsch anlegen - am Spiel oder an einem Release. Die Plattform bleibt
-   * leer, wenn keine gewaehlt ist; ein Standardwert waere eine Behauptung.
+   * Wunsch anlegen - am Spiel oder an einem Release. Vorbelegt ist die
+   * neueste Plattform des Spiels (Entscheidung des Nutzers vom 15.09.2026);
+   * "ohne Plattform" bleibt waehlbar und wird ausdruecklich als "" gesendet.
    */
   function wunschAnlegen() {
     void tue(
-      () =>
-        anfrage('/api/plans', {
-          methode: 'POST',
-          koerper: wunschPlattform === '' ? { art: 'wunsch', spielId: spiel!.id } : { art: 'wunsch', spielId: spiel!.id, plattform: wunschPlattform },
-        }),
+      () => anfrage('/api/plans', { methode: 'POST', koerper: { art: 'wunsch', spielId: spiel!.id, plattform: wunschPlattform } }),
       'Auf die Wunschliste gesetzt.',
     )
   }
@@ -374,16 +373,6 @@ export function Spieldetail() {
                 >
                   {p.favorit ? '★' : '☆'}
                 </button>
-                <select
-                  value={p.prioritaet}
-                  aria-label="Priorität"
-                  disabled={laeuft}
-                  onChange={(e) => tue(() => anfrage(`/api/plans/${p.id}`, { methode: 'PATCH', koerper: { prioritaet: Number(e.target.value) } }))}
-                >
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>{`Priorität ${n}`}</option>
-                  ))}
-                </select>
                 <button
                   type="button"
                   title="Von der Liste entfernen"
@@ -400,7 +389,7 @@ export function Spieldetail() {
         <div className="knopfzeile">
           <label>
             Plattform{' '}
-            <select value={wunschPlattform} onChange={(e) => setWunschPlattform(e.target.value)} disabled={laeuft}>
+            <select value={wunschPlattform} onChange={(e) => setWunschWahl(e.target.value)} disabled={laeuft}>
               <option value="">ohne Plattform</option>
               {PLATTFORMEN.map((p) => (
                 <option key={p} value={p}>

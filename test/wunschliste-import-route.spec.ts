@@ -104,11 +104,31 @@ describe("importAbgleichSchritt", () => {
 		expect((await zeilen(id))[0].release_id).not.toBeNull();
 	});
 
-	it("haengt den Sammlungstreffer am Spiel, wenn mehrere Releases da sind und die Liste keine Plattform nennt", async () => {
+	it("schlaegt beim Sammlungstreffer die neueste Plattform vor, wenn die Liste keine nennt", async () => {
 		await spiel(1, "Bloodborne", "bloodborne", ["PS4", "PS5"]);
 		const id = await lauf("Bloodborne\n");
 		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
-		expect((await zeilen(id))[0]).toMatchObject({ match_kind: "sammlung", game_id: 1, release_id: null });
+		const z = (await zeilen(id))[0];
+		expect(z).toMatchObject({ match_kind: "sammlung", game_id: 1, platform: "PS5" });
+		expect(await env.DB.prepare("SELECT platform FROM release WHERE id = ?").bind(z.release_id).first()).toEqual({ platform: "PS5" });
+	});
+
+	it("laesst die Plattform einer Zeile vor der Uebernahme aendern oder leeren", async () => {
+		await spiel(1, "Bloodborne", "bloodborne", ["PS4", "PS5"]);
+		const id = await lauf("Bloodborne\n");
+		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
+		const zeileId = (await zeilen(id))[0].id;
+		const a = app(fakeIgdb([[]]).client);
+		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ plattform: "PS3" }, "PATCH"), env)).status).toBe(200);
+		expect((await zeilen(id))[0]).toMatchObject({ platform: "PS3", match_kind: "sammlung" });
+		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ plattform: "" }, "PATCH"), env)).status).toBe(200);
+		expect((await zeilen(id))[0]).toMatchObject({ platform: null });
+		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ plattform: "Switch" }, "PATCH"), env)).status).toBe(400);
+		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({}, "PATCH"), env)).status).toBe(400);
+
+		// Ohne Plattform haengt die Uebernahme den Wunsch ans Spiel.
+		await importUebernahmeSchritt(repos(), fakeIgdb([[]]).client, id);
+		expect(await plaene()).toEqual([expect.objectContaining({ game_id: 1, release_id: null })]);
 	});
 
 	it("nimmt bei zwei gleichnamigen Spielen das mit der Plattform aus der Liste", async () => {
@@ -122,7 +142,8 @@ describe("importAbgleichSchritt", () => {
 
 	it("markiert einen Sammlungstreffer als schon vorhanden, wenn am Ziel ein offener Wunsch haengt", async () => {
 		await spiel(1, "Bloodborne", "bloodborne", ["PS4", "PS5"]);
-		await env.DB.prepare("INSERT INTO plan_entry (kind, game_id, origin) VALUES ('wunsch', 1, 'manuell')").run();
+		const ps5 = (await env.DB.prepare("SELECT id FROM release WHERE platform = 'PS5'").first<{ id: number }>())!.id;
+		await env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('wunsch', ?, 'manuell')").bind(ps5).run();
 		const id = await lauf("Bloodborne\n");
 		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
 		expect((await zeilen(id))[0]).toMatchObject({ match_kind: "sammlung", decision: "schon_vorhanden" });
@@ -203,7 +224,10 @@ describe("Blockuebernahme", () => {
 		expect(p).toHaveLength(3);
 		expect(p[0]).toMatchObject({ kind: "wunsch", origin: "import", status: "offen", game_id: null, title_raw: null });
 		expect(p[0].release_id).not.toBeNull();
-		expect(p[1]).toMatchObject({ kind: "wunsch", origin: "import", release_id: null, title_raw: null });
+		// IGDB nennt PS4 - der Vorschlag wird zum Release.
+		expect(p[1]).toMatchObject({ kind: "wunsch", origin: "import", game_id: null, title_raw: null });
+		expect(await env.DB.prepare("SELECT platform FROM release WHERE id = ?").bind(p[1].release_id).first()).toEqual({ platform: "PS4" });
+		expect((await zeilen(id)).map((z) => z.platform)).toEqual(["PS3", "PS4", "PS4"]);
 		const spiele = await env.DB.prepare("SELECT title, igdb_id, release_status, igdb_matched_source FROM game ORDER BY id").all();
 		expect(spiele.results.slice(1)).toEqual([
 			{ title: "Neu", igdb_id: 501, release_status: "erschienen", igdb_matched_source: "manuell" },

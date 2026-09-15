@@ -217,7 +217,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		anweisungen.push(env.DB.prepare("UPDATE plan_entry SET status = 'erledigt' WHERE id % 10 = 0"));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 
-		const auswahl = `SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position, pe.priority,
+		const auswahl = `SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position,
 			  pe.is_favorite, pe.note, pe.origin, pe.status, pe.created_at, pe.resolved_at,
 			  COALESCE(g.title, pe.title_raw) AS titel, g.id AS spiel_id, r.platform,
 			  g.cover_url, g.critic_score, g.release_date, g.release_status

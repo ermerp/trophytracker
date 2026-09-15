@@ -835,3 +835,9 @@ button.notiz {
   gap: 0.3rem;
   margin-top: 0.4rem;
 }
+
+.plattformfilter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}

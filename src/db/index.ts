@@ -6,7 +6,6 @@ import { OwnershipRepository } from "./ownership";
 import { PlanRepository } from "./plan";
 import { PlayStatusRepository } from "./play-status";
 import { ReviewRepository } from "./review";
-import { SettingsRepository } from "./settings";
 import { SyncRepository } from "./sync";
 import { TrophiesRepository } from "./trophies";
 import { WishlistImportRepository } from "./wunschliste";
@@ -21,7 +20,6 @@ import { WishlistImportRepository } from "./wunschliste";
 export function createRepositories(db: D1Database, npssoKey: string) {
 	const playStatus = new PlayStatusRepository(db);
 	return {
-		settings: new SettingsRepository(db),
 		credentials: new CredentialsRepository(db, npssoKey),
 		sync: new SyncRepository(db),
 		trophies: new TrophiesRepository(db),

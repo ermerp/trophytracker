@@ -8,7 +8,6 @@ import { planRoutes } from "./api/plans";
 import { psnRoutes } from "./api/psn";
 import { releaseRoutes } from "./api/releases";
 import { reviewRoutes } from "./api/review";
-import { settingsRoutes } from "./api/settings";
 import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
@@ -51,7 +50,6 @@ export function createApp(
 	 */
 	app.get("/api/health", (c) => c.json({ status: "ok", zeit: new Date().toISOString() }));
 
-	app.route("/api/settings", settingsRoutes);
 	app.route("/api/igdb", igdbRoutes);
 	app.route("/api/unmatched", unmatchedRoutes);
 	app.route("/api/trophies", trophyRoutes);

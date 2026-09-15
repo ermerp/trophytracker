@@ -363,7 +363,6 @@ export const gameRoutes = new Hono<AppEnv>()
 				art: p.kind,
 				releaseId: p.release_id,
 				plattform: p.platform,
-				prioritaet: p.priority,
 				favorit: p.is_favorite === 1,
 				notiz: p.note,
 			})),

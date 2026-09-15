@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 26 – Stufe 11: Wunschlisten-Import als Lauf in der Datenbank mit Abgleich in Schritten, Durchsicht als Liste, Ansicht „Ohne Zuordnung" mit abgelehnten Spielen hinter einem Umschalter; Listendatum nur zum Abgleich (Entscheidungen des Nutzers vom 15.09.2026).*
+*Version 27 – Nachbesserung nach der Abnahme von Stufe 11 (Entscheidungen des Nutzers vom 15.09.2026): Favorit statt Priorität, kein Rang mehr (Migration 0013), Plattform eines Wunsches als Vorschlag „die neueste" mit Dropdown und Filter „ohne Plattform", Sortierungen und Plattformfilter der Wunschliste; Stufe „Oberfläche" als offener Punkt in Abschnitt 16.*
 
 ## 1. Use Cases
 
@@ -16,7 +16,7 @@
 | 7 | Preise: PSN Store für digital, Gebrauchtmarkt für physisch | `price_snapshot.channel`, `market_offer` |
 | 8 | Prüfliste: Trophäen-Bestand durchgehen, erstmalig und bei Änderungen | `review_queue` |
 | 9 | Wunschlisten aus Textdateien importieren | Import-Ansicht, `plan_entry.origin = 'import'` |
-| 10 | Kritikerwertung und eigene Priorität zu einem Rang verrechnen | `game.critic_score`, `plan_entry.priority`, Rangformel |
+| 10 | Nach Kritikerwertung sortieren, Favoriten zuerst | `game.critic_score`, `plan_entry.is_favorite` (keine Rangformel mehr, 5.2) |
 | 11 | Noch nicht erschienene Titel vormerken | `game.release_status`, `v_erscheint_bald` |
 | 12 | Lückenhafte Metadaten nachpflegen | `v_ohne_igdb` |
 | 13 | Datenbestand sichern und exportieren | Abschnitt 14 |
@@ -90,7 +90,7 @@ CREATE TABLE game (
   release_status TEXT NOT NULL DEFAULT 'unbekannt'
                  CHECK (release_status IN ('erschienen','angekuendigt','unbekannt')),
 
-  -- Use Case 10: Kritikerwertung. Bestandteile speichern, nie den fertigen Rang.
+  -- Use Case 10: Kritikerwertung, Sortierkriterium der Listen (5.2).
   critic_score       INTEGER,           -- 0-100
   critic_score_count INTEGER,           -- Anzahl eingeflossener Reviews
   critic_source      TEXT,              -- 'igdb' | 'opencritic' | 'manuell'
@@ -363,7 +363,7 @@ CREATE TABLE plan_entry (
   title_raw     TEXT,                    -- freie Eingabe, Spiel noch nicht angelegt
 
   position      INTEGER,                 -- manuelle Reihenfolge, für To-Do zentral
-  priority      INTEGER NOT NULL DEFAULT 3 CHECK (priority BETWEEN 1 AND 5),
+  -- priority (1-5) gab es bis Migration 0013; Favorit oder nicht reicht (5.1).
   is_favorite   INTEGER NOT NULL DEFAULT 0,   -- der persönliche Anker, s.u.
   note          TEXT,
 
@@ -396,26 +396,28 @@ Diese Übergänge werden vorgeschlagen, nicht erzwungen. Beim Erfassen einer Dis
 hat `origin = 'manuell'` und genau eine Quelle: ein Spiel (`game_id`), ein Release (`release_id`),
 ein IGDB-Treffer (legt bei Bedarf das Spiel an, Abschnitt 3) oder Freitext (`title_raw`). Freitext
 entsteht nur über den ausdrücklichen Knopf nach einer IGDB-Suche (8.2) – kein Fallback, eine
-Entscheidung; er hat weder Cover noch Rang (8.3).
+Entscheidung; er hat weder Cover noch Kritikerwertung (8.3).
 
-- **Die Plattform darf leer bleiben und fällt nie auf einen Standardwert.** Ein Wunsch am Spiel
-  sagt „das Spiel", ein Wunsch am Release sagt „diese Fassung". Ein geratenes PS5 bei einem
-  angekündigten Titel wäre eine Aussage, die nie getroffen wurde. Wählbar ist sie überall
-  (Wunschliste wie Spieldetail); mit Wahl entsteht das Release, falls es fehlt (Abschnitt 3).
-  Freitext hat kein Spiel und deshalb nie eine Plattform.
+- **Die Plattform wird vorgeschlagen und bleibt änderbar (Entscheidung des Nutzers vom
+  15.09.2026, kehrt die vom 14.09. um).** Ein Spiel soll in der Regel eine Plattform bekommen:
+  Ohne ausdrückliche Wahl (`plattform` fehlt oder ist `"auto"`) nimmt der Worker die **neueste**
+  Plattform, die die Releases des Spiels beziehungsweise der IGDB-Eintrag nennen – PS5 vor PS4 vor
+  PS3 vor Vita, dieselbe Rangfolge wie bei geteilten Trophäenlisten (`neuestePlattform`,
+  `src/domain/titel.ts`). Das gilt beim Anlegen von Hand (Wunschliste, Spieldetail), beim Import
+  (8.2) und in der Nachpflege (8.3); überall steht ein Dropdown mit den vier Plattformen und
+  „ohne Plattform" (`""`), das den Vorschlag vor dem Speichern ändert. Ein Wunsch am Spiel sagt
+  „das Spiel", ein Wunsch am Release sagt „diese Fassung"; mit Plattform entsteht das Release,
+  falls es fehlt (Abschnitt 3). `PATCH /api/plans/:id { plattform }` hängt einen Eintrag später um;
+  der Filter „ohne Plattform" der Wunschliste findet, was nachzupflegen ist. Freitext hat kein
+  Spiel und deshalb nie eine Plattform.
 - **Ein offener Eintrag am Spiel und einer an einem seiner Releases sind kein Duplikat**, sondern
   zwei verschiedene Aussagen; sie blockieren sich nicht. Ein zweiter offener Eintrag **derselben Art
   an genau demselben Ziel** ist eines und wird mit `409` abgewiesen. Erledigte und verworfene
   Einträge blockieren nichts – ein Sinneswandel ist ein Feld-Update auf `offen`, kein Neuanlegen.
 
-### 5.1 Priorität und Favorit
+### 5.1 Favorit
 
-Zwei getrennte Felder, weil sie zwei verschiedene Fragen beantworten:
-
-- `priority` (1–5) ist der Regler für die **Sortierung**. Er geht in die Rangformel ein.
-- `is_favorite` ist der binäre Anker für **"das will ich wirklich"**. Er filtert, statt zu sortieren, und überlebt jede Änderung der Rangformel unbeschadet.
-
-Ein Favorit mit mässiger Kritikerwertung soll nicht nach unten rutschen, nur weil die Formel gerade anders gewichtet ist. Deshalb ist Favorit kein Prioritätswert 6.
+`is_favorite` ist der binäre Anker für **„das will ich wirklich"**: Er sortiert nach vorn und filtert. Eine feinere Priorität (1–5) gab es bis Migration 0013; **Entscheidung des Nutzers vom 15.09.2026: sie ist unnötig, Favorit oder nicht reicht.** Damit entfällt auch die Rangformel (5.2) – zwei Regler für dieselbe Frage waren einer zu viel.
 
 ### 5.3 Eine Lücke bewusst verwerfen
 
@@ -444,36 +446,23 @@ späterer Sinneswandel ist ein Feld-Update auf `offen`, kein Neuanlegen.
 
 Umsetzung mit Stufe 14 (Lückenansicht) und Stufe 15 (Kaufliste).
 
-### 5.2 Rangberechnung (Use Case 10)
+### 5.2 Sortierung (Use Case 10)
 
-Der Rang wird **bei der Abfrage berechnet und nie gespeichert**. Gespeichert werden nur die Bestandteile: `game.critic_score`, `plan_entry.priority`, später der Preis. Sobald die Gewichtung angepasst wird – und das wird sie – ist das ein Zahlenwechsel statt einer Datenmigration.
+**Bis Version 26** stand hier eine Rangformel: Kritikerwertung, Priorität und Favorit mit Gewichten aus `app_setting` zu einem Rang verrechnet, bei der Abfrage berechnet und nie gespeichert. Mit der Priorität ist sie gefallen (Entscheidung des Nutzers vom 15.09.2026, Migration 0013 löscht die vier Gewichte `w_*`); `src/domain/rang.ts`, `GET/PUT /api/settings/weights` und die Gewichte in den Einstellungen gibt es nicht mehr.
 
-```sql
--- Gewichte liegen in app_setting und sind in den Einstellungen verstellbar.
-score = (COALESCE(critic_score, 70) / 100.0) * w_critic
-      + (priority / 5.0)                     * w_priority
-      + (is_favorite * w_favorite)
-```
+Stattdessen **sortieren die Listen nach gespeicherten Bestandteilen**, in der Route, nicht in SQL (`src/api/plans.ts`, `sort=`):
 
-`COALESCE(critic_score, 70)` ist bewusst gewählt: ein Spiel ohne Wertung soll weder bevorzugt noch bestraft werden. Ein `0` würde unbewertete Titel dauerhaft ans Listenende drücken.
+| `sort` | Ordnung |
+|---|---|
+| `favorit` (Standard) | Favoriten zuerst, dann Kritikerwertung absteigend, ohne Wertung ans Ende, dann Titel |
+| `wertung` | Kritikerwertung absteigend, ohne Wertung ans Ende, dann Titel |
+| `titel` | alphabetisch |
+| `release` | Erscheinungsdatum aufsteigend, ohne Datum ans Ende |
+| `angelegt` | zuletzt angelegt zuerst |
 
-Die Formel steht als pure Funktion in `src/domain/rang.ts` und wird in der Route gerechnet, nicht in SQL: Das Repository liefert die Bestandteile, die Route holt die Gewichte aus `app_setting` und sortiert. Seit Stufe 10 sortiert die Wunschliste danach, Stufe 15 nutzt dieselbe Funktion für die Kaufliste; die Gewichte sind seit Stufe 10 in den Einstellungen verstellbar. Einträge ohne Spiel (Freitext) haben keinen Rang und stehen am Ende (8.3). Die Oberfläche zeigt den Rang als Zahl von 0 bis 100.
+Dazu die Filter `favorit=1` und `plattform=PS4,PS5,ohne` (Mehrfachauswahl; `ohne` sind Einträge am Spiel oder Freitext). Stufe 15 nutzt dieselbe Ordnung für die Kaufliste; ob der Preis dort als weiteres Sortierkriterium („viel Spiel pro Euro") dazukommt, entscheidet Stufe 18.
 
-Später kommt der Preis als vierter Faktor hinzu und liefert eine Sortierung nach "viel Spiel pro Euro". Bis dahin bleibt `w_price` auf 0.
-
-```sql
-CREATE TABLE app_setting (
-  key   TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
--- w_critic, w_priority, w_favorite, w_price
-```
-
-Vorbelegung aus Migration 0001: `w_critic = 0.5`, `w_priority = 0.3`, `w_favorite = 0.2`,
-`w_price = 0`. Die drei wirksamen summieren sich auf 1, ein Favorit erreicht damit maximal
-1.0 und alles Übrige höchstens 0.8 – `is_favorite` wirkt additiv. Seeds werden als
-`INSERT OR IGNORE` geschrieben, damit ein erneuter Lauf einen angepassten Wert nie
-zurücksetzt.
+`app_setting` (`key`, `value`) bleibt für die Backup-Vermerke (14.2) und künftige Einstellungen bestehen.
 
 ---
 
@@ -770,7 +759,7 @@ Eingabe: Datei-Upload oder Einfügen in ein Textfeld, ein Titel pro Zeile. Leerz
 3. Durchsicht in drei Blöcken. **Eindeutige Treffer, Sammlungstreffer und vorhandene Spiele sind ein Block mit einem Knopf** (`importUebernahmeSchritt`, 25 Zeilen je Aufruf, die IGDB-Einträge aller eindeutigen Zeilen in einer Anfrage); die Liste ist aufklappbar, jede Zeile lässt sich vorher überspringen oder anders wählen. Mehrdeutige und Zeilen ohne Treffer stehen **als Liste** zur Einzelentscheidung – bei den echten Listen rund 100 von 318 –, nicht eine Zeile je Bildschirm: Nichts erzwingt eine Reihenfolge, Ausgelassenes bleibt stehen (wie die IGDB-Zuordnung, 7.6). Die Darstellungsregel „in Serie" (Abschnitt 13) gilt für den Import deshalb nicht mehr.
 4. Jede Entscheidung schreibt sofort: Kandidat übernehmen oder „Ohne IGDB-Eintrag übernehmen" **ist** die Bestätigung und legt den `plan_entry` mit `kind='wunsch'`, `origin='import'` an (mit Rückgängig); „überspringen" ist eine gespeicherte Entscheidung; „umbenennen" setzt den Abgleich der Zeile zurück (der neue Titel ist meist die Korrektur, mit der IGDB trifft); „aufteilen" ersetzt eine Sammelzeile durch mehrere, die neu abgeglichen werden.
 
-**Ziel des Wunsches.** Nennt die Liste eine Plattform (Abschnitt „PS3"/„PS4"), hängt der Wunsch am Release dieser Plattform, das bei Bedarf entsteht (Abschnitt 3) – auch bei Sammlungstreffern. Ohne Plattform hängt er am Spiel; hat ein Sammlungstreffer genau ein Release, an diesem. Eine geratene Plattform wäre eine Aussage, die nie getroffen wurde (Abschnitt 5). In der Durchsicht ist die Plattform mit der aus der Liste vorbelegt und änderbar, „ohne Plattform" eingeschlossen.
+**Ziel des Wunsches.** Nennt die Liste eine Plattform (Abschnitt „PS3"/„PS4"), gilt sie. Sonst schlägt der Abgleich die **neueste** vor (Abschnitt 5, Entscheidung des Nutzers vom 15.09.2026): bei Sammlungstreffern aus den Releases des Spiels, bei IGDB-Treffern aus dem IGDB-Eintrag; sie steht in `wishlist_import_line.platform` und im Dropdown jeder Zeile, änderbar bis zur Übernahme (`PATCH …/zeilen/:id { plattform }`, „ohne Plattform" eingeschlossen). Die Übernahme hängt den Wunsch an das Release dieser Plattform, das bei Bedarf entsteht (Abschnitt 3), oder ohne Plattform an das Spiel. Bei Zeilen zur Durchsicht gilt „neueste des Treffers" (`plattform: 'auto'`), bis im Dropdown etwas gewählt ist.
 
 **Zeilen ohne Treffer werden nicht stillschweigend als Freitext übernommen.** Sie stehen in der Durchsicht mit dem eingebauten IGDB-Suchfeld (`IgdbSuche`): Suchbegriff anpassen, Treffer auswählen, fertig. Titel aus Textdateien sind abgekürzt, falsch geschrieben und mehrdeutig – eine Suche mit korrigierbarer Eingabe löst das, ein automatischer Fallback erzeugt nur Datenmüll.
 
@@ -788,7 +777,7 @@ Ein Eintrag ohne IGDB-Zuordnung entsteht **nur auf ausdrückliche Anweisung** (�
 
 ### 8.3 Nachpflege fehlender Metadaten (Use Case 12)
 
-Einträge ohne IGDB-Zuordnung haben kein Cover, keine Kritikerwertung und kein Erscheinungsdatum. Sie funktionieren in allen Listen, fallen aber aus der Rangberechnung heraus (seit Stufe 10: `rang = null`, am Listenende).
+Einträge ohne IGDB-Zuordnung haben kein Cover, keine Kritikerwertung und kein Erscheinungsdatum. Sie funktionieren in allen Listen, stehen aber bei der Sortierung nach Wertung oder Datum am Ende (5.2).
 
 Die Ansicht „Ohne Zuordnung" (`/ohne-zuordnung`, Werkzeug in den Einstellungen, seit Stufe 11) sammelt sie listenübergreifend aus `v_ohne_igdb` – Freitext aus Wunschliste, To-Do, Backlog und Kaufliste sowie Spiele der Sammlung ohne IGDB-Id – mit demselben IGDB-Suchfeld zum Nachziehen, gruppiert nach `zustand`: Freitext ohne Spiel, Spiele in der IGDB-Zuordnung (mit Link auf deren Kandidaten), noch nicht gesuchte Spiele (der Abgleich läuft in den Einstellungen) und **abgelehnte Spiele hinter einem Umschalter**, standardmäßig ausgeblendet – die Ablehnung ist eine gespeicherte Entscheidung, „Doch suchen" nimmt sie zurück (Entscheidung des Nutzers vom 15.09.2026, schließt den offenen Punkt aus 7.6).
 
@@ -1049,12 +1038,14 @@ GET    /api/zuordnung/offen            Gruppenvorschläge, seitenweise
 POST   /api/zuordnung/gruppe           Gruppe bestätigen: ein Spiel, mehrere Releases
 POST   /api/zuordnung/liste/:npCommId  Einzelne Liste einem Release zuordnen
 
-GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=rang|titel|angelegt&favorit=1
-                                      { gewichte, sortierung, eintraege[] }; Rang je Eintrag berechnet (5.2), null ohne Spiel
-POST   /api/plans                     Body: { art, spielId | releaseId | igdbId | titel, plattform?, prioritaet?, favorit?, notiz? } – genau eine Quelle;
-                                      igdbId legt bei Bedarf ein Spiel an; plattform (nur zu spielId/igdbId) hängt den Wunsch an das Release
+GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=favorit|wertung|titel|release|angelegt&favorit=1&plattform=PS4,PS5,ohne
+                                      { sortierung, plattformen, eintraege[] } (5.2)
+POST   /api/plans                     Body: { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz? } – genau eine Quelle;
+                                      igdbId legt bei Bedarf ein Spiel an; plattform (nur zu spielId/igdbId): fehlt oder 'auto' → die neueste
+                                      der Releases bzw. des IGDB-Eintrags, '' → ohne, sonst eine der vier – der Wunsch hängt am Release
                                       dieser Plattform, das bei Bedarf entsteht; 409 mit eintragId bei offenem Duplikat (Abschnitt 5)
-PATCH  /api/plans/:id                 Teilmenge von { prioritaet, favorit, notiz, status, art }; Statuswechsel setzt resolved_at
+PATCH  /api/plans/:id                 Teilmenge von { favorit, notiz, status, art, plattform }; Statuswechsel setzt resolved_at;
+                                      plattform hängt den Eintrag um (Release entsteht bei Bedarf, '' zurück ans Spiel), 409 bei Duplikat
 PUT    /api/plans/reorder             Body: { kind, orderedIds } – To-Do-Reihenfolge (Stufe 12)
 DELETE /api/plans/:id
 
@@ -1092,8 +1083,6 @@ GET    /api/backup/status             { letzterErfolgAm, letzterCommit, tageSeit
 POST   /api/backup/vermerk            Body: { zeitpunkt (ISO), commit? } – die Backup-Action meldet ihren Lauf
 
 GET    /api/upcoming                  v_erscheint_bald
-GET    /api/settings/weights          Rangformel-Gewichte
-PUT    /api/settings/weights
 
 GET    /api/gaps                      v_luecken
 GET    /api/purchase-candidates       v_kaufkandidaten
@@ -1130,16 +1119,16 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
 | IGDB-Zuordnung | – | Spiele ohne eindeutigen IGDB-Treffer als Liste mit Seiten: Kandidaten (Cover, Jahr, Typ, Plattformen, Wertung) zum Übernehmen, „Anders suchen" mit vorbelegtem Begriff, „Gibt es bei IGDB nicht". Eine Liste, kein Ein-Spiel-pro-Bildschirm: Nichts erzwingt eine Reihenfolge, Ausgelassenes bleibt stehen (7.6) |
 | Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden. Knopf "physisch nicht gewünscht"; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar |
-| Wunschliste | 4, 11 | Nach Rang sortiert (auch Titel, zuletzt angelegt), Favoriten-Filter, erledigte und verworfene standardmäßig ausgeblendet; je Eintrag Cover, Plattform (oder „ohne Plattform"), Kritikerwertung, Rang, Favorit-Stern, Priorität 1–5, Notiz, erledigt/verworfen/wieder öffnen, entfernen; Erscheinungsdatum statt Preis bei angekündigten Titeln. „Wunsch hinzufügen" über die IGDB-Suche mit Plattform-Auswahl, vorbelegt „ohne Plattform" (dann entsteht ein Spiel ohne Release), Freitext nur über „Ohne IGDB-Eintrag übernehmen" nach einer Suche; Rückgängig direkt nach dem Anlegen. Im Spieldetail ein Block „Wunschliste": auf die Liste setzen, Plattform wählbar (auch eine, für die noch kein Release existiert) und standardmäßig leer |
+| Wunschliste | 4, 11 | Sortierung Favoriten zuerst → Wertung (Standard), Wertung, Titel, Erscheinungsdatum, zuletzt angelegt (5.2); Filter nur Favoriten, Plattformen (Mehrfachauswahl) und „ohne Plattform" – zum Nachpflegen; erledigte und verworfene standardmäßig ausgeblendet; je Eintrag Cover, Kritikerwertung, Jahr, Favorit-Stern, Plattform-Dropdown (hängt den Wunsch um), Notiz, erledigt/verworfen/wieder öffnen, entfernen; Erscheinungsdatum statt Preis bei angekündigten Titeln. „Wunsch hinzufügen" über die IGDB-Suche, Plattform vorbelegt mit „neueste des Treffers", die vier Plattformen und „ohne Plattform" wählbar; Freitext nur über „Ohne IGDB-Eintrag übernehmen" nach einer Suche; Rückgängig direkt nach dem Anlegen. Im Spieldetail ein Block „Wunschliste": auf die Liste setzen, Plattform vorbelegt mit der neuesten des Spiels, auch eine ohne Release oder „ohne Plattform" wählbar |
 | To-Do | 5a | Kurz und manuell sortierbar (Drag-and-drop) |
 | Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
-| Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert nach Rang, mit Herkunftskennzeichnung |
+| Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert wie die Wunschliste (5.2), mit Herkunftskennzeichnung |
 | Prüfliste | 8 | Ein Spiel pro Bildschirm, sieben Aktionen mit Tastenkürzeln 1–7, Grund und Vorher-Nachher, aktueller (vorbelegter) Status, Fortschrittsanzeige „noch n von m"; jederzeit verlassen, jede Entscheidung ist schon gespeichert. **Auf dem Handy müssen alle sieben Knöpfe ohne Scrollen sichtbar sein** (zweispaltig, kompakte Karte) – die Ansicht wird bei der Ersteinrichtung mehrere hundert Mal hintereinander bedient. **Die Knopfreihe steht immer an derselben Stelle**, unabhängig von der Titellänge (feste Mindesthöhe der Karte): Wer blind auf dieselbe Position zielt, trifft sonst bei einem zweizeiligen Titel daneben, und eine Fehlentscheidung fällt erst Wochen später auf. Eine Zeile stellt klar: „Du bewertest den Spielstand, nicht den Besitz." |
 | Wunschliste importieren | 9 | `/import`: Datei (UTF-8, sonst Windows-1252) oder Textfeld, Jahr aus dem Dateinamen korrigierbar, Liste der bisherigen Läufe. `/import/:id`: Abgleich in Schritten mit Fortschritt, dann drei Blöcke – Eindeutige, Sammlungstreffer und Vorhandene als ein Block mit einem Knopf und aufklappbarer Liste; Mehrdeutige und Zeilen ohne Treffer als Liste mit Kandidaten, Plattform aus der Liste vorbelegt, IGDB-Suche (8.2), „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen; Übersprungene und Übernommene aufklappbar mit „Doch entscheiden"/„Zurücknehmen"; Rückgängig nach jeder Entscheidung |
 | Ohne Zuordnung | 12 | `/ohne-zuordnung`: `v_ohne_igdb` nach Zustand gruppiert (Freitext, in der IGDB-Zuordnung, nicht gesucht), IGDB-Suchfeld zum Nachziehen, „Gibt es bei IGDB nicht"; abgelehnte hinter „auch abgelehnte zeigen" mit „Doch suchen" |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |
 | Scannen | 1 | Serienerfassung nach Abschnitt 9 |
-| Einstellungen | – | NPSSO, Sync, Sync-Historie, Gewichte der Rangformel (seit Stufe 10), IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen", „Offene erneut suchen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Gewichte der Rangformel, Export und Backup-Status |
+| Einstellungen | – | NPSSO, Sync, Sync-Historie, IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen", „Offene erneut suchen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Export und Backup-Status |
 
 **Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den sechs Hauptansichten (Sammlung, Wunschliste, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Die Wunschliste kam mit Stufe 10 in die Leiste (Entscheidung des Nutzers vom 14.09.2026): Sie wird oft bedient, und ein Umweg über die Einstellungen wäre für die häufigste Liste der falsche Platz. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
 
@@ -1235,7 +1224,7 @@ Der vollständige Ablauf mit Befehlen steht in der README. Er endet nicht beim E
 |---|---|
 | `sammlung` (eine Zeile je Release) | Titel; Plattform; Disc-Fassung; Exemplare; Digital; Fortschritt %; Platin; Status; Bewertung; Zuletzt gespielt |
 | `trophaeen` | Rohtitel; Plattform(en); Titel (zugeordnet); Fortschritt %; Bronze erspielt; Bronze definiert; Silber erspielt; Silber definiert; Gold erspielt; Gold definiert; Platin erspielt; Platin definiert; Zuletzt gespielt; Zugeordnet |
-| `wunsch`, `todo`, `backlog`, `kauf` | Titel; Plattform; Priorität; Favorit; Position; Notiz; Herkunft; Status; Angelegt am |
+| `wunsch`, `todo`, `backlog`, `kauf` | Titel; Plattform; Favorit; Position; Notiz; Herkunft; Status; Angelegt am |
 | `luecken` | Titel; Plattform; Fortschritt %; Platin erspielt; Status; Bester Gebrauchtpreis; Verworfen |
 
 „Platin" in `sammlung` ist dreiwertig als Text (`erspielt` / `offen` / `nicht vorgesehen`) – 93 der 431 Listen haben gar keine Platin-Trophäe, dort wäre „offen" falsch. In `trophaeen` und `luecken` stehen stattdessen die Zahlen beziehungsweise das binäre `hat_platin` der View; die Spalte heisst dort deshalb „Platin erspielt" und behauptet nichts über Verfügbarkeit.
@@ -1417,11 +1406,13 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 12 | To-Do und Backlog mit Sortierung und Kandidatenvorschlägen | **Use Cases 5a und 5b** |
 | 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` | **Use Case 8** vollständig |
 | 14 | `physical_release_status` manuell pflegbar, Lückenansicht, Lücken verwerfen (5.3) | **Use Case 3** |
-| 15 | Kaufliste mit Kandidaten und Rangberechnung, "Erscheint bald" | **Use Cases 6, 10, 11** |
+| 15 | Kaufliste mit Kandidaten und Sortierung (5.2), "Erscheint bald" | **Use Cases 6, 10, 11** |
 | 16 | Barcode-Scan mit Auflösungskette (ohne Feed) | Komfort bei Erfassung |
 | 17 | Cron Trigger, PWA | Automatik und Komfort |
 | 18 | AWIN-Feed: Gebrauchtpreise, automatischer Physisch-Status | **Use Case 7**, Teil 1 |
 | 19 | PSN Store-Preise | **Use Case 7**, Teil 2 |
+
+**Offen: eine Stufe „Oberfläche" nach Stufe 15** (Frage des Nutzers vom 15.09.2026). Bis dahin zählt Funktion vor Form; danach steht ein Durchgang an, der die gewachsenen Ansichten vereinheitlicht – Kacheln und Listen, Handy-Layout, das Dashboard anstelle des Hinweisblocks. Umfang und Platz in der Reihenfolge werden nach Stufe 15 entschieden.
 
 Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 17 hängen an externen Freigaben beziehungsweise inoffiziellen Schnittstellen und stehen deshalb am Ende – die Tabellen dafür existieren aber ab Stufe 1.
 
@@ -1460,12 +1451,11 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 | Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht in den Einstellungen, Warnung im Hinweisblock ab acht Tagen; GitHub schaltet den Zeitplan nach 60 Tagen ohne Repo-Aktivität ab (14.2) |
 | Wiederherstellung nie geprobt | Backup unbrauchbar | Probe am 14.09.2026 durchgeführt – sie fand einen echten Fehler (14.3). Ablauf und Ergebnis in der README |
 | Dump nicht einspielbar nach Tabellen-Neuaufbau | Backup nur scheinbar brauchbar | `scripts/dump-ordnen.mjs` ordnet Schema vor Daten, `PRAGMA foreign_key_check` prüft danach (14.3); `test/dump-ordnen.spec.ts` hält die Zerlegung fest |
-| Kritikerwertung fehlt | Rang verzerrt | `COALESCE(critic_score, 70)` – unbewertete Titel werden weder bevorzugt noch bestraft |
-| IGDB-Treffer falsch | Falsches Cover, falsche Wertung im Rang | Nur eindeutige Treffer automatisch, gegen die echten Titel gemessen (7.6); Herkunft in `igdb_matched_source`; jede Verknüpfung im Spieldetail lösbar oder austauschbar |
+| Kritikerwertung fehlt | Eintrag rutscht ans Listenende | Sortierung nach Wertung stellt Unbewertete hinten an, mit „unbekannt" statt 0; die Nachpflege (8.3) findet sie |
+| IGDB-Treffer falsch | Falsches Cover, falsche Wertung | Nur eindeutige Treffer automatisch, gegen die echten Titel gemessen (7.6); Herkunft in `igdb_matched_source`; jede Verknüpfung im Spieldetail lösbar oder austauschbar |
 | Twitch-Token läuft ab | IGDB-Abfragen scheitern | Client-Credentials-Token im Speicher, Erneuerung bei Ablauf oder 401 ohne Zutun (7.6) |
 | IGDB-Ratenlimit | Abgleich bricht ab | 260 ms Abstand je Anfrage, acht Spiele je Aufruf, 429 beendet den Schritt sauber und die Oberfläche ruft erneut |
 | IGDB-Zugangsdaten fehlen | Kein Cover, keine Wertung | Nur die IGDB-Routen antworten 503, alles andere läuft; Hinweis in den Einstellungen |
-| Rangformel passt nicht | Umbauwunsch | Nur Bestandteile gespeichert, Gewichte in `app_setting` verstellbar |
 | AWIN-Freigabe abgelehnt | Kein Feed, keine Gebrauchtpreise | Stufen 1–12 sind unabhängig |
 | Feed kennt Titel nicht | Physisch-Status und Preis fehlen | Status bleibt `unbekannt`, niemals automatisch `nein` |
 | Feedgröße vs. 10 ms CPU | Import bricht ab | Parsen und Filtern in der GitHub Action, Worker bekommt nur Batches |

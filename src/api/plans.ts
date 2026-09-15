@@ -8,12 +8,10 @@ import {
 	type PlanZeile,
 	type PlanZiel,
 } from "../db/plan";
-import { rang } from "../domain/rang";
-import type { Weights } from "../domain/weights";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
-import { zielAusIgdbId } from "../sync/plan-ziel";
-import { istErlaubtePlattform, type Plattform } from "../domain/titel";
+import { zielAmSpiel, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
+import { ERLAUBTE_PLATTFORMEN, istErlaubtePlattform } from "../domain/titel";
 import type { AppEnv } from "../types";
 import { liesJson } from "./validierung";
 
@@ -23,12 +21,16 @@ import { liesJson } from "./validierung";
  * Stufe 10 bedient die Wunschliste, die Routen kennen aber alle vier Arten.
  * PUT /api/plans/reorder (To-Do-Reihenfolge) kommt mit Stufe 12.
  *
- * Der Rang wird hier berechnet und nie gespeichert (5.2): Die Zeile bringt
- * die Bestandteile mit, die Gewichte kommen aus app_setting.
+ * Sortierung und Filter laufen hier, nicht in SQL (5.2): Favoriten zuerst,
+ * dann Kritikerwertung ist der Standard; Prioritaet und Rang gibt es seit
+ * Migration 0013 nicht mehr (Entscheidung des Nutzers vom 15.09.2026).
  */
 
-const SORTIERUNGEN = ["rang", "titel", "angelegt"] as const;
+const SORTIERUNGEN = ["favorit", "wertung", "titel", "angelegt", "release"] as const;
 type Sortierung = (typeof SORTIERUNGEN)[number];
+
+/** Plattformfilter: die vier Plattformen und "ohne" fuer Eintraege am Spiel oder Freitext. */
+const PLATTFORM_FILTER = [...ERLAUBTE_PLATTFORMEN, "ohne"] as const;
 
 type Koerper = Record<string, unknown>;
 
@@ -48,12 +50,6 @@ function idAus(roh: unknown): number | null {
 function pruefeFelder(k: Koerper): { felder: PlanFelder } | { fehler: string } {
 	const felder: PlanFelder = {};
 
-	if ("prioritaet" in k) {
-		if (typeof k.prioritaet !== "number" || !Number.isInteger(k.prioritaet) || k.prioritaet < 1 || k.prioritaet > 5) {
-			return { fehler: "Priorität muss eine ganze Zahl von 1 bis 5 sein." };
-		}
-		felder.priority = k.prioritaet;
-	}
 	if ("favorit" in k) {
 		if (typeof k.favorit !== "boolean") return { fehler: "Feld 'favorit' muss true oder false sein." };
 		felder.isFavorite = k.favorit;
@@ -76,8 +72,20 @@ function pruefeFelder(k: Koerper): { felder: PlanFelder } | { fehler: string } {
 	return { felder };
 }
 
-/** Eintraege ohne Spiel haben keinen Rang (8.3) - null, nie 0. */
-export function eintragAntwort(z: PlanZeile, gewichte: Weights) {
+/**
+ * Plattformwahl aus dem Koerper: fehlt → "auto" (neueste des Treffers bzw.
+ * der Releases), "" oder null → ohne, sonst eine der vier. undefined im
+ * Ergebnis heisst "Feld nicht im Koerper".
+ */
+function pruefePlattform(k: Koerper): { wahl: PlattformWahl | undefined } | { fehler: string } {
+	if (!("plattform" in k)) return { wahl: undefined };
+	if (k.plattform === null || k.plattform === "") return { wahl: null };
+	if (k.plattform === "auto") return { wahl: "auto" };
+	if (typeof k.plattform === "string" && istErlaubtePlattform(k.plattform)) return { wahl: k.plattform };
+	return { fehler: `Unbekannte Plattform: ${String(k.plattform)}` };
+}
+
+export function eintragAntwort(z: PlanZeile) {
 	return {
 		id: z.id,
 		art: z.kind,
@@ -90,29 +98,35 @@ export function eintragAntwort(z: PlanZeile, gewichte: Weights) {
 		kritik: z.critic_score,
 		erscheinungsdatum: z.release_date,
 		releaseStatus: z.release_status,
-		prioritaet: z.priority,
 		favorit: z.is_favorite === 1,
 		notiz: z.note,
 		herkunft: z.origin,
 		angelegtAm: z.created_at,
 		erledigtAm: z.resolved_at,
-		rang:
-			z.spiel_id === null
-				? null
-				: rang({ kritik: z.critic_score, prioritaet: z.priority, favorit: z.is_favorite === 1 }, gewichte),
 	};
 }
 
 type Eintrag = ReturnType<typeof eintragAntwort>;
 
+const nachTitel = (a: Eintrag, b: Eintrag) => a.titel.localeCompare(b.titel, "de") || a.id - b.id;
+// Hoechste Wertung zuerst; ohne Wertung ans Ende, dort nach Titel.
+const nachWertung = (a: Eintrag, b: Eintrag) => (b.kritik ?? -1) - (a.kritik ?? -1) || nachTitel(a, b);
+
 const vergleicher: Record<Sortierung, (a: Eintrag, b: Eintrag) => number> = {
-	// Hoechster Rang zuerst; ohne Rang ans Ende, dort nach Titel.
-	rang: (a, b) =>
-		(b.rang ?? -1) - (a.rang ?? -1) || a.titel.localeCompare(b.titel, "de"),
-	titel: (a, b) => a.titel.localeCompare(b.titel, "de") || a.id - b.id,
+	favorit: (a, b) => Number(b.favorit) - Number(a.favorit) || nachWertung(a, b),
+	wertung: nachWertung,
+	titel: nachTitel,
 	// Juengste zuerst.
 	angelegt: (a, b) => b.angelegtAm.localeCompare(a.angelegtAm) || b.id - a.id,
+	// Naechstes Erscheinungsdatum zuerst; ohne Datum ans Ende.
+	release: (a, b) => (a.erscheinungsdatum ?? "9999").localeCompare(b.erscheinungsdatum ?? "9999") || nachTitel(a, b),
 };
+
+/** Plattformfilter aus `plattform=PS4,PS5,ohne`; leer heisst alle. */
+function plattformFilter(roh: string | undefined): Set<string> {
+	const werte = (roh ?? "").split(",").map((p) => p.trim().toUpperCase()).filter((p) => p !== "");
+	return new Set(werte.map((p) => (p === "OHNE" ? "ohne" : p)).filter((p) => (PLATTFORM_FILTER as readonly string[]).includes(p)));
+}
 
 function ohneZugang(c: { json: (o: unknown, s: 503) => Response }) {
 	return c.json({ fehler: "IGDB-Zugangsdaten sind nicht hinterlegt." }, 503);
@@ -127,26 +141,30 @@ export const planRoutes = new Hono<AppEnv>()
 		const kind = ausWahl(c.req.query("kind"), PLAN_ARTEN);
 		if (!kind) return c.json({ fehler: `Parameter 'kind' muss einer von ${PLAN_ARTEN.join(", ")} sein.` }, 400);
 		const status: PlanStatus | "alle" = c.req.query("status") === "alle" ? "alle" : "offen";
-		const sortierung = ausWahl(c.req.query("sort"), SORTIERUNGEN) ?? "rang";
+		const sortierung = ausWahl(c.req.query("sort"), SORTIERUNGEN) ?? "favorit";
 		const nurFavoriten = c.req.query("favorit") === "1";
+		const plattformen = plattformFilter(c.req.query("plattform"));
 
-		const gewichte = await c.var.repos.settings.getWeights();
 		const zeilen = await c.var.repos.plan.liste(kind, status);
 		const eintraege = zeilen
-			.map((z) => eintragAntwort(z, gewichte))
+			.map((z) => eintragAntwort(z))
 			.filter((e) => !nurFavoriten || e.favorit)
+			.filter((e) => plattformen.size === 0 || plattformen.has(e.plattform ?? "ohne"))
 			.sort(vergleicher[sortierung]);
 
-		return c.json({ gewichte, sortierung, eintraege });
+		return c.json({ sortierung, plattformen: [...plattformen], eintraege });
 	})
 
 	/**
 	 * Anlegen. Genau eine Quelle: spielId, releaseId, igdbId oder titel.
 	 *
-	 * igdbId legt bei Bedarf ein Spiel ohne Release an (Abschnitt 3) - oder
-	 * verwendet das Spiel mit dieser IGDB-Id wieder. titel ist der Freitext
-	 * ohne Zuordnung, den die Oberflaeche nur auf ausdrueckliche Anweisung
-	 * schickt (8.2).
+	 * igdbId legt bei Bedarf ein Spiel an (Abschnitt 3) - oder verwendet das
+	 * Spiel mit dieser IGDB-Id wieder. titel ist der Freitext ohne Zuordnung,
+	 * den die Oberflaeche nur auf ausdrueckliche Anweisung schickt (8.2).
+	 *
+	 * Plattform (nur zu spielId und igdbId): fehlt sie oder ist "auto", wird
+	 * die neueste der Releases beziehungsweise des IGDB-Eintrags genommen;
+	 * "" heisst ausdruecklich ohne Plattform (Abschnitt 5).
 	 *
 	 * Duplikate (Abschnitt 5): Ein offener Eintrag am Spiel und einer an einem
 	 * seiner Releases sind zwei Aussagen und blockieren sich nicht; nur
@@ -168,20 +186,14 @@ export const planRoutes = new Hono<AppEnv>()
 
 		const geprueft = pruefeFelder(k);
 		if ("fehler" in geprueft) return c.json({ fehler: geprueft.fehler }, 400);
-		const { priority, isFavorite, note } = geprueft.felder;
+		const { isFavorite, note } = geprueft.felder;
 
-		// Plattform nur auf ausdrueckliche Wahl - nie vorbelegt (Abschnitt 5).
-		// Sie haengt den Wunsch an ein Release des Spiels, das bei Bedarf entsteht.
-		let plattform: Plattform | null = null;
-		if (k.plattform !== undefined && k.plattform !== null && k.plattform !== "") {
-			if (typeof k.plattform !== "string" || !istErlaubtePlattform(k.plattform)) {
-				return c.json({ fehler: `Unbekannte Plattform: ${String(k.plattform)}` }, 400);
-			}
-			if (quellen[0] === "releaseId" || quellen[0] === "titel") {
-				return c.json({ fehler: "Eine Plattform passt nur zu spielId oder igdbId." }, 400);
-			}
-			plattform = k.plattform;
+		const gepruefteWahl = pruefePlattform(k);
+		if ("fehler" in gepruefteWahl) return c.json({ fehler: gepruefteWahl.fehler }, 400);
+		if (gepruefteWahl.wahl !== undefined && (quellen[0] === "releaseId" || quellen[0] === "titel")) {
+			return c.json({ fehler: "Eine Plattform passt nur zu spielId oder igdbId." }, 400);
 		}
+		const wahl: PlattformWahl = gepruefteWahl.wahl === undefined ? "auto" : gepruefteWahl.wahl;
 
 		let ziel: PlanZiel;
 		let spielAngelegt = false;
@@ -208,7 +220,7 @@ export const planRoutes = new Hono<AppEnv>()
 				if (!(await c.var.repos.games.spielExistiert(gameId))) {
 					return c.json({ fehler: "Spiel nicht gefunden." }, 404);
 				}
-				ziel = { gameId };
+				ziel = await zielAmSpiel(c.var.repos, gameId, wahl);
 				break;
 			}
 			case "igdbId": {
@@ -218,7 +230,7 @@ export const planRoutes = new Hono<AppEnv>()
 
 				let ergebnis: Awaited<ReturnType<typeof zielAusIgdbId>>;
 				try {
-					ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, plattform);
+					ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, wahl);
 				} catch (fehler) {
 					if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
 					return c.json({ fehler: meldungFuer(fehler) }, 502);
@@ -229,24 +241,24 @@ export const planRoutes = new Hono<AppEnv>()
 				break;
 			}
 		}
-		if (plattform !== null && ziel.gameId !== undefined) {
-			ziel = { releaseId: await c.var.repos.games.releaseFuerPlattform(ziel.gameId, plattform) };
-		}
 
 		const doppelt = await c.var.repos.plan.offenerEintrag(art, ziel);
 		if (doppelt !== null) {
 			return c.json({ fehler: "Dafür gibt es schon einen offenen Eintrag.", eintragId: doppelt }, 409);
 		}
 
-		const id = await c.var.repos.plan.anlegen(art, ziel, "manuell", { priority, isFavorite, note });
+		const id = await c.var.repos.plan.anlegen(art, ziel, "manuell", { isFavorite, note });
 		const zeile = await c.var.repos.plan.eintrag(id);
 		if (!zeile) throw new Error("Eintrag nach dem Anlegen nicht gefunden.");
-		return c.json(
-			{ ...eintragAntwort(zeile, await c.var.repos.settings.getWeights()), spielAngelegt },
-			201,
-		);
+		return c.json({ ...eintragAntwort(zeile), spielAngelegt }, 201);
 	})
 
+	/**
+	 * Aendern. `plattform` haengt einen Eintrag mit Spiel um - an das Release
+	 * der Plattform (entsteht bei Bedarf) oder mit "" zurueck ans Spiel; das
+	 * Nachpflegen aus dem Filter "ohne Plattform". Freitext hat kein Spiel
+	 * und deshalb keine Plattform.
+	 */
 	.patch("/:id", async (c) => {
 		const id = idAus(c.req.param("id"));
 		if (id === null) return c.json({ fehler: "Ungültige Id." }, 400);
@@ -254,13 +266,26 @@ export const planRoutes = new Hono<AppEnv>()
 		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
 		const geprueft = pruefeFelder(k);
 		if ("fehler" in geprueft) return c.json({ fehler: geprueft.fehler }, 400);
+		const gepruefteWahl = pruefePlattform(k);
+		if ("fehler" in gepruefteWahl) return c.json({ fehler: gepruefteWahl.fehler }, 400);
 
-		if (!(await c.var.repos.plan.aendern(id, geprueft.felder))) {
-			return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
+		const vorher = await c.var.repos.plan.eintrag(id);
+		if (!vorher) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
+
+		if (gepruefteWahl.wahl !== undefined) {
+			if (vorher.spiel_id === null) return c.json({ fehler: "Freitext hat kein Spiel und deshalb keine Plattform." }, 400);
+			const ziel = await zielAmSpiel(c.var.repos, vorher.spiel_id, gepruefteWahl.wahl);
+			const doppelt = await c.var.repos.plan.offenerEintrag(vorher.kind, ziel);
+			if (doppelt !== null && doppelt !== id) {
+				return c.json({ fehler: "Dafür gibt es schon einen offenen Eintrag.", eintragId: doppelt }, 409);
+			}
+			await c.var.repos.plan.zielSetzen(id, ziel);
 		}
+
+		await c.var.repos.plan.aendern(id, geprueft.felder);
 		const zeile = await c.var.repos.plan.eintrag(id);
 		if (!zeile) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
-		return c.json({ ...eintragAntwort(zeile, await c.var.repos.settings.getWeights()), geaendert: true });
+		return c.json({ ...eintragAntwort(zeile), geaendert: true });
 	})
 
 	.delete("/:id", async (c) => {

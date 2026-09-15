@@ -63,14 +63,14 @@ describe("PlanRepository", () => {
 		const z = await r.eintrag(id);
 		expect(z).toMatchObject({
 			kind: "wunsch", release_id: ps4, game_id: null, spiel_id: 1, titel: "Bloodborne",
-			platform: "PS4", critic_score: 91, cover_url: "c.jpg", priority: 3, is_favorite: 0, note: "Disc",
+			platform: "PS4", critic_score: 91, cover_url: "c.jpg", is_favorite: 0, note: "Disc",
 			origin: "manuell", status: "offen", resolved_at: null,
 		});
 
-		expect(await r.aendern(id, { isFavorite: true, priority: 5 })).toBe(true);
-		expect(await zeile(id)).toMatchObject({ is_favorite: 1, priority: 5, note: "Disc" });
+		expect(await r.aendern(id, { isFavorite: true })).toBe(true);
+		expect(await zeile(id)).toMatchObject({ is_favorite: 1, note: "Disc" });
 		expect(await r.aendern(id, {})).toBe(true);
-		expect(await r.aendern(999, { priority: 1 })).toBe(false);
+		expect(await r.aendern(999, { isFavorite: true })).toBe(false);
 	});
 
 	it("setzt resolved_at beim Erledigen und nimmt es beim Wiederoeffnen zurueck", async () => {
@@ -137,10 +137,10 @@ describe("PlanRepository", () => {
 });
 
 describe("GET /api/plans", () => {
-	it("verlangt kind, sortiert nach Rang und haengt Eintraege ohne Spiel ans Ende", async () => {
-		await spiel(1, "Gut", [], { critic_score: 90 });
+	it("verlangt kind, sortiert Favoriten zuerst und dann nach Wertung, ohne Wertung ans Ende", async () => {
+		await spiel(1, "Gut", [], { critic_score: 90, release_date: "2030-01-01" });
 		await spiel(2, "Unbewertet", []);
-		await spiel(3, "Favorit", [], { critic_score: 60 });
+		await spiel(3, "Favorit", [], { critic_score: 60, release_date: "2015-05-05" });
 		const r = repos().plan;
 		await r.anlegen("wunsch", { gameId: 1 }, "manuell");
 		await r.anlegen("wunsch", { gameId: 2 }, "manuell");
@@ -151,30 +151,49 @@ describe("GET /api/plans", () => {
 		const a = app();
 		expect((await a.request(`${B}/api/plans`, {}, env)).status).toBe(400);
 
+		const titel = (l: { eintraege: Array<{ titel: string }> }) => l.eintraege.map((e) => e.titel);
 		const liste = await hole(a, "/api/plans?kind=wunsch");
-		expect(liste.gewichte).toMatchObject({ w_critic: 0.5 });
-		expect(liste.eintraege.map((e: { titel: string }) => e.titel)).toEqual(["Favorit", "Gut", "Unbewertet", "Freitext"]);
-		expect(liste.eintraege[3]).toMatchObject({ rang: null, spielId: null });
-		// Unbewertet: 0.7*0.5 + 0.6*0.3 = 0.53
-		expect(liste.eintraege[2].rang).toBeCloseTo(0.53);
+		expect(liste.sortierung).toBe("favorit");
+		expect(titel(liste)).toEqual(["Favorit", "Gut", "Freitext", "Unbewertet"]);
+		expect(liste.eintraege[0]).not.toHaveProperty("rang");
+		expect(liste.eintraege[0]).not.toHaveProperty("prioritaet");
 
-		const favoriten = await hole(a, "/api/plans?kind=wunsch&favorit=1");
-		expect(favoriten.eintraege).toHaveLength(1);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=wertung"))).toEqual(["Gut", "Favorit", "Freitext", "Unbewertet"]);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=titel"))).toEqual(["Favorit", "Freitext", "Gut", "Unbewertet"]);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=release"))).toEqual(["Favorit", "Gut", "Freitext", "Unbewertet"]);
+		expect((await hole(a, "/api/plans?kind=wunsch&favorit=1")).eintraege).toHaveLength(1);
+	});
 
-		const nachTitel = await hole(a, "/api/plans?kind=wunsch&sort=titel");
-		expect(nachTitel.eintraege.map((e: { titel: string }) => e.titel)).toEqual(["Favorit", "Freitext", "Gut", "Unbewertet"]);
+	it("filtert nach Plattformen und nach 'ohne Plattform'", async () => {
+		const [ps4] = await spiel(1, "Auf PS4", ["PS4", "PS5"]);
+		await spiel(2, "Am Spiel", ["PS3"]);
+		const r = repos().plan;
+		await r.anlegen("wunsch", { releaseId: ps4 }, "manuell");
+		await r.anlegen("wunsch", { gameId: 2 }, "manuell");
+		await r.anlegen("wunsch", { titleRaw: "Freitext" }, "manuell");
+		const a = app();
+		const titel = (l: { eintraege: Array<{ titel: string }> }) => l.eintraege.map((e) => e.titel);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=PS4"))).toEqual(["Auf PS4"]);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=ohne"))).toEqual(["Am Spiel", "Freitext"]);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=PS4,ohne"))).toHaveLength(3);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=PS3"))).toEqual([]);
+		// Unbekannte Werte werden ignoriert, nicht mit 400 beantwortet.
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=Switch"))).toHaveLength(3);
 	});
 });
 
 describe("POST /api/plans", () => {
-	it("legt einen Wunsch am Spiel an - ohne Plattform", async () => {
-		await spiel(1, "Bloodborne", ["PS4"]);
-		const antwort = await sende(app(), "POST", "/api/plans", { art: "wunsch", spielId: 1, prioritaet: 4 });
-		expect(antwort.status).toBe(201);
-		expect(await antwort.json()).toMatchObject({
-			art: "wunsch", spielId: 1, releaseId: null, plattform: null, prioritaet: 4, favorit: false,
-			herkunft: "manuell", spielAngelegt: false,
+	it("nimmt ohne Angabe die neueste Plattform des Spiels, mit '' ausdruecklich keine", async () => {
+		await spiel(1, "Bloodborne", ["PS4", "PS3"]);
+		const a = app();
+		const auto = await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1 });
+		expect(auto.status).toBe(201);
+		expect(await auto.json()).toMatchObject({
+			art: "wunsch", spielId: 1, plattform: "PS4", favorit: false, herkunft: "manuell", spielAngelegt: false,
 		});
+		const ohne = await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" });
+		expect(ohne.status).toBe(201);
+		expect(await ohne.json()).toMatchObject({ spielId: 1, releaseId: null, plattform: null });
 	});
 
 	it("legt einen Wunsch am Release an und lehnt ein Duplikat am selben Release mit 409 ab", async () => {
@@ -185,7 +204,9 @@ describe("POST /api/plans", () => {
 		expect(await erste.json()).toMatchObject({ spielId: 1, releaseId: ps4, plattform: "PS4" });
 
 		// Am Spiel selbst: eine andere Aussage, kein Duplikat.
-		expect((await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1 })).status).toBe(201);
+		expect((await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" })).status).toBe(201);
+		// Ohne Angabe waere es die neueste Plattform - also dasselbe Release: Duplikat.
+		expect((await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1 })).status).toBe(409);
 		// Dasselbe Release noch einmal: Duplikat.
 		const doppelt = await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps4 });
 		expect(doppelt.status).toBe(409);
@@ -194,16 +215,17 @@ describe("POST /api/plans", () => {
 		expect((await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps4 })).status).toBe(201);
 	});
 
-	it("legt aus einem IGDB-Treffer ein Spiel ohne Release an und verknuepft es", async () => {
-		const { client } = fakeIgdb([[spielRoh({ id: 1001, name: "Bloodborne" })]]);
+	it("legt aus einem IGDB-Treffer ein Spiel mit der neuesten Plattform an und verknuepft es", async () => {
+		const { client } = fakeIgdb([[spielRoh({ id: 1001, name: "Bloodborne", platforms: [48, 9] })]]);
 		const antwort = await sende(app(client), "POST", "/api/plans", { art: "wunsch", igdbId: 1001, favorit: true });
 		expect(antwort.status).toBe(201);
 		const e = await antwort.json();
-		expect(e).toMatchObject({ titel: "Bloodborne", releaseId: null, plattform: null, favorit: true, spielAngelegt: true, kritik: 91 });
+		expect(e).toMatchObject({ titel: "Bloodborne", plattform: "PS4", favorit: true, spielAngelegt: true, kritik: 91 });
+		expect(e.releaseId).toEqual(expect.any(Number));
 
 		const g = await env.DB.prepare("SELECT * FROM game WHERE id = ?").bind(e.spielId).first<Record<string, unknown>>();
 		expect(g).toMatchObject({ igdb_id: 1001, igdb_matched_source: "manuell", release_status: "erschienen", sort_title: "bloodborne" });
-		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM release").first<{ n: number }>()).toMatchObject({ n: 0 });
+		expect(await env.DB.prepare("SELECT platform FROM release").all()).toMatchObject({ results: [{ platform: "PS4" }] });
 
 		// Das Spiel ist kein Besitz: nicht in der Sammlung, wohl im Spieldetail.
 		const sammlung = await hole(app(client), "/api/games");
@@ -217,8 +239,20 @@ describe("POST /api/plans", () => {
 		const { client, aufrufe } = fakeIgdb([[]]);
 		const antwort = await sende(app(client), "POST", "/api/plans", { art: "wunsch", igdbId: 1001 });
 		expect(antwort.status).toBe(201);
-		expect(await antwort.json()).toMatchObject({ spielId: 7, spielAngelegt: false });
+		expect(await antwort.json()).toMatchObject({ spielId: 7, plattform: "PS4", spielAngelegt: false });
 		expect(aufrufe.filter((a) => /igdb\.com/.test(a.url))).toHaveLength(0);
+	});
+
+	it("legt ohne Plattform ein Spiel ohne Release an, das nicht in der Sammlung steht", async () => {
+		const { client } = fakeIgdb([[spielRoh({ id: 1001, name: "Bloodborne" })]]);
+		const antwort = await sende(app(client), "POST", "/api/plans", { art: "wunsch", igdbId: 1001, plattform: "" });
+		expect(antwort.status).toBe(201);
+		const e = await antwort.json();
+		expect(e).toMatchObject({ releaseId: null, plattform: null, spielAngelegt: true });
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM release").first<{ n: number }>()).toMatchObject({ n: 0 });
+		expect((await hole(app(client), "/api/games")).gesamt).toBe(0);
+		const detail = await hole(app(client), `/api/games/${e.spielId}`);
+		expect(detail.plaene).toEqual([expect.objectContaining({ id: e.id, art: "wunsch" })]);
 	});
 
 	it("antwortet ohne IGDB-Zugang mit 503 und bei unbekannter Id mit 404", async () => {
@@ -267,10 +301,10 @@ describe("POST /api/plans", () => {
 		expect(((await antwort.json()) as { fehler: string }).fehler).toMatch(meldung);
 	});
 
-	it("nimmt Freitext nur ausdruecklich und ohne Rang", async () => {
+	it("nimmt Freitext nur ausdruecklich, ohne Spiel und Plattform", async () => {
 		const antwort = await sende(app(), "POST", "/api/plans", { art: "wunsch", titel: "  Arbeitstitel  " });
 		expect(antwort.status).toBe(201);
-		expect(await antwort.json()).toMatchObject({ titel: "Arbeitstitel", spielId: null, rang: null });
+		expect(await antwort.json()).toMatchObject({ titel: "Arbeitstitel", spielId: null, plattform: null });
 	});
 
 	it.each([
@@ -280,13 +314,41 @@ describe("POST /api/plans", () => {
 		[{ art: "wunsch", spielId: 999 }, /nicht gefunden/],
 		[{ art: "wunsch", releaseId: 999 }, /nicht gefunden/],
 		[{ art: "wunsch", titel: 5 }, /'titel'/],
-		[{ art: "wunsch", spielId: 1, prioritaet: 6 }, /Priorität/],
 		[{ art: "wunsch", spielId: 1, favorit: "ja" }, /'favorit'/],
 	])("lehnt %o ab", async (koerper, meldung) => {
 		await spiel(1, "Bloodborne", ["PS4"]);
 		const antwort = await sende(app(), "POST", "/api/plans", koerper);
 		expect([400, 404]).toContain(antwort.status);
 		expect(((await antwort.json()) as { fehler: string }).fehler).toMatch(meldung);
+	});
+});
+
+describe("PATCH /api/plans/:id mit Plattform", () => {
+	it("haengt den Eintrag an das Release der Plattform um, zurueck ans Spiel, und prueft Duplikate", async () => {
+		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
+		const a = app();
+		const { id } = await (await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" })).json();
+		expect(await zeile(id)).toMatchObject({ game_id: 1, release_id: null });
+
+		const p = await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "PS5" });
+		expect(p.status).toBe(200);
+		expect(await p.json()).toMatchObject({ id, plattform: "PS5", spielId: 1 });
+		expect((await zeile(id))!.game_id).toBeNull();
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM release WHERE game_id = 1").first()).toMatchObject({ n: 2 });
+
+		// Auf ein Release, an dem schon ein offener Wunsch haengt: 409, nichts geaendert.
+		await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps4 });
+		expect((await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "PS4" })).status).toBe(409);
+		expect(await (await sende(a, "PATCH", `/api/plans/${id}`, {})).json()).toMatchObject({ plattform: "PS5" });
+
+		// Zurueck ans Spiel; dieselbe Plattform noch einmal ist kein Duplikat mit sich selbst.
+		expect(await (await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "" })).json()).toMatchObject({ plattform: null, spielId: 1 });
+		expect(await (await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "PS5" })).json()).toMatchObject({ plattform: "PS5" });
+		expect(await (await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "PS5" })).json()).toMatchObject({ plattform: "PS5" });
+
+		const { id: frei } = await (await sende(a, "POST", "/api/plans", { art: "wunsch", titel: "Freitext" })).json();
+		expect((await sende(a, "PATCH", `/api/plans/${frei}`, { plattform: "PS4" })).status).toBe(400);
+		expect((await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "Switch" })).status).toBe(400);
 	});
 });
 
@@ -303,6 +365,7 @@ describe("PATCH und DELETE /api/plans/:id", () => {
 
 		expect((await sende(a, "PATCH", `/api/plans/${id}`, { art: "backlog" })).status).toBe(200);
 		expect(await zeile(id)).toMatchObject({ kind: "backlog" });
+		expect((await sende(a, "PATCH", `/api/plans/${id}`, { prioritaet: 4 })).status).toBe(200);
 
 		expect((await sende(a, "PATCH", `/api/plans/${id}`, { status: "weg" })).status).toBe(400);
 		expect((await sende(a, "PATCH", "/api/plans/999", { favorit: false })).status).toBe(404);

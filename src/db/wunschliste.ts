@@ -76,6 +76,8 @@ export type Abgleichergebnis = {
 	releaseId: number | null;
 	igdbId: number | null;
 	searchPath: string | null;
+	/** Vorgeschlagene Plattform (die neueste des Treffers); null laesst die Zeile unveraendert. */
+	platform: Plattform | null;
 	/** 'schon_vorhanden', wenn am Ziel bereits ein offener Wunsch haengt; sonst 'offen'. */
 	decision: Extract<Entscheidung, "offen" | "schon_vorhanden">;
 };
@@ -247,10 +249,10 @@ export class WishlistImportRepository {
 			this.db
 				.prepare(
 					"UPDATE wishlist_import_line SET checked_at = datetime('now'), match_kind = ?, game_id = ?, release_id = ?, " +
-						"igdb_id = ?, search_path = ?, decision = ?, " +
+						"igdb_id = ?, search_path = ?, platform = COALESCE(?, platform), decision = ?, " +
 						"decided_at = CASE WHEN ? = 'offen' THEN NULL ELSE datetime('now') END WHERE id = ?",
 				)
-				.bind(e.matchKind, e.gameId, e.releaseId, e.igdbId, e.searchPath, e.decision, e.decision, lineId),
+				.bind(e.matchKind, e.gameId, e.releaseId, e.igdbId, e.searchPath, e.platform, e.decision, e.decision, lineId),
 		]);
 	}
 
@@ -271,6 +273,15 @@ export class WishlistImportRepository {
 					"decided_at = CASE WHEN ? = 'offen' THEN NULL ELSE datetime('now') END WHERE id = ?",
 			)
 			.bind(decision, planEntryId, decision, lineId)
+			.run();
+		return (ergebnis.meta.changes ?? 0) > 0;
+	}
+
+	/** Plattform einer Zeile setzen oder leeren - vor der Uebernahme, ohne neuen Abgleich. */
+	async plattformSetzen(lineId: number, plattform: Plattform | null): Promise<boolean> {
+		const ergebnis = await this.db
+			.prepare("UPDATE wishlist_import_line SET platform = ? WHERE id = ? AND decision <> 'uebernommen'")
+			.bind(plattform, lineId)
 			.run();
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}

@@ -144,7 +144,16 @@ export function istErlaubtePlattform(wert: string): wert is Plattform {
  * Gibt null zurueck, wenn keine davon erfassbar ist (etwa reines "PSPC").
  */
 export function vorgeschlagenePlattform(roh: string): Plattform | null {
-	const erlaubt = plattformenAus(roh).filter(istErlaubtePlattform);
+	return neuestePlattform(plattformenAus(roh));
+}
+
+/**
+ * Die neueste der genannten Plattformen - seit der Nachbesserung zu Stufe 11
+ * auch der Vorschlag fuer einen Wunsch (Abschnitt 5, Entscheidung des
+ * Nutzers vom 15.09.2026): PS5 vor PS4 vor PS3 vor Vita.
+ */
+export function neuestePlattform(liste: readonly string[]): Plattform | null {
+	const erlaubt = liste.filter(istErlaubtePlattform);
 	if (erlaubt.length === 0) return null;
 	return erlaubt.reduce((a, b) => ((RANG[b] ?? 0) > (RANG[a] ?? 0) ? b : a));
 }
