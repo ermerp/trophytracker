@@ -731,7 +731,7 @@ Eingabe: Datei-Upload oder Einfügen in ein Textfeld, ein Titel pro Zeile. Leerz
 **Ablauf**
 
 1. Zeilen einlesen, gegen `game` und IGDB abgleichen
-2. Ergebnisliste zur Durchsicht, dreigeteilt: eindeutige Treffer, mehrdeutige Treffer mit Auswahl, ohne Treffer
+2. Ergebnisliste zur Durchsicht, dreigeteilt: eindeutige Treffer, mehrdeutige Treffer mit Auswahl, ohne Treffer. **Eindeutige Treffer und schon vorhandene Spiele werden als ein Block übernommen** (ein Knopf, Liste aufklappbar für Zweifelsfälle); eine Einzelentscheidung verlangt die Durchsicht nur für die Zeilen, die keine eindeutige Zuordnung haben – bei den echten Listen rund 100 von 318 (Entscheidung des Nutzers vom 15.09.2026)
 3. Erst nach Bestätigung werden `plan_entry`-Zeilen mit `kind='wunsch'`, `origin='import'` geschrieben
 
 **Zeilen ohne Treffer werden nicht stillschweigend als Freitext übernommen.** Sie landen in einem Nachbearbeitungsschritt mit einem eingebauten IGDB-Suchfeld: Suchbegriff anpassen, Treffer auswählen, fertig. Titel aus Textdateien sind abgekürzt, falsch geschrieben und mehrdeutig – eine Suche mit korrigierbarer Eingabe löst das, ein automatischer Fallback erzeugt nur Datenmüll.
@@ -1081,7 +1081,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
 | Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert nach Rang, mit Herkunftskennzeichnung |
 | Prüfliste | 8 | Ein Spiel pro Bildschirm, sieben Aktionen mit Tastenkürzeln 1–7, Grund und Vorher-Nachher, aktueller (vorbelegter) Status, Fortschrittsanzeige „noch n von m"; jederzeit verlassen, jede Entscheidung ist schon gespeichert. **Auf dem Handy müssen alle sieben Knöpfe ohne Scrollen sichtbar sein** (zweispaltig, kompakte Karte) – die Ansicht wird bei der Ersteinrichtung mehrere hundert Mal hintereinander bedient. **Die Knopfreihe steht immer an derselben Stelle**, unabhängig von der Titellänge (feste Mindesthöhe der Karte): Wer blind auf dieselbe Position zielt, trifft sonst bei einem zweizeiligen Titel daneben, und eine Fehlentscheidung fällt erst Wochen später auf. Eine Zeile stellt klar: „Du bewertest den Spielstand, nicht den Besitz." |
-| Wunschliste importieren | 9 | Textfeld oder Datei, dreigeteilte Trefferliste, IGDB-Suche für Zeilen ohne Treffer |
+| Wunschliste importieren | 9 | Textfeld oder Datei, dreigeteilte Trefferliste; Eindeutige und Vorhandene als ein Block, Einzelentscheidung nur für Mehrdeutige und Zeilen ohne Treffer, dort die IGDB-Suche (8.2) |
 | Ohne Zuordnung | 12 | Listenübergreifend, mit IGDB-Suchfeld zum Nachziehen |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |
 | Scannen | 1 | Serienerfassung nach Abschnitt 9 |

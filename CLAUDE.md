@@ -51,6 +51,8 @@ Dasselbe gilt für Zuordnungen: Ein einmal gesetztes `trophy_progress.release_id
 
 Das gilt auch in der Oberfläche: fehlende Preise und unbekannte Werte werden als "unbekannt" angezeigt, nie als "0", "–" oder "nicht verfügbar".
 
+Und für Eingaben: Ein freiwilliges Feld bleibt leer, statt mit einem plausiblen Wert vorbelegt zu werden. Die Plattform eines Wunsches ist standardmäßig „ohne Plattform" – ein geratenes PS5 bei einem angekündigten Titel wäre eine Behauptung, die der Nutzer nie aufgestellt hat (Stufe 10). Was er nicht gesagt hat, steht nicht in der Datenbank.
+
 Im CSV-Export ist ein **leeres Feld** die Entsprechung davon (Abschnitt 14.4): Das Wort in einer Zahlenspalte wäre dort der schlechtere Weg.
 
 ### Kein vollautomatisches Matching
