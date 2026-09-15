@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 25 – Nachbesserung nach der Abnahme von Stufe 10: Plattform beim Wunsch wählbar (Release nur aus Wunsch zählt nicht zur Sammlung), IGDB-Treffer nur mit fremden Plattformen fallen heraus.*
+*Version 26 – Stufe 11: Wunschlisten-Import als Lauf in der Datenbank mit Abgleich in Schritten, Durchsicht als Liste, Ansicht „Ohne Zuordnung" mit abgelehnten Spielen hinter einem Umschalter; Listendatum nur zum Abgleich (Entscheidungen des Nutzers vom 15.09.2026).*
 
 ## 1. Use Cases
 
@@ -127,6 +127,40 @@ CREATE TABLE igdb_candidate (
   fetched_at   TEXT NOT NULL,
   UNIQUE (game_id, igdb_id)
 );
+
+-- Wunschlisten-Import (8.2, Migration 0012): ein Lauf je Datei, eine Zeile
+-- je Titel, Kandidaten je Zeile. Arbeitszustand, nicht in backup.json - die
+-- Quelldateien liegen beim Nutzer, das Ergebnis steht in plan_entry.
+CREATE TABLE wishlist_import (
+  id          INTEGER PRIMARY KEY,
+  source_name TEXT,                     -- Dateiname oder 'Eingabe'
+  list_year   INTEGER,                  -- aus dem Dateinamen, korrigierbar
+  form        TEXT NOT NULL CHECK (form IN ('jahresliste','plattformliste','tabelle','einfach')),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE wishlist_import_line (
+  id            INTEGER PRIMARY KEY,
+  import_id     INTEGER NOT NULL REFERENCES wishlist_import(id) ON DELETE CASCADE,
+  position      INTEGER NOT NULL,
+  title         TEXT NOT NULL,          -- bereinigt, vom Nutzer änderbar
+  originals     TEXT NOT NULL,          -- JSON-Liste der Rohzeilen (zusammengeführte Doppelungen)
+  platform      TEXT CHECK (platform IN ('PS3','PS4','PS5','PSVITA')),
+  listed_at     TEXT,                   -- 'JJJJ' oder 'JJJJ-MM', nur zum Abgleich
+  checked_at    TEXT,                   -- NULL = noch nicht abgeglichen
+  search_path   TEXT,                   -- Suchweg aus 7.6, nur zur Anzeige
+  match_kind    TEXT CHECK (match_kind IN ('sammlung','vorhanden','eindeutig','mehrdeutig','ohne_treffer')),
+  game_id       INTEGER REFERENCES game(id) ON DELETE SET NULL,
+  release_id    INTEGER REFERENCES release(id) ON DELETE SET NULL,
+  igdb_id       INTEGER,                -- eindeutiger Treffer
+  decision      TEXT NOT NULL DEFAULT 'offen'
+                CHECK (decision IN ('offen','uebernommen','uebersprungen','schon_vorhanden','aufgeteilt')),
+  plan_entry_id INTEGER REFERENCES plan_entry(id) ON DELETE SET NULL,
+  decided_at    TEXT
+);
+
+-- wishlist_import_candidate: wie igdb_candidate, mit line_id statt game_id
+-- und ohne fetched_at; UNIQUE (line_id, igdb_id).
 
 -- Ein Spiel auf einer konkreten Plattform.
 -- Zwingend getrennt: GTA V existiert auf PS3, PS4 und PS5
@@ -641,13 +675,14 @@ Abruf zusammen mit den übrigen IGDB-Metadaten, nicht als eigener Job. `critic_s
 
 **Rückfälle, nur wenn die Suche leer bleibt** (`kandidatenSuchen`, `src/sync/igdb.ts`; trifft 11 von 420 Titeln, kostet also fast nichts): erst der gekürzte Begriff – alles ab „ - ", „:" oder „/" fällt weg („CastleStorm - Complete Edition" → „CastleStorm", „Type:Rider" → „Type") – ohne Plattformfilter, weil manche IGDB-Einträge keine Plattform nennen; dann IGDBs Teilstringsuche über den Namen (`name ~ *"…"*`), der einzige Weg zu „That's You!" oder „We Were Here Too"; zuletzt dieselbe Teilstringsuche mit dem unbereinigten Titel, weil IGDB „OlliOlli2" ohne Leerzeichen schreibt. Was danach noch fehlt (aus der ersten Abnahme: „Poker Night at the Inventory 2", „TownsmenVR", „Wake-up Club"), kennt IGDB unter keiner Schreibweise – das bleibt „Gibt es bei IGDB nicht" oder eine Suche von Hand.
 
-**Reihenfolge der Kandidaten** (`ordneKandidaten`): Die Suche holt 30 Treffer statt 10, weil bei DLC-reichen Titeln das Hauptspiel sonst gar nicht im Ergebnis steht („Batman: Arkham Knight" an Position 13 hinter zwölf Skin-Paketen, „For Honor" an 23). Gespeichert und angezeigt werden die ersten zehn nach dieser Ordnung: Schlüsseltreffer zuerst, dann Hauptspiel-artige Typen (Hauptspiel, Bundle, eigenständige Erweiterung, Remake, Remaster, erweitertes Spiel, Portierung) vor DLC, Erweiterung, Episode, Staffel und Paket, dann Kandidaten mit einer Plattform des Spiels, innerhalb dessen IGDBs Reihenfolge. Die eingebaute Suche (`GET /api/igdb/search`) nutzt dieselben Rückfälle und dieselbe Ordnung; `plattformen=PS4,PS5` gibt ihr die Plattformen mit – ab Stufe 11 auch aus der Wunschliste, wenn dort eine Plattform neben dem Titel steht. Die Ordnung ändert nichts an der automatischen Verknüpfung.
+**Reihenfolge der Kandidaten** (`ordneKandidaten`): Die Suche holt 30 Treffer statt 10, weil bei DLC-reichen Titeln das Hauptspiel sonst gar nicht im Ergebnis steht („Batman: Arkham Knight" an Position 13 hinter zwölf Skin-Paketen, „For Honor" an 23). Gespeichert und angezeigt werden die ersten zehn nach dieser Ordnung: Schlüsseltreffer zuerst, dann Hauptspiel-artige Typen (Hauptspiel, Bundle, eigenständige Erweiterung, Remake, Remaster, erweitertes Spiel, Portierung) vor DLC, Erweiterung, Episode, Staffel und Paket, dann Kandidaten mit einer Plattform des Spiels, innerhalb dessen IGDBs Reihenfolge. Die eingebaute Suche (`GET /api/igdb/search`) nutzt dieselben Rückfälle und dieselbe Ordnung; `plattformen=PS4,PS5` gibt ihr die Plattformen mit – seit Stufe 11 auch aus der Wunschliste, wenn dort eine Plattform neben dem Titel steht (8.2). Die Ordnung ändert nichts an der automatischen Verknüpfung.
 
 **Eindeutiger Treffer.** Die Regel aus 7.2, auf IGDB übertragen: Automatisch verknüpft wird nur, wenn **genau ein** Kandidat denselben Titelschlüssel trägt wie der bereinigte Suchbegriff. Der Schlüssel wird dabei frisch aus dem Titel berechnet, nicht aus `sort_title` gelesen – die Spalte ist abgeleitet und veraltet still. Drei Verfeinerungen aus der Messung gegen die echten Titel:
 
 - Editionen verweisen mit `version_parent` auf ihr Hauptspiel; ist das Hauptspiel selbst Kandidat, zählt die Edition nicht als zweiter Treffer.
 - Ein Bundle gleichen Namens (GTA V als Paket mit GTA Online) zählt nicht gegen das Hauptspiel; nur ohne anderes bleibt es selbst Kandidat.
 - Nennt der Kandidat Plattformen und das Spiel hat Releases, muss sich mindestens eine decken. Ein Kandidat ohne Plattformangabe wird nicht ausgeschlossen – fehlende Daten sind kein Gegenbeweis. Genau diese Prüfung löst „God of War (2018)" (PS4) und „God of War (2005)" (PS3) beide richtig auf.
+- Seit Stufe 11 optional ein **Jahr**: Bleiben danach mehrere Kandidaten, gewinnt der einzige, dessen Erscheinungsjahr im selben oder angrenzenden Jahr liegt. Nur der Wunschlisten-Import gibt eines mit (8.2); der Abgleich der Sammlung bleibt unverändert.
 
 Alles andere landet mit seinen Kandidaten in `igdb_candidate` und wartet in der Prüfansicht. **Gemessen am 14.09.2026 gegen die 420 Spiele der Produktion:** 372 eindeutig, 5 echt mehrdeutig (etwa MediEvil als Remake oder Portierung, Tekken 6), 32 mit Kandidaten ohne Schlüsseltreffer (Abkürzungen, römische Ziffern, fehlende Untertitel), 11 ohne Treffer. In der Stichprobe aller automatischen Treffer keine Fehlzuordnung. Die Messung lief als Skript außerhalb des Repositories; ins Repository kamen nur die Zahlen.
 
@@ -663,7 +698,7 @@ Alles andere landet mit seinen Kandidaten in `igdb_candidate` und wartet in der 
 
 **Auffrischen.** `POST /api/igdb/auffrischen` holt für die 50 am längsten nicht aktualisierten verknüpften Spiele Wertung, Cover und Datum in **einer** Anfrage (`where id = (…)`) erneut. Kritikerwertungen ändern sich mit jeder neuen Rezension; Stufe 17 hängt den Schritt an den Cron.
 
-**Physische Fassung aus IGDB – für Stufe 14 entschieden.** IGDB führt unter `external_games` Händler- und Store-Einträge je Spiel mit `media` (1 = digital, 2 = physisch) und `platform`; gemessen am 14.09.2026 gegen die 419 verknüpften Spiele: 273 haben Einträge, **109 einen physischen** (überwiegend Amazon-Artikelnummern), 22 einen digitalen. Stufe 14 setzt daraus `physical_release_status = 'ja'` mit `physical_source = 'igdb'`, wenn ein physischer Eintrag zu einer Plattform des Releases existiert – und **nur** `ja`: Fehlen sagt nichts, `nein` bleibt Handarbeit (Abschnitt 3). Der AWIN-Feed (7.3, Stufe 18) ist die zweite Quelle; beide dürfen ein `nein` des Nutzers nicht überschreiben. Ob abgelehnte Spiele in `v_ohne_igdb` und damit in der Ansicht „Ohne Zuordnung" erscheinen sollen, entscheidet Stufe 11; die View ist unverändert.
+**Physische Fassung aus IGDB – für Stufe 14 entschieden.** IGDB führt unter `external_games` Händler- und Store-Einträge je Spiel mit `media` (1 = digital, 2 = physisch) und `platform`; gemessen am 14.09.2026 gegen die 419 verknüpften Spiele: 273 haben Einträge, **109 einen physischen** (überwiegend Amazon-Artikelnummern), 22 einen digitalen. Stufe 14 setzt daraus `physical_release_status = 'ja'` mit `physical_source = 'igdb'`, wenn ein physischer Eintrag zu einer Plattform des Releases existiert – und **nur** `ja`: Fehlen sagt nichts, `nein` bleibt Handarbeit (Abschnitt 3). Der AWIN-Feed (7.3, Stufe 18) ist die zweite Quelle; beide dürfen ein `nein` des Nutzers nicht überschreiben. Abgelehnte Spiele stehen seit Stufe 11 in `v_ohne_igdb` mit `zustand = 'abgelehnt'` und in der Ansicht „Ohne Zuordnung" hinter einem Umschalter (8.3).
 
 ---
 
@@ -728,31 +763,36 @@ Fortschrittsanzeige "noch 47 von 210" und jederzeitiges Abbrechen sind Pflicht, 
 
 Eingabe: Datei-Upload oder Einfügen in ein Textfeld, ein Titel pro Zeile. Leerzeilen und führende Aufzählungszeichen werden entfernt.
 
-**Ablauf**
+**Ablauf (Stufe 11, Entscheidungen des Nutzers vom 15.09.2026)**
 
-1. Zeilen einlesen, gegen `game` und IGDB abgleichen
-2. Ergebnisliste zur Durchsicht, dreigeteilt: eindeutige Treffer, mehrdeutige Treffer mit Auswahl, ohne Treffer. **Eindeutige Treffer und schon vorhandene Spiele werden als ein Block übernommen** (ein Knopf, Liste aufklappbar für Zweifelsfälle); eine Einzelentscheidung verlangt die Durchsicht nur für die Zeilen, die keine eindeutige Zuordnung haben – bei den echten Listen rund 100 von 318 (Entscheidung des Nutzers vom 15.09.2026)
-3. Erst nach Bestätigung werden `plan_entry`-Zeilen mit `kind='wunsch'`, `origin='import'` geschrieben
+1. Zeilen einlesen (`parseWunschliste`, `src/domain/wunschliste.ts`) und als **Lauf in der Datenbank** ablegen: `wishlist_import` (ein Lauf je Datei), `wishlist_import_line` (eine Zeile je Titel), `wishlist_import_candidate` (Kandidaten je Zeile, dieselbe Form wie `igdb_candidate`). Der Zustand liegt bewusst nicht im Browser: 318 Zeilen mit je ein bis vier IGDB-Anfragen passen nicht in einen Aufruf (10 ms CPU, vier Anfragen je Sekunde), und ein „überspringen" muss ein Neuladen überstehen. Die drei Tabellen sind Arbeitszustand und `NICHT_EXPORTIERT` – die Quelldateien liegen beim Nutzer, das Ergebnis steht in `plan_entry`.
+2. **Abgleich in Schritten** (`importAbgleichSchritt`, `src/sync/wunschliste.ts`): acht Zeilen je Aufruf, Fortschritt in `checked_at`, die Oberfläche ruft, solange `weiter` zurückkommt – dasselbe Muster wie der IGDB-Abgleich (7.6). Je Zeile erst die Sammlung über den Titelschlüssel (`sort_title`, kein IGDB-Aufruf), dann IGDB mit den Rückfällen und der Ordnung aus 7.6 und `eindeutigerTreffer` mit dem Jahr aus der Liste. Ergebnis je Zeile (`match_kind`): `sammlung`, `vorhanden` (der IGDB-Treffer hat schon ein Spiel in `game`, etwa aus einem früheren Wunsch – wiederverwenden, nie ein zweites mit derselben IGDB-Id), `eindeutig`, `mehrdeutig`, `ohne_treffer`. Kandidaten werden immer abgelegt, auch bei eindeutigen Treffern, damit die aufgeklappte Liste Zweifel klären kann. Hängt am Ziel schon ein offener Wunsch (Duplikatregel aus Abschnitt 5), ist die Zeile `schon_vorhanden` und wird nicht übernommen.
+3. Durchsicht in drei Blöcken. **Eindeutige Treffer, Sammlungstreffer und vorhandene Spiele sind ein Block mit einem Knopf** (`importUebernahmeSchritt`, 25 Zeilen je Aufruf, die IGDB-Einträge aller eindeutigen Zeilen in einer Anfrage); die Liste ist aufklappbar, jede Zeile lässt sich vorher überspringen oder anders wählen. Mehrdeutige und Zeilen ohne Treffer stehen **als Liste** zur Einzelentscheidung – bei den echten Listen rund 100 von 318 –, nicht eine Zeile je Bildschirm: Nichts erzwingt eine Reihenfolge, Ausgelassenes bleibt stehen (wie die IGDB-Zuordnung, 7.6). Die Darstellungsregel „in Serie" (Abschnitt 13) gilt für den Import deshalb nicht mehr.
+4. Jede Entscheidung schreibt sofort: Kandidat übernehmen oder „Ohne IGDB-Eintrag übernehmen" **ist** die Bestätigung und legt den `plan_entry` mit `kind='wunsch'`, `origin='import'` an (mit Rückgängig); „überspringen" ist eine gespeicherte Entscheidung; „umbenennen" setzt den Abgleich der Zeile zurück (der neue Titel ist meist die Korrektur, mit der IGDB trifft); „aufteilen" ersetzt eine Sammelzeile durch mehrere, die neu abgeglichen werden.
 
-**Zeilen ohne Treffer werden nicht stillschweigend als Freitext übernommen.** Sie landen in einem Nachbearbeitungsschritt mit einem eingebauten IGDB-Suchfeld: Suchbegriff anpassen, Treffer auswählen, fertig. Titel aus Textdateien sind abgekürzt, falsch geschrieben und mehrdeutig – eine Suche mit korrigierbarer Eingabe löst das, ein automatischer Fallback erzeugt nur Datenmüll.
+**Ziel des Wunsches.** Nennt die Liste eine Plattform (Abschnitt „PS3"/„PS4"), hängt der Wunsch am Release dieser Plattform, das bei Bedarf entsteht (Abschnitt 3) – auch bei Sammlungstreffern. Ohne Plattform hängt er am Spiel; hat ein Sammlungstreffer genau ein Release, an diesem. Eine geratene Plattform wäre eine Aussage, die nie getroffen wurde (Abschnitt 5). In der Durchsicht ist die Plattform mit der aus der Liste vorbelegt und änderbar, „ohne Plattform" eingeschlossen.
 
-Ein Eintrag ohne IGDB-Zuordnung entsteht **nur auf ausdrückliche Anweisung** ("trotzdem übernehmen"). Das ist der richtige Weg für Titel, die IGDB nicht kennt – etwa sehr frühe Ankündigungen –, aber es ist eine bewusste Entscheidung, kein Nebeneffekt.
+**Zeilen ohne Treffer werden nicht stillschweigend als Freitext übernommen.** Sie stehen in der Durchsicht mit dem eingebauten IGDB-Suchfeld (`IgdbSuche`): Suchbegriff anpassen, Treffer auswählen, fertig. Titel aus Textdateien sind abgekürzt, falsch geschrieben und mehrdeutig – eine Suche mit korrigierbarer Eingabe löst das, ein automatischer Fallback erzeugt nur Datenmüll.
+
+Ein Eintrag ohne IGDB-Zuordnung entsteht **nur auf ausdrückliche Anweisung** („Ohne IGDB-Eintrag übernehmen"). Das ist der richtige Weg für Titel, die IGDB nicht kennt – etwa sehr frühe Ankündigungen –, aber es ist eine bewusste Entscheidung, kein Nebeneffekt. Ist der Suchbegriff dabei geändert worden, wird die Zeile vorher umbenannt: Der Freitext ist das, was der Nutzer zuletzt eingetippt hat.
 
 **Befunde aus den echten Wunschlisten (gemessen am 14.09.2026, vor Stufe 11).** Zwölf Textdateien mit 332 Titelzeilen, gegen `game` und IGDB mit dem Suchweg aus 7.6 gemessen: 20 treffen über den Titelschlüssel ein Spiel der Sammlung, 199 sind bei IGDB eindeutig, 76 haben Kandidaten ohne eindeutigen Treffer, 37 finden nichts. Was der Import daraus können muss:
 
-- **Form der Dateien:** eine Datei je Jahr mit Überschriften `-Januar` … `-Dezember` (Erscheinungsmonat, teils geschätzt), dazu eine Datei mit Abschnitten `PS4` / `PS3`. Vier Dateien mit BOM, eine in Windows-1252, alle mit CRLF. Der Parser nimmt Jahr aus dem Dateinamen und Monat aus der Überschrift als **ungefähres Erscheinungsdatum** mit, die Plattform aus dem Abschnitt; Schreibfehler in Überschriften („-Oktiber", „- August") dürfen nicht als Titel durchgehen.
-- **Das Datum entscheidet Mehrdeutigkeiten.** Gleichnamige Spiele sind in den Listen häufig – „Layers of Fear" 2016 und das Remake 2023, „Resident Evil 2", „DOOM", „Oblivion" –, und der Monat aus der Liste liegt meist im richtigen Jahr. Ein Kandidat, dessen `first_release_date` im selben oder angrenzenden Jahr liegt, wird bevorzugt; das ist die Ergänzung zum Plattformabgleich aus 7.6.
-- **Doppelungen** (10 von 332): derselbe Titel in zwei Jahren ist meist eine Verschiebung („Iron Harvest" 2020 → 2021) und wird einmal übernommen, mit dem späteren Datum; manchmal ist es ein anderes Spiel („Judgment" 2019, „Lost Judgment" 2021) – dann zeigt die Durchsicht beide.
+- **Form der Dateien:** eine Datei je Jahr mit Überschriften `-Januar` … `-Dezember` (Erscheinungsmonat, teils geschätzt), dazu eine Datei mit Abschnitten `PS4` / `PS3`. Vier Dateien mit BOM, eine in Windows-1252, alle mit CRLF. Die Kodierung löst das Frontend vor dem Hochladen (UTF-8 mit `fatal`, sonst Windows-1252). Der Parser nimmt Jahr aus dem Dateinamen (in der Oberfläche korrigierbar, darf leer bleiben) und Monat aus der Überschrift als **ungefähres Erscheinungsdatum** (`listed_at`, `JJJJ` oder `JJJJ-MM`) mit, die Plattform aus dem Abschnitt. Eine Zeile, die mit `-` beginnt und aus einem Wort besteht, ist eine Überschrift, nie ein Titel; der Monat wird mit Editierdistanz bis 2 erkannt („-Oktiber", „- August"), sonst bleibt nur das Jahr. Gemessen am 15.09.2026 gegen die zwölf Dateien: 331 Titelzeilen (eine Doppelung innerhalb einer Datei schon zusammengeführt), 118 Überschriften, keine davon als Titel.
+- **Das Datum entscheidet Mehrdeutigkeiten.** Gleichnamige Spiele sind in den Listen häufig – „Layers of Fear" 2016 und das Remake 2023, „Resident Evil 2", „DOOM", „Oblivion" –, und der Monat aus der Liste liegt meist im richtigen Jahr. Bleiben in `eindeutigerTreffer` nach den drei Verfeinerungen aus 7.6 mehrere Kandidaten, gewinnt der einzige, dessen `first_release_date` im selben oder angrenzenden Jahr liegt; ohne Jahr ändert sich nichts. **Das Datum wird nicht gespeichert** (Entscheidung des Nutzers vom 15.09.2026): Es bleibt in der Import-Zeile, `plan_entry` bekommt nichts Abgeleitetes – bei Treffern liefert IGDB das echte Datum.
+- **Doppelungen** (10 von 332): derselbe Titel in zwei Jahren ist meist eine Verschiebung („Iron Harvest" 2020 → 2021) und wird einmal übernommen, mit dem späteren Datum; der Parser führt gleiche Titelschlüssel innerhalb einer Datei zusammen (alle Rohzeilen bleiben in `originals`), über Dateien hinweg fängt die Duplikatprüfung gegen offene Wünsche den zweiten Import ab (`schon_vorhanden`). Manchmal ist es ein anderes Spiel („Judgment" 2019, „Lost Judgment" 2021) – verschiedene Schlüssel, die Durchsicht zeigt beide.
 - **Ohne Treffer** sind vor allem Tippfehler („Assasins", „Yakusa", „Devip May Cry"), deutsche Titel („Mittelerde: Schatten des Krieges", „Der Pate"), Sammelzeilen („Mass Effect 1+2+3", „Yakuza 1-4", „Dark Souls Trilogie") und Arbeitstitel. Genau dafür ist das korrigierbare Suchfeld da; ein automatischer Freitext-Fallback würde hier nur Müll erzeugen.
 - **Schon in der Sammlung:** 20 Zeilen treffen ein vorhandenes Spiel. **Entscheidung des Nutzers (14.09.2026): Sie bleiben Wünsche.** Ein digital gespieltes Spiel auf der Wunschliste heißt „physisch besitzen wollen" – das ist genau die Lücke aus Use Case 3. Der Import legt sie also als `wunsch` an, mit `release_id` des vorhandenen Releases statt nur `game_id`, und die Durchsicht kennzeichnet sie („schon gespielt, Wunsch bleibt") statt sie auszusortieren.
-- **Alle Dateien sind Wunschlisten**, auch die ältere ohne Jahresgliederung: `kind = 'wunsch'` für jede Zeile, kein Backlog-Import. Sammelzeilen („Mass Effect 1+2+3", „Overlord + 2") meinen mehrere Spiele; der Nutzer trennt sie in der Durchsicht, der Import rät nicht.
-- **Bereinigte Fassung.** Aus der Messung ist eine zusammengeführte Liste entstanden (`wunschlisten/wunschliste-bereinigt.txt`, lokal; Tabulator-getrennt: Datum, Titel, Plattform, Status, Original, Hinweis). 330 Zeilen wurden 318 – Doppelte zusammengeführt, das spätere Datum gewinnt –, davon 20 in der Sammlung, 198 eindeutig (6 davon erst über das Jahr aus der Liste), 65 zu prüfen, 35 unbekannt. Der Import in Stufe 11 nimmt beides an: die rohen Jahresdateien und diese Form.
+- **Alle Dateien sind Wunschlisten**, auch die ältere ohne Jahresgliederung: `kind = 'wunsch'` für jede Zeile, kein Backlog-Import. Sammelzeilen („Mass Effect 1+2+3", „Overlord + 2") meinen mehrere Spiele; der Nutzer trennt sie in der Durchsicht („aufteilen"), der Import rät nicht.
+- **Bereinigte Fassung.** Aus der Messung ist eine zusammengeführte Liste entstanden (`wunschlisten/wunschliste-bereinigt.txt`, lokal; Tabulator-getrennt: Datum, Titel, Plattform, Status, Original, Hinweis). 330 Zeilen wurden 318 – Doppelte zusammengeführt, das spätere Datum gewinnt –, davon 20 in der Sammlung, 198 eindeutig (6 davon erst über das Jahr aus der Liste), 65 zu prüfen, 35 unbekannt. Der Import nimmt beides an: die rohen Jahresdateien und diese Form. Aus der Tabelle liest er nur Datum, Titel und Plattform; Status und Hinweis waren Messergebnis, keine Entscheidung – der Abgleich läuft frisch.
 
 ### 8.3 Nachpflege fehlender Metadaten (Use Case 12)
 
 Einträge ohne IGDB-Zuordnung haben kein Cover, keine Kritikerwertung und kein Erscheinungsdatum. Sie funktionieren in allen Listen, fallen aber aus der Rangberechnung heraus (seit Stufe 10: `rang = null`, am Listenende).
 
-Eine Ansicht in den Einstellungen sammelt sie listenübergreifend – aus Wunschliste, To-Do, Backlog und Sammlung gleichermassen – mit demselben IGDB-Suchfeld zum Nachziehen.
+Die Ansicht „Ohne Zuordnung" (`/ohne-zuordnung`, Werkzeug in den Einstellungen, seit Stufe 11) sammelt sie listenübergreifend aus `v_ohne_igdb` – Freitext aus Wunschliste, To-Do, Backlog und Kaufliste sowie Spiele der Sammlung ohne IGDB-Id – mit demselben IGDB-Suchfeld zum Nachziehen, gruppiert nach `zustand`: Freitext ohne Spiel, Spiele in der IGDB-Zuordnung (mit Link auf deren Kandidaten), noch nicht gesuchte Spiele (der Abgleich läuft in den Einstellungen) und **abgelehnte Spiele hinter einem Umschalter**, standardmäßig ausgeblendet – die Ablehnung ist eine gespeicherte Entscheidung, „Doch suchen" nimmt sie zurück (Entscheidung des Nutzers vom 15.09.2026, schließt den offenen Punkt aus 7.6).
+
+Ein Freitext-Eintrag wird über `POST /api/unmatched/plan_<art>/:id/link` einem IGDB-Treffer zugeordnet: Das Spiel wird wiederverwendet oder ohne Release angelegt (Abschnitt 3), dann `game_id` gesetzt und `title_raw` geleert; ein offener Eintrag derselben Art am Spiel ist ein Duplikat (409, Abschnitt 5). Die Logik „Ziel aus IGDB-Treffer" ist eine Funktion (`src/sync/plan-ziel.ts`) und wird von `POST /api/plans`, dem Import und der Nachpflege gemeinsam benutzt.
 
 Der Aufwand ist gering, weil die Suche aus 8.2 wiederverwendet wird – seit Stufe 9 existiert sie als Komponente `IgdbSuche` im Spieldetail und in der IGDB-Zuordnung (7.6). Falls der Fall in der Praxis nie auftritt, kostet die Ansicht nichts; falls doch, hast du keinen Weg, ihn sonst zu finden.
 
@@ -920,12 +960,17 @@ ORDER BY
                  WHEN 'neue_trophaeen' THEN 2 ELSE 3 END,
   t.progress_pct DESC;
 
--- Use Case 12: alles ohne IGDB-Zuordnung, listenübergreifend.
+-- Use Case 12: alles ohne IGDB-Zuordnung, listenübergreifend. `zustand`
+-- seit Migration 0012, damit die Ansicht abgelehnte Spiele hinter einem
+-- Umschalter halten kann (8.3).
 CREATE VIEW v_ohne_igdb AS
-SELECT 'spiel' AS quelle, g.id AS ref_id, g.title
+SELECT 'spiel' AS quelle, g.id AS ref_id, g.title,
+       CASE WHEN g.igdb_declined_at IS NOT NULL THEN 'abgelehnt'
+            WHEN g.igdb_checked_at IS NULL THEN 'nicht_gesucht'
+            ELSE 'zur_pruefung' END AS zustand
 FROM game g WHERE g.igdb_id IS NULL
 UNION ALL
-SELECT 'plan_' || pe.kind, pe.id, pe.title_raw
+SELECT 'plan_' || pe.kind, pe.id, pe.title_raw, 'freitext'
 FROM plan_entry pe
 WHERE pe.status = 'offen' AND pe.game_id IS NULL AND pe.release_id IS NULL;
 
@@ -1023,14 +1068,23 @@ GET    /api/igdb/offen                Prüfansicht: Spiele ohne eindeutigen Tref
 POST   /api/igdb/abgleich             ein Schritt: acht Spiele; { geprueft, verknuepft, vorgeschlagen, ohneTreffer, nochOffen, weiter }
 POST   /api/igdb/auffrischen          ein Schritt: 50 verknüpfte Spiele in einer IGDB-Anfrage
 POST   /api/igdb/erneut-suchen        alle Spiele zur Prüfung zurück in den Abgleich; { zurueckgesetzt }
-GET    /api/unmatched                 v_ohne_igdb (Stufe 11)
-POST   /api/unmatched/:quelle/:id/link  Body: { igdbId } – Quelle 'spiel' seit Stufe 9, 'plan_*' ab Stufe 11
+GET    /api/unmatched?abgelehnte=1    v_ohne_igdb mit zustand; abgelehnte nur mit Parameter (Stufe 11)
+POST   /api/unmatched/:quelle/:id/link  Body: { igdbId } – Quelle 'spiel' seit Stufe 9, 'plan_wunsch|todo|backlog|kauf' seit Stufe 11 (Freitext → Spiel)
 DELETE /api/unmatched/spiel/:id/link  Verknüpfung lösen; nimmt alles zurück, was von IGDB kam
 POST   /api/unmatched/spiel/:id/ablehnen  "Gibt es bei IGDB nicht" – gespeicherte Entscheidung
 POST   /api/unmatched/spiel/:id/suchen    Ablehnung zurücknehmen; der nächste Abgleich sucht erneut
 
-POST   /api/imports/wishlist/parse    Body: { text } → Trefferliste zur Durchsicht
-POST   /api/imports/wishlist/confirm  Body: { entries[] } → schreibt plan_entry
+GET    /api/imports/wishlist          Läufe mit Zählern (gesamt, ungeprueft, klar, mehrdeutig, ohneTreffer, uebernommen, uebersprungen, schonVorhanden)
+POST   /api/imports/wishlist          Body: { text, dateiname?, jahr? } → parst, legt Lauf und Zeilen an; { id, form, zeilen, ueberschriften, zusammengefuehrt }
+GET    /api/imports/wishlist/:id      Lauf mit Zählern; ?gruppe=klar|unklar|uebersprungen|uebernommen&limit&offset → Zeilen mit Kandidaten
+DELETE /api/imports/wishlist/:id      Lauf verwerfen; übernommene plan_entry bleiben
+POST   /api/imports/wishlist/:id/abgleich     ein Schritt: acht Zeilen; { status, geprueft, sammlung, eindeutig, mehrdeutig, ohneTreffer, nochOffen, weiter }
+POST   /api/imports/wishlist/:id/uebernehmen  ein Schritt: 25 klare Zeilen, eine IGDB-Anfrage; { uebernommen, spieleAngelegt, nochOffen, weiter }
+POST   /api/imports/wishlist/:id/zeilen/:zeileId/entscheiden
+                                      Body: { aktion: 'igdb', igdbId, plattform? } | { aktion: 'freitext' } | { aktion: 'ueberspringen' } | { aktion: 'zuruecknehmen' }
+                                      igdb/freitext schreiben plan_entry sofort (201), 409 bei offenem Duplikat; zuruecknehmen löscht ihn wieder
+PATCH  /api/imports/wishlist/:id/zeilen/:zeileId            Body: { titel } – umbenennen, Abgleich der Zeile zurücksetzen
+POST   /api/imports/wishlist/:id/zeilen/:zeileId/aufteilen  Body: { titel: string[] } – Sammelzeile trennen
 
 GET    /api/export/:liste.csv         sammlung|wunsch|todo|backlog|kauf|luecken|trophaeen; Semikolon und BOM (14.4)
 GET    /api/export/backup.json        Vollsicherung: die 14 Fachtabellen, ohne Rohantworten und Zugangsdaten (14.2)
@@ -1081,17 +1135,17 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
 | Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert nach Rang, mit Herkunftskennzeichnung |
 | Prüfliste | 8 | Ein Spiel pro Bildschirm, sieben Aktionen mit Tastenkürzeln 1–7, Grund und Vorher-Nachher, aktueller (vorbelegter) Status, Fortschrittsanzeige „noch n von m"; jederzeit verlassen, jede Entscheidung ist schon gespeichert. **Auf dem Handy müssen alle sieben Knöpfe ohne Scrollen sichtbar sein** (zweispaltig, kompakte Karte) – die Ansicht wird bei der Ersteinrichtung mehrere hundert Mal hintereinander bedient. **Die Knopfreihe steht immer an derselben Stelle**, unabhängig von der Titellänge (feste Mindesthöhe der Karte): Wer blind auf dieselbe Position zielt, trifft sonst bei einem zweizeiligen Titel daneben, und eine Fehlentscheidung fällt erst Wochen später auf. Eine Zeile stellt klar: „Du bewertest den Spielstand, nicht den Besitz." |
-| Wunschliste importieren | 9 | Textfeld oder Datei, dreigeteilte Trefferliste; Eindeutige und Vorhandene als ein Block, Einzelentscheidung nur für Mehrdeutige und Zeilen ohne Treffer, dort die IGDB-Suche (8.2) |
-| Ohne Zuordnung | 12 | Listenübergreifend, mit IGDB-Suchfeld zum Nachziehen |
+| Wunschliste importieren | 9 | `/import`: Datei (UTF-8, sonst Windows-1252) oder Textfeld, Jahr aus dem Dateinamen korrigierbar, Liste der bisherigen Läufe. `/import/:id`: Abgleich in Schritten mit Fortschritt, dann drei Blöcke – Eindeutige, Sammlungstreffer und Vorhandene als ein Block mit einem Knopf und aufklappbarer Liste; Mehrdeutige und Zeilen ohne Treffer als Liste mit Kandidaten, Plattform aus der Liste vorbelegt, IGDB-Suche (8.2), „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen; Übersprungene und Übernommene aufklappbar mit „Doch entscheiden"/„Zurücknehmen"; Rückgängig nach jeder Entscheidung |
+| Ohne Zuordnung | 12 | `/ohne-zuordnung`: `v_ohne_igdb` nach Zustand gruppiert (Freitext, in der IGDB-Zuordnung, nicht gesucht), IGDB-Suchfeld zum Nachziehen, „Gibt es bei IGDB nicht"; abgelehnte hinter „auch abgelehnte zeigen" mit „Doch suchen" |
 | Erscheint bald | 11 | Vorgemerkte Titel mit Datum |
 | Scannen | 1 | Serienerfassung nach Abschnitt 9 |
 | Einstellungen | – | NPSSO, Sync, Sync-Historie, Gewichte der Rangformel (seit Stufe 10), IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen", „Offene erneut suchen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Gewichte der Rangformel, Export und Backup-Status |
 
 **Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den sechs Hauptansichten (Sammlung, Wunschliste, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Die Wunschliste kam mit Stufe 10 in die Leiste (Entscheidung des Nutzers vom 14.09.2026): Sie wird oft bedient, und ein Umweg über die Einstellungen wäre für die häufigste Liste der falsche Platz. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
 
-Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/wunschliste`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/igdb`, `/pruefen`, `/trophaeen`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen, seit Stufe 10 die Wunschliste; Zuordnung, IGDB-Zuordnung, Sammlung prüfen und Trophäen hängen als Werkzeuge an den Einstellungen. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
+Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/wunschliste`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/igdb`, `/pruefen`, `/trophaeen`, seit Stufe 11 `/import`, `/import/:id`, `/ohne-zuordnung`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen, seit Stufe 10 die Wunschliste; Zuordnung, IGDB-Zuordnung, Sammlung prüfen, Trophäen, Wunschliste importieren und Ohne Zuordnung hängen als Werkzeuge an den Einstellungen, der Import zusätzlich als Link auf der Wunschliste. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
 
-Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste), nicht zugeordnete Trophäenlisten, seit Stufe 8 eine **überfällige Sicherung** (mehr als acht Tage oder noch nie, siehe 14.2) und seit Stufe 9 Spiele, die noch nicht bei IGDB gesucht wurden oder auf die IGDB-Zuordnung warten – jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
+Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste), nicht zugeordnete Trophäenlisten, seit Stufe 8 eine **überfällige Sicherung** (mehr als acht Tage oder noch nie, siehe 14.2) seit Stufe 9 Spiele, die noch nicht bei IGDB gesucht wurden oder auf die IGDB-Zuordnung warten, und seit Stufe 11 einen Import mit offenen Zeilen sowie Freitext-Einträge ohne Spiel – jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
 
 **Darstellungsregeln**
 
@@ -1099,7 +1153,7 @@ Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dess
 - Trophäenfortschritt und eigener Status stehen immer nebeneinander, nie ineinander verrechnet.
 - Bei unveröffentlichten Titeln steht das Erscheinungsdatum an der Stelle, wo sonst der Preis steht – nicht "0 €" und nicht "nicht verfügbar".
 - Store-Preis und Gebrauchtpreis werden getrennt beschriftet.
-- Ansichten, die **in Serie** bedient werden – Prüfliste (Use Case 8), Import-Durchsicht (Use Case 9), Serienerfassung beim Scannen (Abschnitt 9.1) –, müssen auf dem Handy ohne Scrollen bedienbar sein, und ihre Bedienelemente stehen unabhängig von der Inhaltslänge an derselben Stelle (feste Mindesthöhe statt mitwachsender Karte). Wer hundertfach blind auf dieselbe Position tippt, trifft sonst bei einem längeren Titel daneben – und eine Fehlentscheidung fällt erst Wochen später auf.
+- Ansichten, die **in Serie** bedient werden – Prüfliste (Use Case 8), Serienerfassung beim Scannen (Abschnitt 9.1) –, müssen auf dem Handy ohne Scrollen bedienbar sein, und ihre Bedienelemente stehen unabhängig von der Inhaltslänge an derselben Stelle (feste Mindesthöhe statt mitwachsender Karte). Wer hundertfach blind auf dieselbe Position tippt, trifft sonst bei einem längeren Titel daneben – und eine Fehlentscheidung fällt erst Wochen später auf. Die Import-Durchsicht (Use Case 9) gehörte ursprünglich dazu und ist seit Stufe 11 eine Liste wie die IGDB-Zuordnung (Entscheidung des Nutzers vom 15.09.2026, 8.2): Sie wird einmal durchgearbeitet, nicht hundertfach blind.
 
 **PWA:** Manifest und Service Worker, Sammlungsdaten für Offline-Lesezugriff cachen.
 
