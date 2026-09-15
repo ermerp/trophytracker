@@ -62,17 +62,23 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	it("misst die Abfragen der Sammlung einzeln", async () => {
 		const zuletzt =
 			"(SELECT MAX(t2.last_played_at) FROM trophy_progress t2 JOIN release r2 ON r2.id = t2.release_id WHERE r2.game_id = g.id)";
+		// Releases nur aus Wunsch bleiben aussen vor (Stufe 10) - drei Index-Lookups je Release.
+		const nurWunsch =
+			"(t.release_id IS NULL AND NOT EXISTS (SELECT 1 FROM physical_copy p0 WHERE p0.release_id = r.id) " +
+			"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d0 WHERE d0.release_id = r.id) " +
+			"AND EXISTS (SELECT 1 FROM plan_entry pe0 WHERE pe0.release_id = r.id AND pe0.kind = 'wunsch' AND pe0.status = 'offen'))";
 		const seite = await zeilenGelesen(
 			`SELECT g.id, g.title, g.sort_title, g.cover_url,
 			  (SELECT t3.icon_url FROM trophy_progress t3 JOIN release r3 ON r3.id = t3.release_id
 			    WHERE r3.game_id = g.id AND t3.icon_url IS NOT NULL ORDER BY r3.platform DESC LIMIT 1) AS icon_url,
 			  ${zuletzt} AS zuletzt_gespielt
 			 FROM game g WHERE EXISTS (SELECT 1 FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id
-			   LEFT JOIN play_status ps ON ps.release_id = r.id WHERE r.game_id = g.id)
+			   LEFT JOIN play_status ps ON ps.release_id = r.id WHERE r.game_id = g.id AND (NOT ${nurWunsch}))
 			 ORDER BY g.sort_title LIMIT 50 OFFSET 0`,
 		);
 		const sortiertNachZuletzt = await zeilenGelesen(
-			`SELECT g.id FROM game g WHERE EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id)
+			`SELECT g.id FROM game g WHERE EXISTS (SELECT 1 FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id
+			   WHERE r.game_id = g.id AND (NOT ${nurWunsch}))
 			 ORDER BY ${zuletzt} IS NULL, ${zuletzt} DESC, g.sort_title LIMIT 50`,
 		);
 		const releasesDerSeite = await zeilenGelesen(
@@ -81,7 +87,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			  (SELECT GROUP_CONCAT(d.source) FROM digital_entitlement d WHERE d.release_id = r.id) AS digital
 			 FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id
 			 LEFT JOIN play_status ps ON ps.release_id = r.id
-			 WHERE r.game_id IN (${Array.from({ length: 50 }, (_, i) => i + 1).join(",")})`,
+			 WHERE r.game_id IN (${Array.from({ length: 50 }, (_, i) => i + 1).join(",")}) AND NOT ${nurWunsch}`,
 		);
 		const pruefliste = await zeilenGelesen("SELECT release_id FROM v_review_offen LIMIT 1 OFFSET 0");
 		const uebersicht = await zeilenGelesen(

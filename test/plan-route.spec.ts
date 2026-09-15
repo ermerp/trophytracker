@@ -229,6 +229,44 @@ describe("POST /api/plans", () => {
 		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM game").first<{ n: number }>()).toMatchObject({ n: 0 });
 	});
 
+	it("haengt den Wunsch mit gewaehlter Plattform an ein Release, das bei Bedarf entsteht", async () => {
+		const { client } = fakeIgdb([[spielRoh({ id: 1001, name: "Bloodborne" })]]);
+		const a = app(client);
+		const antwort = await sende(a, "POST", "/api/plans", { art: "wunsch", igdbId: 1001, plattform: "PS4" });
+		expect(antwort.status).toBe(201);
+		const e = await antwort.json();
+		expect(e).toMatchObject({ titel: "Bloodborne", plattform: "PS4", spielAngelegt: true });
+		expect(e.releaseId).toEqual(expect.any(Number));
+
+		// Dasselbe Spiel, andere Plattform: zweites Release, kein Duplikat.
+		const ps5 = await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: e.spielId, plattform: "PS5" });
+		expect(ps5.status).toBe(201);
+		expect(await ps5.json()).toMatchObject({ plattform: "PS5", spielAngelegt: false });
+		// Dieselbe Plattform noch einmal: dasselbe Release, Duplikat.
+		expect((await sende(a, "POST", "/api/plans", { art: "wunsch", igdbId: 1001, plattform: "PS4" })).status).toBe(409);
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM release WHERE game_id = ?").bind(e.spielId).first()).toMatchObject({ n: 2 });
+
+		// Ein Release nur aus Wunsch gehoert nicht zur Sammlung ...
+		expect((await hole(a, "/api/games")).gesamt).toBe(0);
+		expect((await hole(a, "/api/games?platform=PS4")).gesamt).toBe(0);
+		// ... bis Besitz dazukommt; dann nur das besessene Release.
+		await env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)").bind(e.releaseId).run();
+		const sammlung = await hole(a, "/api/games");
+		expect(sammlung.gesamt).toBe(1);
+		expect(sammlung.spiele[0].releases.map((r: { plattform: string }) => r.plattform)).toEqual(["PS4"]);
+	});
+
+	it.each([
+		[{ art: "wunsch", releaseId: 1, plattform: "PS4" }, /nur zu spielId oder igdbId/],
+		[{ art: "wunsch", titel: "x", plattform: "PS4" }, /nur zu spielId oder igdbId/],
+		[{ art: "wunsch", spielId: 1, plattform: "Switch" }, /Unbekannte Plattform/],
+	])("lehnt die Plattform in %o ab", async (koerper, meldung) => {
+		await spiel(1, "Bloodborne", ["PS4"]);
+		const antwort = await sende(app(), "POST", "/api/plans", koerper);
+		expect(antwort.status).toBe(400);
+		expect(((await antwort.json()) as { fehler: string }).fehler).toMatch(meldung);
+	});
+
 	it("nimmt Freitext nur ausdruecklich und ohne Rang", async () => {
 		const antwort = await sende(app(), "POST", "/api/plans", { art: "wunsch", titel: "  Arbeitstitel  " });
 		expect(antwort.status).toBe(201);

@@ -13,6 +13,7 @@ import { rang } from "../domain/rang";
 import type { Weights } from "../domain/weights";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
+import { istErlaubtePlattform, type Plattform } from "../domain/titel";
 import type { AppEnv } from "../types";
 import { liesJson } from "./validierung";
 
@@ -169,6 +170,19 @@ export const planRoutes = new Hono<AppEnv>()
 		if ("fehler" in geprueft) return c.json({ fehler: geprueft.fehler }, 400);
 		const { priority, isFavorite, note } = geprueft.felder;
 
+		// Plattform nur auf ausdrueckliche Wahl - nie vorbelegt (Abschnitt 5).
+		// Sie haengt den Wunsch an ein Release des Spiels, das bei Bedarf entsteht.
+		let plattform: Plattform | null = null;
+		if (k.plattform !== undefined && k.plattform !== null && k.plattform !== "") {
+			if (typeof k.plattform !== "string" || !istErlaubtePlattform(k.plattform)) {
+				return c.json({ fehler: `Unbekannte Plattform: ${String(k.plattform)}` }, 400);
+			}
+			if (quellen[0] === "releaseId" || quellen[0] === "titel") {
+				return c.json({ fehler: "Eine Plattform passt nur zu spielId oder igdbId." }, 400);
+			}
+			plattform = k.plattform;
+		}
+
 		let ziel: PlanZiel;
 		let igdb: IgdbKandidat | null = null;
 		switch (quellen[0]) {
@@ -217,6 +231,9 @@ export const planRoutes = new Hono<AppEnv>()
 				ziel = { gameId: vorhanden };
 				break;
 			}
+		}
+		if (plattform !== null && ziel.gameId !== undefined) {
+			ziel = { releaseId: await c.var.repos.games.releaseFuerPlattform(ziel.gameId, plattform) };
 		}
 
 		const doppelt = await c.var.repos.plan.offenerEintrag(art, ziel);
