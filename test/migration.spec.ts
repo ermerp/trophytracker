@@ -69,3 +69,38 @@ describe("Migration 0001", () => {
 		}
 	});
 });
+
+describe("Migration 0014", () => {
+	// Die Datenmigration selbst laeuft im Setup auf leerer Tabelle; hier wird
+	// ihr UPDATE aus der Datei gelesen und gegen einen Bestand wie den der
+	// Produktion (To-Do aus der Triage, ohne Position) noch einmal ausgefuehrt.
+	it("gibt offenen To-Do-Eintraegen ohne Position eine, hinter den vorhandenen", async () => {
+		const datei = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0014"));
+		expect(datei).toBeDefined();
+		const update = datei!.queries.find((q) => q.trim().startsWith("UPDATE plan_entry SET position = neu.p"));
+		expect(update).toBeDefined();
+
+		await env.DB.batch(["plan_entry", "release", "game"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (1, 'x', 'x')").run();
+		const einfuegen = env.DB.prepare("INSERT INTO plan_entry (id, kind, game_id, origin, status, position) VALUES (?, ?, 1, 'triage', ?, ?)");
+		await env.DB.batch([
+			einfuegen.bind(10, "todo", "offen", null),
+			einfuegen.bind(11, "todo", "offen", 2),
+			einfuegen.bind(12, "todo", "offen", null),
+			einfuegen.bind(13, "todo", "erledigt", null),
+			einfuegen.bind(14, "backlog", "offen", null),
+		]);
+
+		await env.DB.prepare(update!).run();
+
+		const { results } = await env.DB.prepare("SELECT id, position FROM plan_entry ORDER BY id").all();
+		expect(results).toEqual([
+			{ id: 10, position: 3 },
+			{ id: 11, position: 2 },
+			{ id: 12, position: 4 },
+			{ id: 13, position: null },
+			{ id: 14, position: null },
+		]);
+		await env.DB.batch(["plan_entry", "game"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+	});
+});

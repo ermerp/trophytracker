@@ -205,8 +205,27 @@ export type PlanEintrag = {
   favorit: boolean
   notiz: string | null
   herkunft: string | null
+  /** Manuelle Reihenfolge, nur To-Do (Stufe 12); null sortiert ans Ende. */
+  position: number | null
   angelegtAm: string
   erledigtAm: string | null
+  /** Eigene Bewertung am Release (4.2), nur zur Anzeige neben der Absicht. */
+  eigenerStatus: PlayStatus | null
+  /** Übergang aus Abschnitt 5: die Bewertung sagt durchgespielt/komplettiert/abgebrochen – vorgeschlagen, nie erzwungen. */
+  erledigtVorgeschlagen: boolean
+}
+
+/** Status, die einen To-Do- oder Backlog-Eintrag als erledigt vorschlagen (Abschnitt 5, Stufe 12). */
+export const ERLEDIGT_STATUS: readonly PlayStatus[] = ['durchgespielt', 'komplettiert', 'abgebrochen']
+
+/** Kandidat für den Backlog aus v_backlog_kandidaten: im Besitz, nie angefasst (Stufe 12). */
+export type BacklogKandidat = {
+  releaseId: number
+  spielId: number
+  titel: string
+  plattform: Plattform
+  bild: string | null
+  kritik: number | null
 }
 
 /** Wunschlisten-Import (Abschnitt 8.2, Stufe 11). */

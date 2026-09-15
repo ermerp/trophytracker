@@ -863,3 +863,108 @@ button.notiz {
     justify-self: start;
   }
 }
+
+/* To-Do und Backlog (Stufe 12) */
+.reiter {
+  display: flex;
+  gap: 0.2rem;
+  margin: -0.5rem 0 0.8rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.3);
+}
+
+.reiter a {
+  padding: 0.4rem 0.9rem;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.7;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.reiter a.active {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: currentColor;
+}
+
+/* Eine Spalte statt Raster: Die Reihenfolge ist der Inhalt. */
+.kacheln.sortierbar {
+  grid-template-columns: 1fr;
+  max-width: 44rem;
+}
+
+.kachel.zieht {
+  opacity: 0.5;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+button.griff {
+  align-self: center;
+  padding: 0.6rem 0.3rem;
+  border: none;
+  background: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  letter-spacing: -0.2em;
+  color: rgba(128, 128, 128, 0.9);
+  cursor: grab;
+  touch-action: none;
+}
+
+button.griff:active {
+  cursor: grabbing;
+}
+
+.hinweis.vorschlag {
+  margin: 0.4rem 0;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.kandidaten {
+  margin-top: 2rem;
+}
+
+.kandidatenliste {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.kandidatenliste li {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  flex-wrap: wrap;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+}
+
+.kandidatenliste .bild {
+  width: 3rem;
+  min-width: 3rem;
+  aspect-ratio: 264 / 374;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.kandidatenliste .bild img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.kandidatenliste > li > div:not(.knopfzeile) {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.kandidatenliste .knopfzeile {
+  margin: 0;
+}

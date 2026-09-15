@@ -229,7 +229,13 @@ describe("Dichtheitsprüfung", () => {
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({ favorit: true }),
 			}),
+			await ruf(app, "/api/plans/reorder", {
+				method: "PUT",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ art: "todo", orderedIds: [1] }),
+			}),
 			await ruf(app, "/api/plans/1", { method: "DELETE" }),
+			await ruf(app, "/api/backlog-candidates"),
 			await ruf(app, "/api/deviations"),
 			await ruf(app, "/api/review/queue"),
 			await ruf(app, "/api/review/progress"),

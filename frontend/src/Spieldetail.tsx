@@ -20,6 +20,7 @@ import {
   type Quelle,
   type Zustand,
   KRITIKQUELLE,
+  ERLEDIGT_STATUS,
   PLAN_ARTTEXT,
   RELEASE_STATUS_TEXT,
   type PlanArt,
@@ -147,6 +148,42 @@ export function Spieldetail() {
     void tue(
       () => anfrage('/api/plans', { methode: 'POST', koerper: { art: 'wunsch', spielId: spiel!.id, plattform: wunschPlattform } }),
       'Auf die Wunschliste gesetzt.',
+    )
+  }
+
+  /**
+   * Eintrag entfernen. Raeumt der Worker dabei das Spiel mit ab (Waisen,
+   * Abschnitt 5: nichts als dieser Eintrag hing daran), gibt es hier nichts
+   * mehr zu zeigen - zurueck zur Sammlung statt "Spiel nicht gefunden".
+   */
+  async function vonListeEntfernen(planId: number) {
+    setLaeuft(true)
+    setMeldung(null)
+    try {
+      const r = await anfrage<{ spielGeloescht: boolean }>(`/api/plans/${planId}`, { methode: 'DELETE' })
+      if (r.spielGeloescht) {
+        navigate('/sammlung')
+        return
+      }
+      setMeldung('Von der Liste entfernt.')
+      await laden()
+    } catch (f) {
+      setMeldung(f instanceof Error ? f.message : 'Fehlgeschlagen.')
+    } finally {
+      setLaeuft(false)
+    }
+  }
+
+  /** Offener To-Do- oder Backlog-Eintrag an diesem Release (Stufe 12). */
+  function listenEintrag(releaseId: number) {
+    return spiel!.plaene.find((p) => p.releaseId === releaseId && (p.art === 'todo' || p.art === 'backlog'))
+  }
+  const aufListe = (releaseId: number) => listenEintrag(releaseId) !== undefined
+
+  function listeAnlegen(art: 'todo' | 'backlog', releaseId: number) {
+    void tue(
+      () => anfrage('/api/plans', { methode: 'POST', koerper: { art, releaseId } }),
+      art === 'todo' ? 'Auf To-Do gesetzt.' : 'Ins Backlog gesetzt.',
     )
   }
 
@@ -357,7 +394,7 @@ export function Spieldetail() {
       </section>
 
       <section className="wunsch-block">
-        <h2>Wunschliste</h2>
+        <h2>Listen</h2>
         {spiel.plaene.length > 0 && (
           <ul className="besitz">
             {spiel.plaene.map((p) => (
@@ -378,7 +415,7 @@ export function Spieldetail() {
                   title="Von der Liste entfernen"
                   aria-label="Von der Liste entfernen"
                   disabled={laeuft}
-                  onClick={() => tue(() => anfrage(`/api/plans/${p.id}`, { methode: 'DELETE' }), 'Von der Liste entfernt.')}
+                  onClick={() => vonListeEntfernen(p.id)}
                 >
                   ×
                 </button>
@@ -403,6 +440,19 @@ export function Spieldetail() {
           </button>
           <Link to="/wunschliste" className="zeile">zur Wunschliste</Link>
         </div>
+        {spiel.releases.length > 0 && (
+          <div className="knopfzeile">
+            {/* To-Do und Backlog haengen am Release (Stufe 12); ein offener Eintrag einer der beiden Listen sperrt beide, wie in der Triage (8.1). */}
+            {spiel.releases.map((r) => (
+              <span key={r.id} className="pille">
+                {r.plattform}
+                <button type="button" disabled={laeuft || aufListe(r.id)} onClick={() => listeAnlegen('todo', r.id)}>Auf To-Do</button>
+                <button type="button" disabled={laeuft || aufListe(r.id)} onClick={() => listeAnlegen('backlog', r.id)}>Ins Backlog</button>
+              </span>
+            ))}
+            <Link to="/todo" className="zeile">zu To-Do und Backlog</Link>
+          </div>
+        )}
       </section>
 
       {spiel.releases.map((r) => (
@@ -439,6 +489,20 @@ export function Spieldetail() {
             </div>
             <div>
               <h3>Eigene Bewertung</h3>
+              {r.bewertung && ERLEDIGT_STATUS.includes(r.bewertung.status) && listenEintrag(r.id) && (
+                /* Uebergang aus Abschnitt 5: vorgeschlagen, nicht erzwungen. */
+                <p className="hinweis vorschlag">
+                  Steht auf {PLAN_ARTTEXT[listenEintrag(r.id)!.art]}, die Bewertung sagt „{STATUSTEXT[r.bewertung.status]}".{' '}
+                  <button
+                    type="button"
+                    className="klein"
+                    disabled={laeuft}
+                    onClick={() => tue(() => anfrage(`/api/plans/${listenEintrag(r.id)!.id}`, { methode: 'PATCH', koerper: { status: 'erledigt' } }), 'Eintrag erledigt.')}
+                  >
+                    erledigt setzen
+                  </button>
+                </p>
+              )}
               <BewertungForm
                 bewertung={r.bewertung}
                 laeuft={laeuft}

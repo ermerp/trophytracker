@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 27 – Nachbesserung nach der Abnahme von Stufe 11 (Entscheidungen des Nutzers vom 15.09.2026): Favorit statt Priorität, kein Rang mehr (Migration 0013), Plattform eines Wunsches als Vorschlag „die neueste" mit Dropdown und Filter „ohne Plattform", Sortierungen und Plattformfilter der Wunschliste; Stufe „Oberfläche" als offener Punkt in Abschnitt 16.*
+*Version 28 – Stufe 12 (Entscheidungen des Nutzers vom 15.09.2026): To-Do mit manueller Reihenfolge (`position`, `PUT /api/plans/reorder`, Drag-and-drop mit @dnd-kit), Backlog mit Kandidaten aus `v_backlog_kandidaten` und „nicht vorgesehen" als verworfenem Eintrag (Migration 0014), Übergang „erledigt" als Vorschlag in Liste und Spieldetail, Listen-Knöpfe im Spieldetail, Waisen beim Löschen eines Eintrags (schließt den offenen Punkt aus Stufe 11).*
 
 ## 1. Use Cases
 
@@ -62,7 +62,8 @@ Produktionsgröße und hält Obergrenzen fest. Regel: Wer eine Tabelle mit `REFE
 den Index in derselben Migration an; korrelierte Unterabfragen laufen nur über indizierte Spalten.
 Migration 0011 holt den in 0008 übersehenen Index auf `plan_entry.game_id` nach (bis Stufe 10 hing
 kein Eintrag an einem Spiel) und legt einen auf `game.igdb_id` an; die Wunschliste liest bei 300
-Wünschen rund 900 Zeilen, die Absichten eines Spiels sechs.
+Wünschen rund 900 Zeilen, die Absichten eines Spiels sechs. `v_backlog_kandidaten` liest bei 470
+Releases im Besitz rund 1 800 Zeilen (vier Index-Lookups je Release, Stufe 12).
 
 **Cron Trigger helfen dagegen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für
 normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz muss deshalb aus dem
@@ -225,9 +226,10 @@ demselben `sort_title`, antwortet die Route mit `409` und den Kandidaten, und de
 ob er dort ein Release anhängt oder mit `trotzdem` ein zweites Spiel anlegt. `DELETE` auf Release
 oder Spiel gibt anhängende Trophäenlisten in die Zuordnung zurück (`release_id`, `matched_at` und
 `matched_source` werden NULL); Exemplare und Berechtigungen kaskadieren. Bleibt ein Spiel ohne
-Release, wird es mit gelöscht – **es sei denn, eine offene Absicht hängt daran** (`plan_entry` mit
-`game_id` und `status = 'offen'`): Sonst verschwände ein Wunsch per CASCADE, sobald ein probeweise
-angelegtes Release wieder entfernt wird.
+Release, wird es mit gelöscht – **es sei denn, eine Absicht hängt daran** (`plan_entry` mit
+`game_id`, seit Stufe 12 in jedem Status, davor nur `offen`): Sonst verschwände ein Wunsch per
+CASCADE, sobald ein probeweise angelegtes Release wieder entfernt wird; ein erledigter oder
+verworfener ist Historie und hält das Spiel ebenso (Abschnitt 5, Waisen).
 
 **Spiel ohne Release, Release nur aus Wunsch (seit Stufe 10).** Ein Wunsch aus der IGDB-Suche legt
 ein Spiel mit den IGDB-Metadaten an, **ohne Release**, solange keine Plattform gewählt ist: Ein Wunsch
@@ -339,7 +341,7 @@ Alle übrigen Abweichungen zwischen Trophäen und Bewertung werden angezeigt, ni
 
 **Manuell setzen = durchgesehen.** `PUT /api/releases/:id/play-status` setzt Status, Start- und Enddatum, Bewertung (1–10) und Notiz. Wer den Status im Spieldetail setzt, hat das Spiel gesehen: Der Aufruf stempelt zugleich `reviewed_*` auf den aktuellen Trophäenstand und löscht einen offenen `review_queue`-Eintrag (8.1) – sonst legte die Prüfliste dasselbe Spiel gleich noch einmal vor.
 
-Anders als die Prüfliste legt der Aufruf aber **keinen `plan_entry` an**: „Auf To-Do" und „Ins Backlog" sind Entscheidungen der Triage (8.1), das Spieldetail setzt nur die Bewertung. Ein Release kann deshalb `pausiert` sein, ohne auf einer Liste zu stehen – das ist kein Fehlzustand, den ein späterer Abgleich reparieren dürfte.
+Anders als die Prüfliste legt der Aufruf aber **keinen `plan_entry` an** und schließt auch keinen: „Auf To-Do" und „Ins Backlog" sind eigene Knöpfe (Triage 8.1, Spieldetail seit Stufe 12), und ein To-Do-Eintrag wird bei `durchgespielt` nur als erledigt **vorgeschlagen** (Abschnitt 5). Ein Release kann deshalb `pausiert` sein, ohne auf einer Liste zu stehen – das ist kein Fehlzustand, den ein späterer Abgleich reparieren dürfte.
 
 ---
 
@@ -362,7 +364,7 @@ CREATE TABLE plan_entry (
   game_id       INTEGER REFERENCES game(id) ON DELETE CASCADE,
   title_raw     TEXT,                    -- freie Eingabe, Spiel noch nicht angelegt
 
-  position      INTEGER,                 -- manuelle Reihenfolge, für To-Do zentral
+  position      INTEGER,                 -- manuelle Reihenfolge, nur To-Do (5.4); sonst NULL
   -- priority (1-5) gab es bis Migration 0013; Favorit oder nicht reicht (5.1).
   is_favorite   INTEGER NOT NULL DEFAULT 0,   -- der persönliche Anker, s.u.
   note          TEXT,
@@ -392,6 +394,10 @@ CREATE INDEX idx_plan_offen ON plan_entry(kind, status, position);
 
 Diese Übergänge werden vorgeschlagen, nicht erzwungen. Beim Erfassen einer Disc erscheint ein Hinweis "Stand auf deiner Kaufliste – erledigt setzen und ins Backlog übernehmen?".
 
+**Der Übergang `todo`/`backlog` → `erledigt` (seit Stufe 12)** ist genau so ein Vorschlag: `GET /api/plans` liefert je Eintrag `eigenerStatus` (die Bewertung am Release, 4.2) und `erledigtVorgeschlagen` (offen, und die Bewertung sagt `durchgespielt`, `komplettiert` oder `abgebrochen` – `ERLEDIGT_STATUS` in `src/domain/play-status.ts`). To-Do und Backlog zeigen dann „Bewertung sagt ‚durchgespielt'" mit dem Knopf „erledigt setzen"; das Spieldetail zeigt denselben Hinweis am Release neben der Bewertung. Kein Aufruf schließt den Eintrag von selbst – auch `PUT /api/releases/:id/play-status` nicht (4.2): Das Kennzeichen in der Liste fängt jeden Weg ab, auf dem die Bewertung entsteht, auch Prüfliste und Vorbelegung.
+
+**Auf die Listen kommt ein Release** über die Triage (8.1), über die Backlog-Kandidaten (5.4), über „auf To-Do" im Backlog (`PATCH { art: 'todo' }`, hängt ans Ende) und seit Stufe 12 über die Knöpfe „Auf To-Do" / „Ins Backlog" je Release im Spieldetail – gesperrt, solange dort ein offener `todo`- oder `backlog`-Eintrag hängt, dieselbe Regel wie in der Triage.
+
 **Anlegen und Duplikate (Stufe 10, Entscheidungen des Nutzers vom 14.09.2026).** Ein Eintrag von Hand
 hat `origin = 'manuell'` und genau eine Quelle: ein Spiel (`game_id`), ein Release (`release_id`),
 ein IGDB-Treffer (legt bei Bedarf das Spiel an, Abschnitt 3) oder Freitext (`title_raw`). Freitext
@@ -417,11 +423,17 @@ Entscheidung; er hat weder Cover noch Kritikerwertung (8.3).
   zwei verschiedene Aussagen; sie blockieren sich nicht. Ein zweiter offener Eintrag **derselben Art
   an genau demselben Ziel** ist eines und wird mit `409` abgewiesen. Erledigte und verworfene
   Einträge blockieren nichts – ein Sinneswandel ist ein Feld-Update auf `offen`, kein Neuanlegen.
-- **Offen (seit Stufe 11):** Wird ein Wunsch gelöscht oder per „Rückgängig" zurückgenommen, bleibt
-  ein aus IGDB angelegtes Spiel ohne Release und ohne Absicht in `game` stehen. Es stört nirgends
-  (nicht in der Sammlung, nicht in `v_ohne_igdb`), ist aber eine Waise. Ob solche Spiele beim
-  Löschen des letzten Eintrags mitgehen sollen – wie ein leeres Spiel beim Löschen eines Releases –,
-  ist in Stufe 12 zu entscheiden, wenn To-Do und Backlog dieselben Wege nehmen.
+- **Waisen (entschieden in Stufe 12, Entscheidung des Nutzers vom 15.09.2026; offen seit Stufe 11).**
+  `DELETE /api/plans/:id` – „entfernen" und „Rückgängig" – räumt auf, was nur für diesen Eintrag
+  entstand (`GamesRepository.waiseAufraeumen`): erst das Release, wenn es weder Trophäenliste noch
+  Exemplar, digitale Berechtigung, Bewertung, gepflegten `physical_release_status` noch einen anderen
+  Eintrag trägt; dann das Spiel, wenn es kein Release und **keinen** Eintrag mehr hat. Erledigte und
+  verworfene Einträge halten das Spiel – sie sind Historie; dieselbe Regel gilt seither auch beim
+  Löschen eines Releases (Abschnitt 3, bis dahin zählten nur offene). Ein von Hand angelegtes Spiel
+  ohne Exemplar fällt damit ebenfalls, sobald sein einziger Listeneintrag geht – ein Titel ohne
+  Besitz, Fortschritt, Bewertung und Absicht ist nichts, was die Sammlung verliert; die Antwort nennt
+  `releaseGeloescht` und `spielGeloescht`, das Spieldetail kehrt dann zur Sammlung zurück. Erledigen
+  oder verwerfen löscht nichts.
 
 ### 5.1 Favorit
 
@@ -467,8 +479,15 @@ Stattdessen **sortieren die Listen nach gespeicherten Bestandteilen**, in der Ro
 | `titel` | alphabetisch |
 | `release` | Erscheinungsdatum aufsteigend, ohne Datum ans Ende |
 | `angelegt` | zuletzt angelegt zuerst |
+| `position` | eigene Reihenfolge (5.4); ohne Position ans Ende, dort nach Id – Standard für `kind=todo` |
 
-Dazu die Filter `favorit=1` und `plattform=PS4,PS5,ohne` (Mehrfachauswahl; `ohne` sind Einträge am Spiel oder Freitext). Stufe 15 nutzt dieselbe Ordnung für die Kaufliste; ob der Preis dort als weiteres Sortierkriterium („viel Spiel pro Euro") dazukommt, entscheidet Stufe 18.
+Dazu die Filter `favorit=1` und `plattform=PS4,PS5,ohne` (Mehrfachauswahl; `ohne` sind Einträge am Spiel oder Freitext). Das Backlog nutzt dieselbe Ordnung wie die Wunschliste, To-Do steht in eigener Reihenfolge ohne Sortierwahl. Stufe 15 nutzt dieselbe Ordnung für die Kaufliste; ob der Preis dort als weiteres Sortierkriterium („viel Spiel pro Euro") dazukommt, entscheidet Stufe 18.
+
+### 5.4 To-Do-Reihenfolge und Backlog-Kandidaten (Stufe 12)
+
+**Reihenfolge.** Nur To-Do ist manuell geordnet; `position` ist dort gesetzt und bei allen anderen Arten `NULL`. Wer auf To-Do kommt – Anlegen, Triage (8.1), `PATCH { art: 'todo' }` aus dem Backlog, wieder öffnen –, hängt **ans Ende** (`POSITION_ANS_ENDE`, `src/db/plan.ts`: `MAX(position) + 1` der offenen To-Do-Einträge); wer To-Do verlässt, verliert die Position; erledigen behält sie. `PUT /api/plans/reorder { art, orderedIds }` schreibt die ganze Liste in neuer Ordnung (Positionen 1..n); eine Id, die kein offener Eintrag der Art ist, ist ein Fehler (`400`), nicht genannte behalten ihre Position. Migration 0014 gibt den Triage-Einträgen aus Stufe 7 (ohne Position) eine, sonst stünde der nächste neue Eintrag mit `1` vor ihnen. Die Oberfläche zieht mit Maus, Finger oder Tastatur (`@dnd-kit`) und hat Pfeilknöpfe als Rückfall; jede Umsortierung schreibt sofort, ein Fehler lädt den gespeicherten Stand zurück.
+
+**Kandidaten.** `v_backlog_kandidaten` (Abschnitt 11) nennt, was im Besitz ist, keinen Trophäenfortschritt und keine Bewertung über `nicht_gespielt` hinaus hat und auf keiner Liste steht – `GET /api/backlog-candidates`. Das Backlog zeigt sie mit „ins Backlog", „auf To-Do" und **„nicht vorgesehen"**. Letzteres ist kein neues Feld, sondern ein `backlog`-Eintrag mit `status = 'verworfen'` (`POST /api/plans` mit `status`), genau wie eine verworfene Lücke (5.3); die View blendet ihn aus, sonst tauchte der abgelehnte Titel bei jeder Abfrage wieder auf – derselbe Fehler, der einst in `v_kaufkandidaten` steckte. Abgelehnte stehen unter „auch erledigte und verworfene", „entfernen" macht sie wieder zum Kandidaten. Die Route nennt die Anzahl der Abgelehnten mit (`abgelehnt`). Der Hinweisblock der Sammlung zeigt die Kandidatenzahl, solange sie größer als null ist. Gemessen am 15.09.2026: In der Produktion gibt es noch keine Kandidaten, weil erst vier Besitzzeilen erfasst sind – der Block füllt sich mit der Regal-Erfassung.
 
 `app_setting` (`key`, `value`) bleibt für die Backup-Vermerke (14.2) und künftige Einstellungen bestehen.
 
@@ -748,7 +767,7 @@ Der Filter "nicht `am_spielen`" ist wichtig: bei einem Spiel, das du gerade akti
 | Unverändert lassen | Status bleibt, Eintrag verschwindet trotzdem |
 | Überspringen | `play_status = 'unentschieden'`; Eintrag verschwindet, das Spiel bleibt über den Status-Filter der Sammlung auffindbar – die zweite Runde |
 
-Die Aktionen setzen **nur den Status**; Bewertung, Notiz und Daten bleiben stehen. „Auf To-Do" und „Ins Backlog" legen den `plan_entry` nur an, wenn am Release noch kein offener `todo`- oder `backlog`-Eintrag hängt. Tastenkürzel 1–7 lösen die Aktionen aus.
+Die Aktionen setzen **nur den Status**; Bewertung, Notiz und Daten bleiben stehen. „Auf To-Do" und „Ins Backlog" legen den `plan_entry` nur an, wenn am Release noch kein offener `todo`- oder `backlog`-Eintrag hängt; To-Do hängt ans Ende der Liste (5.4). Tastenkürzel 1–7 lösen die Aktionen aus.
 
 **Jede Entscheidung** löscht die Zeile aus `review_queue` und stempelt `reviewed_earned_total`, `reviewed_defined_total` und `reviewed_at` auf den aktuellen Stand. Damit ist der Referenzpunkt gesetzt, und dasselbe Spiel taucht erst bei der nächsten echten Änderung wieder auf.
 
@@ -986,8 +1005,11 @@ ORDER BY g.release_date;
 -- die Bedingung als "physisch ODER (digital UND alles Übrige)" gelesen, und
 -- jedes Release mit einer Disc im Regal wäre Kandidat – auch ein zu 100 %
 -- durchgespieltes, das bereits auf einer Liste steht.
+-- Seit Migration 0014 mit Spiel-Id, Cover und Wertung für die Anzeige, und
+-- 'verworfen' schliesst den als "nicht vorgesehen" abgelehnten Kandidaten
+-- aus (5.4) – sonst tauchte er bei jeder Abfrage wieder auf.
 CREATE VIEW v_backlog_kandidaten AS
-SELECT g.title, r.id AS release_id, r.platform
+SELECT g.id AS game_id, g.title, g.cover_url, g.critic_score, r.id AS release_id, r.platform
 FROM release r
 JOIN game g ON g.id = r.game_id
 WHERE (EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)
@@ -998,7 +1020,8 @@ AND NOT EXISTS (
 AND COALESCE((SELECT status FROM play_status WHERE release_id = r.id),
              'nicht_gespielt') = 'nicht_gespielt'
 AND r.id NOT IN (SELECT release_id FROM plan_entry
-                 WHERE kind IN ('todo','backlog') AND status='offen' AND release_id IS NOT NULL);
+                 WHERE kind IN ('todo','backlog') AND status IN ('offen','verworfen')
+                   AND release_id IS NOT NULL);
 
 -- Trophäen und eigene Bewertung weichen ab. Nicht als Fehler behandeln,
 -- nur zur Durchsicht anzeigen.
@@ -1046,16 +1069,18 @@ GET    /api/zuordnung/offen            Gruppenvorschläge, seitenweise
 POST   /api/zuordnung/gruppe           Gruppe bestätigen: ein Spiel, mehrere Releases
 POST   /api/zuordnung/liste/:npCommId  Einzelne Liste einem Release zuordnen
 
-GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=favorit|wertung|titel|release|angelegt&favorit=1&plattform=PS4,PS5,ohne
-                                      { sortierung, plattformen, eintraege[] } (5.2)
-POST   /api/plans                     Body: { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz? } – genau eine Quelle;
+GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=favorit|wertung|titel|release|angelegt|position&favorit=1&plattform=PS4,PS5,ohne
+                                      { sortierung, plattformen, eintraege[] } (5.2); Standard position bei todo, sonst favorit;
+                                      je Eintrag position, eigenerStatus, erledigtVorgeschlagen (Abschnitt 5)
+POST   /api/plans                     Body: { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz?, status? } – genau eine Quelle;
+                                      status nur offen (Standard) oder verworfen („nicht vorgesehen", 5.4); todo hängt ans Ende;
                                       igdbId legt bei Bedarf ein Spiel an; plattform (nur zu spielId/igdbId): fehlt oder 'auto' → die neueste
                                       der Releases bzw. des IGDB-Eintrags, '' → ohne, sonst eine der vier – der Wunsch hängt am Release
                                       dieser Plattform, das bei Bedarf entsteht; 409 mit eintragId bei offenem Duplikat (Abschnitt 5)
 PATCH  /api/plans/:id                 Teilmenge von { favorit, notiz, status, art, plattform }; Statuswechsel setzt resolved_at;
                                       plattform hängt den Eintrag um (Release entsteht bei Bedarf, '' zurück ans Spiel), 409 bei Duplikat
-PUT    /api/plans/reorder             Body: { kind, orderedIds } – To-Do-Reihenfolge (Stufe 12)
-DELETE /api/plans/:id
+PUT    /api/plans/reorder             Body: { art, orderedIds } – Reihenfolge (5.4); { art, geordnet }; 400 bei fremder Id
+DELETE /api/plans/:id                 { id, geloescht, releaseGeloescht, spielGeloescht } – räumt Waisen ab (Abschnitt 5)
 
 GET    /api/review/queue              v_review_offen, paginiert (limit, offset); ein Eintrag je Bildschirm
 POST   /api/review/:releaseId/decide  Body: { aktion } – sieben Aktionen aus 8.1; Antwort mit status, planAngelegt, nochOffen
@@ -1094,7 +1119,7 @@ GET    /api/upcoming                  v_erscheint_bald
 
 GET    /api/gaps                      v_luecken
 GET    /api/purchase-candidates       v_kaufkandidaten
-GET    /api/backlog-candidates        v_backlog_kandidaten
+GET    /api/backlog-candidates        { anzahl, abgelehnt, kandidaten[] } aus v_backlog_kandidaten (5.4)
 
 POST   /api/scan                      Body: { ean }
 GET    /api/scan/unresolved
@@ -1123,13 +1148,13 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 |---|---|---|
 | Dashboard | – | Kennzahlen je Plattform, Platin-Zähler, Backlog-Länge, letzter Sync, Warnung bei abgelaufenem NPSSO; offene Prüfliste mit Anzahl **und daneben die Anzahl der `unentschieden`-Einträge mit Link auf die gefilterte Sammlung** – sonst verschwindet die zweite Runde aus dem Blick, sobald die Prüfliste leer ist |
 | Sammlung | 1 | Kachelraster mit Covern, Filterleiste, Suche. Schnellerfassung je Release („+ Disc", „+ digital") mit Rückgängig direkt in der Kachel, eigener Status je Release als Text und Filter und Löschen am Kennzeichen – bei 431 Titeln entscheidet die Klickzahl, ob die Ersterfassung des Regals durchgezogen wird. „Spiel anlegen" für Titel ohne Trophäenliste. Seit Stufe 9 das IGDB-Cover im Hochformat; das Trophäensymbol bleibt Rückfall, solange eine Verknüpfung fehlt |
-| Spieldetail | 1, 2, 7 | Releases, Exemplare (Zustand, Anleitung, Kaufdatum, Preis, EAN, Notiz), digitale Berechtigungen; je Release „Trophäen (Sony)" und „Eigene Bewertung" (Status, Bewertung 1–10, Begonnen/Beendet, Notiz) nebeneinander, nie verrechnet; Preisverlauf je Kanal; Release hinzufügen und löschen, Spiel löschen. Block „IGDB" (seit Stufe 9): Kritikerwertung mit Anzahl und Quelle, Erscheinungsdatum und Status, Herkunft der Verknüpfung, Link zu igdb.com; „Anderen Eintrag wählen", „Verknüpfung lösen", ohne Verknüpfung Suche und „Gibt es bei IGDB nicht" |
+| Spieldetail | 1, 2, 7 | Releases, Exemplare (Zustand, Anleitung, Kaufdatum, Preis, EAN, Notiz), digitale Berechtigungen; je Release „Trophäen (Sony)" und „Eigene Bewertung" (Status, Bewertung 1–10, Begonnen/Beendet, Notiz) nebeneinander, nie verrechnet, seit Stufe 12 daneben der Vorschlag „Steht auf To-Do, die Bewertung sagt ‚durchgespielt' – erledigt setzen" (Abschnitt 5); Preisverlauf je Kanal; Release hinzufügen und löschen, Spiel löschen. Block „IGDB" (seit Stufe 9): Kritikerwertung mit Anzahl und Quelle, Erscheinungsdatum und Status, Herkunft der Verknüpfung, Link zu igdb.com; „Anderen Eintrag wählen", „Verknüpfung lösen", ohne Verknüpfung Suche und „Gibt es bei IGDB nicht" |
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
 | IGDB-Zuordnung | – | Spiele ohne eindeutigen IGDB-Treffer als Liste mit Seiten: Kandidaten (Cover, Jahr, Typ, Plattformen, Wertung) zum Übernehmen, „Anders suchen" mit vorbelegtem Begriff, „Gibt es bei IGDB nicht". Eine Liste, kein Ein-Spiel-pro-Bildschirm: Nichts erzwingt eine Reihenfolge, Ausgelassenes bleibt stehen (7.6) |
 | Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden. Knopf "physisch nicht gewünscht"; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar |
-| Wunschliste | 4, 11 | Sortierung Favoriten zuerst → Wertung (Standard), Wertung, Titel, Erscheinungsdatum, zuletzt angelegt (5.2); Filter nur Favoriten, Plattformen (Mehrfachauswahl) und „ohne Plattform" – zum Nachpflegen; erledigte und verworfene standardmäßig ausgeblendet; je Eintrag Cover, Kritikerwertung, Jahr, Favorit-Stern, Plattform-Dropdown (hängt den Wunsch um), Notiz, erledigt/verworfen/wieder öffnen, entfernen; Erscheinungsdatum statt Preis bei angekündigten Titeln. „Wunsch hinzufügen" über die IGDB-Suche, Plattform-Dropdown an jedem Treffer (vorbelegt mit dessen neuester, „ohne Plattform" wählbar); Freitext nur über „Ohne IGDB-Eintrag übernehmen" nach einer Suche; Rückgängig direkt nach dem Anlegen. Im Spieldetail ein Block „Wunschliste": auf die Liste setzen, Plattform vorbelegt mit der neuesten des Spiels, auch eine ohne Release oder „ohne Plattform" wählbar |
-| To-Do | 5a | Kurz und manuell sortierbar (Drag-and-drop) |
-| Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
+| Wunschliste | 4, 11 | Sortierung Favoriten zuerst → Wertung (Standard), Wertung, Titel, Erscheinungsdatum, zuletzt angelegt (5.2); Filter nur Favoriten, Plattformen (Mehrfachauswahl) und „ohne Plattform" – zum Nachpflegen; erledigte und verworfene standardmäßig ausgeblendet; je Eintrag Cover, Kritikerwertung, Jahr, Favorit-Stern, Plattform-Dropdown (hängt den Wunsch um), Notiz, erledigt/verworfen/wieder öffnen, entfernen; Erscheinungsdatum statt Preis bei angekündigten Titeln. „Wunsch hinzufügen" über die IGDB-Suche, Plattform-Dropdown an jedem Treffer (vorbelegt mit dessen neuester, „ohne Plattform" wählbar); Freitext nur über „Ohne IGDB-Eintrag übernehmen" nach einer Suche; Rückgängig direkt nach dem Anlegen. Kachel, Filterleiste und Schreibzugriffe teilt sie sich seit Stufe 12 mit To-Do und Backlog (`frontend/src/Absichten.tsx`: `usePlanListe`, `PlanKarte`). Im Spieldetail ein Block „Listen" (bis Stufe 12 „Wunschliste"): offene Absichten als Pillen, auf die Wunschliste setzen (Plattform vorbelegt mit der neuesten des Spiels, auch eine ohne Release oder „ohne Plattform" wählbar), je Release „Auf To-Do" / „Ins Backlog" (Abschnitt 5) |
+| To-Do | 5a | `/todo`, Reiter „To-Do \| Backlog": eine Spalte in eigener Reihenfolge, Griff zum Ziehen (Maus, Finger, Tastatur; `@dnd-kit`) und Pfeilknöpfe, jede Umsortierung sofort gespeichert; Filter nur Favoriten und „auch erledigte", keine Sortierwahl; je Kachel wie die Wunschliste plus „ins Backlog" und der Vorschlag „Bewertung sagt ‚durchgespielt' – erledigt setzen" (Abschnitt 5) |
+| Backlog | 5b | `/backlog`, derselbe Reiter: sortiert und gefiltert wie die Wunschliste (5.2), „auf To-Do" hängt ans Ende der To-Do-Liste; darunter der Block **Kandidaten** aus `v_backlog_kandidaten` mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (5.4), Anzahl der Abgelehnten mit Sprung zu „auch erledigte und verworfene"; Rückgängig nach jeder Übernahme |
 | Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert wie die Wunschliste (5.2), mit Herkunftskennzeichnung |
 | Prüfliste | 8 | Ein Spiel pro Bildschirm, sieben Aktionen mit Tastenkürzeln 1–7, Grund und Vorher-Nachher, aktueller (vorbelegter) Status, Fortschrittsanzeige „noch n von m"; jederzeit verlassen, jede Entscheidung ist schon gespeichert. **Auf dem Handy müssen alle sieben Knöpfe ohne Scrollen sichtbar sein** (zweispaltig, kompakte Karte) – die Ansicht wird bei der Ersteinrichtung mehrere hundert Mal hintereinander bedient. **Die Knopfreihe steht immer an derselben Stelle**, unabhängig von der Titellänge (feste Mindesthöhe der Karte): Wer blind auf dieselbe Position zielt, trifft sonst bei einem zweizeiligen Titel daneben, und eine Fehlentscheidung fällt erst Wochen später auf. Eine Zeile stellt klar: „Du bewertest den Spielstand, nicht den Besitz." |
 | Wunschliste importieren | 9 | `/import`: Datei (UTF-8, sonst Windows-1252) oder Textfeld, Jahr aus dem Dateinamen korrigierbar, Liste der bisherigen Läufe. `/import/:id`: Abgleich in Schritten mit Fortschritt, dann drei Blöcke – Eindeutige, Sammlungstreffer und Vorhandene als ein Block mit einem Knopf und aufklappbarer Liste; Mehrdeutige und Zeilen ohne Treffer als Liste mit Kandidaten, Plattform aus der Liste vorbelegt, IGDB-Suche (8.2), „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen; Übersprungene und Übernommene aufklappbar mit „Doch entscheiden"/„Zurücknehmen"; Rückgängig nach jeder Entscheidung |
@@ -1138,11 +1163,11 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Scannen | 1 | Serienerfassung nach Abschnitt 9 |
 | Einstellungen | – | NPSSO, Sync, Sync-Historie, IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen", „Offene erneut suchen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Export und Backup-Status |
 
-**Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den sechs Hauptansichten (Sammlung, Wunschliste, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Die Wunschliste kam mit Stufe 10 in die Leiste (Entscheidung des Nutzers vom 14.09.2026): Sie wird oft bedient, und ein Umweg über die Einstellungen wäre für die häufigste Liste der falsche Platz. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
+**Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den sechs Hauptansichten (Sammlung, Wunschliste, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Die Wunschliste kam mit Stufe 10 in die Leiste (Entscheidung des Nutzers vom 14.09.2026): Sie wird oft bedient, und ein Umweg über die Einstellungen wäre für die häufigste Liste der falsche Platz. To-Do kam mit Stufe 12; das Backlog ist kein siebter Eintrag, sondern ein Reiter neben To-Do auf derselben Seite (`/todo`, `/backlog`), der Leisteneintrag bleibt auf beiden markiert. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
 
-Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/wunschliste`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/igdb`, `/pruefen`, `/trophaeen`, seit Stufe 11 `/import`, `/import/:id`, `/ohne-zuordnung`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen, seit Stufe 10 die Wunschliste; Zuordnung, IGDB-Zuordnung, Sammlung prüfen, Trophäen, Wunschliste importieren und Ohne Zuordnung hängen als Werkzeuge an den Einstellungen, der Import zusätzlich als Link auf der Wunschliste. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
+Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/wunschliste`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/igdb`, `/pruefen`, `/trophaeen`, seit Stufe 11 `/import`, `/import/:id`, `/ohne-zuordnung`, seit Stufe 12 `/todo`, `/backlog`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen, seit Stufe 10 die Wunschliste, seit Stufe 12 To-Do (mit Backlog als Reiter); Zuordnung, IGDB-Zuordnung, Sammlung prüfen, Trophäen, Wunschliste importieren und Ohne Zuordnung hängen als Werkzeuge an den Einstellungen, der Import zusätzlich als Link auf der Wunschliste. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
 
-Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste), nicht zugeordnete Trophäenlisten, seit Stufe 8 eine **überfällige Sicherung** (mehr als acht Tage oder noch nie, siehe 14.2) seit Stufe 9 Spiele, die noch nicht bei IGDB gesucht wurden oder auf die IGDB-Zuordnung warten, und seit Stufe 11 einen Import mit offenen Zeilen sowie Freitext-Einträge ohne Spiel – jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
+Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste), nicht zugeordnete Trophäenlisten, seit Stufe 8 eine **überfällige Sicherung** (mehr als acht Tage oder noch nie, siehe 14.2) seit Stufe 9 Spiele, die noch nicht bei IGDB gesucht wurden oder auf die IGDB-Zuordnung warten, seit Stufe 11 einen Import mit offenen Zeilen sowie Freitext-Einträge ohne Spiel und seit Stufe 12 die Backlog-Kandidaten (5.4) – jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
 
 **Darstellungsregeln**
 
@@ -1449,6 +1474,8 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 | Triage bricht in der Mitte ab | Halber Datenbestand | Jede Entscheidung wird sofort gespeichert, `unentschieden` hält Zweifelsfälle auffindbar |
 | Wunschlisten-Import trifft falsch | Datenmüll in der Liste | Keine automatische Übernahme, kein Freitext-Fallback, IGDB-Suche für Zeilen ohne Treffer |
 | Prüfliste läuft voll | Wird ignoriert und damit nutzlos | Aktiv gespielte Titel erzeugen keine Einträge, "unverändert lassen" setzt den Referenzpunkt neu |
+| Backlog-Kandidaten laufen voll | Ungewollte Titel stehen bei jedem Aufruf wieder da | „nicht vorgesehen" als verworfener Eintrag, die View blendet ihn aus (5.4) |
+| Eintrag entfernt, Spiel weg | Von Hand angelegter Titel verschwindet | Nur ohne Besitz, Fortschritt, Bewertung, Physisch-Status und jeden anderen Eintrag; Antwort nennt `spielGeloescht`, Spieldetail kehrt zur Sammlung zurück (Abschnitt 5) |
 | Cloudflare-Konto weg | Totalverlust | Wöchentlicher Export in ein privates GitHub-Repository, ausserhalb von Cloudflare |
 | Backup landet im öffentlichen Repo | Sammlung öffentlich lesbar | Getrennte Repos, Fine-grained Token nur auf das private, `*.sql` in `.gitignore` (Ausnahme `!migrations/*.sql`), Dump nie als Workflow-Artifact |
 | Bearer-Token geleakt | Fremdzugriff auf die Daten | Access-Richtlinie am Worker davor; kein Bearer-Token im Worker – Maschinen-Endpunkte laufen über ein Access Service Token (15.3) |

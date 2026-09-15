@@ -80,6 +80,28 @@ describe("v_backlog_kandidaten", () => {
 		expect(await zaehle("v_backlog_kandidaten")).toBe(0);
 	});
 
+	// Migration 0014 (Stufe 12): "nicht vorgesehen" ist ein verworfener
+	// Eintrag; ohne diese Bedingung taeuchte der abgelehnte Kandidat bei
+	// jeder Abfrage wieder auf - derselbe Fehler wie einst bei v_kaufkandidaten.
+	it("schliesst einen als 'nicht vorgesehen' abgelehnten Kandidaten aus, nicht aber einen erledigten", async () => {
+		const r = await spiel(1, "Nioh");
+		await env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)").bind(r).run();
+		await env.DB.prepare("INSERT INTO plan_entry (kind, release_id, status) VALUES ('backlog', ?, 'verworfen')").bind(r).run();
+		expect(await zaehle("v_backlog_kandidaten")).toBe(0);
+
+		await env.DB.prepare("UPDATE plan_entry SET status = 'erledigt'").run();
+		expect(await zaehle("v_backlog_kandidaten")).toBe(1);
+	});
+
+	it("liefert Spiel-Id, Cover und Kritikerwertung fuer die Anzeige", async () => {
+		const r = await spiel(1, "Sekiro");
+		await env.DB.prepare("UPDATE game SET cover_url = 'c.jpg', critic_score = 90 WHERE id = 1").run();
+		await env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)").bind(r).run();
+		expect(await env.DB.prepare("SELECT * FROM v_backlog_kandidaten").first()).toEqual({
+			game_id: 1, title: "Sekiro", cover_url: "c.jpg", critic_score: 90, release_id: r, platform: "PS4",
+		});
+	});
+
 	it("schliesst ein angespieltes Spiel im Regal aus", async () => {
 		const r = await spiel(1, "Ghost of Tsushima");
 		await env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)").bind(r).run();

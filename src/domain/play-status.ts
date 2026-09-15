@@ -38,3 +38,15 @@ export function abgeleiteterStatus(progressPct: number): "komplettiert" | "am_sp
 	if (progressPct > 0) return "am_spielen";
 	return null;
 }
+
+/**
+ * Status, die einen To-Do- oder Backlog-Eintrag als erledigt vorschlagen
+ * (Uebergaenge in Abschnitt 5, Stufe 12). Vorgeschlagen, nicht erzwungen:
+ * Die Listen und das Spieldetail zeigen den Vorschlag mit einem Knopf, der
+ * Eintrag wird nie automatisch geschlossen.
+ */
+export const ERLEDIGT_STATUS = ["durchgespielt", "komplettiert", "abgebrochen"] as const;
+
+export function giltAlsErledigt(status: string | null | undefined): boolean {
+	return status != null && (ERLEDIGT_STATUS as readonly string[]).includes(status);
+}

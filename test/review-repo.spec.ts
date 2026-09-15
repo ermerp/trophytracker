@@ -148,10 +148,11 @@ describe("entscheiden", () => {
 			const e = await repos().review.entscheiden(r, aktion);
 			expect(e).toEqual({ status: "pausiert", planAngelegt: true });
 
-			const { results } = await env.DB.prepare("SELECT kind, origin, status FROM plan_entry WHERE release_id = ?")
+			const { results } = await env.DB.prepare("SELECT kind, origin, status, position FROM plan_entry WHERE release_id = ?")
 				.bind(r)
 				.all();
-			expect(results).toEqual([{ kind, origin: "triage", status: "offen" }]);
+			// To-Do haengt ans Ende der Liste, Backlog traegt keine Position (Stufe 12).
+			expect(results).toEqual([{ kind, origin: "triage", status: "offen", position: kind === "todo" ? 1 : null }]);
 
 			// Zweite Runde (wieder eingereiht) legt keinen zweiten offenen Eintrag an.
 			await env.DB.prepare("INSERT INTO review_queue (release_id, reason) VALUES (?, 'erstimport')").bind(r).run();

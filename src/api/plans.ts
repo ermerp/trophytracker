@@ -2,12 +2,14 @@ import { Hono } from "hono";
 import {
 	PLAN_ARTEN,
 	PLAN_STATUS,
+	type KandidatZeile,
 	type PlanArt,
 	type PlanFelder,
 	type PlanStatus,
 	type PlanZeile,
 	type PlanZiel,
 } from "../db/plan";
+import { giltAlsErledigt } from "../domain/play-status";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
 import { zielAmSpiel, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
@@ -18,15 +20,17 @@ import { liesJson } from "./validierung";
 /**
  * Absichten (Abschnitt 12): GET/POST/PATCH/DELETE /api/plans.
  *
- * Stufe 10 bedient die Wunschliste, die Routen kennen aber alle vier Arten.
- * PUT /api/plans/reorder (To-Do-Reihenfolge) kommt mit Stufe 12.
+ * Stufe 10 bedient die Wunschliste, Stufe 12 To-Do und Backlog; die Routen
+ * kennen alle vier Arten. PUT /reorder setzt die manuelle Reihenfolge der
+ * To-Do-Liste, GET /api/backlog-candidates liest v_backlog_kandidaten.
  *
  * Sortierung und Filter laufen hier, nicht in SQL (5.2): Favoriten zuerst,
- * dann Kritikerwertung ist der Standard; Prioritaet und Rang gibt es seit
- * Migration 0013 nicht mehr (Entscheidung des Nutzers vom 15.09.2026).
+ * dann Kritikerwertung ist der Standard; To-Do steht nach Position.
+ * Prioritaet und Rang gibt es seit Migration 0013 nicht mehr (Entscheidung
+ * des Nutzers vom 15.09.2026).
  */
 
-const SORTIERUNGEN = ["favorit", "wertung", "titel", "angelegt", "release"] as const;
+const SORTIERUNGEN = ["favorit", "wertung", "titel", "angelegt", "release", "position"] as const;
 type Sortierung = (typeof SORTIERUNGEN)[number];
 
 /** Plattformfilter: die vier Plattformen und "ohne" fuer Eintraege am Spiel oder Freitext. */
@@ -101,8 +105,24 @@ export function eintragAntwort(z: PlanZeile) {
 		favorit: z.is_favorite === 1,
 		notiz: z.note,
 		herkunft: z.origin,
+		position: z.position,
 		angelegtAm: z.created_at,
 		erledigtAm: z.resolved_at,
+		/** Eigene Bewertung am Release (4.2), nur zur Anzeige neben der Absicht. */
+		eigenerStatus: z.play_status,
+		// Uebergang aus Abschnitt 5: vorgeschlagen, nie erzwungen.
+		erledigtVorgeschlagen: z.status === "offen" && giltAlsErledigt(z.play_status),
+	};
+}
+
+export function kandidatAntwort(k: KandidatZeile) {
+	return {
+		releaseId: k.release_id,
+		spielId: k.game_id,
+		titel: k.title,
+		plattform: k.platform,
+		bild: k.cover_url,
+		kritik: k.critic_score,
 	};
 }
 
@@ -120,6 +140,8 @@ const vergleicher: Record<Sortierung, (a: Eintrag, b: Eintrag) => number> = {
 	angelegt: (a, b) => b.angelegtAm.localeCompare(a.angelegtAm) || b.id - a.id,
 	// Naechstes Erscheinungsdatum zuerst; ohne Datum ans Ende.
 	release: (a, b) => (a.erscheinungsdatum ?? "9999").localeCompare(b.erscheinungsdatum ?? "9999") || nachTitel(a, b),
+	// Manuelle Reihenfolge (To-Do); ohne Position ans Ende, dort nach Id.
+	position: (a, b) => (a.position ?? Infinity) - (b.position ?? Infinity) || a.id - b.id,
 };
 
 /** Plattformfilter aus `plattform=PS4,PS5,ohne`; leer heisst alle. */
@@ -141,7 +163,7 @@ export const planRoutes = new Hono<AppEnv>()
 		const kind = ausWahl(c.req.query("kind"), PLAN_ARTEN);
 		if (!kind) return c.json({ fehler: `Parameter 'kind' muss einer von ${PLAN_ARTEN.join(", ")} sein.` }, 400);
 		const status: PlanStatus | "alle" = c.req.query("status") === "alle" ? "alle" : "offen";
-		const sortierung = ausWahl(c.req.query("sort"), SORTIERUNGEN) ?? "favorit";
+		const sortierung = ausWahl(c.req.query("sort"), SORTIERUNGEN) ?? (kind === "todo" ? "position" : "favorit");
 		const nurFavoriten = c.req.query("favorit") === "1";
 		const plattformen = plattformFilter(c.req.query("plattform"));
 
@@ -186,7 +208,10 @@ export const planRoutes = new Hono<AppEnv>()
 
 		const geprueft = pruefeFelder(k);
 		if ("fehler" in geprueft) return c.json({ fehler: geprueft.fehler }, 400);
-		const { isFavorite, note } = geprueft.felder;
+		const { isFavorite, note, status } = geprueft.felder;
+		// "verworfen" beim Anlegen ist "nicht vorgesehen" fuer einen Backlog-
+		// Kandidaten (Migration 0014); "erledigt" anzulegen ergibt keinen Sinn.
+		if (status === "erledigt") return c.json({ fehler: "Ein Eintrag wird nicht als erledigt angelegt." }, 400);
 
 		const gepruefteWahl = pruefePlattform(k);
 		if ("fehler" in gepruefteWahl) return c.json({ fehler: gepruefteWahl.fehler }, 400);
@@ -247,10 +272,31 @@ export const planRoutes = new Hono<AppEnv>()
 			return c.json({ fehler: "Dafür gibt es schon einen offenen Eintrag.", eintragId: doppelt }, 409);
 		}
 
-		const id = await c.var.repos.plan.anlegen(art, ziel, "manuell", { isFavorite, note });
+		const id = await c.var.repos.plan.anlegen(art, ziel, "manuell", { isFavorite, note, status });
 		const zeile = await c.var.repos.plan.eintrag(id);
 		if (!zeile) throw new Error("Eintrag nach dem Anlegen nicht gefunden.");
 		return c.json({ ...eintragAntwort(zeile), spielAngelegt }, 201);
+	})
+
+	/**
+	 * Manuelle Reihenfolge (Stufe 12): { art, orderedIds } - die Oberflaeche
+	 * schickt die ganze offene Liste in ihrer neuen Ordnung. Eine Id, die
+	 * kein offener Eintrag der Art ist, ist ein Fehler (400), kein Sonderfall.
+	 */
+	.put("/reorder", async (c) => {
+		const k = await liesJson(c);
+		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
+		const art = ausWahl(typeof k.art === "string" ? k.art : undefined, PLAN_ARTEN);
+		if (!art) return c.json({ fehler: `Feld 'art' muss eine von ${PLAN_ARTEN.join(", ")} sein.` }, 400);
+		if (!Array.isArray(k.orderedIds)) return c.json({ fehler: "Feld 'orderedIds' muss eine Liste von Ids sein." }, 400);
+		const ids = k.orderedIds.map(idAus);
+		if (ids.some((id) => id === null) || new Set(ids).size !== ids.length) {
+			return c.json({ fehler: "orderedIds müssen eindeutige, positive Ids sein." }, 400);
+		}
+
+		const geordnet = await c.var.repos.plan.neuOrdnen(art, ids as number[]);
+		if (geordnet === null) return c.json({ fehler: "Eine der Ids ist kein offener Eintrag dieser Liste." }, 400);
+		return c.json({ art, geordnet });
 	})
 
 	/**
@@ -288,9 +334,24 @@ export const planRoutes = new Hono<AppEnv>()
 		return c.json({ ...eintragAntwort(zeile), geaendert: true });
 	})
 
+	/**
+	 * Loeschen - und Waisen aufraeumen (Stufe 12, Abschnitt 5): Ein Release,
+	 * das nur fuer diesen Eintrag entstand, und ein Spiel ohne Release und
+	 * ohne weiteren Eintrag gehen mit. Erledigte und verworfene Eintraege
+	 * halten das Spiel, sie sind Historie.
+	 */
 	.delete("/:id", async (c) => {
 		const id = idAus(c.req.param("id"));
 		if (id === null) return c.json({ fehler: "Ungültige Id." }, 400);
-		if (!(await c.var.repos.plan.loeschen(id))) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
-		return c.json({ id, geloescht: true });
+		const vorher = await c.var.repos.plan.eintrag(id);
+		if (!vorher || !(await c.var.repos.plan.loeschen(id))) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
+		const waisen = await c.var.repos.games.waiseAufraeumen(vorher.spiel_id, vorher.release_id);
+		return c.json({ id, geloescht: true, ...waisen });
 	});
+
+/** Use Case 5b: Kandidaten fuer den Backlog - im Besitz, nie angefasst (Abschnitt 11). */
+export const backlogCandidateRoutes = new Hono<AppEnv>().get("/", async (c) => {
+	const kandidaten = (await c.var.repos.plan.backlogKandidaten()).map(kandidatAntwort);
+	const abgelehnt = await c.var.repos.plan.abgelehnteKandidaten();
+	return c.json({ anzahl: kandidaten.length, abgelehnt, kandidaten });
+});

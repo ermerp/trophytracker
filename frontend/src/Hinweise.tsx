@@ -18,6 +18,7 @@ export function Hinweise() {
   const [igdb, setIgdb] = useState<IgdbStatus | null>(null)
   const [importOffen, setImportOffen] = useState<{ id: number; offen: number } | null>(null)
   const [freitext, setFreitext] = useState(0)
+  const [kandidaten, setKandidaten] = useState(0)
 
   useEffect(() => {
     anfrage<ReviewFortschritt>('/api/review/progress').then(setReview).catch(() => {})
@@ -37,6 +38,10 @@ export function Hinweise() {
       .catch(() => {})
     anfrage<{ eintraege: Array<{ zustand: string }> }>('/api/unmatched')
       .then((a) => setFreitext(a.eintraege.filter((e) => e.zustand === 'freitext').length))
+      .catch(() => {})
+    // Stufe 12: im Besitz, nie angefasst, auf keiner Liste.
+    anfrage<{ anzahl: number }>('/api/backlog-candidates')
+      .then((a) => setKandidaten(a.anzahl))
       .catch(() => {})
   }, [])
 
@@ -101,6 +106,14 @@ export function Hinweise() {
       <li key="freitext">
         <strong>{freitext}</strong> Einträge haben keinen IGDB-Eintrag.{' '}
         <Link to="/ohne-zuordnung">Ohne Zuordnung</Link>
+      </li>,
+    )
+  }
+  if (kandidaten > 0) {
+    zeilen.push(
+      <li key="kandidaten">
+        <strong>{kandidaten}</strong> Spiele im Besitz stehen auf keiner Liste.{' '}
+        <Link to="/backlog">Backlog-Kandidaten</Link>
       </li>,
     )
   }
