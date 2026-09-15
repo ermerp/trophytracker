@@ -5,6 +5,7 @@ import { Gewichte } from './Gewichte'
 import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
 import { Navigation } from './Navigation'
+import { OhneZuordnung } from './OhneZuordnung'
 import { Pruefliste } from './Pruefliste'
 import { Sammlung } from './Sammlung'
 import { SammlungPruefen } from './SammlungPruefen'
@@ -12,6 +13,7 @@ import { Sicherung } from './Sicherung'
 import { Spieldetail } from './Spieldetail'
 import { Trophaeen } from './Trophaeen'
 import { Wunschliste } from './Wunschliste'
+import { WunschlisteImport } from './WunschlisteImport'
 import { Zuordnung } from './Zuordnung'
 import './App.css'
 
@@ -31,6 +33,8 @@ function Werkzeuge() {
         <li><Link to="/pruefliste">Prüfliste</Link> – Trophäenbestand einmal durchgehen, danach nur Änderungen</li>
         <li><Link to="/zuordnung">Zuordnung</Link> – Trophäenlisten zu Spielen und Releases machen</li>
         <li><Link to="/igdb">IGDB-Zuordnung</Link> – Spiele ohne eindeutigen IGDB-Treffer nachziehen</li>
+        <li><Link to="/import">Wunschliste importieren</Link> – Textdateien einlesen, abgleichen, durchsehen</li>
+        <li><Link to="/ohne-zuordnung">Ohne Zuordnung</Link> – alles ohne IGDB-Eintrag, listenübergreifend nachziehen</li>
         <li><Link to="/pruefen">Sammlung prüfen</Link> – alle Zuordnungen als Tabelle</li>
         <li><Link to="/trophaeen">Trophäen</Link> – die Rohliste von Sony</li>
       </ul>
@@ -65,6 +69,9 @@ function App() {
           />
           <Route path="/zuordnung" element={<Zuordnung />} />
           <Route path="/igdb" element={<IgdbZuordnung />} />
+          <Route path="/import" element={<WunschlisteImport />} />
+          <Route path="/import/:id" element={<WunschlisteImport />} />
+          <Route path="/ohne-zuordnung" element={<OhneZuordnung />} />
           <Route path="/pruefen" element={<SammlungPruefen />} />
           <Route path="/trophaeen" element={<Trophaeen />} />
           <Route path="*" element={<Navigate to="/sammlung" replace />} />

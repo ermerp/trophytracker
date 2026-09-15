@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { anfrage, type IgdbStatus, type ReviewFortschritt } from './api'
+import { anfrage, type IgdbStatus, type ImportLauf, type ReviewFortschritt } from './api'
 import type { Sicherungsstand } from './Sicherung'
 
 /**
@@ -16,6 +16,8 @@ export function Hinweise() {
   const [listenOffen, setListenOffen] = useState(0)
   const [sicherung, setSicherung] = useState<Sicherungsstand | null>(null)
   const [igdb, setIgdb] = useState<IgdbStatus | null>(null)
+  const [importOffen, setImportOffen] = useState<{ id: number; offen: number } | null>(null)
+  const [freitext, setFreitext] = useState(0)
 
   useEffect(() => {
     anfrage<ReviewFortschritt>('/api/review/progress').then(setReview).catch(() => {})
@@ -24,6 +26,18 @@ export function Hinweise() {
       .catch(() => {})
     anfrage<Sicherungsstand>('/api/backup/status').then(setSicherung).catch(() => {})
     anfrage<IgdbStatus>('/api/igdb/status').then(setIgdb).catch(() => {})
+    // Stufe 11: ein Import mit offenen Zeilen und Freitext-Einträge ohne Spiel.
+    anfrage<{ laeufe: ImportLauf[] }>('/api/imports/wishlist')
+      .then((a) => {
+        const offen = a.laeufe
+          .map((l) => ({ id: l.id, offen: l.zaehler.ungeprueft + l.zaehler.klar + l.zaehler.mehrdeutig + l.zaehler.ohneTreffer }))
+          .find((l) => l.offen > 0)
+        setImportOffen(offen ?? null)
+      })
+      .catch(() => {})
+    anfrage<{ eintraege: Array<{ zustand: string }> }>('/api/unmatched')
+      .then((a) => setFreitext(a.eintraege.filter((e) => e.zustand === 'freitext').length))
+      .catch(() => {})
   }, [])
 
   const zeilen: React.ReactNode[] = []
@@ -67,6 +81,26 @@ export function Hinweise() {
       <li key="igdb-pruefung">
         <strong>{igdb.zurPruefung}</strong> Spiele warten auf die IGDB-Zuordnung.{' '}
         <Link to="/igdb">IGDB-Zuordnung</Link>
+      </li>,
+    )
+  }
+
+  // Abschnitt 13: Der Import ist keine Dauernavigation - er erscheint hier,
+  // solange ein Lauf offene Zeilen hat. Freitext-Eintraege ohne Spiel haben
+  // weder Cover noch Rang (8.3) und wandern ueber "Ohne Zuordnung" nach.
+  if (importOffen) {
+    zeilen.push(
+      <li key="import">
+        Ein Wunschlisten-Import hat <strong>{importOffen.offen}</strong> offene Zeilen.{' '}
+        <Link to={`/import/${importOffen.id}`}>Weiter</Link>
+      </li>,
+    )
+  }
+  if (freitext > 0) {
+    zeilen.push(
+      <li key="freitext">
+        <strong>{freitext}</strong> Einträge haben keinen IGDB-Eintrag.{' '}
+        <Link to="/ohne-zuordnung">Ohne Zuordnung</Link>
       </li>,
     )
   }

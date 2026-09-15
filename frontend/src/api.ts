@@ -209,3 +209,73 @@ export type Gewichte = { w_critic: number; w_priority: number; w_favorite: numbe
 
 /** Rang als Prozentzahl, wie die Kritikerwertung – 0 bis 100 statt 0,00 bis 1,00. */
 export const rangText = (rang: number | null) => (rang === null ? '–' : String(Math.round(rang * 100)))
+
+/** Wunschlisten-Import (Abschnitt 8.2, Stufe 11). */
+export type ImportZaehler = {
+  gesamt: number
+  ungeprueft: number
+  klar: number
+  mehrdeutig: number
+  ohneTreffer: number
+  uebernommen: number
+  uebersprungen: number
+  schonVorhanden: number
+}
+
+export type ImportLauf = {
+  id: number
+  quelle: string | null
+  jahr: number | null
+  form: 'jahresliste' | 'plattformliste' | 'tabelle' | 'einfach'
+  angelegtAm: string
+  zaehler: ImportZaehler
+}
+
+export type ImportTreffer = 'sammlung' | 'vorhanden' | 'eindeutig' | 'mehrdeutig' | 'ohne_treffer'
+export type ImportEntscheidung = 'offen' | 'uebernommen' | 'uebersprungen' | 'schon_vorhanden' | 'aufgeteilt'
+export type ImportGruppe = 'klar' | 'unklar' | 'uebersprungen' | 'uebernommen'
+
+export type ImportZeile = {
+  id: number
+  position: number
+  titel: string
+  originals: string[]
+  plattform: Plattform | null
+  listenDatum: string | null
+  geprueft: boolean
+  suchweg: string | null
+  treffer: ImportTreffer | null
+  spielId: number | null
+  spielTitel: string | null
+  spielBild: string | null
+  releaseId: number | null
+  releasePlattform: string | null
+  igdbId: number | null
+  entscheidung: ImportEntscheidung
+  planId: number | null
+  entschiedenAm: string | null
+  kandidaten: IgdbKandidat[]
+}
+
+export type ImportSeite = ImportLauf & { gruppe: ImportGruppe; gesamt: number; limit: number; offset: number; zeilen: ImportZeile[] }
+
+export const FORMTEXT: Record<ImportLauf['form'], string> = {
+  jahresliste: 'Jahresliste mit Monaten',
+  plattformliste: 'Liste mit Plattform-Abschnitten',
+  tabelle: 'bereinigte Tabelle',
+  einfach: 'einfache Liste',
+}
+
+/**
+ * Textdatei lesen: UTF-8, sonst Windows-1252 – vier der echten Dateien
+ * tragen ein BOM, eine ist in Windows-1252 (8.2). Der Parser im Worker
+ * bekommt immer sauberen Text.
+ */
+export async function textAusDatei(datei: File): Promise<string> {
+  const bytes = await datei.arrayBuffer()
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return new TextDecoder('windows-1252').decode(bytes)
+  }
+}
