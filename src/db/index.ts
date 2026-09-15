@@ -9,6 +9,7 @@ import { ReviewRepository } from "./review";
 import { SettingsRepository } from "./settings";
 import { SyncRepository } from "./sync";
 import { TrophiesRepository } from "./trophies";
+import { WishlistImportRepository } from "./wunschliste";
 
 /**
  * Die eine Stelle, an der D1 hereinkommt.
@@ -31,6 +32,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		playStatus,
 		review: new ReviewRepository(db, playStatus),
 		export: new ExportRepository(db),
+		wishlistImport: new WishlistImportRepository(db),
 	};
 }
 

@@ -25,6 +25,9 @@
  * - `igdb_candidate` - Suchergebnisse von IGDB fuer die Pruefansicht,
  *   abgeleitet und jederzeit neu abrufbar. Die Entscheidungen des Nutzers
  *   (Verknuepfung, Ablehnung) stehen in `game` und werden gesichert.
+ * - `wishlist_import`, `wishlist_import_line`, `wishlist_import_candidate` -
+ *   Arbeitszustand eines Wunschlisten-Imports (Stufe 11). Die Quelldateien
+ *   liegen beim Nutzer, das Ergebnis steht in `plan_entry`.
  */
 export const EXPORT_TABELLEN = [
 	"game",
@@ -49,6 +52,9 @@ export const NICHT_EXPORTIERT = [
 	"psn_raw_response",
 	"d1_migrations",
 	"igdb_candidate",
+	"wishlist_import",
+	"wishlist_import_line",
+	"wishlist_import_candidate",
 ] as const;
 
 export type Exporttabelle = (typeof EXPORT_TABELLEN)[number];

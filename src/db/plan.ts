@@ -175,6 +175,18 @@ export class PlanRepository {
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 
+	/**
+	 * Freitext-Eintrag nachtraeglich einem Spiel zuordnen (8.3): game_id
+	 * setzen, title_raw leeren. Nur fuer Eintraege ohne Spiel und Release.
+	 */
+	async spielZuordnen(id: number, gameId: number): Promise<boolean> {
+		const ergebnis = await this.db
+			.prepare("UPDATE plan_entry SET game_id = ?, title_raw = NULL WHERE id = ? AND game_id IS NULL AND release_id IS NULL")
+			.bind(gameId, id)
+			.run();
+		return (ergebnis.meta.changes ?? 0) > 0;
+	}
+
 	async loeschen(id: number): Promise<boolean> {
 		const ergebnis = await this.db.prepare("DELETE FROM plan_entry WHERE id = ?").bind(id).run();
 		return (ergebnis.meta.changes ?? 0) > 0;

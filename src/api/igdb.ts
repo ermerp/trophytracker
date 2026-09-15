@@ -1,11 +1,14 @@
 import { Hono } from "hono";
 import type { SpielDetail } from "../db/games";
 import type { KandidatZeile } from "../db/igdb";
+import type { PlanArt } from "../db/plan";
 import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, type IgdbKandidat } from "../domain/igdb";
 import { plattformenAus, titelSchluessel } from "../domain/titel";
 import { IgdbKonfigError } from "../igdb/client";
 import { igdbAbgleichSchritt, igdbAuffrischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
+import { zielAusIgdbId } from "../sync/plan-ziel";
 import type { AppEnv } from "../types";
+import { eintragAntwort } from "./plans";
 
 /**
  * Abschnitt 12: IGDB-Suche, Abgleich und Pruefansicht (7.6).
@@ -153,10 +156,71 @@ function spielId(c: { req: { param: (n: "id") => string } }): number | null {
 }
 
 /**
- * Abschnitt 12: POST /api/unmatched/:quelle/:id/link. Stufe 9 kennt nur die
- * Quelle `spiel`; `plan_*` kommt mit Stufe 11.
+ * Abschnitt 12: /api/unmatched. Quelle `spiel` seit Stufe 9, `plan_*` und
+ * die Liste aus v_ohne_igdb seit Stufe 11.
  */
 export const unmatchedRoutes = new Hono<AppEnv>()
+	/** Ansicht "Ohne Zuordnung" (8.3): v_ohne_igdb, abgelehnte nur mit `abgelehnte=1`. */
+	.get("/", async (c) => {
+		const zeilen = await c.var.repos.igdb.ohneZuordnung(c.req.query("abgelehnte") === "1");
+		return c.json({
+			eintraege: zeilen.map((z) => ({
+				quelle: z.quelle,
+				id: z.ref_id,
+				titel: z.title,
+				zustand: z.zustand,
+				art: z.quelle.startsWith("plan_") ? z.quelle.slice(5) : null,
+			})),
+		});
+	})
+
+	/**
+	 * Freitext-Eintrag einem IGDB-Treffer zuordnen (Stufe 11): Spiel
+	 * wiederverwenden oder anlegen, dann game_id setzen und title_raw
+	 * leeren. Ein offener Eintrag derselben Art am Spiel ist ein Duplikat (409).
+	 */
+	.post("/:quelle{plan_(wunsch|todo|backlog|kauf)}/:id/link", async (c) => {
+		const id = spielId(c);
+		if (id === null) return c.json({ fehler: "Ungültige Id." }, 400);
+		if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
+		const art = c.req.param("quelle").slice(5) as PlanArt;
+
+		let koerper: unknown;
+		try {
+			koerper = await c.req.json();
+		} catch {
+			return c.json({ fehler: "Ungültiges JSON." }, 400);
+		}
+		const igdbId = Number((koerper as { igdbId?: unknown })?.igdbId);
+		if (!Number.isInteger(igdbId) || igdbId <= 0) {
+			return c.json({ fehler: "Feld 'igdbId' fehlt oder ist ungültig." }, 400);
+		}
+
+		const eintrag = await c.var.repos.plan.eintrag(id);
+		if (!eintrag || eintrag.kind !== art) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
+		if (eintrag.title_raw === null || eintrag.game_id !== null || eintrag.release_id !== null) {
+			return c.json({ fehler: "Der Eintrag ist schon einem Spiel zugeordnet." }, 409);
+		}
+
+		let ergebnis: Awaited<ReturnType<typeof zielAusIgdbId>>;
+		try {
+			ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, null);
+		} catch (fehler) {
+			if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
+			return c.json({ fehler: meldungFuer(fehler) }, 502);
+		}
+		if (!ergebnis || ergebnis.ziel.gameId === undefined) return c.json({ fehler: "IGDB kennt diesen Eintrag nicht." }, 404);
+
+		const doppelt = await c.var.repos.plan.offenerEintrag(art, ergebnis.ziel);
+		if (doppelt !== null && doppelt !== id) {
+			return c.json({ fehler: "Dafür gibt es schon einen offenen Eintrag.", eintragId: doppelt }, 409);
+		}
+		await c.var.repos.plan.spielZuordnen(id, ergebnis.ziel.gameId);
+		const zeile = await c.var.repos.plan.eintrag(id);
+		if (!zeile) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
+		return c.json({ ...eintragAntwort(zeile, await c.var.repos.settings.getWeights()), spielAngelegt: ergebnis.spielAngelegt });
+	})
+
 	.post("/spiel/:id/link", async (c) => {
 		const id = spielId(c);
 		if (id === null) return c.json({ fehler: "Ungültige Id." }, 400);

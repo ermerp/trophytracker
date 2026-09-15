@@ -251,6 +251,54 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		await env.DB.prepare("DELETE FROM plan_entry").run();
 	});
 
+	it("misst den Wunschlisten-Import und die Ansicht Ohne Zuordnung (Stufe 11)", async () => {
+		// Ein Lauf in Produktionsgroesse: 320 Zeilen, je zehn Kandidaten bei den unklaren.
+		await env.DB.prepare("INSERT INTO wishlist_import (id, form) VALUES (1, 'jahresliste')").run();
+		const zeile = env.DB.prepare(
+			"INSERT INTO wishlist_import_line (id, import_id, position, title, originals, checked_at, match_kind, game_id, igdb_id, decision) VALUES (?, 1, ?, ?, '[]', '2026-09-15', ?, ?, ?, 'offen')",
+		);
+		const kandidat = env.DB.prepare(
+			"INSERT INTO wishlist_import_candidate (line_id, igdb_id, name, position) VALUES (?, ?, ?, ?)",
+		);
+		const anweisungen: D1PreparedStatement[] = [];
+		for (let i = 1; i <= 320; i++) {
+			const art = i % 3 === 0 ? "mehrdeutig" : i % 10 === 0 ? "sammlung" : "eindeutig";
+			anweisungen.push(zeile.bind(i, i, `Titel ${i}`, art, art === "sammlung" ? i : null, art === "eindeutig" ? 100000 + i : null));
+			if (art === "mehrdeutig") for (let k = 0; k < 10; k++) anweisungen.push(kandidat.bind(i, 200000 + i * 10 + k, `Kandidat ${k}`, k));
+		}
+		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
+
+		const auswahl = `SELECT l.id, l.title, g.title AS spiel_titel, r.platform AS release_plattform
+			 FROM wishlist_import_line l LEFT JOIN game g ON g.id = l.game_id LEFT JOIN release r ON r.id = l.release_id `;
+		const zaehler = await zeilenGelesen("SELECT COUNT(*) AS n, SUM(decision = 'offen') AS o FROM wishlist_import_line WHERE import_id = ?", 1);
+		const naechste = await zeilenGelesen(auswahl + "WHERE l.import_id = ? AND l.checked_at IS NULL AND l.decision = 'offen' ORDER BY l.position, l.id LIMIT 8", 1);
+		const unklarSeite = await zeilenGelesen(
+			auswahl + "WHERE l.import_id = ? AND l.decision = 'offen' AND l.match_kind IN ('mehrdeutig','ohne_treffer') ORDER BY l.position, l.id LIMIT 20 OFFSET 0",
+			1,
+		);
+		const kandidatenSeite = await zeilenGelesen(
+			`SELECT line_id, igdb_id, name FROM wishlist_import_candidate WHERE line_id IN (${Array.from({ length: 20 }, (_, i) => (i + 1) * 3).join(",")}) ORDER BY line_id, position`,
+		);
+		const ohneZuordnung = await zeilenGelesen("SELECT quelle, ref_id, title, zustand FROM v_ohne_igdb WHERE zustand <> 'abgelehnt' ORDER BY quelle, title");
+
+		console.info({ zaehler, naechste, unklarSeite, kandidatenSeite, ohneZuordnung });
+
+		// Ein Lauf wird ueber idx_wl_line_import einmal durchgesehen (320 Zeilen);
+		// die Kandidaten einer Seite kommen als Index-Lookup je Zeile (rund zwei
+		// gelesene Zeilen je Ergebniszeile bei 200 Kandidaten).
+		expect(zaehler).toBeLessThan(400);
+		expect(naechste).toBeLessThan(400);
+		expect(unklarSeite).toBeLessThan(500);
+		expect(kandidatenSeite).toBeLessThan(600);
+		// v_ohne_igdb scannt game (430) und plan_entry einmal.
+		expect(ohneZuordnung).toBeLessThan(1_000);
+
+		for (const pfad of ["/api/imports/wishlist/1?gruppe=unklar", "/api/imports/wishlist/1?gruppe=klar", "/api/unmatched"]) {
+			expect((await SELF.fetch(`${B}${pfad}`)).status, pfad).toBe(200);
+		}
+		await env.DB.prepare("DELETE FROM wishlist_import").run();
+	});
+
 	it("beantwortet die Exportrouten bei 430 Listen", async () => {
 		for (const pfad of ["/api/export/backup.json", "/api/export/sammlung.csv", "/api/export/trophaeen.csv"]) {
 			const antwort = await SELF.fetch(`${B}${pfad}`);

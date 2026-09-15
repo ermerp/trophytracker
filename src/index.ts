@@ -3,6 +3,7 @@ import { deviationRoutes } from "./api/deviations";
 import { backupRoutes, exportRoutes } from "./api/export";
 import { digitalEntitlementRoutes, physicalCopyRoutes } from "./api/ownership";
 import { igdbRoutes, unmatchedRoutes } from "./api/igdb";
+import { importRoutes } from "./api/imports";
 import { planRoutes } from "./api/plans";
 import { psnRoutes } from "./api/psn";
 import { releaseRoutes } from "./api/releases";
@@ -58,6 +59,7 @@ export function createApp(
 	app.route("/api/games", gameRoutes);
 	app.route("/api/releases", releaseRoutes);
 	app.route("/api/plans", planRoutes);
+	app.route("/api/imports/wishlist", importRoutes);
 	app.route("/api/deviations", deviationRoutes);
 	app.route("/api/review", reviewRoutes);
 	app.route("/api/export", exportRoutes);
