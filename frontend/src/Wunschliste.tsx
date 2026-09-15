@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   PLAN_STATUSTEXT,
+  PLATTFORMEN,
   anfrage,
   datum,
   rangText,
@@ -19,7 +20,9 @@ import { IgdbSuche } from './IgdbSuche'
  * ohne IGDB-Zuordnung entsteht nur über den ausdrücklichen Knopf (8.2).
  * Bei angekündigten Titeln steht das Erscheinungsdatum dort, wo später
  * der Preis steht (8.4). Ein Wunsch braucht keine Plattform: Wo keine
- * steht, wurde keine behauptet.
+ * steht, wurde keine behauptet – die Auswahl ist mit „ohne Plattform"
+ * vorbelegt. Mit Plattform hängt der Wunsch an einem Release, das nicht
+ * zur Sammlung zählt, solange es nur den Wunsch trägt (Abschnitt 3).
  *
  * Sortierung und Filter liegen in der URL, wie in der Sammlung.
  */
@@ -44,6 +47,8 @@ export function Wunschliste() {
   const [hinzufuegen, setHinzufuegen] = useState(false)
   const [eben, setEben] = useState<PlanEintrag | null>(null)
   const [notizOffen, setNotizOffen] = useState<number | null>(null)
+  // '' heisst "ohne Plattform" - nie vorbelegt mit einer echten.
+  const [plattform, setPlattform] = useState('')
 
   const sortierung: Sortierung = (params.get('sort') as Sortierung) in SORTIERTEXT ? (params.get('sort') as Sortierung) : 'rang'
   const nurFavoriten = params.get('favorit') === '1'
@@ -132,7 +137,8 @@ export function Wunschliste() {
     }
   }
 
-  const igdbWaehlen = (k: IgdbKandidat) => anlegen({ igdbId: k.igdbId })
+  const igdbWaehlen = (k: IgdbKandidat) => anlegen(plattform ? { igdbId: k.igdbId, plattform } : { igdbId: k.igdbId })
+  // Freitext hat kein Spiel und damit kein Release - die Plattform bleibt weg.
   const ohneTreffer = (begriff: string) => anlegen({ titel: begriff })
 
   return (
@@ -146,9 +152,24 @@ export function Wunschliste() {
         {hinzufuegen && (
           <>
             <p className="zeile">
-              Bei IGDB suchen und übernehmen – das legt ein Spiel ohne Plattform an. Steht das Spiel schon in der Sammlung, geht es auch aus dem Spieldetail, dort auch je Plattform.
+              Bei IGDB suchen und übernehmen. Die Plattform ist freiwillig – ohne Angabe gilt der Wunsch dem Spiel; Freitext bleibt immer ohne Plattform.
             </p>
-            <IgdbSuche vorgabe="" onWahl={igdbWaehlen} onOhneTreffer={ohneTreffer} laeuft={laeuft} />
+            <label className="zeile">
+              Plattform{' '}
+              <select value={plattform} onChange={(e) => setPlattform(e.target.value)} disabled={laeuft}>
+                <option value="">ohne Plattform</option>
+                {PLATTFORMEN.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </label>
+            <IgdbSuche
+              vorgabe=""
+              plattformen={plattform ? [plattform] : []}
+              onWahl={igdbWaehlen}
+              onOhneTreffer={ohneTreffer}
+              laeuft={laeuft}
+            />
           </>
         )}
       </section>

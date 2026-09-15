@@ -65,7 +65,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
 | IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar. **Abgenommen am 14.09.2026: 419 von 420 verknüpft**, eines bewusst abgelehnt (Vita-Wecker-App, IGDB kennt sie nicht) |
 | Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer (Stand vor Migration 0011, seitdem 20 Indizes) |
-| Wunschliste | Eigene Ansicht in der Leiste: nach Rang sortiert (berechnet, nie gespeichert), Favoriten-Filter, Priorität 1–5, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche als Spiel ohne Release, Freitext nur ausdrücklich; im Spieldetail je Spiel oder je Plattform, die Plattform bleibt standardmäßig leer. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat |
+| Wunschliste | Eigene Ansicht in der Leiste: nach Rang sortiert (berechnet, nie gespeichert), Favoriten-Filter, Priorität 1–5, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform wählbar und standardmäßig leer – ohne Plattform ein Spiel ohne Release, mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat |
 | Rangformel | Gewichte in den Einstellungen verstellbar; `src/domain/rang.ts` ist die eine Stelle für die Formel |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
@@ -613,13 +613,14 @@ DELETE /api/plans/:id
 ```
 
 Der Rang wird bei jeder Abfrage aus Kritikerwertung, Priorität und Favorit mit
-den Gewichten aus den Einstellungen berechnet und nie gespeichert. Ein Wunsch
-aus der IGDB-Suche legt ein Spiel **ohne Release** an – es erscheint nicht in
-der Sammlung, weil ein Wunsch kein Besitz ist, wohl aber im Spieldetail. Die
+den Gewichten aus den Einstellungen berechnet und nie gespeichert. Die
 Plattform bleibt leer, solange keine gewählt wird; ein Standardwert wäre eine
-Behauptung. Ein Wunsch am Spiel und einer an einem seiner Releases sind zwei
-verschiedene Aussagen und blockieren sich nicht; nur dasselbe Ziel derselben
-Art antwortet mit `409`.
+Behauptung. Ohne Plattform legt ein Wunsch aus der IGDB-Suche ein Spiel **ohne
+Release** an; mit Plattform entsteht das Release, und es zählt **nicht zur
+Sammlung, solange es nur den Wunsch trägt** – ein Wunsch ist kein Besitz. Im
+Spieldetail ist es immer sichtbar. Ein Wunsch am Spiel und einer an einem
+seiner Releases sind zwei verschiedene Aussagen und blockieren sich nicht; nur
+dasselbe Ziel derselben Art antwortet mit `409`.
 
 ## Export
 

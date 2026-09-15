@@ -119,7 +119,8 @@ export function Spieldetail() {
   const [meldung, setMeldung] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [igdbSuche, setIgdbSuche] = useState(false)
-  // '' heisst "ohne Plattform" - der Wunsch haengt dann am Spiel, nicht an einem Release.
+  // '' heisst "ohne Plattform" - der Wunsch haengt dann am Spiel, nicht an einem
+  // Release. Mit Plattform legt der Server das Release an, falls es fehlt.
   const [wunschPlattform, setWunschPlattform] = useState('')
 
   const laden = useCallback(async () => {
@@ -140,14 +141,20 @@ export function Spieldetail() {
    * leer, wenn keine gewaehlt ist; ein Standardwert waere eine Behauptung.
    */
   function wunschAnlegen() {
-    const releaseId = wunschPlattform === '' ? null : Number(wunschPlattform)
     void tue(
       () =>
         anfrage('/api/plans', {
           methode: 'POST',
-          koerper: releaseId === null ? { art: 'wunsch', spielId: spiel!.id } : { art: 'wunsch', releaseId },
+          koerper: wunschPlattform === '' ? { art: 'wunsch', spielId: spiel!.id } : { art: 'wunsch', spielId: spiel!.id, plattform: wunschPlattform },
         }),
       'Auf die Wunschliste gesetzt.',
+    )
+  }
+
+  /** Gibt es schon einen offenen Wunsch fuer diese Wahl? Dann ist der Knopf aus. */
+  function wunschVorhanden() {
+    return spiel!.plaene.some(
+      (p) => p.art === 'wunsch' && (wunschPlattform === '' ? p.releaseId === null : p.plattform === wunschPlattform),
     )
   }
 
@@ -395,20 +402,14 @@ export function Spieldetail() {
             Plattform{' '}
             <select value={wunschPlattform} onChange={(e) => setWunschPlattform(e.target.value)} disabled={laeuft}>
               <option value="">ohne Plattform</option>
-              {spiel.releases.map((r) => (
-                <option key={r.id} value={r.id}>{r.plattform}</option>
+              {PLATTFORMEN.map((p) => (
+                <option key={p} value={p}>
+                  {p}{spiel.releases.some((r) => r.plattform === p) ? '' : ' (neues Release)'}
+                </option>
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            className="klein"
-            disabled={
-              laeuft ||
-              spiel.plaene.some((p) => p.art === 'wunsch' && p.releaseId === (wunschPlattform === '' ? null : Number(wunschPlattform)))
-            }
-            onClick={wunschAnlegen}
-          >
+          <button type="button" className="klein" disabled={laeuft || wunschVorhanden()} onClick={wunschAnlegen}>
             Auf die Wunschliste
           </button>
           <Link to="/wunschliste" className="zeile">zur Wunschliste</Link>

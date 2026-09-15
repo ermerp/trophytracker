@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 24 – Stufe 10: Wunschliste mit Favoriten und Rang; Spiele ohne Release (Wunsch aus IGDB), Duplikatregel für Absichten, Wunschliste in der Navigationsleiste, Migration 0011.*
+*Version 25 – Nachbesserung nach der Abnahme von Stufe 10: Plattform beim Wunsch wählbar (Release nur aus Wunsch zählt nicht zur Sammlung), IGDB-Treffer nur mit fremden Plattformen fallen heraus.*
 
 ## 1. Use Cases
 
@@ -195,11 +195,17 @@ Release, wird es mit gelöscht – **es sei denn, eine offene Absicht hängt dar
 `game_id` und `status = 'offen'`): Sonst verschwände ein Wunsch per CASCADE, sobald ein probeweise
 angelegtes Release wieder entfernt wird.
 
-**Spiel ohne Release (seit Stufe 10).** Ein Wunsch aus der IGDB-Suche legt ein Spiel mit den
-IGDB-Metadaten an, aber **ohne Release**: Ein Wunsch braucht weder Release noch Plattform (8.4), und
-eine geratene Plattform wäre eine Behauptung, die der Nutzer nie aufgestellt hat. Solche Spiele
-erscheinen nicht in der Sammlung – die Liste verlangt ein Release, und ein Wunsch ist kein Besitz –,
-wohl aber im Spieldetail. Gibt es bereits ein Spiel mit derselben `igdb_id`, wird es wiederverwendet.
+**Spiel ohne Release, Release nur aus Wunsch (seit Stufe 10).** Ein Wunsch aus der IGDB-Suche legt
+ein Spiel mit den IGDB-Metadaten an, **ohne Release**, solange keine Plattform gewählt ist: Ein Wunsch
+braucht weder Release noch Plattform (8.4), und eine geratene Plattform wäre eine Behauptung, die der
+Nutzer nie aufgestellt hat. Wählt er eine, entsteht das Release dieser Plattform (oder wird
+wiederverwendet) und der Wunsch hängt daran – dort, wo später Kaufliste und Preise hängen. **Ein
+Release, das nur einen Wunsch trägt, zählt nicht zur Sammlung:** keine Trophäenliste, kein Exemplar,
+keine digitale Berechtigung, aber ein offener `wunsch`-Eintrag (`GamesRepository.NUR_WUNSCH`). Es
+erscheint in der Sammlung, sobald Besitz oder Fortschritt dazukommt; Spieldetail und „Sammlung
+prüfen" zeigen es immer. Ein Wunsch ist kein Besitz, aber der Nutzer soll sagen dürfen, für welche
+Plattform er ihn hat (Entscheidung vom 15.09.2026). Gibt es bereits ein Spiel mit derselben
+`igdb_id`, wird es wiederverwendet.
 
 ---
 
@@ -360,7 +366,9 @@ Entscheidung; er hat weder Cover noch Rang (8.3).
 
 - **Die Plattform darf leer bleiben und fällt nie auf einen Standardwert.** Ein Wunsch am Spiel
   sagt „das Spiel", ein Wunsch am Release sagt „diese Fassung". Ein geratenes PS5 bei einem
-  angekündigten Titel wäre eine Aussage, die nie getroffen wurde.
+  angekündigten Titel wäre eine Aussage, die nie getroffen wurde. Wählbar ist sie überall
+  (Wunschliste wie Spieldetail); mit Wahl entsteht das Release, falls es fehlt (Abschnitt 3).
+  Freitext hat kein Spiel und deshalb nie eine Plattform.
 - **Ein offener Eintrag am Spiel und einer an einem seiner Releases sind kein Duplikat**, sondern
   zwei verschiedene Aussagen; sie blockieren sich nicht. Ein zweiter offener Eintrag **derselben Art
   an genau demselben Ziel** ist eines und wird mit `409` abgewiesen. Erledigte und verworfene
@@ -628,6 +636,8 @@ Abruf zusammen mit den übrigen IGDB-Metadaten, nicht als eigener Job. `critic_s
 **Suchbegriff.** `suchbegriff(title)` (`src/domain/igdb.ts`) bereinigt nur für die Anfrage, nie für den Schlüssel: ein Jahr in Klammern aus der Umbenennung durch den Nutzer („God of War (2018)") fällt weg, an Wörter geklebte Ziffern werden getrennt („Velocity2X" → „Velocity 2X"; IGDB findet nur diese Schreibweise).
 
 **Exakte Namensabfrage.** Trifft nach der Volltextsuche kein Kandidat den Schlüssel, fragt der Abgleich zusätzlich exakt nach dem Namen (`name ~ "…"`, Groß-/Kleinschreibung egal) und mischt das Ergebnis vorn ein. IGDBs Volltextsuche übergeht „THE FINALS" und liefert Final Fantasy, während der exakte Name sofort trifft; und in der Handsuche findet „Rainbow Six Siege" damit das Grundspiel, das IGDB ohne „Tom Clancy's" führt und das die Volltextsuche hinter dreißig Editionen versteckt. Eine Anfrage mehr für die rund 50 Spiele ohne Schlüsseltreffer, nicht für alle.
+
+**Nur PlayStation.** Die Rückfälle unten laufen ohne Plattformfilter, weil manche IGDB-Einträge gar keine Plattform nennen. Einträge, die *ausschließlich* fremde Plattformen nennen, fallen deshalb schon in der Normalisierung heraus (`normalisiereTreffer`), wie Mods und Updates – sonst lieferte „Zelda" in der Wunschlisten-Suche Switch-Spiele (Rückmeldung aus der Abnahme von Stufe 10). „Keine Plattform genannt" bleibt zugelassen: fehlende Daten sind kein Gegenbeweis.
 
 **Rückfälle, nur wenn die Suche leer bleibt** (`kandidatenSuchen`, `src/sync/igdb.ts`; trifft 11 von 420 Titeln, kostet also fast nichts): erst der gekürzte Begriff – alles ab „ - ", „:" oder „/" fällt weg („CastleStorm - Complete Edition" → „CastleStorm", „Type:Rider" → „Type") – ohne Plattformfilter, weil manche IGDB-Einträge keine Plattform nennen; dann IGDBs Teilstringsuche über den Namen (`name ~ *"…"*`), der einzige Weg zu „That's You!" oder „We Were Here Too"; zuletzt dieselbe Teilstringsuche mit dem unbereinigten Titel, weil IGDB „OlliOlli2" ohne Leerzeichen schreibt. Was danach noch fehlt (aus der ersten Abnahme: „Poker Night at the Inventory 2", „TownsmenVR", „Wake-up Club"), kennt IGDB unter keiner Schreibweise – das bleibt „Gibt es bei IGDB nicht" oder eine Suche von Hand.
 
@@ -996,8 +1006,9 @@ POST   /api/zuordnung/liste/:npCommId  Einzelne Liste einem Release zuordnen
 
 GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=rang|titel|angelegt&favorit=1
                                       { gewichte, sortierung, eintraege[] }; Rang je Eintrag berechnet (5.2), null ohne Spiel
-POST   /api/plans                     Body: { art, spielId | releaseId | igdbId | titel, prioritaet?, favorit?, notiz? } – genau eine Quelle;
-                                      igdbId legt bei Bedarf ein Spiel ohne Release an; 409 mit eintragId bei offenem Duplikat (Abschnitt 5)
+POST   /api/plans                     Body: { art, spielId | releaseId | igdbId | titel, plattform?, prioritaet?, favorit?, notiz? } – genau eine Quelle;
+                                      igdbId legt bei Bedarf ein Spiel an; plattform (nur zu spielId/igdbId) hängt den Wunsch an das Release
+                                      dieser Plattform, das bei Bedarf entsteht; 409 mit eintragId bei offenem Duplikat (Abschnitt 5)
 PATCH  /api/plans/:id                 Teilmenge von { prioritaet, favorit, notiz, status, art }; Statuswechsel setzt resolved_at
 PUT    /api/plans/reorder             Body: { kind, orderedIds } – To-Do-Reihenfolge (Stufe 12)
 DELETE /api/plans/:id
@@ -1049,7 +1060,7 @@ GET    /api/stats
 
 **Filter auf `/api/games`:** `platform`, `owned` (physisch/digital/beide/keins), `played` (ja/nein), `platinum` (ja/nein/nichtverfuegbar), `playStatus` (die sieben Werte; ein Release ohne Zeile zählt als `nicht_gespielt`), `physicalAvailable` (ja/nein/unbekannt), `search`, dazu `sort` (titel/zuletzt), `limit`, `offset`.
 
-Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein Release alle Filter zugleich** erfüllt. `platform=PS4&owned=physisch` heisst also "hat eine PS4-Disc", nicht "hat irgendeine Disc und irgendein PS4-Release". Unbekannte Filterwerte werden ignoriert, nicht mit `400` beantwortet – ein alter Link soll die Liste zeigen, keine Fehlermeldung. Die Suche ist eine einfache Teilstringsuche im Titel, keine Suche über den Titelschlüssel.
+Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein Release alle Filter zugleich** erfüllt. Releases, die nur einen Wunsch tragen (Abschnitt 3), zählen dabei nicht mit und fehlen auch in der Release-Liste des Spiels. `platform=PS4&owned=physisch` heisst also "hat eine PS4-Disc", nicht "hat irgendeine Disc und irgendein PS4-Release". Unbekannte Filterwerte werden ignoriert, nicht mit `400` beantwortet – ein alter Link soll die Liste zeigen, keine Fehlermeldung. Die Suche ist eine einfache Teilstringsuche im Titel, keine Suche über den Titelschlüssel.
 
 **Zugriffsschutz:** siehe Abschnitt 15.3. Kurz: eine Access-Richtlinie am Worker – da Frontend und API derselbe Worker sind, deckt sie beides in einem ab. Die Maschinen-Endpunkte (`/api/imports/feed`, `/api/export/backup.json`, `/api/backup/vermerk`) laufen seit Stufe 8 über ein **Access Service Token** und tragen deshalb **keine eigene Token-Prüfung im Worker** (Entscheidung in 15.3).
 
@@ -1065,7 +1076,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
 | IGDB-Zuordnung | – | Spiele ohne eindeutigen IGDB-Treffer als Liste mit Seiten: Kandidaten (Cover, Jahr, Typ, Plattformen, Wertung) zum Übernehmen, „Anders suchen" mit vorbelegtem Begriff, „Gibt es bei IGDB nicht". Eine Liste, kein Ein-Spiel-pro-Bildschirm: Nichts erzwingt eine Reihenfolge, Ausgelassenes bleibt stehen (7.6) |
 | Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden. Knopf "physisch nicht gewünscht"; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar |
-| Wunschliste | 4, 11 | Nach Rang sortiert (auch Titel, zuletzt angelegt), Favoriten-Filter, erledigte und verworfene standardmäßig ausgeblendet; je Eintrag Cover, Plattform (oder „ohne Plattform"), Kritikerwertung, Rang, Favorit-Stern, Priorität 1–5, Notiz, erledigt/verworfen/wieder öffnen, entfernen; Erscheinungsdatum statt Preis bei angekündigten Titeln. „Wunsch hinzufügen" über die IGDB-Suche (legt ein Spiel ohne Release an), Freitext nur über „Ohne IGDB-Eintrag übernehmen" nach einer Suche; Rückgängig direkt nach dem Anlegen. Im Spieldetail ein Block „Wunschliste": auf die Liste setzen, Plattform wählbar und standardmäßig leer |
+| Wunschliste | 4, 11 | Nach Rang sortiert (auch Titel, zuletzt angelegt), Favoriten-Filter, erledigte und verworfene standardmäßig ausgeblendet; je Eintrag Cover, Plattform (oder „ohne Plattform"), Kritikerwertung, Rang, Favorit-Stern, Priorität 1–5, Notiz, erledigt/verworfen/wieder öffnen, entfernen; Erscheinungsdatum statt Preis bei angekündigten Titeln. „Wunsch hinzufügen" über die IGDB-Suche mit Plattform-Auswahl, vorbelegt „ohne Plattform" (dann entsteht ein Spiel ohne Release), Freitext nur über „Ohne IGDB-Eintrag übernehmen" nach einer Suche; Rückgängig direkt nach dem Anlegen. Im Spieldetail ein Block „Wunschliste": auf die Liste setzen, Plattform wählbar (auch eine, für die noch kein Release existiert) und standardmäßig leer |
 | To-Do | 5a | Kurz und manuell sortierbar (Drag-and-drop) |
 | Backlog | 5b | Der grosse Haufen, Kandidatenvorschläge aus dem Besitz, Hochziehen auf To-Do |
 | Kaufliste | 6, 10 | Gespeist aus Lücken und Wunschliste, sortiert nach Rang, mit Herkunftskennzeichnung |

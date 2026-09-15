@@ -119,20 +119,24 @@ export function isoDatum(unixSekunden: number): string {
  * Oberflaeche zeigt dann "unbekannt", nie "0".
  *
  * Mods, Forks und Updates fallen heraus: Sie sind nie ein Spiel der
- * Sammlung und wuerden nur die Kandidatenliste verlaengern.
+ * Sammlung und wuerden nur die Kandidatenliste verlaengern. Ebenso
+ * Eintraege, die ausschliesslich fremde Plattformen nennen: Die Rueckfaelle
+ * der Suche laufen ohne Plattformfilter (manche Eintraege nennen gar keine
+ * Plattform), und ohne diese Pruefung stuenden Switch- und PC-Spiele in der
+ * Wunschlisten-Suche - Rueckmeldung aus der Abnahme von Stufe 10. "Keine
+ * Plattform genannt" bleibt dagegen zugelassen: fehlende Daten sind kein
+ * Gegenbeweis (7.6).
  */
 export function normalisiereTreffer(roh: IgdbSpielRoh): IgdbKandidat | null {
 	if (!roh.name || !Number.isInteger(roh.id)) return null;
 	if (roh.game_type !== undefined && NIE_EIN_SPIEL_MENGE.has(roh.game_type)) return null;
 
 	const imageId = typeof roh.cover === "object" ? roh.cover?.image_id : undefined;
+	const genannt = roh.platforms ?? [];
 	const plattformen = [
-		...new Set(
-			(roh.platforms ?? [])
-				.map((p) => IGDB_PLATTFORMEN[p])
-				.filter((p): p is Plattform => p !== undefined),
-		),
+		...new Set(genannt.map((p) => IGDB_PLATTFORMEN[p]).filter((p): p is Plattform => p !== undefined)),
 	];
+	if (genannt.length > 0 && plattformen.length === 0) return null;
 
 	return {
 		igdbId: roh.id,

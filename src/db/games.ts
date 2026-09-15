@@ -438,18 +438,31 @@ aeenliste haengt
 	}
 
 	/**
+	 * Ein Release, das nur ein Wunsch traegt, gehoert nicht zur Sammlung
+	 * (Abschnitt 3, Stufe 10): keine Trophaeenliste, kein Exemplar, keine
+	 * digitale Berechtigung, aber ein offener Wunsch. Es erscheint, sobald
+	 * Besitz oder Fortschritt dazukommt. Drei Index-Lookups je Release.
+	 */
+	private static readonly NUR_WUNSCH =
+		"(t.release_id IS NULL " +
+		"AND NOT EXISTS (SELECT 1 FROM physical_copy p0 WHERE p0.release_id = r.id) " +
+		"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d0 WHERE d0.release_id = r.id) " +
+		"AND EXISTS (SELECT 1 FROM plan_entry pe0 WHERE pe0.release_id = r.id AND pe0.kind = 'wunsch' AND pe0.status = 'offen'))";
+
+	/**
 	 * Gefilterte Spieleliste fuer die Sammlungsansicht.
 	 *
 	 * Die Bedingungen kommen aus festen Textbausteinen, Nutzerwerte gehen
 	 * ausschliesslich als Bindings hinein. Zwei Abfragen: erst die Seite der
 	 * Spiele, dann die Releases dieser Spiele. Kein Rechnen im Worker.
+	 * Releases nur aus Wunsch (NUR_WUNSCH) bleiben in beiden aussen vor.
 	 */
 	async spieleListe(filter: SpieleFilter): Promise<{
 		zeilen: SpielZeile[];
 		releases: ReleaseZeile[];
 		gesamt: number;
 	}> {
-		const bedingungen: string[] = [];
+		const bedingungen: string[] = [`NOT ${GamesRepository.NUR_WUNSCH}`];
 		const werte: unknown[] = [];
 
 		if (filter.platform) {
@@ -528,7 +541,7 @@ aeenliste haengt
 				        (SELECT GROUP_CONCAT(d.source) FROM digital_entitlement d WHERE d.release_id = r.id) AS digital
 				 FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id
 				 LEFT JOIN play_status ps ON ps.release_id = r.id
-				 WHERE r.game_id IN (${ids.map(() => "?").join(",")})
+				 WHERE r.game_id IN (${ids.map(() => "?").join(",")}) AND NOT ${GamesRepository.NUR_WUNSCH}
 				 ORDER BY r.game_id, r.platform`,
 			)
 			.bind(...ids)
@@ -659,6 +672,28 @@ aeenliste haengt
 			.first<{ id: number }>();
 		if (!r) throw new Error("Release konnte nicht angelegt werden.");
 		return { releaseId: r.id };
+	}
+
+	/**
+	 * Release fuer eine Plattform - vorhanden oder neu (Stufe 10). Ein Wunsch
+	 * mit gewaehlter Plattform haengt an einem Release; fehlt es, entsteht es
+	 * hier, ohne Besitz und ohne Trophaeenliste (siehe NUR_WUNSCH).
+	 */
+	async releaseFuerPlattform(gameId: number, plattform: Plattform): Promise<number> {
+		const vorhanden = await this.db
+			.prepare(
+				"SELECT id FROM release WHERE game_id = ? AND platform = ? " +
+					"AND edition IS NULL AND region IS NULL ORDER BY id LIMIT 1",
+			)
+			.bind(gameId, plattform)
+			.first<{ id: number }>();
+		if (vorhanden) return vorhanden.id;
+		const r = await this.db
+			.prepare("INSERT INTO release (game_id, platform) VALUES (?, ?) RETURNING id")
+			.bind(gameId, plattform)
+			.first<{ id: number }>();
+		if (!r) throw new Error("Release konnte nicht angelegt werden.");
+		return r.id;
 	}
 
 	/**
