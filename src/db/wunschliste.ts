@@ -5,8 +5,6 @@ import type { WunschlistenForm, WunschZeile } from "../domain/wunschliste";
 export const MATCH_ARTEN = ["sammlung", "vorhanden", "eindeutig", "mehrdeutig", "ohne_treffer"] as const;
 export type MatchArt = (typeof MATCH_ARTEN)[number];
 
-/** Klare Zeilen: Sammlung, vorhandenes Spiel oder eindeutiger IGDB-Treffer - ein Block, ein Knopf (8.2). */
-export const KLAR: readonly MatchArt[] = ["sammlung", "vorhanden", "eindeutig"];
 
 export const ENTSCHEIDUNGEN = ["offen", "uebernommen", "uebersprungen", "schon_vorhanden", "aufgeteilt"] as const;
 export type Entscheidung = (typeof ENTSCHEIDUNGEN)[number];
