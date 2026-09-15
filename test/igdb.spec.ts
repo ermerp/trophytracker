@@ -66,6 +66,16 @@ describe("normalisiereTreffer", () => {
 		});
 	});
 
+	it("laesst Eintraege fallen, die ausschliesslich fremde Plattformen nennen", () => {
+		// 130 = Switch, 6 = PC: nie ein Spiel der Sammlung.
+		expect(normalisiereTreffer(spielRoh({ platforms: [130, 6] }))).toBeNull();
+		// Fremde neben einer eigenen: bleibt, nur die eigene wird gefuehrt.
+		expect(normalisiereTreffer(spielRoh({ platforms: [130, 48] }))).toMatchObject({ plattformen: ["PS4"] });
+		// Gar keine Angabe: fehlende Daten sind kein Gegenbeweis.
+		expect(normalisiereTreffer(spielRoh({ platforms: undefined }))).toMatchObject({ plattformen: [] });
+		expect(normalisiereTreffer(spielRoh({ platforms: [] }))).toMatchObject({ plattformen: [] });
+	});
+
 	it("uebersetzt nur die eigenen Plattformen, PSVR und PSVR2 als PS4 und PS5", () => {
 		const k = normalisiereTreffer(spielRoh({ platforms: [6, 9, 46, 48, 165, 167, 390, 130] }));
 		expect(k?.plattformen).toEqual(["PS3", "PSVITA", "PS4", "PS5"]);
