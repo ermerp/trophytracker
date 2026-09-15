@@ -67,7 +67,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
 | IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar. **Abgenommen am 14.09.2026: 419 von 420 verknüpft**, eines bewusst abgelehnt (Vita-Wecker-App, IGDB kennt sie nicht) |
 | Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer (Stand vor Migration 0011; seit Migration 0012 sind es 21 Tabellen und 25 Indizes) |
-| Wunschliste | Eigene Ansicht in der Leiste: Favoriten zuerst, dann Kritikerwertung (auch Wertung, Titel, Erscheinungsdatum, zuletzt angelegt); Filter Favoriten, Plattformen, „ohne Plattform"; Favorit-Stern, Plattform-Dropdown je Eintrag, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform vorbelegt mit der neuesten des Treffers und änderbar – mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint, ohne Plattform ein Spiel ohne Release; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026**; Priorität und Rang danach auf Wunsch des Nutzers entfernt (Migration 0013) |
+| Wunschliste | Eigene Ansicht in der Leiste: Favoriten zuerst, dann Kritikerwertung (auch Wertung, Titel, Erscheinungsdatum, zuletzt angelegt); Filter Favoriten, Plattformen, „ohne Plattform"; Favorit-Stern, Plattform-Dropdown je Eintrag, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform-Dropdown an jedem Treffer, vorbelegt mit dessen neuester – mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint, ohne Plattform ein Spiel ohne Release; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026**; Priorität und Rang danach auf Wunsch des Nutzers entfernt (Migration 0013) |
 | Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
 | Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
 
@@ -656,9 +656,9 @@ DELETE /api/imports/wishlist/:id
 Der Abgleich läuft in Schritten wie der IGDB-Abgleich – erst gegen die
 Sammlung über den Titelschlüssel, dann gegen IGDB; das Jahr aus der Liste
 entscheidet Gleichnamige („Layers of Fear" 2016 oder 2023) und wird sonst
-nicht gespeichert. Jede Zeile bekommt die neueste Plattform des Treffers
+nicht gespeichert. Jede klare Zeile bekommt die neueste Plattform des Treffers
 vorgeschlagen (oder die aus dem Abschnitt der Liste), änderbar im Dropdown vor
-der Übernahme. Eindeutige Treffer, Sammlungstreffer und schon angelegte
+der Übernahme; bei Zeilen zur Durchsicht steht das Dropdown an jedem Treffer. Eindeutige Treffer, Sammlungstreffer und schon angelegte
 Spiele sind **ein Block mit einem Knopf**; ein digital gespieltes Spiel bleibt
 ein Wunsch – „physisch besitzen wollen". Mehrdeutige und Zeilen ohne Treffer
 stehen als Liste zur Einzelentscheidung: Kandidat übernehmen, anders suchen,

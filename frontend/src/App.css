@@ -841,3 +841,25 @@ button.notiz {
   flex-wrap: wrap;
   gap: 0.6rem;
 }
+
+/* Plattform je Treffer (Nachbesserung Stufe 11) */
+.kandidat.mit-plattform {
+  grid-template-columns: 3rem 1fr auto auto;
+}
+
+.kandidat.mit-plattform select {
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .kandidat.mit-plattform {
+    grid-template-columns: 3rem 1fr;
+  }
+
+  .kandidat.mit-plattform select,
+  .kandidat.mit-plattform button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

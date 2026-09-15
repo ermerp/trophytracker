@@ -74,6 +74,13 @@ describe("POST /api/unmatched/plan_*/:id/link", () => {
 		expect(await env.DB.prepare("SELECT title_raw FROM plan_entry WHERE id = 10").first()).toEqual({ title_raw: "Nur Text" });
 	});
 
+	it("nimmt die Plattform aus dem Koerper - '' heisst ohne", async () => {
+		const { client } = fakeIgdb([[spielRoh({ id: 77, name: "Nur Text", platforms: [48, 167] })]]);
+		const a = await app(client).request("/api/unmatched/plan_wunsch/10/link", json({ igdbId: 77, plattform: "" }), env);
+		expect(await a.json()).toMatchObject({ plattform: null, spielAngelegt: true });
+		expect((await app(client).request("/api/unmatched/plan_backlog/11/link", json({ igdbId: 4711, plattform: "Switch" }), env)).status).toBe(400);
+	});
+
 	it("prueft Art, Zustand und Koerper", async () => {
 		const a = app(fakeIgdb([[]]).client);
 		expect((await a.request("/api/unmatched/plan_wunsch/11/link", json({ igdbId: 4711 }), env)).status).toBe(404);
