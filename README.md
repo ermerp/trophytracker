@@ -24,8 +24,8 @@ Trophäenlisten sind bewertet, die Warteschlange ist leer. Damit steht der
 Datenbestand – und ab hier steckt darin Arbeit, die PlayStation nicht
 zurückliefert. Stufe 8 sichert ihn wöchentlich ins private Repository und
 liefert den CSV-Export (Use Case 13). Stufe 9 holt Cover, Kritikerwertung und
-Erscheinungsdatum von IGDB; Stufe 10 baut darauf die Wunschliste mit Favoriten,
-Priorität und Rang (Use Case 4) – die erste der vier Absichts-Listen, deren
+Erscheinungsdatum von IGDB; Stufe 10 baut darauf die Wunschliste mit Favoriten
+(Use Case 4) – die erste der vier Absichts-Listen, deren
 Routen und Repository auch To-Do, Backlog und Kaufliste tragen werden. Stufe 11
 holt die alten Wunschlisten aus Textdateien herein (Use Case 9) und sammelt
 alles ohne IGDB-Eintrag in einer Ansicht zum Nachziehen (Use Case 12).
@@ -45,7 +45,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 21 Tabellen, 7 Views, zwölf Migrationen |
+| Schema | 21 Tabellen, 7 Views, dreizehn Migrationen |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
@@ -67,8 +67,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
 | IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar. **Abgenommen am 14.09.2026: 419 von 420 verknüpft**, eines bewusst abgelehnt (Vita-Wecker-App, IGDB kennt sie nicht) |
 | Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer (Stand vor Migration 0011; seit Migration 0012 sind es 21 Tabellen und 25 Indizes) |
-| Wunschliste | Eigene Ansicht in der Leiste: nach Rang sortiert (berechnet, nie gespeichert), Favoriten-Filter, Priorität 1–5, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform wählbar und standardmäßig leer – ohne Plattform ein Spiel ohne Release, mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026** |
-| Rangformel | Gewichte in den Einstellungen verstellbar; `src/domain/rang.ts` ist die eine Stelle für die Formel |
+| Wunschliste | Eigene Ansicht in der Leiste: Favoriten zuerst, dann Kritikerwertung (auch Wertung, Titel, Erscheinungsdatum, zuletzt angelegt); Filter Favoriten, Plattformen, „ohne Plattform"; Favorit-Stern, Plattform-Dropdown je Eintrag, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform vorbelegt mit der neuesten des Treffers und änderbar – mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint, ohne Plattform ein Spiel ohne Release; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026**; Priorität und Rang danach auf Wunsch des Nutzers entfernt (Migration 0013) |
 | Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
 | Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
 
@@ -611,19 +610,22 @@ Wunschliste, To-Do, Backlog und Kaufliste liegen in einer Tabelle `plan_entry`
 Stufe 10 bedient die Wunschliste, die Routen kennen alle vier Arten:
 
 ```
-GET    /api/plans?kind=wunsch&status=offen|alle&sort=rang|titel|angelegt&favorit=1
-POST   /api/plans        { art, spielId | releaseId | igdbId | titel, prioritaet?, favorit?, notiz? }
-PATCH  /api/plans/:id    Teilmenge von { prioritaet, favorit, notiz, status, art }
+GET    /api/plans?kind=wunsch&status=offen|alle&sort=favorit|wertung|titel|release|angelegt&favorit=1&plattform=PS4,PS5,ohne
+POST   /api/plans        { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz? }
+PATCH  /api/plans/:id    Teilmenge von { favorit, notiz, status, art, plattform }
 DELETE /api/plans/:id
 ```
 
-Der Rang wird bei jeder Abfrage aus Kritikerwertung, Priorität und Favorit mit
-den Gewichten aus den Einstellungen berechnet und nie gespeichert. Die
-Plattform bleibt leer, solange keine gewählt wird; ein Standardwert wäre eine
-Behauptung. Ohne Plattform legt ein Wunsch aus der IGDB-Suche ein Spiel **ohne
-Release** an; mit Plattform entsteht das Release, und es zählt **nicht zur
-Sammlung, solange es nur den Wunsch trägt** – ein Wunsch ist kein Besitz. Im
-Spieldetail ist es immer sichtbar. Ein Wunsch am Spiel und einer an einem
+Sortiert wird bei der Abfrage aus gespeicherten Bestandteilen – Favoriten
+zuerst, dann Kritikerwertung; eine Rangformel mit Gewichten gab es bis
+Migration 0013 (Priorität entfernt, Entscheidung vom 15.09.2026). Die
+Plattform wird mit der **neuesten** vorbelegt, die Releases oder IGDB-Eintrag
+nennen (`plattform` fehlt oder `'auto'`), und ist vor dem Speichern und
+später per `PATCH` änderbar; `''` heißt ausdrücklich ohne. Mit Plattform
+entsteht das Release, und es zählt **nicht zur Sammlung, solange es nur den
+Wunsch trägt** – ein Wunsch ist kein Besitz. Ohne Plattform bleibt ein Spiel
+aus der IGDB-Suche **ohne Release**; der Filter „ohne Plattform" findet solche
+Wünsche zum Nachpflegen. Im Spieldetail ist das Spiel immer sichtbar. Ein Wunsch am Spiel und einer an einem
 seiner Releases sind zwei verschiedene Aussagen und blockieren sich nicht; nur
 dasselbe Ziel derselben Art antwortet mit `409`.
 
@@ -654,15 +656,17 @@ DELETE /api/imports/wishlist/:id
 Der Abgleich läuft in Schritten wie der IGDB-Abgleich – erst gegen die
 Sammlung über den Titelschlüssel, dann gegen IGDB; das Jahr aus der Liste
 entscheidet Gleichnamige („Layers of Fear" 2016 oder 2023) und wird sonst
-nicht gespeichert. Eindeutige Treffer, Sammlungstreffer und schon angelegte
+nicht gespeichert. Jede Zeile bekommt die neueste Plattform des Treffers
+vorgeschlagen (oder die aus dem Abschnitt der Liste), änderbar im Dropdown vor
+der Übernahme. Eindeutige Treffer, Sammlungstreffer und schon angelegte
 Spiele sind **ein Block mit einem Knopf**; ein digital gespieltes Spiel bleibt
 ein Wunsch – „physisch besitzen wollen". Mehrdeutige und Zeilen ohne Treffer
 stehen als Liste zur Einzelentscheidung: Kandidat übernehmen, anders suchen,
 „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen („Mass Effect 1+2+3"),
 überspringen. Jede Entscheidung ist sofort gespeichert und überlebt ein
-Neuladen; Rückgängig löscht den angelegten Wunsch wieder. Nennt die Liste eine
-Plattform, hängt der Wunsch am Release dieser Plattform (entsteht bei Bedarf);
-sonst am Spiel. Hängt am Ziel schon ein offener Wunsch, wird die Zeile als
+Neuladen; Rückgängig löscht den angelegten Wunsch wieder. Der Wunsch hängt am
+Release der gewählten Plattform (entsteht bei Bedarf), ohne Plattform am
+Spiel. Hängt am Ziel schon ein offener Wunsch, wird die Zeile als
 „schon auf der Wunschliste" ausgelassen – ein zweiter Import derselben Datei
 erzeugt keine Dubletten.
 
@@ -802,7 +806,8 @@ Zeilen. `PRAGMA foreign_key_check`: **null Verletzungen**.
 Die Abweichung bei `app_setting` ist erklärt und kein Mangel: Der Dump entstand
 um 09:24:57 UTC, der Backup-Vermerk schrieb `backup_letzter_erfolg_am` und
 `backup_letzter_commit` acht Sekunden später. Genau diese beiden Schlüssel
-fehlen, alle vier Gewichte der Rangformel sind da.
+fehlen, alle vier Gewichte der damaligen Rangformel sind da (seit Migration
+0013 gelöscht).
 
 Zusätzlich bietet Cloudflare `wrangler d1 time-travel` zum Zurückstellen auf
 einen Zeitpunkt. Das hilft gegen Bedienfehler, aber nicht gegen ein verlorenes
@@ -827,7 +832,7 @@ frontend/      React + Vite, wird als Static Assets mit dem Worker ausgeliefert
 lokalem SQLite auf `src/db/` begrenzt.
 
 Getestet wird, was Logik ist, nicht was Glue ist: Die Views werden gegen
-eingespielte Daten geprüft, die Gewichte-Validierung ohne Datenbank. Die Tests
+eingespielte Daten geprüft, der Wunschlisten-Parser ohne Datenbank. Die Tests
 laufen gegen dasselbe Schema wie Produktion – `vitest.config.mts` liest die
 Migrationen aus `migrations/` ein und wendet sie je Testlauf an.
 

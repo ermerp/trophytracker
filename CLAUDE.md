@@ -51,7 +51,7 @@ Dasselbe gilt für Zuordnungen: Ein einmal gesetztes `trophy_progress.release_id
 
 Das gilt auch in der Oberfläche: fehlende Preise und unbekannte Werte werden als "unbekannt" angezeigt, nie als "0", "–" oder "nicht verfügbar".
 
-Und für Eingaben: Ein freiwilliges Feld bleibt leer, statt mit einem plausiblen Wert vorbelegt zu werden. Die Plattform eines Wunsches ist standardmäßig „ohne Plattform" – ein geratenes PS5 bei einem angekündigten Titel wäre eine Behauptung, die der Nutzer nie aufgestellt hat (Stufe 10). Was er nicht gesagt hat, steht nicht in der Datenbank.
+Und für Eingaben: Ein freiwilliges Feld bleibt leer, statt mit einem plausiblen Wert vorbelegt zu werden. **Eine Ausnahme hat der Nutzer am 15.09.2026 ausdrücklich entschieden:** Die Plattform eines Wunsches wird mit der *neuesten* Plattform vorbelegt, die Releases oder IGDB-Eintrag nennen (PS5 > PS4 > PS3 > Vita, `neuestePlattform`), sichtbar in einem Dropdown und vor dem Speichern änderbar, „ohne Plattform" eingeschlossen; der Filter „ohne Plattform" auf der Wunschliste findet, was nachzupflegen ist (Spezifikation Abschnitt 5). Das ist ein Vorschlag mit Korrekturmöglichkeit, kein stiller Standardwert – und für kein anderes Feld ein Freibrief.
 
 Im CSV-Export ist ein **leeres Feld** die Entsprechung davon (Abschnitt 14.4): Das Wort in einer Zahlenspalte wäre dort der schlechtere Weg.
 
@@ -71,7 +71,7 @@ Das gilt auch für seine Zwischenentscheidungen: Ein "überspringen" ist eine En
 
 ### Berechnetes nicht speichern
 
-Die Rangformel (Kritikerwertung, Priorität, Favorit, später Preis) wird bei der Abfrage berechnet. Gespeichert werden nur die Bestandteile, die Gewichte liegen in `app_setting`.
+Sortierungen der Listen (Favorit, Kritikerwertung, Erscheinungsdatum) werden bei der Abfrage aus gespeicherten Bestandteilen gebildet, nie als Rang abgelegt. Die frühere Rangformel mit Gewichten ist seit Migration 0013 weg (Favorit statt Priorität, Entscheidung des Nutzers vom 15.09.2026, Abschnitt 5.2) – kommt so etwas zurück, gilt dieselbe Regel.
 
 Ebenso: "nur digital gespielt" und "Lücke" sind Views, keine Spalten.
 
@@ -165,7 +165,7 @@ Das Repository ist öffentlich, das Backup-Repository ist privat. Ein Datenbank-
 - **Views mit ihren Basistabellen zusammen ändern.** Fasst eine Migration eine Tabelle an, auf der eine View steht, wird die View in **derselben** Migration gedroppt und neu angelegt. Gemessen gegen SQLite 3.46.1: `RENAME COLUMN` schreibt die View-Definition selbst um, aber ein Tabellen-Neuaufbau (`DROP TABLE` + `RENAME TO`) und `DROP COLUMN` scheitern laut mit `error in view …`. Der Neuaufbau ist SQLites Standardweg für jede Constraint- oder Typänderung — ohne vorheriges Droppen der Views ist er schlicht nicht ausführbar, und in der Pipeline wäre das ein roter Deploy mit halb angewendeter Migration.
 - **Views listen ihre Spalten explizit auf, nie `SELECT *`.** Das ist der eine Fall, in dem SQLite still danebengreift: Bei `SELECT *` wächst die Ergebnismenge nach einem `ADD COLUMN` lautlos mit, während die Definition in `sqlite_master` unverändert bleibt. Ein Test in `test/migration.spec.ts` hält die Regel fest.
 - **Seeds immer als `INSERT OR IGNORE`.** Nicht wegen Idempotenz — Migrationen laufen wegen der `d1_migrations`-Buchführung ohnehin nur einmal —, sondern damit ein erneuter Lauf einen vom Nutzer angepassten Wert niemals zurücksetzt. Kein `CREATE TABLE IF NOT EXISTS`: das verdeckt ein abweichendes Schema, und lautes Scheitern ist dort das bessere Verhalten.
-- **Testen, was Logik ist, nicht was Glue ist.** Lohnend: Titel-Normalisierung und Matching, Trophäen-Normalisierung aus Roh-JSON, Änderungserkennung für die `review_queue`, Rangformel. Diese Funktionen sollen pur bleiben und ohne Datenbank testbar sein.
+- **Testen, was Logik ist, nicht was Glue ist.** Lohnend: Titel-Normalisierung und Matching, Trophäen-Normalisierung aus Roh-JSON, Änderungserkennung für die `review_queue`, Wunschlisten-Parser. Diese Funktionen sollen pur bleiben und ohne Datenbank testbar sein.
 - **Abgleichlogik gegen die echten Daten prüfen, bevor sie gebaut wird.** Titelnormalisierung, Matching und Importe treffen auf Fremddaten mit Eigenheiten, die sich nicht erraten lassen. Die Produktivdatenbank ist lesend verfügbar (`wrangler d1 execute --remote --json`), und ein Domain-Modul lässt sich mit `npx esbuild <datei> --format=esm` transpilieren und in Node gegen den echten Bestand laufen lassen — ohne echte Daten ins Repository zu holen.
 - **Deutsche Bezeichner in Daten und Oberfläche** (Statuswerte, Anzeigetexte), englische im Code (Variablen, Funktionen). Das Schema in der Spezifikation zeigt die Konvention.
 - **Bei Unklarheiten in der Spezifikation nachfragen**, statt eine Annahme zu treffen und weiterzubauen.
