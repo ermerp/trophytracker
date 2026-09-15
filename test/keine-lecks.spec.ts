@@ -198,7 +198,6 @@ describe("Dichtheitsprüfung", () => {
 			}),
 			await ruf(app, "/api/sync", { method: "POST" }),
 			await ruf(app, "/api/sync/status"),
-			await ruf(app, "/api/settings/weights"),
 			await ruf(app, "/api/health"),
 			await ruf(app, "/api/games?owned=physisch&search=x"),
 			await ruf(app, "/api/games/1"),

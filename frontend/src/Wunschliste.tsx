@@ -1,41 +1,46 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import {
-  PLAN_STATUSTEXT,
-  PLATTFORMEN,
-  anfrage,
-  datum,
-  rangText,
-  type Gewichte,
-  type IgdbKandidat,
-  type PlanEintrag,
-} from './api'
+import { PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, type IgdbKandidat, type PlanEintrag } from './api'
 import { IgdbSuche } from './IgdbSuche'
 
 /**
  * Wunschliste (Use Case 4, ab Stufe 10; Use Case 11 für das Datum).
  *
- * Nach Rang sortiert – berechnet, nie gespeichert (5.2) –, mit
- * Favoriten-Filter. Neue Wünsche kommen aus der IGDB-Suche; ein Eintrag
- * ohne IGDB-Zuordnung entsteht nur über den ausdrücklichen Knopf (8.2).
- * Bei angekündigten Titeln steht das Erscheinungsdatum dort, wo später
- * der Preis steht (8.4). Ein Wunsch braucht keine Plattform: Wo keine
- * steht, wurde keine behauptet – die Auswahl ist mit „ohne Plattform"
- * vorbelegt. Mit Plattform hängt der Wunsch an einem Release, das nicht
- * zur Sammlung zählt, solange es nur den Wunsch trägt (Abschnitt 3).
+ * Favoriten zuerst, dann nach Kritikerwertung (5.2); alternativ Wertung,
+ * Titel, Erscheinungsdatum, zuletzt angelegt. Filter: nur Favoriten,
+ * Plattformen, „ohne Plattform" – der Filter, mit dem sich Wünsche ohne
+ * Plattform nachpflegen lassen (Entscheidung des Nutzers vom 15.09.2026).
+ * Neue Wünsche kommen aus der IGDB-Suche mit der neuesten Plattform des
+ * Treffers als Vorgabe; „ohne Plattform" bleibt wählbar. Ein Eintrag ohne
+ * IGDB-Zuordnung entsteht nur über den ausdrücklichen Knopf (8.2). Bei
+ * angekündigten Titeln steht das Erscheinungsdatum dort, wo später der
+ * Preis steht (8.4). Ein Release nur aus Wunsch zählt nicht zur Sammlung
+ * (Abschnitt 3).
  *
  * Sortierung und Filter liegen in der URL, wie in der Sammlung.
  */
 
-type Antwort = { gewichte: Gewichte; sortierung: Sortierung; eintraege: PlanEintrag[] }
+type Antwort = { sortierung: Sortierung; eintraege: PlanEintrag[] }
 
-const SORTIERTEXT = { rang: 'Rang', titel: 'Titel', angelegt: 'zuletzt angelegt' } as const
+const SORTIERTEXT = {
+  favorit: 'Favoriten zuerst, dann Wertung',
+  wertung: 'Kritikerwertung',
+  titel: 'Titel',
+  release: 'Erscheinungsdatum',
+  angelegt: 'zuletzt angelegt',
+} as const
 type Sortierung = keyof typeof SORTIERTEXT
 
+const PLATTFORM_FILTER = [...PLATTFORMEN, 'ohne'] as const
+
 /** Dieselbe Ordnung wie im Worker, damit eine Änderung die Kachel sofort an ihren Platz rückt. */
+const nachTitel = (a: PlanEintrag, b: PlanEintrag) => a.titel.localeCompare(b.titel, 'de') || a.id - b.id
+const nachWertung = (a: PlanEintrag, b: PlanEintrag) => (b.kritik ?? -1) - (a.kritik ?? -1) || nachTitel(a, b)
 const VERGLEICH: Record<Sortierung, (a: PlanEintrag, b: PlanEintrag) => number> = {
-  rang: (a, b) => (b.rang ?? -1) - (a.rang ?? -1) || a.titel.localeCompare(b.titel, 'de'),
-  titel: (a, b) => a.titel.localeCompare(b.titel, 'de') || a.id - b.id,
+  favorit: (a, b) => Number(b.favorit) - Number(a.favorit) || nachWertung(a, b),
+  wertung: nachWertung,
+  titel: nachTitel,
+  release: (a, b) => (a.erscheinungsdatum ?? '9999').localeCompare(b.erscheinungsdatum ?? '9999') || nachTitel(a, b),
   angelegt: (a, b) => b.angelegtAm.localeCompare(a.angelegtAm) || b.id - a.id,
 }
 
@@ -47,23 +52,26 @@ export function Wunschliste() {
   const [hinzufuegen, setHinzufuegen] = useState(false)
   const [eben, setEben] = useState<PlanEintrag | null>(null)
   const [notizOffen, setNotizOffen] = useState<number | null>(null)
-  // '' heisst "ohne Plattform" - nie vorbelegt mit einer echten.
-  const [plattform, setPlattform] = useState('')
+  // 'auto' = die neueste Plattform des Treffers; '' = ausdruecklich ohne.
+  const [plattform, setPlattform] = useState('auto')
 
-  const sortierung: Sortierung = (params.get('sort') as Sortierung) in SORTIERTEXT ? (params.get('sort') as Sortierung) : 'rang'
+  const sortierung: Sortierung = (params.get('sort') as Sortierung) in SORTIERTEXT ? (params.get('sort') as Sortierung) : 'favorit'
   const nurFavoriten = params.get('favorit') === '1'
   const alle = params.get('status') === 'alle'
+  const plattformParam = params.get('plattform') ?? ''
+  const plattformen = new Set(plattformParam.split(',').filter((p) => (PLATTFORM_FILTER as readonly string[]).includes(p)))
 
   const laden = useCallback(async () => {
     try {
       const abfrage = new URLSearchParams({ kind: 'wunsch', sort: sortierung })
       if (nurFavoriten) abfrage.set('favorit', '1')
       if (alle) abfrage.set('status', 'alle')
+      if (plattformParam) abfrage.set('plattform', plattformParam)
       setDaten(await anfrage<Antwort>(`/api/plans?${abfrage}`))
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Laden fehlgeschlagen.')
     }
-  }, [sortierung, nurFavoriten, alle])
+  }, [sortierung, nurFavoriten, alle, plattformParam])
 
   useEffect(() => {
     void laden()
@@ -76,12 +84,22 @@ export function Wunschliste() {
     setParams(neu, { replace: true })
   }
 
+  function plattformFilterUmschalten(p: string) {
+    const neu = new Set(plattformen)
+    if (neu.has(p)) neu.delete(p)
+    else neu.add(p)
+    setzeParam('plattform', [...neu].join(','))
+  }
+
   /** Eine Kachel im lokalen Stand ersetzen und neu einsortieren – kein Neuladen. */
   function ersetze(e: PlanEintrag) {
     setDaten((d) => {
       if (!d) return d
       const rest = d.eintraege.filter((x) => x.id !== e.id)
-      const bleibt = (alle || e.status === 'offen') && (!nurFavoriten || e.favorit)
+      const bleibt =
+        (alle || e.status === 'offen') &&
+        (!nurFavoriten || e.favorit) &&
+        (plattformen.size === 0 || plattformen.has(e.plattform ?? 'ohne'))
       return { ...d, eintraege: (bleibt ? [...rest, e] : rest).sort(VERGLEICH[sortierung]) }
     })
   }
@@ -137,7 +155,7 @@ export function Wunschliste() {
     }
   }
 
-  const igdbWaehlen = (k: IgdbKandidat) => anlegen(plattform ? { igdbId: k.igdbId, plattform } : { igdbId: k.igdbId })
+  const igdbWaehlen = (k: IgdbKandidat) => anlegen({ igdbId: k.igdbId, plattform })
   // Freitext hat kein Spiel und damit kein Release - die Plattform bleibt weg.
   const ohneTreffer = (begriff: string) => anlegen({ titel: begriff })
 
@@ -153,20 +171,21 @@ export function Wunschliste() {
         {hinzufuegen && (
           <>
             <p className="zeile">
-              Bei IGDB suchen und übernehmen. Die Plattform ist freiwillig – ohne Angabe gilt der Wunsch dem Spiel; Freitext bleibt immer ohne Plattform.
+              Bei IGDB suchen und übernehmen. Ohne Wahl bekommt der Wunsch die neueste Plattform des Treffers; Freitext bleibt immer ohne Plattform.
             </p>
             <label className="zeile">
               Plattform{' '}
               <select value={plattform} onChange={(e) => setPlattform(e.target.value)} disabled={laeuft}>
-                <option value="">ohne Plattform</option>
+                <option value="auto">neueste des Treffers</option>
                 {PLATTFORMEN.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
+                <option value="">ohne Plattform</option>
               </select>
             </label>
             <IgdbSuche
               vorgabe=""
-              plattformen={plattform ? [plattform] : []}
+              plattformen={plattform && plattform !== 'auto' ? [plattform] : []}
               onWahl={igdbWaehlen}
               onOhneTreffer={ohneTreffer}
               laeuft={laeuft}
@@ -178,7 +197,7 @@ export function Wunschliste() {
       <div className="filterleiste">
         <label>
           Sortierung{' '}
-          <select value={sortierung} onChange={(e) => setzeParam('sort', e.target.value === 'rang' ? '' : e.target.value)}>
+          <select value={sortierung} onChange={(e) => setzeParam('sort', e.target.value === 'favorit' ? '' : e.target.value)}>
             {Object.entries(SORTIERTEXT).map(([wert, text]) => (
               <option key={wert} value={wert}>{text}</option>
             ))}
@@ -190,11 +209,13 @@ export function Wunschliste() {
         <label>
           <input type="checkbox" checked={alle} onChange={(e) => setzeParam('status', e.target.checked ? 'alle' : '')} /> auch erledigte und verworfene
         </label>
-        {daten && (
-          <span className="zeile" title="Gewichte der Rangformel, einstellbar in den Einstellungen">
-            Rang: Kritik {daten.gewichte.w_critic} · Priorität {daten.gewichte.w_priority} · Favorit {daten.gewichte.w_favorite}
-          </span>
-        )}
+        <span className="plattformfilter" role="group" aria-label="Plattformen">
+          {PLATTFORM_FILTER.map((p) => (
+            <label key={p}>
+              <input type="checkbox" checked={plattformen.has(p)} onChange={() => plattformFilterUmschalten(p)} /> {p === 'ohne' ? 'ohne Plattform' : p}
+            </label>
+          ))}
+        </span>
       </div>
 
       {meldung && <p role="alert" className="auffaellig">{meldung}</p>}
@@ -208,7 +229,7 @@ export function Wunschliste() {
       {!daten ? (
         <p>wird geladen …</p>
       ) : daten.eintraege.length === 0 ? (
-        <p>{nurFavoriten ? 'Keine Favoriten.' : 'Die Wunschliste ist leer.'}</p>
+        <p>{nurFavoriten || plattformen.size > 0 ? 'Nichts passt zum Filter.' : 'Die Wunschliste ist leer.'}</p>
       ) : (
         <>
           <p>{daten.eintraege.length} Einträge</p>
@@ -230,16 +251,9 @@ export function Wunschliste() {
                       <span className="titel">{e.titel}</span>
                     )}
                     <div className="zeile">
-                      {e.plattform ?? 'ohne Plattform'}
-                      {e.spielId === null && ' · ohne IGDB-Eintrag'}
-                      {e.spielId !== null && ` · Kritik ${e.kritik ?? 'unbekannt'}`}
-                    </div>
-                    <div className="zeile">
-                      {e.releaseStatus === 'angekuendigt'
-                        ? `erscheint ${e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'}`
-                        : e.spielId !== null
-                          ? `Rang ${rangText(e.rang)}`
-                          : 'kein Rang'}
+                      {e.spielId === null ? 'ohne IGDB-Eintrag' : `Kritik ${e.kritik ?? 'unbekannt'}`}
+                      {e.releaseStatus === 'angekuendigt' && ` · erscheint ${e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'}`}
+                      {e.releaseStatus !== 'angekuendigt' && e.erscheinungsdatum && ` · ${e.erscheinungsdatum.slice(0, 4)}`}
                       {e.status !== 'offen' && ` · ${PLAN_STATUSTEXT[e.status]}`}
                     </div>
                   </div>
@@ -255,14 +269,21 @@ export function Wunschliste() {
                   >
                     {e.favorit ? '★' : '☆'}
                   </button>
-                  <label>
-                    Priorität{' '}
-                    <select value={e.prioritaet} onChange={(ev) => aendern(e.id, { prioritaet: Number(ev.target.value) })}>
-                      {[1, 2, 3, 4, 5].map((p) => (
+                  {e.spielId !== null ? (
+                    <select
+                      value={e.plattform ?? ''}
+                      aria-label="Plattform"
+                      title="Plattform des Wunsches – ein Release entsteht bei Bedarf"
+                      onChange={(ev) => aendern(e.id, { plattform: ev.target.value })}
+                    >
+                      <option value="">ohne Plattform</option>
+                      {PLATTFORMEN.map((p) => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
-                  </label>
+                  ) : (
+                    <span className="zeile">ohne Plattform</span>
+                  )}
                   {e.status === 'offen' ? (
                     <>
                       <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'erledigt' })}>erledigt</button>

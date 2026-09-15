@@ -5,9 +5,10 @@ import { istErlaubtePlattform, type Plattform } from "../domain/titel";
 import { jahrAusDateiname, parseWunschliste } from "../domain/wunschliste";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
-import { zielAusIgdbId } from "../sync/plan-ziel";
+import { zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
 import { importAbgleichSchritt, importUebernahmeSchritt } from "../sync/wunschliste";
 import type { AppEnv } from "../types";
+import { eintragAntwort } from "./plans";
 import { liesJson } from "./validierung";
 
 /**
@@ -219,10 +220,12 @@ export const importRoutes = new Hono<AppEnv>()
 		} else {
 			const igdbId = idAus(k.igdbId);
 			if (igdbId === null) return c.json({ fehler: "Feld 'igdbId' fehlt oder ist ungültig." }, 400);
-			// Plattform: ausdruecklich aus dem Koerper, sonst die aus der Liste; "" heisst ohne.
-			let plattform: Plattform | null = zeile.platform;
+			// Plattform: ausdruecklich aus dem Koerper, sonst die der Zeile, sonst
+			// die neueste des Treffers ("auto"); "" heisst ausdruecklich ohne.
+			let plattform: PlattformWahl = zeile.platform ?? "auto";
 			if (k.plattform !== undefined) {
 				if (k.plattform === null || k.plattform === "") plattform = null;
+				else if (k.plattform === "auto") plattform = "auto";
 				else if (typeof k.plattform === "string" && istErlaubtePlattform(k.plattform)) plattform = k.plattform;
 				else return c.json({ fehler: `Unbekannte Plattform: ${String(k.plattform)}` }, 400);
 			}
@@ -246,18 +249,45 @@ export const importRoutes = new Hono<AppEnv>()
 		}
 		const planId = await repos.plan.anlegen("wunsch", ziel, "import");
 		await repos.wishlistImport.entscheiden(zeile.id, "uebernommen", planId);
-		return c.json({ ...zeileAntwort((await repos.wishlistImport.zeile(zeile.id)) ?? zeile), spielAngelegt }, 201);
+		const wunsch = await repos.plan.eintrag(planId);
+		return c.json(
+			{
+				...zeileAntwort((await repos.wishlistImport.zeile(zeile.id)) ?? zeile),
+				spielAngelegt,
+				wunsch: wunsch ? eintragAntwort(wunsch) : null,
+			},
+			201,
+		);
 	})
 
-	/** Titel aendern; die Zeile wird beim naechsten Abgleichschritt neu gesucht. */
+	/**
+	 * Titel aendern (die Zeile wird beim naechsten Abgleichschritt neu gesucht)
+	 * oder die Plattform setzen beziehungsweise leeren (ohne neuen Abgleich) -
+	 * das Dropdown vor der Blockuebernahme.
+	 */
 	.patch("/:id/zeilen/:zeileId", async (c) => {
 		const geladen = await zeileLaden(c);
 		if ("antwort" in geladen) return geladen.antwort;
 		const k = await liesJson(c);
 		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
-		if (typeof k.titel !== "string" || k.titel.trim() === "") return c.json({ fehler: "Feld 'titel' muss Text sein." }, 400);
-		if (!(await c.var.repos.wishlistImport.umbenennen(geladen.zeile.id, k.titel.trim()))) {
-			return c.json({ fehler: "Eine übernommene Zeile lässt sich nicht umbenennen." }, 409);
+		if (k.titel === undefined && k.plattform === undefined) return c.json({ fehler: "Feld 'titel' oder 'plattform' angeben." }, 400);
+		if (k.plattform !== undefined) {
+			let plattform: Plattform | null = null;
+			if (k.plattform !== null && k.plattform !== "") {
+				if (typeof k.plattform !== "string" || !istErlaubtePlattform(k.plattform)) {
+					return c.json({ fehler: `Unbekannte Plattform: ${String(k.plattform)}` }, 400);
+				}
+				plattform = k.plattform;
+			}
+			if (!(await c.var.repos.wishlistImport.plattformSetzen(geladen.zeile.id, plattform))) {
+				return c.json({ fehler: "Eine übernommene Zeile lässt sich nicht ändern." }, 409);
+			}
+		}
+		if (k.titel !== undefined) {
+			if (typeof k.titel !== "string" || k.titel.trim() === "") return c.json({ fehler: "Feld 'titel' muss Text sein." }, 400);
+			if (!(await c.var.repos.wishlistImport.umbenennen(geladen.zeile.id, k.titel.trim()))) {
+				return c.json({ fehler: "Eine übernommene Zeile lässt sich nicht umbenennen." }, 409);
+			}
 		}
 		return c.json({ ...zeileAntwort((await c.var.repos.wishlistImport.zeile(geladen.zeile.id)) ?? geladen.zeile), geaendert: true });
 	})

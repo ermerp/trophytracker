@@ -1,7 +1,6 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { Abweichungen } from './Abweichungen'
 import { Einstellungen } from './Einstellungen'
-import { Gewichte } from './Gewichte'
 import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
 import { Navigation } from './Navigation'
@@ -59,7 +58,6 @@ function App() {
               <>
                 <h1>Einstellungen</h1>
                 <Einstellungen />
-                <Gewichte />
                 <Igdb />
                 <Sicherung />
                 <Abweichungen />

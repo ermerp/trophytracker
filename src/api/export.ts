@@ -78,7 +78,6 @@ const KOPF_TROPHAEEN = [
 const KOPF_PLAN = [
 	"Titel",
 	"Plattform",
-	"Priorität",
 	"Favorit",
 	"Position",
 	"Notiz",
@@ -193,7 +192,6 @@ async function csvFuerListe(
 		zeilen.map((z) => [
 			z.titel,
 			z.platform,
-			z.priority,
 			z.is_favorite === 1,
 			z.position,
 			z.note,

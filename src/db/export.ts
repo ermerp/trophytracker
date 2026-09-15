@@ -102,7 +102,6 @@ export type TrophaeenZeile = {
 export type PlanZeile = {
 	titel: string | null;
 	platform: string | null;
-	priority: number;
 	is_favorite: number;
 	position: number | null;
 	note: string | null;
@@ -224,7 +223,7 @@ export class ExportRepository {
 		const { results } = await this.db
 			.prepare(
 				`SELECT COALESCE(g.title, pe.title_raw) AS titel, r.platform,
-				        pe.priority, pe.is_favorite, pe.position, pe.note, pe.origin,
+				        pe.is_favorite, pe.position, pe.note, pe.origin,
 				        pe.status, pe.created_at
 				 FROM plan_entry pe
 				 LEFT JOIN release r ON r.id = pe.release_id

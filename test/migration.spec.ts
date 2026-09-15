@@ -35,17 +35,15 @@ describe("Migration 0001", () => {
 		expect(await namen("view")).toEqual(VIEWS);
 	});
 
-	it("belegt die Gewichte der Rangformel vor", async () => {
+	it("hat seit Migration 0013 weder Gewichte noch eine Prioritaetsspalte", async () => {
 		const { results } = await env.DB.prepare(
-			"SELECT key, value FROM app_setting ORDER BY key",
-		).all<{ key: string; value: string }>();
+			"SELECT key FROM app_setting WHERE key LIKE 'w_%'",
+		).all<{ key: string }>();
+		expect(results).toEqual([]);
 
-		expect(results).toEqual([
-			{ key: "w_critic", value: "0.5" },
-			{ key: "w_favorite", value: "0.2" },
-			{ key: "w_price", value: "0" },
-			{ key: "w_priority", value: "0.3" },
-		]);
+		const spalten = await env.DB.prepare("SELECT name FROM pragma_table_info('plan_entry') ORDER BY cid").all<{ name: string }>();
+		expect(spalten.results.map((s) => s.name)).not.toContain("priority");
+		expect(spalten.results.map((s) => s.name)).toContain("is_favorite");
 	});
 
 	it("legt keine psn_credentials-Zeile an - Abwesenheit heisst 'nicht eingerichtet'", async () => {

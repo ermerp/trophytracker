@@ -34,6 +34,13 @@ export async function anfrage<T>(
 export const PLATTFORMEN = ['PS3', 'PS4', 'PS5', 'PSVITA'] as const
 export type Plattform = (typeof PLATTFORMEN)[number]
 
+/** Die neueste der genannten Plattformen – der Vorschlag für einen Wunsch (Abschnitt 5); '' wenn keine. */
+export function neuestePlattform(liste: readonly string[]): Plattform | '' {
+  const rang: Record<string, number> = { PS5: 4, PS4: 3, PS3: 2, PSVITA: 1 }
+  const erlaubt = liste.filter((p): p is Plattform => (PLATTFORMEN as readonly string[]).includes(p))
+  return erlaubt.length === 0 ? '' : erlaubt.reduce((a, b) => (rang[b] > rang[a] ? b : a))
+}
+
 export const ZUSTAENDE = ['neu', 'sehr gut', 'gut', 'akzeptabel'] as const
 export type Zustand = (typeof ZUSTAENDE)[number]
 
@@ -195,20 +202,12 @@ export type PlanEintrag = {
   kritik: number | null
   erscheinungsdatum: string | null
   releaseStatus: ReleaseStatus | null
-  prioritaet: number
   favorit: boolean
   notiz: string | null
   herkunft: string | null
   angelegtAm: string
   erledigtAm: string | null
-  /** Bei der Abfrage berechnet (5.2); null ohne Spiel. */
-  rang: number | null
 }
-
-export type Gewichte = { w_critic: number; w_priority: number; w_favorite: number; w_price: number }
-
-/** Rang als Prozentzahl, wie die Kritikerwertung – 0 bis 100 statt 0,00 bis 1,00. */
-export const rangText = (rang: number | null) => (rang === null ? '–' : String(Math.round(rang * 100)))
 
 /** Wunschlisten-Import (Abschnitt 8.2, Stufe 11). */
 export type ImportZaehler = {

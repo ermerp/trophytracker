@@ -176,8 +176,9 @@ export const unmatchedRoutes = new Hono<AppEnv>()
 
 	/**
 	 * Freitext-Eintrag einem IGDB-Treffer zuordnen (Stufe 11): Spiel
-	 * wiederverwenden oder anlegen, dann game_id setzen und title_raw
-	 * leeren. Ein offener Eintrag derselben Art am Spiel ist ein Duplikat (409).
+	 * wiederverwenden oder anlegen, Plattform "auto" (neueste), dann das Ziel
+	 * umhaengen und title_raw leeren. Ein offener Eintrag derselben Art am
+	 * Ziel ist ein Duplikat (409).
 	 */
 	.post("/:quelle{plan_(wunsch|todo|backlog|kauf)}/:id/link", async (c) => {
 		const id = spielId(c);
@@ -204,21 +205,21 @@ export const unmatchedRoutes = new Hono<AppEnv>()
 
 		let ergebnis: Awaited<ReturnType<typeof zielAusIgdbId>>;
 		try {
-			ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, null);
+			ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, "auto");
 		} catch (fehler) {
 			if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
 			return c.json({ fehler: meldungFuer(fehler) }, 502);
 		}
-		if (!ergebnis || ergebnis.ziel.gameId === undefined) return c.json({ fehler: "IGDB kennt diesen Eintrag nicht." }, 404);
+		if (!ergebnis) return c.json({ fehler: "IGDB kennt diesen Eintrag nicht." }, 404);
 
 		const doppelt = await c.var.repos.plan.offenerEintrag(art, ergebnis.ziel);
 		if (doppelt !== null && doppelt !== id) {
 			return c.json({ fehler: "Dafür gibt es schon einen offenen Eintrag.", eintragId: doppelt }, 409);
 		}
-		await c.var.repos.plan.spielZuordnen(id, ergebnis.ziel.gameId);
+		await c.var.repos.plan.zielSetzen(id, ergebnis.ziel);
 		const zeile = await c.var.repos.plan.eintrag(id);
 		if (!zeile) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
-		return c.json({ ...eintragAntwort(zeile, await c.var.repos.settings.getWeights()), spielAngelegt: ergebnis.spielAngelegt });
+		return c.json({ ...eintragAntwort(zeile), spielAngelegt: ergebnis.spielAngelegt });
 	})
 
 	.post("/spiel/:id/link", async (c) => {

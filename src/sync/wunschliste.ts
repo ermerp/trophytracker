@@ -2,7 +2,7 @@ import type { Repositories } from "../db";
 import type { PlanZiel } from "../db/plan";
 import type { Abgleichergebnis, ImportZeile } from "../db/wunschliste";
 import { eindeutigerTreffer, normalisiereTrefferliste, ordneKandidaten, type IgdbKandidat } from "../domain/igdb";
-import { istErlaubtePlattform, titelSchluessel, type Plattform } from "../domain/titel";
+import { istErlaubtePlattform, neuestePlattform, titelSchluessel, type Plattform } from "../domain/titel";
 import { IgdbRateError, type IgdbClient } from "../igdb/client";
 import { KANDIDATEN_JE_SPIEL, kandidatenSuchen, meldungFuer } from "./igdb";
 import { zielAusKandidat } from "./plan-ziel";
@@ -44,17 +44,16 @@ function plattformDerZeile(z: ImportZeile): Plattform | null {
 /**
  * Sammlungstreffer: Genau ein Spiel mit gleichem Schluessel - oder bei
  * mehreren das eine, dessen Releases die Plattform der Liste tragen.
- * Das Release steht hier nur, wenn es schon existiert (Anzeige und
- * Duplikatpruefung); die Uebernahme legt es bei genannter Plattform an.
- * Ohne Plattform zaehlt das einzige Release, sonst haengt der Wunsch am
- * Spiel - eine geratene Plattform waere eine Aussage, die nie getroffen
- * wurde (Abschnitt 5).
+ * Nennt die Liste keine Plattform, wird die neueste der Releases
+ * vorgeschlagen (Abschnitt 5, Entscheidung des Nutzers vom 15.09.2026);
+ * der Nutzer kann sie vor der Uebernahme aendern. Das Release steht hier
+ * nur, wenn es schon existiert; die Uebernahme legt es sonst an.
  */
 async function sammlungstreffer(
 	repos: Repositories,
 	schluessel: string,
 	plattform: Plattform | null,
-): Promise<{ gameId: number; releaseId: number | null } | null> {
+): Promise<{ gameId: number; releaseId: number | null; platform: Plattform | null } | null> {
 	const spiele = await repos.games.spieleNachSchluessel(schluessel);
 	if (spiele.length === 0) return null;
 	let spiel = spiele.length === 1 ? spiele[0] : null;
@@ -65,11 +64,9 @@ async function sammlungstreffer(
 	if (!spiel) return null;
 
 	const releases = await repos.games.releasesVon(spiel.id);
-	if (plattform !== null) {
-		const release = releases.find((r) => r.platform === plattform);
-		return { gameId: spiel.id, releaseId: release?.id ?? null };
-	}
-	return { gameId: spiel.id, releaseId: releases.length === 1 ? releases[0].id : null };
+	const gewaehlt = plattform ?? neuestePlattform(releases.map((r) => r.platform));
+	const release = gewaehlt !== null ? releases.find((r) => r.platform === gewaehlt) : undefined;
+	return { gameId: spiel.id, releaseId: release?.id ?? null, platform: gewaehlt };
 }
 
 /** Am Ziel haengt schon ein offener Wunsch (409-Regel aus Abschnitt 5) → 'schon_vorhanden'. */
@@ -105,6 +102,7 @@ export async function importAbgleichSchritt(
 						releaseId: inSammlung.releaseId,
 						igdbId: null,
 						searchPath: null,
+						platform: inSammlung.platform,
 						decision: await entscheidungFuer(repos, ziel),
 					},
 					[],
@@ -127,7 +125,8 @@ export async function importAbgleichSchritt(
 					// Das Spiel gibt es schon (etwa aus einem frueheren Wunsch) -
 					// wiederverwenden statt ein zweites mit derselben IGDB-Id anzulegen.
 					const releases = await repos.games.releasesVon(vorhanden);
-					const release = plattform !== null ? releases.find((r) => r.platform === plattform) : undefined;
+					const gewaehlt = plattform ?? neuestePlattform(releases.map((r) => r.platform)) ?? neuestePlattform(treffer.plattformen);
+					const release = gewaehlt !== null ? releases.find((r) => r.platform === gewaehlt) : undefined;
 					const ziel: PlanZiel = release ? { releaseId: release.id } : { gameId: vorhanden };
 					ergebnis = {
 						matchKind: "vorhanden",
@@ -135,10 +134,20 @@ export async function importAbgleichSchritt(
 						releaseId: release?.id ?? null,
 						igdbId: treffer.igdbId,
 						searchPath: weg,
+						platform: gewaehlt,
 						decision: await entscheidungFuer(repos, ziel),
 					};
 				} else {
-					ergebnis = { matchKind: "eindeutig", gameId: null, releaseId: null, igdbId: treffer.igdbId, searchPath: weg, decision: "offen" };
+					// Neuestes der genannten Plattformen als Vorschlag; aenderbar vor der Uebernahme.
+					ergebnis = {
+						matchKind: "eindeutig",
+						gameId: null,
+						releaseId: null,
+						igdbId: treffer.igdbId,
+						searchPath: weg,
+						platform: plattform ?? neuestePlattform(treffer.plattformen),
+						decision: "offen",
+					};
 				}
 				await repos.wishlistImport.ergebnisSetzen(zeile.id, ergebnis, geordnet);
 				zaehler.eindeutig++;
@@ -151,6 +160,7 @@ export async function importAbgleichSchritt(
 						releaseId: null,
 						igdbId: null,
 						searchPath: weg,
+						platform: null,
 						decision: "offen",
 					},
 					geordnet,
@@ -215,7 +225,7 @@ export async function importUebernahmeSchritt(
 					// IGDB kennt den Eintrag nicht mehr - zurueck in die Durchsicht statt raten.
 					await repos.wishlistImport.ergebnisSetzen(
 						zeile.id,
-						{ matchKind: "ohne_treffer", gameId: null, releaseId: null, igdbId: null, searchPath: zeile.search_path, decision: "offen" },
+						{ matchKind: "ohne_treffer", gameId: null, releaseId: null, igdbId: null, searchPath: zeile.search_path, platform: null, decision: "offen" },
 						[],
 					);
 					continue;
@@ -224,11 +234,10 @@ export async function importUebernahmeSchritt(
 				ziel = e.ziel;
 				if (e.spielAngelegt) spieleAngelegt++;
 			} else if (zeile.game_id !== null) {
-				// Nennt die Liste eine Plattform, haengt der Wunsch am Release dieser
-				// Plattform - es entsteht bei Bedarf, wie beim IGDB-Treffer. Ohne
-				// Plattform am einzigen Release, sonst am Spiel.
+				// Die Plattform der Zeile (aus der Liste oder vorgeschlagen, vom
+				// Nutzer aenderbar) entscheidet: Release, das bei Bedarf entsteht,
+				// oder ohne Plattform das Spiel.
 				if (plattform !== null) ziel = { releaseId: await repos.games.releaseFuerPlattform(zeile.game_id, plattform) };
-				else if (zeile.release_id !== null) ziel = { releaseId: zeile.release_id };
 				else ziel = { gameId: zeile.game_id };
 			} else {
 				continue;

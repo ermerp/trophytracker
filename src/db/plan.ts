@@ -14,7 +14,6 @@ export type PlanZiel =
 	| { titleRaw: string; releaseId?: undefined; gameId?: undefined };
 
 export type PlanFelder = {
-	priority?: number;
 	isFavorite?: boolean;
 	note?: string | null;
 	status?: PlanStatus;
@@ -29,7 +28,6 @@ export type PlanZeile = {
 	game_id: number | null;
 	title_raw: string | null;
 	position: number | null;
-	priority: number;
 	is_favorite: number;
 	note: string | null;
 	origin: PlanHerkunft | null;
@@ -48,7 +46,6 @@ export type PlanZeile = {
 };
 
 const SPALTEN: Record<keyof PlanFelder, string> = {
-	priority: "priority",
 	isFavorite: "is_favorite",
 	note: "note",
 	status: "status",
@@ -61,7 +58,7 @@ function wert(feld: keyof PlanFelder, felder: PlanFelder): unknown {
 }
 
 const AUSWAHL =
-	"SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position, pe.priority, " +
+	"SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position, " +
 	"pe.is_favorite, pe.note, pe.origin, pe.status, pe.created_at, pe.resolved_at, " +
 	"COALESCE(g.title, pe.title_raw) AS titel, g.id AS spiel_id, r.platform, " +
 	"g.cover_url, g.critic_score, g.release_date, g.release_status " +
@@ -74,9 +71,9 @@ const AUSWAHL =
  * Tabelle. Stufe 10 bedient die Wunschliste; die Methoden sind fuer alle vier
  * Arten geschrieben, damit die spaeteren Stufen denselben Weg nehmen.
  *
- * Der Rang wird nicht hier berechnet: Das Repository liefert die Bestandteile
- * (critic_score, priority, is_favorite), die Route rechnet mit den Gewichten
- * aus app_setting (src/domain/rang.ts). Nichts davon wird gespeichert.
+ * Sortierung und Filter (Favorit, Kritikerwertung, Plattform) liegen in der
+ * Route: Die Listen sind klein, und die Regeln aendern sich oefter als das
+ * Schema. Seit Migration 0013 gibt es keine Prioritaet und keinen Rang mehr.
  */
 export class PlanRepository {
 	constructor(private readonly db: D1Database) {}
@@ -133,19 +130,18 @@ export class PlanRepository {
 		kind: PlanArt,
 		ziel: PlanZiel,
 		origin: PlanHerkunft,
-		felder: Pick<PlanFelder, "priority" | "isFavorite" | "note"> = {},
+		felder: Pick<PlanFelder, "isFavorite" | "note"> = {},
 	): Promise<number> {
 		const r = await this.db
 			.prepare(
-				"INSERT INTO plan_entry (kind, release_id, game_id, title_raw, priority, is_favorite, note, origin) " +
-					"VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+				"INSERT INTO plan_entry (kind, release_id, game_id, title_raw, is_favorite, note, origin) " +
+					"VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
 			)
 			.bind(
 				kind,
 				ziel.releaseId ?? null,
 				ziel.gameId ?? null,
 				ziel.titleRaw ?? null,
-				felder.priority ?? 3,
 				felder.isFavorite ? 1 : 0,
 				felder.note ?? null,
 				origin,
@@ -176,13 +172,13 @@ export class PlanRepository {
 	}
 
 	/**
-	 * Freitext-Eintrag nachtraeglich einem Spiel zuordnen (8.3): game_id
-	 * setzen, title_raw leeren. Nur fuer Eintraege ohne Spiel und Release.
+	 * Ziel eines Eintrags umhaengen - vom Spiel an ein Release oder zurueck,
+	 * wenn der Nutzer die Plattform nachpflegt (Nachbesserung Stufe 11).
 	 */
-	async spielZuordnen(id: number, gameId: number): Promise<boolean> {
+	async zielSetzen(id: number, ziel: PlanZiel): Promise<boolean> {
 		const ergebnis = await this.db
-			.prepare("UPDATE plan_entry SET game_id = ?, title_raw = NULL WHERE id = ? AND game_id IS NULL AND release_id IS NULL")
-			.bind(gameId, id)
+			.prepare("UPDATE plan_entry SET release_id = ?, game_id = ?, title_raw = ? WHERE id = ?")
+			.bind(ziel.releaseId ?? null, ziel.gameId ?? null, ziel.titleRaw ?? null, id)
 			.run();
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
