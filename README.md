@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 11 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 12 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -29,7 +29,9 @@ Erscheinungsdatum von IGDB; Stufe 10 baut darauf die Wunschliste mit Favoriten
 Routen und Repository auch To-Do, Backlog und Kaufliste tragen werden. Stufe 11
 holt die alten Wunschlisten aus Textdateien herein (Use Case 9) und sammelt
 alles ohne IGDB-Eintrag in einer Ansicht zum Nachziehen (Use Case 12).
-**Abgenommen am 15.09.2026**, die ersten drei Listen sind importiert.
+**Abgenommen am 15.09.2026**, die ersten drei Listen sind importiert. Stufe 12
+bringt To-Do in eigener Reihenfolge und das Backlog mit Kandidaten aus dem
+Besitz (Use Cases 5a und 5b); die Abnahme steht aus.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -46,7 +48,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 21 Tabellen, 7 Views, dreizehn Migrationen |
+| Schema | 21 Tabellen, 7 Views, vierzehn Migrationen |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
@@ -71,14 +73,16 @@ Was steht und in Betrieb nachgewiesen ist:
 | Wunschliste | Eigene Ansicht in der Leiste: Favoriten zuerst, dann Kritikerwertung (auch Wertung, Titel, Erscheinungsdatum, zuletzt angelegt); Filter Favoriten, Plattformen, „ohne Plattform"; Favorit-Stern, Plattform-Dropdown je Eintrag, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform-Dropdown an jedem Treffer, vorbelegt mit dessen neuester – mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint, ohne Plattform ein Spiel ohne Release; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026**; Priorität und Rang danach auf Wunsch des Nutzers entfernt (Migration 0013) |
 | Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
 | Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
+| To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert; „ins Backlog"; Vorschlag „erledigt", wenn die Bewertung durchgespielt/komplettiert/abgebrochen sagt – nie automatisch |
+| Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende; Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 12 – To-Do und Backlog** mit Sortierung und
-Kandidatenvorschlägen (Use Cases 5a und 5b). Routen und Repository kennen alle
-vier Arten seit Stufe 10; `PUT /api/plans/reorder` und `v_backlog_kandidaten`
-warten darauf.
+**Als Nächstes: Stufe 13 – Änderungserkennung im Sync** (`neue_trophaeen`,
+`dlc_erweitert`, Use Case 8 vollständig). Sie braucht einen zweiten Sync, der
+gegen `reviewed_*` vergleicht; die Prüfliste und der Stempel stehen seit
+Stufe 7.
 
 ## Architektur in einem Absatz
 
@@ -608,14 +612,29 @@ aus einer Sony-Antwort.
 
 Wunschliste, To-Do, Backlog und Kaufliste liegen in einer Tabelle `plan_entry`
 ([Abschnitt 5](docs/spezifikation.md#5-datenmodell--absichten-use-cases-4-5-6));
-Stufe 10 bedient die Wunschliste, die Routen kennen alle vier Arten:
+Stufe 10 bedient die Wunschliste, Stufe 12 To-Do und Backlog, die Routen
+kennen alle vier Arten:
 
 ```
-GET    /api/plans?kind=wunsch&status=offen|alle&sort=favorit|wertung|titel|release|angelegt&favorit=1&plattform=PS4,PS5,ohne
-POST   /api/plans        { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz? }
+GET    /api/plans?kind=wunsch|todo|backlog&status=offen|alle&sort=favorit|wertung|titel|release|angelegt|position&favorit=1&plattform=PS4,PS5,ohne
+POST   /api/plans        { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz?, status? }
 PATCH  /api/plans/:id    Teilmenge von { favorit, notiz, status, art, plattform }
-DELETE /api/plans/:id
+PUT    /api/plans/reorder  { art, orderedIds } – To-Do-Reihenfolge
+DELETE /api/plans/:id    räumt Release und Spiel ab, wenn sonst nichts daran hängt
+GET    /api/backlog-candidates   { anzahl, abgelehnt, kandidaten[] }
 ```
+
+**To-Do** ist die einzige Liste mit eigener Reihenfolge (`position`): Neues
+hängt ans Ende, `PUT /api/plans/reorder` schreibt die ganze Liste neu, im
+Browser per Drag-and-drop (`@dnd-kit`, auch Finger und Tastatur) oder
+Pfeilknöpfen. Migration 0014 gibt den To-Do-Einträgen aus der Triage eine
+Position; der Deploy-Job protokolliert, wie viele ohne Position bleiben
+(erwartet 0). **Backlog-Kandidaten** sind Releases im Besitz ohne
+Trophäenfortschritt, die auf keiner Liste stehen; „nicht vorgesehen" legt einen
+verworfenen Backlog-Eintrag an, den die View ausblendet – die Liste bleibt so
+frei von Titeln, die nie gespielt werden sollen. Wird die Bewertung eines
+Releases `durchgespielt`, `komplettiert` oder `abgebrochen`, schlagen Liste und
+Spieldetail „erledigt" vor; geschlossen wird nie automatisch.
 
 Sortiert wird bei der Abfrage aus gespeicherten Bestandteilen – Favoriten
 zuerst, dann Kritikerwertung; eine Rangformel mit Gewichten gab es bis

@@ -1,5 +1,6 @@
 import { wirkung, type ReviewAktion, type ReviewGrund } from "../domain/review";
 import type { PlayStatus } from "../domain/play-status";
+import { POSITION_ANS_ENDE } from "./plan";
 import type { PlayStatusRepository } from "./play-status";
 
 export type ReviewZeile = {
@@ -143,11 +144,12 @@ export class ReviewRepository {
 			statements.push(
 				this.db
 					.prepare(
-						"INSERT INTO plan_entry (kind, release_id, origin) SELECT ?, ?, 'triage' " +
+						"INSERT INTO plan_entry (kind, release_id, origin, position) " +
+							`SELECT ?, ?, 'triage', CASE WHEN ? = 'todo' THEN ${POSITION_ANS_ENDE} END ` +
 							"WHERE NOT EXISTS (SELECT 1 FROM plan_entry WHERE release_id = ? " +
 							"AND kind IN ('todo','backlog') AND status = 'offen')",
 					)
-					.bind(w.plan, releaseId, releaseId),
+					.bind(w.plan, releaseId, w.plan, releaseId),
 			);
 		}
 

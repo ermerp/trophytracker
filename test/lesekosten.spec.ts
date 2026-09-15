@@ -220,11 +220,16 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const auswahl = `SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position,
 			  pe.is_favorite, pe.note, pe.origin, pe.status, pe.created_at, pe.resolved_at,
 			  COALESCE(g.title, pe.title_raw) AS titel, g.id AS spiel_id, r.platform,
-			  g.cover_url, g.critic_score, g.release_date, g.release_status
+			  g.cover_url, g.critic_score, g.release_date, g.release_status, ps.status AS play_status
 			 FROM plan_entry pe
 			 LEFT JOIN release r ON r.id = pe.release_id
-			 LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id) `;
-		const wunschliste = await zeilenGelesen(auswahl + "WHERE pe.kind = ? AND pe.status = ? ORDER BY pe.id", "wunsch", "offen");
+			 LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id)
+			 LEFT JOIN play_status ps ON ps.release_id = pe.release_id `;
+		const wunschliste = await zeilenGelesen(
+			auswahl + "WHERE pe.kind = ? AND pe.status = ? ORDER BY pe.position IS NULL, pe.position, pe.id",
+			"wunsch",
+			"offen",
+		);
 		const fuerSpiel = await zeilenGelesen(
 			auswahl +
 				"WHERE pe.status = 'offen' AND (pe.game_id = ? OR pe.release_id IN (SELECT id FROM release WHERE game_id = ?)) ORDER BY pe.id",
@@ -297,6 +302,71 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			expect((await SELF.fetch(`${B}${pfad}`)).status, pfad).toBe(200);
 		}
 		await env.DB.prepare("DELETE FROM wishlist_import").run();
+	});
+
+	it("misst Backlog-Kandidaten, To-Do-Liste und Umsortieren (Stufe 12)", async () => {
+		// Regal-Erfassung in Produktionsgroesse: jedes Release im Besitz, dazu
+		// 50 To-Do- und 100 Backlog-Eintraege. Der Grundbestand hat ueberall
+		// Trophaeenfortschritt und 'am_spielen', die Kandidaten kommen aus 40
+		// zusaetzlichen Releases ohne Liste.
+		await env.DB.prepare("DELETE FROM plan_entry").run();
+		const disc = env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)");
+		const digital = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, 'kauf')");
+		const release = env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (?, ?, 'PS5')");
+		const todo = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin, position) VALUES ('todo', ?, 'triage', ?)");
+		const backlog = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('backlog', ?, 'triage')");
+		const anweisungen: D1PreparedStatement[] = [];
+		for (let i = 1; i <= ANZAHL; i++) anweisungen.push(i % 2 === 0 ? disc.bind(i) : digital.bind(i));
+		for (let i = 1; i <= 40; i++) anweisungen.push(release.bind(ANZAHL + i, i), disc.bind(ANZAHL + i));
+		for (let i = 1; i <= 50; i++) anweisungen.push(todo.bind(i, i));
+		for (let i = 51; i <= 150; i++) anweisungen.push(backlog.bind(i));
+		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
+
+		const kandidaten = await zeilenGelesen(
+			"SELECT game_id, title, cover_url, critic_score, release_id, platform FROM v_backlog_kandidaten ORDER BY title, platform",
+		);
+		const todoListe = await zeilenGelesen(
+			`SELECT pe.id FROM plan_entry pe LEFT JOIN release r ON r.id = pe.release_id
+			 LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id)
+			 LEFT JOIN play_status ps ON ps.release_id = pe.release_id
+			 WHERE pe.kind = ? AND pe.status = ? ORDER BY pe.position IS NULL, pe.position, pe.id`,
+			"todo",
+			"offen",
+		);
+		const pruefung = await zeilenGelesen(
+			`SELECT id FROM plan_entry WHERE kind = ? AND status = 'offen' AND id IN (${Array.from({ length: 50 }, () => "?").join(", ")})`,
+			"todo",
+			...Array.from({ length: 50 }, (_, i) => i + 1),
+		);
+		const ansEnde = await zeilenGelesen(
+			"SELECT COALESCE(MAX(position), 0) + 1 AS p FROM plan_entry WHERE kind = 'todo' AND status = 'offen'",
+		);
+		const umsortieren = await env.DB.batch(
+			Array.from({ length: 50 }, (_, i) => env.DB.prepare("UPDATE plan_entry SET position = ? WHERE id = ?").bind(50 - i, i + 1)),
+		);
+		const geschrieben = umsortieren.reduce((n, r) => n + (r.meta.rows_read ?? 0), 0);
+
+		console.info({ kandidaten, todoListe, pruefung, ansEnde, umsortieren: geschrieben });
+
+		// Je Release vier korrelierte Index-Lookups; die View liest jedes
+		// Release einmal, nicht die Tabellen quer.
+		expect(kandidaten).toBeLessThan(3_000);
+		expect(todoListe).toBeLessThan(500);
+		expect(pruefung).toBeLessThan(200);
+		expect(ansEnde).toBeLessThan(200);
+		expect(geschrieben).toBeLessThan(200);
+
+		for (const pfad of ["/api/backlog-candidates", "/api/plans?kind=todo", "/api/plans?kind=backlog"]) {
+			const antwort = await SELF.fetch(`${B}${pfad}`);
+			expect(antwort.status, pfad).toBe(200);
+		}
+		const antwort = await SELF.fetch(`${B}/api/backlog-candidates`);
+		expect(((await antwort.json()) as { anzahl: number }).anzahl).toBe(40);
+
+		await env.DB.batch(
+			["plan_entry", "physical_copy", "digital_entitlement"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)),
+		);
+		await env.DB.prepare("DELETE FROM release WHERE id > ?").bind(ANZAHL).run();
 	});
 
 	it("beantwortet die Exportrouten bei 430 Listen", async () => {

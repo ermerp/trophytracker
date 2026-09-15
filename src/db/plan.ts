@@ -20,6 +20,16 @@ export type PlanFelder = {
 	kind?: PlanArt;
 };
 
+/** Eine Zeile aus v_backlog_kandidaten (Stufe 12): im Besitz, nie angefasst. */
+export type KandidatZeile = {
+	game_id: number;
+	title: string;
+	cover_url: string | null;
+	critic_score: number | null;
+	release_id: number;
+	platform: string;
+};
+
 /** Eine Zeile der Liste: der Eintrag mit dem, was Spiel und Release dazu wissen. */
 export type PlanZeile = {
 	id: number;
@@ -43,6 +53,8 @@ export type PlanZeile = {
 	critic_score: number | null;
 	release_date: string | null;
 	release_status: string | null;
+	/** Eigene Bewertung am Release (4.2); null am Spiel, bei Freitext oder ohne Zeile. */
+	play_status: string | null;
 };
 
 const SPALTEN: Record<keyof PlanFelder, string> = {
@@ -61,10 +73,20 @@ const AUSWAHL =
 	"SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position, " +
 	"pe.is_favorite, pe.note, pe.origin, pe.status, pe.created_at, pe.resolved_at, " +
 	"COALESCE(g.title, pe.title_raw) AS titel, g.id AS spiel_id, r.platform, " +
-	"g.cover_url, g.critic_score, g.release_date, g.release_status " +
+	"g.cover_url, g.critic_score, g.release_date, g.release_status, ps.status AS play_status " +
 	"FROM plan_entry pe " +
 	"LEFT JOIN release r ON r.id = pe.release_id " +
-	"LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id) ";
+	"LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id) " +
+	"LEFT JOIN play_status ps ON ps.release_id = pe.release_id ";
+
+/**
+ * Naechste freie Position am Ende der offenen To-Do-Liste (Stufe 12). Nur
+ * To-Do ist manuell geordnet; alle anderen Arten tragen NULL, und NULL
+ * sortiert hinter jeder Position - so bleibt der Bestand aus der Triage
+ * ohne Datenmigration bedienbar, die erste Umsortierung vergibt Positionen.
+ */
+export const POSITION_ANS_ENDE =
+	"(SELECT COALESCE(MAX(position), 0) + 1 FROM plan_entry WHERE kind = 'todo' AND status = 'offen')";
 
 /**
  * Absichten (Abschnitt 5): Wunschliste, To-Do, Backlog und Kaufliste in einer
@@ -84,7 +106,11 @@ export class PlanRepository {
 	 * Rang passiert erst in der Route. Der Zugriff laeuft ueber idx_plan_offen.
 	 */
 	async liste(kind: PlanArt, status: PlanStatus | "alle"): Promise<PlanZeile[]> {
-		const sql = AUSWAHL + "WHERE pe.kind = ?" + (status === "alle" ? "" : " AND pe.status = ?") + " ORDER BY pe.id";
+		const sql =
+			AUSWAHL +
+			"WHERE pe.kind = ?" +
+			(status === "alle" ? "" : " AND pe.status = ?") +
+			" ORDER BY pe.position IS NULL, pe.position, pe.id";
 		const abfrage = status === "alle" ? this.db.prepare(sql).bind(kind) : this.db.prepare(sql).bind(kind, status);
 		const { results } = await abfrage.all<PlanZeile>();
 		return results;
@@ -126,16 +152,27 @@ export class PlanRepository {
 		return r?.id ?? null;
 	}
 
+	/**
+	 * Anlegen. To-Do haengt ans Ende der Liste (POSITION_ANS_ENDE). Ein Status
+	 * beim Anlegen ist fuer "nicht vorgesehen" da: Ein abgelehnter
+	 * Backlog-Kandidat ist ein verworfener Eintrag, der die View ausblendet
+	 * (Migration 0014) - dieselbe Form wie eine verworfene Luecke (5.3).
+	 */
 	async anlegen(
 		kind: PlanArt,
 		ziel: PlanZiel,
 		origin: PlanHerkunft,
-		felder: Pick<PlanFelder, "isFavorite" | "note"> = {},
+		felder: Pick<PlanFelder, "isFavorite" | "note" | "status"> = {},
 	): Promise<number> {
+		const status = felder.status ?? "offen";
 		const r = await this.db
 			.prepare(
-				"INSERT INTO plan_entry (kind, release_id, game_id, title_raw, is_favorite, note, origin) " +
-					"VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+				"INSERT INTO plan_entry (kind, release_id, game_id, title_raw, is_favorite, note, origin, status, resolved_at, position) " +
+					"VALUES (?, ?, ?, ?, ?, ?, ?, ?, " +
+					(status === "offen" ? "NULL" : "datetime('now')") +
+					", " +
+					(kind === "todo" && status === "offen" ? POSITION_ANS_ENDE : "NULL") +
+					") RETURNING id",
 			)
 			.bind(
 				kind,
@@ -145,6 +182,7 @@ export class PlanRepository {
 				felder.isFavorite ? 1 : 0,
 				felder.note ?? null,
 				origin,
+				status,
 			)
 			.first<{ id: number }>();
 		if (!r) throw new Error("Eintrag konnte nicht angelegt werden.");
@@ -155,6 +193,10 @@ export class PlanRepository {
 	 * Nur die uebergebenen Felder aendern. Ein Statuswechsel setzt resolved_at:
 	 * auf jetzt bei erledigt/verworfen, auf NULL zurueck bei offen - ein
 	 * Sinneswandel ist ein Feld-Update, kein Neuanlegen (5.3).
+	 *
+	 * Position (Stufe 12): Wer auf To-Do kommt oder dort wieder geoeffnet
+	 * wird, haengt ans Ende, sofern er keine Position hat; wer To-Do
+	 * verlaesst, verliert sie.
 	 */
 	async aendern(id: number, felder: PlanFelder): Promise<boolean> {
 		const keys = (Object.keys(felder) as Array<keyof PlanFelder>).filter((k) => felder[k] !== undefined);
@@ -164,11 +206,60 @@ export class PlanRepository {
 		if (felder.status !== undefined) {
 			setzungen.push(felder.status === "offen" ? "resolved_at = NULL" : "resolved_at = datetime('now')");
 		}
+		const werte: unknown[] = keys.map((k) => wert(k, felder));
+		if (felder.kind !== undefined && felder.kind !== "todo") {
+			setzungen.push("position = NULL");
+		} else if (felder.kind === "todo") {
+			setzungen.push(`position = COALESCE(position, ${POSITION_ANS_ENDE})`);
+		} else if (felder.status === "offen") {
+			// `kind` in der SET-Klausel ist der alte Wert der Zeile - hier bleibt er, weil kind nicht im Koerper ist.
+			setzungen.push(`position = CASE WHEN kind = 'todo' THEN COALESCE(position, ${POSITION_ANS_ENDE}) ELSE position END`);
+		}
 		const ergebnis = await this.db
 			.prepare(`UPDATE plan_entry SET ${setzungen.join(", ")} WHERE id = ?`)
-			.bind(...keys.map((k) => wert(k, felder)), id)
+			.bind(...werte, id)
 			.run();
 		return (ergebnis.meta.changes ?? 0) > 0;
+	}
+
+	/**
+	 * Manuelle Reihenfolge (PUT /api/plans/reorder, Stufe 12): Die genannten
+	 * Ids bekommen die Positionen 1..n. Jede Id muss ein offener Eintrag der
+	 * Art sein, sonst null - die Oberflaeche schickt immer die ganze Liste,
+	 * eine fremde Id ist ein Fehler, kein Sonderfall. Nicht genannte
+	 * Eintraege behalten ihre Position.
+	 */
+	async neuOrdnen(kind: PlanArt, ids: number[]): Promise<number | null> {
+		if (ids.length === 0) return 0;
+		const platzhalter = ids.map(() => "?").join(", ");
+		const { results } = await this.db
+			.prepare(`SELECT id FROM plan_entry WHERE kind = ? AND status = 'offen' AND id IN (${platzhalter})`)
+			.bind(kind, ...ids)
+			.all<{ id: number }>();
+		if (results.length !== ids.length) return null;
+
+		const update = this.db.prepare("UPDATE plan_entry SET position = ? WHERE id = ?");
+		await this.db.batch(ids.map((id, i) => update.bind(i + 1, id)));
+		return ids.length;
+	}
+
+	/** Abgelehnte Kandidaten: verworfene Backlog-Eintraege, ein Index-Lookup (idx_plan_offen). */
+	async abgelehnteKandidaten(): Promise<number> {
+		const r = await this.db
+			.prepare("SELECT COUNT(*) AS n FROM plan_entry WHERE kind = 'backlog' AND status = 'verworfen'")
+			.first<{ n: number }>();
+		return r?.n ?? 0;
+	}
+
+	/** Kandidaten fuer den Backlog aus v_backlog_kandidaten (Migration 0014). */
+	async backlogKandidaten(): Promise<KandidatZeile[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT game_id, title, cover_url, critic_score, release_id, platform " +
+					"FROM v_backlog_kandidaten ORDER BY title, platform",
+			)
+			.all<KandidatZeile>();
+		return results;
 	}
 
 	/**

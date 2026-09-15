@@ -1,5 +1,6 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { Abweichungen } from './Abweichungen'
+import { Backlog } from './Backlog'
 import { Einstellungen } from './Einstellungen'
 import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
@@ -9,6 +10,7 @@ import { Pruefliste } from './Pruefliste'
 import { Sammlung } from './Sammlung'
 import { SammlungPruefen } from './SammlungPruefen'
 import { Sicherung } from './Sicherung'
+import { Todo } from './Todo'
 import { Spieldetail } from './Spieldetail'
 import { Trophaeen } from './Trophaeen'
 import { Wunschliste } from './Wunschliste'
@@ -51,6 +53,8 @@ function App() {
           <Route path="/sammlung" element={<Sammlung />} />
           <Route path="/spiel/:id" element={<Spieldetail />} />
           <Route path="/wunschliste" element={<Wunschliste />} />
+          <Route path="/todo" element={<Todo />} />
+          <Route path="/backlog" element={<Backlog />} />
           <Route path="/pruefliste" element={<Pruefliste />} />
           <Route
             path="/einstellungen"

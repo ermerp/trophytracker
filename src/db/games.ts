@@ -354,21 +354,55 @@ aeenliste haengt
 
 	/**
 	 * Ein Spiel ohne Releases hat keinen Zweck mehr - ausser es traegt eine
-	 * offene Absicht (Stufe 10): Ein Wunsch aus der IGDB-Suche haengt am
-	 * Spiel und hat nie ein Release gehabt. Wer probeweise eines anlegt und
-	 * wieder entfernt, darf den Wunsch nicht per CASCADE verlieren.
-	 * Gibt zurueck, ob geloescht wurde.
+	 * Absicht (Stufe 10): Ein Wunsch aus der IGDB-Suche haengt am Spiel und
+	 * hat nie ein Release gehabt. Wer probeweise eines anlegt und wieder
+	 * entfernt, darf den Wunsch nicht per CASCADE verlieren. Seit Stufe 12
+	 * zaehlt jeder Eintrag, nicht nur ein offener: Ein erledigter oder
+	 * verworfener ist Historie und haelt das Spiel (Entscheidung des Nutzers
+	 * vom 15.09.2026, Abschnitt 5). Gibt zurueck, ob geloescht wurde.
 	 */
 	private async leeresSpielLoeschen(gameId: number): Promise<boolean> {
 		const ergebnis = await this.db
 			.prepare(
 				"DELETE FROM game WHERE id = ? " +
 					"AND NOT EXISTS (SELECT 1 FROM release WHERE game_id = game.id) " +
-					"AND NOT EXISTS (SELECT 1 FROM plan_entry WHERE game_id = game.id AND status = 'offen')",
+					"AND NOT EXISTS (SELECT 1 FROM plan_entry WHERE game_id = game.id)",
 			)
 			.bind(gameId)
 			.run();
 		return (ergebnis.meta.changes ?? 0) > 0;
+	}
+
+	/**
+	 * Waisen nach dem Loeschen eines Eintrags (Stufe 12, Abschnitt 5): Ein
+	 * Release, das nur fuer einen Wunsch entstanden ist - ohne Trophaeenliste,
+	 * Exemplar, Berechtigung, Bewertung und anderen Eintrag - geht mit, danach
+	 * das leere Spiel. Ein Index-Lookup je Bedingung, alles auf
+	 * Fremdschluesseln (Migration 0008). Ein Release aus PSN, mit Besitz oder
+	 * mit gepflegtem Physisch-Status (Stufe 14) bleibt immer stehen; ein von
+	 * Hand angelegtes ohne all das ist nur ein Titel und geht mit.
+	 */
+	async waiseAufraeumen(
+		gameId: number | null,
+		releaseId: number | null,
+	): Promise<{ releaseGeloescht: boolean; spielGeloescht: boolean }> {
+		let releaseGeloescht = false;
+		if (releaseId !== null) {
+			const ergebnis = await this.db
+				.prepare(
+					"DELETE FROM release WHERE id = ? AND physical_release_status = 'unbekannt' " +
+						"AND NOT EXISTS (SELECT 1 FROM trophy_progress WHERE release_id = release.id) " +
+						"AND NOT EXISTS (SELECT 1 FROM physical_copy WHERE release_id = release.id) " +
+						"AND NOT EXISTS (SELECT 1 FROM digital_entitlement WHERE release_id = release.id) " +
+						"AND NOT EXISTS (SELECT 1 FROM play_status WHERE release_id = release.id) " +
+						"AND NOT EXISTS (SELECT 1 FROM plan_entry WHERE release_id = release.id)",
+				)
+				.bind(releaseId)
+				.run();
+			releaseGeloescht = (ergebnis.meta.changes ?? 0) > 0;
+		}
+		const spielGeloescht = gameId !== null && (await this.leeresSpielLoeschen(gameId));
+		return { releaseGeloescht, spielGeloescht };
 	}
 
 	/**
@@ -712,7 +746,7 @@ aeenliste haengt
 	 * die Zuordnung zurueck. Herkunft der alten Zuordnung wird geloescht, sonst
 	 * truege eine offene Liste eine matched_source. Exemplare kaskadieren.
 	 * Ein Spiel ohne Releases wird mit entfernt, wie bei releaseAbtrennen -
-	 * es sei denn, eine offene Absicht haengt daran (leeresSpielLoeschen).
+	 * es sei denn, eine Absicht haengt daran (leeresSpielLoeschen).
 	 */
 	async releaseLoeschen(
 		releaseId: number,

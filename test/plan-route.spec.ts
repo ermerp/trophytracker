@@ -50,7 +50,7 @@ const zeile = (id: number) => env.DB.prepare("SELECT * FROM plan_entry WHERE id 
 
 beforeEach(async () => {
 	await env.DB.batch(
-		["plan_entry", "igdb_candidate", "trophy_progress", "release", "game"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)),
+		["plan_entry", "igdb_candidate", "trophy_progress", "physical_copy", "digital_entitlement", "play_status", "release", "game"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)),
 	);
 });
 
@@ -127,12 +127,67 @@ describe("PlanRepository", () => {
 		expect(await r.games.spielExistiert(1)).toBe(true);
 		expect(await zeile(id)).not.toBeNull();
 
-		// Ohne offene Absicht faellt das leere Spiel wie bisher weg.
+		// Ein erledigter Wunsch ist Historie und haelt das Spiel ebenfalls
+		// (Stufe 12, Entscheidung des Nutzers vom 15.09.2026).
 		await r.plan.aendern(id, { status: "erledigt" });
 		const [neu] = await spiel(2, "Zweites", ["PS4"]);
 		await env.DB.prepare("UPDATE release SET game_id = 1 WHERE id = ?").bind(neu).run();
-		expect(await r.games.releaseLoeschen(neu)).toMatchObject({ spielGeloescht: true });
+		expect(await r.games.releaseLoeschen(neu)).toMatchObject({ spielGeloescht: false });
+		expect(await r.games.spielExistiert(1)).toBe(true);
+
+		// Erst ohne jeden Eintrag faellt das leere Spiel weg.
+		await r.plan.loeschen(id);
+		const [dritt] = await spiel(3, "Drittes", ["PS4"]);
+		await env.DB.prepare("UPDATE release SET game_id = 1 WHERE id = ?").bind(dritt).run();
+		expect(await r.games.releaseLoeschen(dritt)).toMatchObject({ spielGeloescht: true });
 		expect(await r.games.spielExistiert(1)).toBe(false);
+	});
+
+	it("haengt To-Do ans Ende, laesst Backlog ohne Position und ordnet neu (Stufe 12)", async () => {
+		const [a, b, c] = await spiel(1, "Bloodborne", ["PS3", "PS4", "PS5"]);
+		const r = repos().plan;
+		const erster = await r.anlegen("todo", { releaseId: a }, "manuell");
+		const zweiter = await r.anlegen("todo", { releaseId: b }, "manuell");
+		const backlog = await r.anlegen("backlog", { releaseId: c }, "manuell");
+		expect((await zeile(erster))!.position).toBe(1);
+		expect((await zeile(zweiter))!.position).toBe(2);
+		expect((await zeile(backlog))!.position).toBeNull();
+
+		// Hochziehen haengt ans Ende, zurueck ins Backlog nimmt die Position weg.
+		await r.aendern(backlog, { kind: "todo" });
+		expect((await zeile(backlog))!.position).toBe(3);
+		await r.aendern(erster, { kind: "backlog" });
+		expect((await zeile(erster))!.position).toBeNull();
+
+		// Erledigt behaelt die Position, wieder oeffnen aendert sie nicht.
+		await r.aendern(zweiter, { status: "erledigt" });
+		await r.aendern(zweiter, { status: "offen" });
+		expect((await zeile(zweiter))!.position).toBe(2);
+
+		expect(await r.neuOrdnen("todo", [backlog, zweiter])).toBe(2);
+		expect((await r.liste("todo", "offen")).map((z) => z.id)).toEqual([backlog, zweiter]);
+		expect((await zeile(backlog))!.position).toBe(1);
+		// Eine Id, die kein offener To-Do-Eintrag ist: nichts wird geschrieben.
+		expect(await r.neuOrdnen("todo", [zweiter, erster])).toBeNull();
+		expect((await zeile(backlog))!.position).toBe(1);
+	});
+
+	it("legt einen abgelehnten Kandidaten verworfen an und liest die Kandidaten aus der View", async () => {
+		const [ps4, ps5] = await spiel(1, "Bloodborne", ["PS4", "PS5"], { cover_url: "c.jpg", critic_score: 91 });
+		await env.DB.batch([
+			env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)").bind(ps4),
+			env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, 'kauf')").bind(ps5),
+		]);
+		const r = repos().plan;
+		expect((await r.backlogKandidaten()).map((k) => k.release_id)).toEqual([ps4, ps5]);
+		expect((await r.backlogKandidaten())[0]).toMatchObject({ game_id: 1, title: "Bloodborne", cover_url: "c.jpg", critic_score: 91, platform: "PS4" });
+
+		const id = await r.anlegen("backlog", { releaseId: ps4 }, "manuell", { status: "verworfen" });
+		expect(await zeile(id)).toMatchObject({ status: "verworfen", resolved_at: expect.any(String), position: null });
+		expect((await r.backlogKandidaten()).map((k) => k.release_id)).toEqual([ps5]);
+		// Entfernen macht ihn wieder zum Kandidaten.
+		await r.loeschen(id);
+		expect(await r.backlogKandidaten()).toHaveLength(2);
 	});
 });
 
@@ -373,5 +428,115 @@ describe("PATCH und DELETE /api/plans/:id", () => {
 		expect((await sende(a, "DELETE", `/api/plans/${id}`)).status).toBe(200);
 		expect(await zeile(id)).toBeNull();
 		expect((await sende(a, "DELETE", `/api/plans/${id}`)).status).toBe(404);
+	});
+});
+
+describe("To-Do, Backlog und Kandidaten (Stufe 12)", () => {
+	it("liefert To-Do nach Position mit eigenem Status und Vorschlag erledigt", async () => {
+		const [ps4, ps5] = await spiel(1, "Bloodborne", ["PS4", "PS5"]);
+		const a = app();
+		const erster = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps4 })).json();
+		const zweiter = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps5 })).json();
+		expect(erster).toMatchObject({ position: 1, eigenerStatus: null, erledigtVorgeschlagen: false });
+		await env.DB.prepare("INSERT INTO play_status (release_id, status) VALUES (?, 'durchgespielt')").bind(ps4).run();
+
+		const liste = await hole(a, "/api/plans?kind=todo");
+		expect(liste.sortierung).toBe("position");
+		expect(liste.eintraege.map((e: { id: number }) => e.id)).toEqual([erster.id, zweiter.id]);
+		expect(liste.eintraege[0]).toMatchObject({ eigenerStatus: "durchgespielt", erledigtVorgeschlagen: true });
+		expect(liste.eintraege[1]).toMatchObject({ eigenerStatus: null, erledigtVorgeschlagen: false });
+
+		// Die Wunschliste sortiert weiter nach Favorit; Backlog ebenso.
+		expect((await hole(a, "/api/plans?kind=backlog")).sortierung).toBe("favorit");
+	});
+
+	it("ordnet per PUT /api/plans/reorder neu und weist fremde Ids ab", async () => {
+		const [a1, a2, a3] = await spiel(1, "Bloodborne", ["PS3", "PS4", "PS5"]);
+		const a = app();
+		const ids: number[] = [];
+		for (const r of [a1, a2, a3]) ids.push((await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: r })).json()).id);
+		const backlog = (await (await sende(a, "POST", "/api/plans", { art: "backlog", spielId: 1 })).json()).id;
+
+		const p = await sende(a, "PUT", "/api/plans/reorder", { art: "todo", orderedIds: [ids[2], ids[0], ids[1]] });
+		expect(p.status).toBe(200);
+		expect(await p.json()).toEqual({ art: "todo", geordnet: 3 });
+		expect((await hole(a, "/api/plans?kind=todo")).eintraege.map((e: { id: number }) => e.id)).toEqual([ids[2], ids[0], ids[1]]);
+
+		expect((await sende(a, "PUT", "/api/plans/reorder", { art: "todo", orderedIds: [ids[0], backlog] })).status).toBe(400);
+		expect((await sende(a, "PUT", "/api/plans/reorder", { art: "todo", orderedIds: [ids[0], ids[0]] })).status).toBe(400);
+		expect((await sende(a, "PUT", "/api/plans/reorder", { art: "todo", orderedIds: "x" })).status).toBe(400);
+		expect((await sende(a, "PUT", "/api/plans/reorder", { art: "egal", orderedIds: [] })).status).toBe(400);
+		// Nichts davon hat die Ordnung veraendert.
+		expect((await hole(a, "/api/plans?kind=todo")).eintraege.map((e: { id: number }) => e.id)).toEqual([ids[2], ids[0], ids[1]]);
+	});
+
+	it("liest Kandidaten und lehnt einen als 'nicht vorgesehen' ab", async () => {
+		const [ps4] = await spiel(1, "Bloodborne", ["PS4"], { cover_url: "c.jpg" });
+		await env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)").bind(ps4).run();
+		const a = app();
+		expect(await hole(a, "/api/backlog-candidates")).toEqual({
+			anzahl: 1,
+			abgelehnt: 0,
+			kandidaten: [{ releaseId: ps4, spielId: 1, titel: "Bloodborne", plattform: "PS4", bild: "c.jpg", kritik: null }],
+		});
+
+		const p = await sende(a, "POST", "/api/plans", { art: "backlog", releaseId: ps4, status: "verworfen" });
+		expect(p.status).toBe(201);
+		expect(await p.json()).toMatchObject({ status: "verworfen", erledigtAm: expect.any(String) });
+		expect(await hole(a, "/api/backlog-candidates")).toMatchObject({ anzahl: 0, abgelehnt: 1 });
+
+		expect((await sende(a, "POST", "/api/plans", { art: "backlog", spielId: 1, status: "erledigt" })).status).toBe(400);
+	});
+
+	it("raeumt beim Loeschen Release und Spiel auf, die nur fuer den Eintrag entstanden", async () => {
+		const client = fakeIgdb([[spielRoh()]]).client;
+		const a = app(client);
+		const e = await (await sende(a, "POST", "/api/plans", { art: "wunsch", igdbId: 1001 })).json();
+		expect(e).toMatchObject({ spielAngelegt: true, plattform: "PS4" });
+
+		const p = await sende(a, "DELETE", `/api/plans/${e.id}`);
+		expect(await p.json()).toEqual({ id: e.id, geloescht: true, releaseGeloescht: true, spielGeloescht: true });
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM game").first<{ n: number }>()).toEqual({ n: 0 });
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM release").first<{ n: number }>()).toEqual({ n: 0 });
+	});
+
+	it("laesst Release und Spiel stehen, wenn etwas anderes daran haengt", async () => {
+		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
+		const a = app();
+
+		// Trophaeenliste am Release.
+		await env.DB.prepare(
+			"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, release_id, synced_at) VALUES ('NPWR1', 'trophy', 'Bloodborne', 'PS4', ?, datetime('now'))",
+		).bind(ps4).run();
+		let e = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps4 })).json();
+		expect(await (await sende(a, "DELETE", `/api/plans/${e.id}`)).json()).toMatchObject({ releaseGeloescht: false, spielGeloescht: false });
+		await env.DB.prepare("DELETE FROM trophy_progress").run();
+
+		// Eigene Bewertung am Release.
+		await env.DB.prepare("INSERT INTO play_status (release_id, status) VALUES (?, 'pausiert')").bind(ps4).run();
+		e = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps4 })).json();
+		expect(await (await sende(a, "DELETE", `/api/plans/${e.id}`)).json()).toMatchObject({ releaseGeloescht: false, spielGeloescht: false });
+		await env.DB.prepare("DELETE FROM play_status").run();
+
+		// Ein erledigter Zweiteintrag am Spiel haelt Release und Spiel.
+		const alt = await (await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" })).json();
+		await sende(a, "PATCH", `/api/plans/${alt.id}`, { status: "erledigt" });
+		e = await (await sende(a, "POST", "/api/plans", { art: "backlog", releaseId: ps4 })).json();
+		expect(await (await sende(a, "DELETE", `/api/plans/${e.id}`)).json()).toMatchObject({ releaseGeloescht: true, spielGeloescht: false });
+		expect(await repos().games.spielExistiert(1)).toBe(true);
+
+		// Ohne alles: weg.
+		await sende(a, "DELETE", `/api/plans/${alt.id}`);
+		expect(await repos().games.spielExistiert(1)).toBe(false);
+	});
+});
+
+describe("Waisen: gepflegter Physisch-Status haelt das Release", () => {
+	it("laesst ein Release mit physical_release_status stehen", async () => {
+		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
+		await env.DB.prepare("UPDATE release SET physical_release_status = 'ja' WHERE id = ?").bind(ps4).run();
+		const a = app();
+		const e = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps4 })).json();
+		expect(await (await sende(a, "DELETE", `/api/plans/${e.id}`)).json()).toMatchObject({ releaseGeloescht: false, spielGeloescht: false });
 	});
 });
