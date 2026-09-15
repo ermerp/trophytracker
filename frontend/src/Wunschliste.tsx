@@ -10,8 +10,9 @@ import { IgdbSuche } from './IgdbSuche'
  * Titel, Erscheinungsdatum, zuletzt angelegt. Filter: nur Favoriten,
  * Plattformen, „ohne Plattform" – der Filter, mit dem sich Wünsche ohne
  * Plattform nachpflegen lassen (Entscheidung des Nutzers vom 15.09.2026).
- * Neue Wünsche kommen aus der IGDB-Suche mit der neuesten Plattform des
- * Treffers als Vorgabe; „ohne Plattform" bleibt wählbar. Ein Eintrag ohne
+ * Neue Wünsche kommen aus der IGDB-Suche; jeder Treffer trägt sein eigenes
+ * Plattform-Dropdown, vorbelegt mit seiner neuesten; „ohne Plattform" bleibt
+ * wählbar. Ein Eintrag ohne
  * IGDB-Zuordnung entsteht nur über den ausdrücklichen Knopf (8.2). Bei
  * angekündigten Titeln steht das Erscheinungsdatum dort, wo später der
  * Preis steht (8.4). Ein Release nur aus Wunsch zählt nicht zur Sammlung
@@ -52,8 +53,6 @@ export function Wunschliste() {
   const [hinzufuegen, setHinzufuegen] = useState(false)
   const [eben, setEben] = useState<PlanEintrag | null>(null)
   const [notizOffen, setNotizOffen] = useState<number | null>(null)
-  // 'auto' = die neueste Plattform des Treffers; '' = ausdruecklich ohne.
-  const [plattform, setPlattform] = useState('auto')
 
   const sortierung: Sortierung = (params.get('sort') as Sortierung) in SORTIERTEXT ? (params.get('sort') as Sortierung) : 'favorit'
   const nurFavoriten = params.get('favorit') === '1'
@@ -155,7 +154,7 @@ export function Wunschliste() {
     }
   }
 
-  const igdbWaehlen = (k: IgdbKandidat) => anlegen({ igdbId: k.igdbId, plattform })
+  const igdbWaehlen = (k: IgdbKandidat, plattform: string) => anlegen({ igdbId: k.igdbId, plattform })
   // Freitext hat kein Spiel und damit kein Release - die Plattform bleibt weg.
   const ohneTreffer = (begriff: string) => anlegen({ titel: begriff })
 
@@ -171,25 +170,9 @@ export function Wunschliste() {
         {hinzufuegen && (
           <>
             <p className="zeile">
-              Bei IGDB suchen und übernehmen. Ohne Wahl bekommt der Wunsch die neueste Plattform des Treffers; Freitext bleibt immer ohne Plattform.
+              Bei IGDB suchen und übernehmen. Die Plattform steht an jedem Treffer, vorbelegt mit seiner neuesten; Freitext bleibt immer ohne Plattform.
             </p>
-            <label className="zeile">
-              Plattform{' '}
-              <select value={plattform} onChange={(e) => setPlattform(e.target.value)} disabled={laeuft}>
-                <option value="auto">neueste des Treffers</option>
-                {PLATTFORMEN.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-                <option value="">ohne Plattform</option>
-              </select>
-            </label>
-            <IgdbSuche
-              vorgabe=""
-              plattformen={plattform && plattform !== 'auto' ? [plattform] : []}
-              onWahl={igdbWaehlen}
-              onOhneTreffer={ohneTreffer}
-              laeuft={laeuft}
-            />
+            <IgdbSuche vorgabe="" onWahl={igdbWaehlen} onOhneTreffer={ohneTreffer} laeuft={laeuft} mitPlattform />
           </>
         )}
       </section>

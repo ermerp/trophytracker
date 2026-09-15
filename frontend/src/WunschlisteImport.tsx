@@ -18,10 +18,11 @@ import { IgdbSuche, KandidatenListe } from './IgdbSuche'
 /**
  * Wunschliste importieren (Use Case 9, Abschnitt 8.2).
  *
- * Ein Lauf je Datei; der Zustand liegt in der Datenbank. Jede Zeile bekommt
- * beim Abgleich die neueste Plattform des Treffers vorgeschlagen, änderbar im
- * Dropdown vor der Übernahme (Entscheidung des Nutzers vom 15.09.2026); bei
- * Zeilen zur Durchsicht gilt „neueste des Treffers", bis etwas gewählt ist.
+ * Ein Lauf je Datei; der Zustand liegt in der Datenbank. Jede klare Zeile
+ * bekommt beim Abgleich die neueste Plattform des Treffers vorgeschlagen,
+ * änderbar im Dropdown vor der Übernahme; bei Zeilen zur Durchsicht steht
+ * das Dropdown an jedem Treffer, weil die Treffer verschiedene Plattformen
+ * nennen (Entscheidungen des Nutzers vom 15.09.2026).
  * Der Abgleich läuft
  * in Schritten (acht Zeilen je Aufruf), solange `weiter` zurückkommt – wie
  * beim IGDB-Abgleich. Danach die Durchsicht in drei Blöcken: Eindeutige und
@@ -507,8 +508,6 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
   const [teilText, setTeilText] = useState(zeile.titel)
   const [umbenennen, setUmbenennen] = useState(false)
   const [neuerTitel, setNeuerTitel] = useState(zeile.titel)
-  // Zur Durchsicht: 'auto' = neueste des gewählten Treffers, solange die Zeile keine Plattform hat; '' = ohne.
-  const [plattform, setPlattform] = useState<string>(zeile.plattform ?? 'auto')
 
   const gewaehlt = zeile.igdbId !== null ? zeile.kandidaten.find((k) => k.igdbId === zeile.igdbId) : undefined
   const beschaeftigt = aktionen.beschaeftigt
@@ -554,18 +553,6 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
         </div>
       </header>
 
-      {offen && unklar && (
-        <label className="zeile">
-          Plattform{' '}
-          <select value={plattform} onChange={(e) => setPlattform(e.target.value)} disabled={beschaeftigt}>
-            <option value="auto">neueste des Treffers</option>
-            {PLATTFORMEN.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-            <option value="">ohne Plattform</option>
-          </select>
-        </label>
-      )}
       {offen && !unklar && (
         <label className="zeile">
           Plattform{' '}
@@ -579,7 +566,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
       )}
 
       {offen && (unklar || zeigeWahl) && zeile.kandidaten.length > 0 && (
-        <KandidatenListe kandidaten={zeile.kandidaten} onWahl={(k) => void aktionen.uebernehmenIgdb(zeile, k, plattform)} laeuft={beschaeftigt} />
+        <KandidatenListe kandidaten={zeile.kandidaten} onWahl={(k, p) => void aktionen.uebernehmenIgdb(zeile, k, p)} laeuft={beschaeftigt} mitPlattform />
       )}
 
       <div className="knopfzeile">
@@ -608,10 +595,11 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
       {offen && suche && (
         <IgdbSuche
           vorgabe={zeile.titel}
-          plattformen={plattform && plattform !== 'auto' ? [plattform] : []}
-          onWahl={(k) => void aktionen.uebernehmenIgdb(zeile, k, plattform)}
+          plattformen={zeile.plattform ? [zeile.plattform] : []}
+          onWahl={(k, p) => void aktionen.uebernehmenIgdb(zeile, k, p)}
           onOhneTreffer={(begriff) => void aktionen.freitext(zeile, begriff)}
           laeuft={beschaeftigt}
+          mitPlattform
         />
       )}
 

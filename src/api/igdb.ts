@@ -3,10 +3,10 @@ import type { SpielDetail } from "../db/games";
 import type { KandidatZeile } from "../db/igdb";
 import type { PlanArt } from "../db/plan";
 import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, type IgdbKandidat } from "../domain/igdb";
-import { plattformenAus, titelSchluessel } from "../domain/titel";
+import { istErlaubtePlattform, plattformenAus, titelSchluessel } from "../domain/titel";
 import { IgdbKonfigError } from "../igdb/client";
 import { igdbAbgleichSchritt, igdbAuffrischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
-import { zielAusIgdbId } from "../sync/plan-ziel";
+import { zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
 import type { AppEnv } from "../types";
 import { eintragAntwort } from "./plans";
 
@@ -196,6 +196,14 @@ export const unmatchedRoutes = new Hono<AppEnv>()
 		if (!Number.isInteger(igdbId) || igdbId <= 0) {
 			return c.json({ fehler: "Feld 'igdbId' fehlt oder ist ungültig." }, 400);
 		}
+		// Plattform wie bei POST /api/plans: fehlt oder "auto" → die neueste, "" → ohne.
+		const roh = (koerper as { plattform?: unknown }).plattform;
+		let wahl: PlattformWahl = "auto";
+		if (roh === null || roh === "") wahl = null;
+		else if (typeof roh === "string" && roh !== "auto") {
+			if (!istErlaubtePlattform(roh)) return c.json({ fehler: `Unbekannte Plattform: ${roh}` }, 400);
+			wahl = roh;
+		}
 
 		const eintrag = await c.var.repos.plan.eintrag(id);
 		if (!eintrag || eintrag.kind !== art) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
@@ -205,7 +213,7 @@ export const unmatchedRoutes = new Hono<AppEnv>()
 
 		let ergebnis: Awaited<ReturnType<typeof zielAusIgdbId>>;
 		try {
-			ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, "auto");
+			ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, wahl);
 		} catch (fehler) {
 			if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
 			return c.json({ fehler: meldungFuer(fehler) }, 502);

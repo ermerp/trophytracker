@@ -67,8 +67,18 @@ export function OhneZuordnung() {
     }
   }
 
-  const verknuepfen = (e: Eintrag, k: IgdbKandidat) =>
-    tue(e, () => anfrage(`/api/unmatched/${e.quelle}/${e.id}/link`, { methode: 'POST', koerper: { igdbId: k.igdbId } }), `„${e.titel}" → ${k.name}`)
+  // Freitext-Eintraege bekommen die Plattform am Treffer gewaehlt; Spiele der
+  // Sammlung werden nur verknuepft, ihre Releases stehen schon fest.
+  const verknuepfen = (e: Eintrag, k: IgdbKandidat, plattform: string) =>
+    tue(
+      e,
+      () =>
+        anfrage(`/api/unmatched/${e.quelle}/${e.id}/link`, {
+          methode: 'POST',
+          koerper: e.quelle === 'spiel' ? { igdbId: k.igdbId } : { igdbId: k.igdbId, plattform },
+        }),
+      `„${e.titel}" → ${k.name}`,
+    )
   const ablehnen = (e: Eintrag) => tue(e, () => anfrage(`/api/unmatched/spiel/${e.id}/ablehnen`, { methode: 'POST' }), `„${e.titel}": kein IGDB-Eintrag.`)
   const dochSuchen = (e: Eintrag) => tue(e, () => anfrage(`/api/unmatched/spiel/${e.id}/suchen`, { methode: 'POST' }), `„${e.titel}" wird beim nächsten Abgleich gesucht.`)
 
@@ -129,7 +139,7 @@ export function OhneZuordnung() {
                         <button type="button" className="klein" onClick={() => dochSuchen(e)} disabled={laeuft === k}>Doch suchen</button>
                       )}
                     </div>
-                    {suche === k && <IgdbSuche vorgabe={e.titel} onWahl={(kand) => verknuepfen(e, kand)} laeuft={laeuft === k} />}
+                    {suche === k && <IgdbSuche vorgabe={e.titel} onWahl={(kand, p) => verknuepfen(e, kand, p)} laeuft={laeuft === k} mitPlattform={e.quelle !== 'spiel'} />}
                   </li>
                 )
               })}
