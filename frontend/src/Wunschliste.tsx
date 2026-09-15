@@ -148,7 +148,8 @@ export function Wunschliste() {
       <section className="anlegen">
         <button type="button" onClick={() => setHinzufuegen(!hinzufuegen)} disabled={laeuft}>
           {hinzufuegen ? 'Schließen' : 'Wunsch hinzufügen'}
-        </button>
+        </button>{' '}
+        <Link to="/import" className="zeile">Liste importieren</Link>
         {hinzufuegen && (
           <>
             <p className="zeile">

@@ -131,6 +131,22 @@ describe("eindeutigerTreffer", () => {
 		expect(eindeutigerTreffer("medievil", ["PS4"], k)).toBeNull();
 	});
 
+	it("loest Gleichnamige ueber das Jahr aus der Wunschliste, sonst nicht (8.2)", () => {
+		const k = [
+			kandidat({ igdbId: 1, name: "Layers of Fear", releaseDate: "2016-02-16" }),
+			kandidat({ igdbId: 2, name: "Layers of Fear", releaseDate: "2023-06-15" }),
+		];
+		expect(eindeutigerTreffer("layers of fear", [], k)).toBeNull();
+		expect(eindeutigerTreffer("layers of fear", [], k, 2016)?.igdbId).toBe(1);
+		// Angrenzendes Jahr zaehlt - der Monat aus der Liste ist geschaetzt.
+		expect(eindeutigerTreffer("layers of fear", [], k, 2024)?.igdbId).toBe(2);
+		// Zwischen beiden: nichts eindeutig.
+		expect(eindeutigerTreffer("layers of fear", [], k, 2019)).toBeNull();
+		// Ohne Datum kann ein Kandidat nicht ueber das Jahr gewinnen.
+		const ohne = [kandidat({ igdbId: 1, name: "DOOM", releaseDate: null }), kandidat({ igdbId: 2, name: "DOOM", releaseDate: "2016-05-13" })];
+		expect(eindeutigerTreffer("doom", [], ohne, 2016)?.igdbId).toBe(2);
+	});
+
 	it("zaehlt eine Edition nicht gegen ihr Hauptspiel", () => {
 		const k = [
 			kandidat({ igdbId: 1, name: "Grand Theft Auto V" }),

@@ -170,20 +170,26 @@ describe("v_abweichungen", () => {
 });
 
 describe("v_ohne_igdb", () => {
-	it("sammelt Spiele ohne IGDB-Zuordnung und Freitext-Eintraege", async () => {
+	it("sammelt Spiele ohne IGDB-Zuordnung und Freitext-Eintraege, mit Zustand (Migration 0012)", async () => {
 		await spiel(1, "Unbekanntes Spiel", { igdb: null });
 		await spiel(2, "Bekanntes Spiel", { igdb: 4711 });
+		await spiel(3, "Zur Pruefung", { igdb: null });
+		await spiel(4, "Abgelehnt", { igdb: null });
+		await env.DB.prepare("UPDATE game SET igdb_checked_at = '2026-09-01' WHERE id IN (3, 4)").run();
+		await env.DB.prepare("UPDATE game SET igdb_declined_at = '2026-09-02' WHERE id = 4").run();
 		await env.DB.prepare(
 			"INSERT INTO plan_entry (kind, title_raw, status) VALUES ('wunsch', 'Nur Text', 'offen')",
 		).run();
 
 		const { results } = await env.DB.prepare(
-			"SELECT quelle, title FROM v_ohne_igdb ORDER BY quelle",
-		).all<{ quelle: string; title: string }>();
+			"SELECT quelle, title, zustand FROM v_ohne_igdb ORDER BY quelle, ref_id",
+		).all<{ quelle: string; title: string; zustand: string }>();
 
 		expect(results).toEqual([
-			{ quelle: "plan_wunsch", title: "Nur Text" },
-			{ quelle: "spiel", title: "Unbekanntes Spiel" },
+			{ quelle: "plan_wunsch", title: "Nur Text", zustand: "freitext" },
+			{ quelle: "spiel", title: "Unbekanntes Spiel", zustand: "nicht_gesucht" },
+			{ quelle: "spiel", title: "Zur Pruefung", zustand: "zur_pruefung" },
+			{ quelle: "spiel", title: "Abgelehnt", zustand: "abgelehnt" },
 		]);
 	});
 });

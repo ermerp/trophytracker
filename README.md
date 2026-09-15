@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 10 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 11 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -26,7 +26,9 @@ zurückliefert. Stufe 8 sichert ihn wöchentlich ins private Repository und
 liefert den CSV-Export (Use Case 13). Stufe 9 holt Cover, Kritikerwertung und
 Erscheinungsdatum von IGDB; Stufe 10 baut darauf die Wunschliste mit Favoriten,
 Priorität und Rang (Use Case 4) – die erste der vier Absichts-Listen, deren
-Routen und Repository auch To-Do, Backlog und Kaufliste tragen werden.
+Routen und Repository auch To-Do, Backlog und Kaufliste tragen werden. Stufe 11
+holt die alten Wunschlisten aus Textdateien herein (Use Case 9) und sammelt
+alles ohne IGDB-Eintrag in einer Ansicht zum Nachziehen (Use Case 12).
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -43,7 +45,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 18 Tabellen, 7 Views, elf Migrationen |
+| Schema | 21 Tabellen, 7 Views, zwölf Migrationen |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
@@ -64,19 +66,19 @@ Was steht und in Betrieb nachgewiesen ist:
 | Export | Sieben CSV-Listen und die JSON-Vollsicherung, verlinkt in den Einstellungen |
 | Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
 | IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar. **Abgenommen am 14.09.2026: 419 von 420 verknüpft**, eines bewusst abgelehnt (Vita-Wecker-App, IGDB kennt sie nicht) |
-| Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer (Stand vor Migration 0011, seitdem 20 Indizes) |
+| Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer (Stand vor Migration 0011; seit Migration 0012 sind es 21 Tabellen und 25 Indizes) |
 | Wunschliste | Eigene Ansicht in der Leiste: nach Rang sortiert (berechnet, nie gespeichert), Favoriten-Filter, Priorität 1–5, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform wählbar und standardmäßig leer – ohne Plattform ein Spiel ohne Release, mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026** |
 | Rangformel | Gewichte in den Einstellungen verstellbar; `src/domain/rang.ts` ist die eine Stelle für die Formel |
+| Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
+| Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 11 – Wunschlisten-Import mit Suche, Ansicht „Ohne
-Zuordnung"** (Use Cases 9 und 12). Die Routen `/api/plans` und die IGDB-Suche
-mit dem Knopf „Ohne IGDB-Eintrag übernehmen" stehen seit Stufe 10; der Import
-setzt darauf auf und nimmt die rohen Jahresdateien wie die bereinigte Liste
-(`wunschlisten/wunschliste-bereinigt.txt`, lokal) an – Befunde in
-[Abschnitt 8.2](docs/spezifikation.md#82-wunschlisten-import-aus-textdateien-use-case-9).
+**Als Nächstes: Stufe 12 – To-Do und Backlog** mit Sortierung und
+Kandidatenvorschlägen (Use Cases 5a und 5b). Routen und Repository kennen alle
+vier Arten seit Stufe 10; `PUT /api/plans/reorder` und `v_backlog_kandidaten`
+warten darauf.
 
 ## Architektur in einem Absatz
 
@@ -322,7 +324,9 @@ POST /api/igdb/abgleich          ein Schritt, { weiter } solange etwas offen ist
 POST /api/igdb/auffrischen       50 Spiele in einer IGDB-Anfrage
 GET  /api/igdb/offen             Prüfansicht mit Kandidaten
 POST /api/igdb/erneut-suchen     offene Spiele zurück in den Abgleich
-GET  /api/igdb/search?q=&plattformen=  Suche mit Rückfällen, auch für Import und Nachpflege (Stufe 11)
+GET  /api/igdb/search?q=&plattformen=  Suche mit Rückfällen, auch für Import und Nachpflege
+GET  /api/unmatched?abgelehnte=1 alles ohne IGDB-Eintrag (v_ohne_igdb), abgelehnte nur mit Parameter
+POST /api/unmatched/plan_wunsch/:id/link  Freitext-Eintrag einem IGDB-Treffer zuordnen (auch plan_todo, plan_backlog, plan_kauf)
 ```
 
 **Alte Wunschlisten** gehören als Textdateien in `wunschlisten/` (lokal,
@@ -330,8 +334,9 @@ per `.gitignore` ausgeschlossen). Sie sind am 14.09.2026 gegen Sammlung und
 IGDB gemessen worden – 332 Zeilen, 20 schon in der Sammlung, 199 eindeutig,
 76 mit Kandidaten, 37 ohne Treffer. Daraus ist `wunschlisten/wunschliste-bereinigt.txt`
 entstanden (tabulatorgetrennt: Datum, Titel, Plattform, Status, Original,
-Hinweis); der Import in Stufe 11 nimmt die rohen Jahresdateien und diese Form.
-Alles sind Wünsche, auch schon Gespieltes – Folgerungen in
+Hinweis); der Import nimmt die rohen Jahresdateien und diese Form, siehe
+[Wunschlisten-Import](#wunschlisten-import). Alles sind Wünsche, auch schon
+Gespieltes – Folgerungen in
 [Spezifikation 8.2](docs/spezifikation.md#82-wunschlisten-import-aus-textdateien-use-case-9).
 
 ## Zugriffsschutz
@@ -621,6 +626,52 @@ Sammlung, solange es nur den Wunsch trägt** – ein Wunsch ist kein Besitz. Im
 Spieldetail ist es immer sichtbar. Ein Wunsch am Spiel und einer an einem
 seiner Releases sind zwei verschiedene Aussagen und blockieren sich nicht; nur
 dasselbe Ziel derselben Art antwortet mit `409`.
+
+### Wunschlisten-Import
+
+Seit Stufe 11 unter `/import` (Werkzeug in den Einstellungen, Link auf der
+Wunschliste). Eine Datei oder eingefügter Text, ein Titel pro Zeile. Erkannt
+werden Jahreslisten mit Überschriften `-Januar` … `-Dezember` (auch mit
+Tippfehlern), Listen mit Abschnitten `PS4` / `PS3`, die bereinigte Tabellenform
+(Datum, Titel, Plattform; die übrigen Spalten werden ignoriert) und einfache
+Listen. UTF-8 mit oder ohne BOM, sonst Windows-1252; das Jahr kommt aus dem
+Dateinamen und ist vor dem Einlesen korrigierbar.
+
+Der Import ist ein **Lauf in der Datenbank** (`wishlist_import*`, nicht in der
+Sicherung – die Quelldateien liegen bei dir, das Ergebnis in `plan_entry`):
+
+```
+POST   /api/imports/wishlist                     { text, dateiname?, jahr? } → Lauf mit Zeilen
+GET    /api/imports/wishlist[/:id][?gruppe=klar|unklar|uebersprungen|uebernommen]
+POST   /api/imports/wishlist/:id/abgleich        ein Schritt, acht Zeilen, { weiter }
+POST   /api/imports/wishlist/:id/uebernehmen     ein Schritt, 25 klare Zeilen
+POST   /api/imports/wishlist/:id/zeilen/:z/entscheiden   { aktion: igdb|freitext|ueberspringen|zuruecknehmen }
+PATCH  /api/imports/wishlist/:id/zeilen/:z       { titel } – umbenennen, neu suchen
+POST   /api/imports/wishlist/:id/zeilen/:z/aufteilen     { titel: [...] }
+DELETE /api/imports/wishlist/:id
+```
+
+Der Abgleich läuft in Schritten wie der IGDB-Abgleich – erst gegen die
+Sammlung über den Titelschlüssel, dann gegen IGDB; das Jahr aus der Liste
+entscheidet Gleichnamige („Layers of Fear" 2016 oder 2023) und wird sonst
+nicht gespeichert. Eindeutige Treffer, Sammlungstreffer und schon angelegte
+Spiele sind **ein Block mit einem Knopf**; ein digital gespieltes Spiel bleibt
+ein Wunsch – „physisch besitzen wollen". Mehrdeutige und Zeilen ohne Treffer
+stehen als Liste zur Einzelentscheidung: Kandidat übernehmen, anders suchen,
+„Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen („Mass Effect 1+2+3"),
+überspringen. Jede Entscheidung ist sofort gespeichert und überlebt ein
+Neuladen; Rückgängig löscht den angelegten Wunsch wieder. Nennt die Liste eine
+Plattform, hängt der Wunsch am Release dieser Plattform (entsteht bei Bedarf);
+sonst am Spiel. Hängt am Ziel schon ein offener Wunsch, wird die Zeile als
+„schon auf der Wunschliste" ausgelassen – ein zweiter Import derselben Datei
+erzeugt keine Dubletten.
+
+### Ohne Zuordnung
+
+`/ohne-zuordnung` sammelt alles ohne IGDB-Eintrag: Freitext-Einträge aus allen
+vier Listen, Spiele in der IGDB-Zuordnung, noch nicht gesuchte Spiele – mit
+demselben Suchfeld zum Nachziehen. Abgelehnte („gibt es bei IGDB nicht")
+stehen hinter „auch abgelehnte zeigen" mit „Doch suchen".
 
 ## Export
 

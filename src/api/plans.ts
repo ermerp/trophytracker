@@ -8,11 +8,11 @@ import {
 	type PlanZeile,
 	type PlanZiel,
 } from "../db/plan";
-import { heuteIso, metadatenAus, normalisiereTrefferliste, type IgdbKandidat } from "../domain/igdb";
 import { rang } from "../domain/rang";
 import type { Weights } from "../domain/weights";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
+import { zielAusIgdbId } from "../sync/plan-ziel";
 import { istErlaubtePlattform, type Plattform } from "../domain/titel";
 import type { AppEnv } from "../types";
 import { liesJson } from "./validierung";
@@ -184,7 +184,7 @@ export const planRoutes = new Hono<AppEnv>()
 		}
 
 		let ziel: PlanZiel;
-		let igdb: IgdbKandidat | null = null;
+		let spielAngelegt = false;
 		switch (quellen[0]) {
 			case "titel": {
 				if (typeof k.titel !== "string" || k.titel.trim() === "") {
@@ -216,19 +216,16 @@ export const planRoutes = new Hono<AppEnv>()
 				if (igdbId === null) return c.json({ fehler: "Feld 'igdbId' ist ungültig." }, 400);
 				if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
 
-				let vorhanden = await c.var.repos.games.spielNachIgdbId(igdbId);
-				if (vorhanden === null) {
-					try {
-						igdb = normalisiereTrefferliste(await c.var.igdb.nachIds([igdbId]))[0] ?? null;
-					} catch (fehler) {
-						if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
-						return c.json({ fehler: meldungFuer(fehler) }, 502);
-					}
-					if (!igdb) return c.json({ fehler: "IGDB kennt diesen Eintrag nicht." }, 404);
-					vorhanden = await c.var.repos.games.spielOhneRelease(igdb.name);
-					await c.var.repos.igdb.verknuepfen(vorhanden, metadatenAus(igdb, heuteIso()), "manuell");
+				let ergebnis: Awaited<ReturnType<typeof zielAusIgdbId>>;
+				try {
+					ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, plattform);
+				} catch (fehler) {
+					if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
+					return c.json({ fehler: meldungFuer(fehler) }, 502);
 				}
-				ziel = { gameId: vorhanden };
+				if (!ergebnis) return c.json({ fehler: "IGDB kennt diesen Eintrag nicht." }, 404);
+				ziel = ergebnis.ziel;
+				spielAngelegt = ergebnis.spielAngelegt;
 				break;
 			}
 		}
@@ -245,7 +242,7 @@ export const planRoutes = new Hono<AppEnv>()
 		const zeile = await c.var.repos.plan.eintrag(id);
 		if (!zeile) throw new Error("Eintrag nach dem Anlegen nicht gefunden.");
 		return c.json(
-			{ ...eintragAntwort(zeile, await c.var.repos.settings.getWeights()), spielAngelegt: igdb !== null },
+			{ ...eintragAntwort(zeile, await c.var.repos.settings.getWeights()), spielAngelegt },
 			201,
 		);
 	})

@@ -191,11 +191,19 @@ export function releaseStatusAus(datum: string | null, heute: string): ReleaseSt
  * Ergebnis der Messung am 14.09.2026: 372 von 420 eindeutig, 5 mehrdeutig, 32 mit
  * Kandidaten ohne Schluesseltreffer, 11 ohne Treffer; keine Fehlzuordnung in den
  * Stichproben. Der Rest geht mit Kandidaten in die Pruefansicht.
+ *
+ * Vierte Verfeinerung fuer den Wunschlisten-Import (8.2): Bleiben danach
+ * mehrere Kandidaten und ist ein Jahr aus der Liste bekannt, gewinnt der
+ * einzige, dessen Erscheinungsjahr im selben oder angrenzenden Jahr liegt -
+ * "Layers of Fear" 2016 und das Remake 2023 stehen beide auf den Listen,
+ * und der Monat aus der Liste liegt meist im richtigen Jahr. Ohne Jahr
+ * (Abgleich der Sammlung) aendert sich nichts.
  */
 export function eindeutigerTreffer(
 	schluessel: string,
 	plattformenDesSpiels: readonly string[],
 	kandidaten: readonly IgdbKandidat[],
+	jahr: number | null = null,
 ): IgdbKandidat | null {
 	const gleich = kandidaten.filter((k) => titelSchluessel(k.name) === schluessel);
 	const ids = new Set(gleich.map((k) => k.igdbId));
@@ -211,7 +219,12 @@ export function eindeutigerTreffer(
 
 	const ohneBundles = passend.filter((k) => k.typId !== TYP_BUNDLE);
 	const engere = ohneBundles.length > 0 ? ohneBundles : passend;
-	return engere.length === 1 ? engere[0] : null;
+	if (engere.length === 1) return engere[0];
+	if (engere.length > 1 && jahr !== null) {
+		const imJahr = engere.filter((k) => k.releaseDate !== null && Math.abs(Number(k.releaseDate.slice(0, 4)) - jahr) <= 1);
+		if (imJahr.length === 1) return imJahr[0];
+	}
+	return null;
 }
 
 /**

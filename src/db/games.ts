@@ -623,6 +623,15 @@ aeenliste haengt
 		return r?.id ?? null;
 	}
 
+	/** Releases eines Spiels, fuer die Release-Wahl beim Wunschlisten-Import (8.2). */
+	async releasesVon(gameId: number): Promise<Array<{ id: number; platform: string }>> {
+		const { results } = await this.db
+			.prepare("SELECT id, platform FROM release WHERE game_id = ? ORDER BY id")
+			.bind(gameId)
+			.all<{ id: number; platform: string }>();
+		return results;
+	}
+
 	async spielExistiert(id: number): Promise<boolean> {
 		const r = await this.db.prepare("SELECT 1 AS x FROM game WHERE id = ?").bind(id).first();
 		return r !== null;

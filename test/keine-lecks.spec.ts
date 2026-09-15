@@ -113,6 +113,23 @@ const IGDB_ROUTEN = (app: ReturnType<typeof createApp>) => [
 	}),
 	ruf(app, "/api/unmatched/spiel/1/ablehnen", { method: "POST" }),
 	ruf(app, "/api/unmatched/spiel/1/suchen", { method: "POST" }),
+	// Stufe 11: Import und Nachpflege. Lauf 1 / Zeile 1 entstehen im beforeEach.
+	ruf(app, "/api/unmatched?abgelehnte=1"),
+	ruf(app, "/api/unmatched/plan_wunsch/1/link", {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ igdbId: 1001 }),
+	}),
+	ruf(app, "/api/imports/wishlist"),
+	ruf(app, "/api/imports/wishlist/1"),
+	ruf(app, "/api/imports/wishlist/1?gruppe=unklar"),
+	ruf(app, "/api/imports/wishlist/1/abgleich", { method: "POST" }),
+	ruf(app, "/api/imports/wishlist/1/uebernehmen", { method: "POST" }),
+	ruf(app, "/api/imports/wishlist/1/zeilen/1/entscheiden", {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ aktion: "igdb", igdbId: 1001 }),
+	}),
 ];
 
 /** PSN-Client, der ueberall scheitert - fuer die Fehlerpfade. */
@@ -140,8 +157,13 @@ beforeEach(async () => {
 		env.DB.prepare("DELETE FROM psn_sync_run"),
 		env.DB.prepare("DELETE FROM psn_credentials"),
 		env.DB.prepare("DELETE FROM igdb_candidate"),
+		env.DB.prepare("DELETE FROM wishlist_import"),
+		env.DB.prepare("DELETE FROM plan_entry"),
 		env.DB.prepare("DELETE FROM game"),
 		env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (1, 'Bloodborne', 'bloodborne')"),
+		env.DB.prepare("INSERT INTO plan_entry (id, kind, title_raw, origin) VALUES (1, 'wunsch', 'Nur Text', 'manuell')"),
+		env.DB.prepare("INSERT INTO wishlist_import (id, form) VALUES (1, 'einfach')"),
+		env.DB.prepare("INSERT INTO wishlist_import_line (id, import_id, position, title, originals) VALUES (1, 1, 1, 'Bloodborne', '[\"Bloodborne\"]')"),
 	]);
 });
 

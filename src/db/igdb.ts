@@ -38,6 +38,13 @@ export type IgdbZaehlung = {
 
 export type Verknuepfungsquelle = "automatisch" | "manuell";
 
+export type OhneZuordnungZeile = {
+	quelle: "spiel" | "plan_wunsch" | "plan_todo" | "plan_backlog" | "plan_kauf";
+	ref_id: number;
+	title: string;
+	zustand: "nicht_gesucht" | "zur_pruefung" | "abgelehnt" | "freitext";
+};
+
 /**
  * Buchfuehrung des IGDB-Abgleichs auf `game` und die Kandidaten in
  * `igdb_candidate` (Abschnitt 7.6).
@@ -289,6 +296,22 @@ export class IgdbRepository {
 			.bind(...ids)
 			.all<KandidatZeile>();
 		return { spiele, kandidaten, gesamt };
+	}
+
+	/**
+	 * Alles ohne IGDB-Zuordnung, listenuebergreifend (v_ohne_igdb, 8.3).
+	 * Abgelehnte Spiele nur auf Wunsch - die Ablehnung ist eine gespeicherte
+	 * Entscheidung und steht standardmaessig nicht im Weg.
+	 */
+	async ohneZuordnung(mitAbgelehnten: boolean): Promise<OhneZuordnungZeile[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT quelle, ref_id, title, zustand FROM v_ohne_igdb " +
+					(mitAbgelehnten ? "" : "WHERE zustand <> 'abgelehnt' ") +
+					"ORDER BY quelle, title",
+			)
+			.all<OhneZuordnungZeile>();
+		return results;
 	}
 
 	async zaehlung(): Promise<IgdbZaehlung> {
