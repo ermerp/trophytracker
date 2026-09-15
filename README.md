@@ -29,6 +29,7 @@ Erscheinungsdatum von IGDB; Stufe 10 baut darauf die Wunschliste mit Favoriten
 Routen und Repository auch To-Do, Backlog und Kaufliste tragen werden. Stufe 11
 holt die alten Wunschlisten aus Textdateien herein (Use Case 9) und sammelt
 alles ohne IGDB-Eintrag in einer Ansicht zum Nachziehen (Use Case 12).
+**Abgenommen am 15.09.2026**, die ersten drei Listen sind importiert.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
