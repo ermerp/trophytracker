@@ -950,6 +950,8 @@ Serienerfassung: nach jedem erkannten Code wird die Auflösung eingeblendet, ohn
 
 Stufen 1, 3 und 4 laufen ohne Feed. Der Barcode-Scan hängt damit **nicht** an der AWIN-Freigabe; Stufe 2 ist eine Verbesserung, kein Fundament.
 
+**Keine externe EAN-Quelle (Entscheidung des Nutzers vom 16.09.2026, gemessen mit drei Codes seiner Discs – Darksiders PS3, Fallout 4 PS4, Hogwarts Legacy PS5):** `upcitemdb` (frei) kannte 1 von 3, mit Händlertitel („Ps3 / Sony Playstation 3 Game - Darksiders [standard] En/ger Boxed"); ean-suche.de blockt automatische Abfragen und bietet die API nur gegen Account; Websuchen liefern Bot-Challenges (DuckDuckGo) oder brauchen bezahlte Schlüssel (Google), Bing ist eingestellt, Brave wäre ein Freikontingent mit Rateheuristik über Seitenüberschriften; IGDB kennt keine Barcodes. Für das **Regal erfassen** bringt eine Vorbelegung ohnehin wenig – die Disc liegt vor, die Auswahl aus der eigenen Sammlung ist ein Tipp. Eine Quelle lohnte nur für **„im Laden prüfen"** (fremder Code → habe ich das schon, steht es auf der Kaufliste?); dieses Szenario ist **nicht Teil von Stufe 17**. Die Auswahl (Stufe 3 der Kette) wird so gebaut, dass sich später ein Titelvorschlag aus einer Quelle einhängen lässt, erst nach einer Messung mit mehr Codes (> 2 von 3 als Schwelle).
+
 ```sql
 CREATE TABLE ean_mapping (
   ean           TEXT PRIMARY KEY,
