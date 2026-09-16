@@ -256,6 +256,8 @@ export function ordneKandidaten(
 /** Die Spalten, die eine Verknuepfung oder Auffrischung in `game` schreibt. */
 export type IgdbMetadaten = {
 	igdbId: number;
+	/** Der IGDB-Name; wird zum Titel eines Spiels ohne Trophaeenliste (7.6). */
+	name: string;
 	igdbSlug: string | null;
 	coverUrl: string | null;
 	releaseDate: string | null;
@@ -267,6 +269,7 @@ export type IgdbMetadaten = {
 export function metadatenAus(k: IgdbKandidat, heute: string): IgdbMetadaten {
 	return {
 		igdbId: k.igdbId,
+		name: k.name,
 		igdbSlug: k.slug,
 		coverUrl: k.coverUrl,
 		releaseDate: k.releaseDate,
