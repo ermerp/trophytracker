@@ -389,10 +389,11 @@ CREATE INDEX idx_plan_offen ON plan_entry(kind, status, position);
 | `wunsch` | auf Kaufliste gesetzt | `kauf`, `origin='wunsch'` |
 | Lücke (abgeleitet) | auf Kaufliste gesetzt | `kauf`, `origin='luecke'` |
 | `kauf` | `physical_copy` oder `digital_entitlement` angelegt | `status='erledigt'`, optional neuer `todo`- oder `backlog`-Eintrag |
+| `wunsch` | `physical_copy` oder `digital_entitlement` am Release angelegt, ohne den Umweg über die Kaufliste | `status='erledigt'` – **in Stufe 15 zu bauen** (Entscheidung des Nutzers vom 16.09.2026, Anlass: Anno 117 als Disc erfasst, Wunsch blieb offen) |
 | `backlog` | hochgezogen | `todo`, mit `position` |
-| `todo` / `backlog` | `play_status` wird `durchgespielt`/`komplettiert`/`abgebrochen` | `status='erledigt'` |
+| `todo` / `backlog` | `play_status` wird `durchgespielt`/`komplettiert`/`abgebrochen` | `status='erledigt'` – seit 5.5 automatisch |
 
-Diese Übergänge werden vorgeschlagen, nicht erzwungen. Beim Erfassen einer Disc erscheint ein Hinweis "Stand auf deiner Kaufliste – erledigt setzen und ins Backlog übernehmen?".
+Diese Übergänge werden vorgeschlagen, nicht erzwungen (Ausnahme: die Kopplung in 5.5). Beim Erfassen einer Disc erscheint ein Hinweis "Stand auf deiner Kaufliste – erledigt setzen und ins Backlog übernehmen?" – ab Stufe 15 ebenso für einen offenen Wunsch am selben Release; der Import hängt Wünsche an vorhandene Releases (`vorhanden`), deshalb liegen rund 20 Wünsche auf Spielen der Sammlung.
 
 **Der Übergang `todo`/`backlog` → `erledigt`** war in Version 28 ein Vorschlag mit Knopf; seit der Kopplung (5.5, 16.09.2026) geschieht er von selbst, sobald die Bewertung `durchgespielt`, `komplettiert` oder `abgebrochen` wird. `GET /api/plans` liefert je Eintrag `eigenerStatus` (die Bewertung am Release, 4.2).
 

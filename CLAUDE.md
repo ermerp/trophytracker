@@ -45,6 +45,12 @@ Der Sync ändert `play_status` **nur** beim allerersten Import eines Titels (100
 
 Dasselbe gilt für Zuordnungen: Ein einmal gesetztes `trophy_progress.release_id` wird von keinem automatischen Prozess überschrieben.
 
+**To-Do und Backlog sind mit `play_status` gekoppelt** (Abschnitt 5.5, Entscheidung des Nutzers vom 16.09.2026): To-Do heißt `am_spielen`, Backlog `pausiert` (nie gestartete bleiben `nicht_gespielt`); eine Bewertung legt den Eintrag an, hängt ihn um oder erledigt ihn. Das ist kein dritter automatischer Pfad, sondern dieselbe Nutzerentscheidung in zwei Darstellungen – jeder Schreibpfad läuft über `src/db/kopplung.ts`, der Sync nie. Wer einen neuen Weg auf eine der beiden Listen oder einen neuen Weg zum Status baut, koppelt dort mit.
+
+### Nur PS3, PS4, PS5 und PS Vita
+
+Spiele anderer Plattformen dürfen nirgends auftauchen – nicht in Suche, Kandidaten, Listen oder Zuordnung. Ein IGDB-Eintrag ist nur ein Treffer, wenn er eine der vier Plattformen **nennt**; fehlende Angabe ist kein „vielleicht" (7.6 – die frühere Ausnahme ließ einen PC-Eintrag als PS4-Wunsch durch, vom Nutzer am 16.09.2026 zweimal angemahnt). Jede neue Datenquelle (Feed, Store, Barcode) bekommt dieselbe Prüfung und wird gegen die echten Verknüpfungen gemessen, bevor sie live geht.
+
 ### Dreiwertige Felder nicht zu Booleans vereinfachen
 
 `release.physical_release_status` ist `ja` / `nein` / `unbekannt`. Fehlende Daten sind `unbekannt`, niemals `nein`. Ein `nein` setzt ausschließlich der Nutzer von Hand.
@@ -113,7 +119,7 @@ Das gilt für PSN. IGDB-Antworten werden **nicht** roh abgelegt — offizielle S
 
 ### Titelnormalisierung ist geteilte Logik
 
-`src/domain/titel.ts` hält `titelSchluessel` (aggressiv, nur zum Vergleichen) und `anzeigeTitel` (zurückhaltend, für `game.title`). Beide werden ab Stufe 9 auch für IGDB und ab Stufe 11 für den Wunschlisten-Import gebraucht — Änderungen dort wirken auf alle Abgleiche. `trophy_progress.title_name` bleibt immer der Rohwert von Sony.
+`src/domain/titel.ts` hält `titelSchluessel` (aggressiv, nur zum Vergleichen) und `anzeigeTitel` (zurückhaltend, für `game.title`). Beide werden ab Stufe 9 auch für IGDB und ab Stufe 11 für den Wunschlisten-Import gebraucht — Änderungen dort wirken auf alle Abgleiche. `trophy_progress.title_name` bleibt immer der Rohwert von Sony. `game.title` eines Spiels **mit** Trophäenliste bleibt der daraus normalisierte Titel; ein Spiel **ohne** Trophäenliste (von Hand, aus einem Wunsch) übernimmt beim Verknüpfen den IGDB-Namen, nur dann, nie beim Auffrischen – was der Nutzer umbenennt, bleibt (7.6).
 
 **`game.sort_title` ist abgeleitet und veraltet still**, wenn sich `titelSchluessel` ändert. Nach jeder Änderung an der Normalisierung `POST /api/games/schluessel-neu-berechnen` aufrufen — sonst findet die automatische Zuordnung über `sort_title` falsche oder gar keine Kandidaten. Die Ansicht „Sammlung prüfen" markiert veraltete Schlüssel. Wo der Titel ohnehin vorliegt, den Schlüssel frisch berechnen statt `sort_title` zu lesen; die Spalte ist nur für SQL-Lookups da.
 
