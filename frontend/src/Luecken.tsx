@@ -12,7 +12,10 @@ import { STATUSTEXT, anfrage, euro, type DiscFassung, type PlayStatus } from './
  * Darunter „Disc-Fassung unbekannt": digital gespielt, nicht im Regal, aber
  * ohne Beleg für eine Disc (Entscheidung des Nutzers vom 16.09.2026, Block
  * B). Dort entsteht das „nein" von Hand – oder ein „ja", wenn er es besser
- * weiß als IGDB. Preise kommen mit Stufe 18; bis dahin steht „unbekannt".
+ * weiß als IGDB; „physisch nicht gewünscht" gibt es auch hier (Wunsch des
+ * Nutzers vom 16.09.2026): Die Frage nach der Disc bleibt offen, die Absicht
+ * ist trotzdem entschieden. Preise kommen mit Stufe 18; bis dahin steht
+ * „unbekannt".
  */
 
 type Luecke = {
@@ -167,7 +170,8 @@ export function Luecken() {
         </h2>
         <p className="zeile">
           Digital gespielt und nicht im Regal, aber ohne Beleg, dass es eine Disc gibt. „Disc gibt es" macht daraus eine Lücke, „gibt es nicht" nimmt das
-          Release dauerhaft heraus – beides gilt als deine Entscheidung und wird von IGDB nicht mehr überschrieben.
+          Release dauerhaft heraus – beides gilt als deine Entscheidung und wird von IGDB nicht mehr überschrieben. „physisch nicht gewünscht" lässt die
+          Frage offen und blendet das Release trotzdem aus: ob es die Disc gibt, ist dir dann egal.
         </p>
         {moeglichOffen &&
           (!daten ? (
@@ -178,8 +182,15 @@ export function Luecken() {
             <ul className="kandidatenliste">
               {daten.moeglich.map((l) => (
                 <LueckeZeile key={l.releaseId} l={l}>
-                  <button type="button" className="klein" disabled={laeuft} onClick={() => discSetzen(l, 'ja')}>Disc gibt es</button>
-                  <button type="button" className="klein" disabled={laeuft} onClick={() => discSetzen(l, 'nein')}>gibt es nicht</button>
+                  {l.verworfen ? (
+                    <button type="button" className="klein" disabled={laeuft} onClick={() => wiederZeigen(l)}>wieder zeigen</button>
+                  ) : (
+                    <>
+                      <button type="button" className="klein" disabled={laeuft} onClick={() => discSetzen(l, 'ja')}>Disc gibt es</button>
+                      <button type="button" className="klein" disabled={laeuft} onClick={() => discSetzen(l, 'nein')}>gibt es nicht</button>
+                      <button type="button" className="klein" disabled={laeuft} onClick={() => verwerfen(l)}>physisch nicht gewünscht</button>
+                    </>
+                  )}
                 </LueckeZeile>
               ))}
             </ul>

@@ -247,6 +247,19 @@ describe("GET /api/gaps und verwerfen", () => {
 		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM release").first()).toEqual({ n: 4 });
 	});
 
+	it("verwirft auch ein Release mit unbekannter Disc-Fassung - die Frage bleibt offen, der Block blendet es aus", async () => {
+		await spiel(1, null, [["PS4", "unbekannt"]]);
+		const id = (await env.DB.prepare("SELECT id FROM release").first<{ id: number }>())!.id;
+		await trophaeen(id, 50);
+
+		expect((await post(`/api/gaps/${id}/verwerfen`)).status).toBe(201);
+		const standard = await json(await SELF.fetch(`${B}/api/gaps?unbekannte=1`));
+		expect(standard.body).toMatchObject({ anzahl: 0, verworfen: 1, unbekannt: 0, moeglich: [] });
+		const alles = await json(await SELF.fetch(`${B}/api/gaps?unbekannte=1&verworfene=1`));
+		expect(alles.body.moeglich.map((l: any) => [l.discFassung, l.verworfen])).toEqual([["unbekannt", true]]);
+		expect(await env.DB.prepare("SELECT physical_release_status AS s FROM release").first()).toEqual({ s: "unbekannt" });
+	});
+
 	it("weist verwerfen ab, wenn schon ein offener Kaufeintrag am Release haengt", async () => {
 		await spiel(1, null, [["PS4", "ja", "igdb"]]);
 		const id = (await env.DB.prepare("SELECT id FROM release").first<{ id: number }>())!.id;
