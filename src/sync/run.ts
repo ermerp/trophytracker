@@ -1,4 +1,5 @@
 import type { Repositories } from "../db";
+import { einreihungSumme, type Einreihung } from "../db/review";
 import { normalisiereSeite } from "../domain/normalize";
 import { Geheimnis } from "../domain/secret";
 import {
@@ -22,8 +23,10 @@ export type SyncErgebnis = {
 	offeneSeiten?: number;
 	/** Am Ende der Normalisierung: vorbelegte play_status-Zeilen (Abschnitt 4.2). */
 	vorbelegt?: number;
-	/** Am Ende der Normalisierung: neu in die Pruefliste eingereiht (Abschnitt 8.1). */
+	/** Am Ende der Normalisierung: neu in die Pruefliste eingereiht (Abschnitt 8.1), Summe. */
 	eingereiht?: number;
+	/** Dieselbe Zahl je Grund: erstimport, neueTrophaeen, dlcErweitert (Aenderungserkennung, Stufe 13). */
+	eingereihtNachGrund?: Pick<Einreihung, "erstimport" | "neueTrophaeen" | "dlcErweitert">;
 	weiter: boolean;
 	meldung?: string;
 };
@@ -190,8 +193,11 @@ export async function normalisierungsSchritt(
 		// 'nicht_gespielt' - ein gesetzter Status ueberlebt jeden Sync.
 		const vorbelegt = await repos.playStatus.vorbelegen();
 		// Abschnitt 8.1: Der Sync schreibt nur in die Warteschlange, nie einen
-		// Status. Stufe 7 kennt nur 'erstimport'.
-		const { eingereiht } = await repos.review.einreihen();
+		// Status - nie durchgesehene Listen als 'erstimport', Aenderungen
+		// gegenueber dem Stempel der letzten Durchsicht als 'neue_trophaeen'
+		// oder 'dlc_erweitert'.
+		const { erstimport, neueTrophaeen, dlcErweitert } = await repos.review.einreihen();
+		const eingereihtNachGrund = { erstimport, neueTrophaeen, dlcErweitert };
 
 		const gesamt = await repos.trophies.anzahl();
 		await repos.sync.abschliessen(laufId, gesamt);
@@ -204,7 +210,8 @@ export async function normalisierungsSchritt(
 			titlesSeen: gesamt,
 			offeneSeiten: 0,
 			vorbelegt,
-			eingereiht,
+			eingereiht: einreihungSumme(eingereihtNachGrund),
+			eingereihtNachGrund,
 			weiter: false,
 		};
 	}

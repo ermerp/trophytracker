@@ -22,6 +22,7 @@ export type TrophyListe = {
  *   release_id                    - die Zuordnung, die der Nutzer trifft
  *   reviewed_earned_total         - Referenzstand der letzten Durchsicht
  *   reviewed_defined_total
+ *   reviewed_progress_pct
  *   reviewed_at
  *
  * Sie fehlen deshalb bewusst im ON-CONFLICT-Zweig unten. Wer dort ein Feld

@@ -158,7 +158,7 @@ export function Pruefliste() {
           <h2>
             <Link to={`/spiel/${e.spielId}`}>{e.titel}</Link> <span className="zeile">{e.plattform}</span>
           </h2>
-          {e.detail && <p className="hinweis">{e.detail}</p>}
+          {e.detail && <p className={e.grund === 'erstimport' ? 'hinweis' : 'vergleich'}>{e.detail}</p>}
           {e.fortschritt === null ? (
             <p className="zeile">keine Trophäenliste</p>
           ) : (

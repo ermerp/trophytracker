@@ -124,7 +124,9 @@ export class PlayStatusRepository {
 	 * Durchsicht festhalten (Abschnitt 8.1): reviewed_* auf den aktuellen
 	 * Trophaeenstand stempeln und den offenen Pruefeintrag entfernen. Von
 	 * setzen und von der Pruefliste gemeinsam benutzt, damit "durchgesehen"
-	 * ueberall dasselbe heisst.
+	 * ueberall dasselbe heisst. Der Prozentwert kommt mit, weil er sich aus
+	 * den Zaehlern nicht rekonstruieren laesst (Sony gewichtet) und die
+	 * Aenderungserkennung ihn fuer "100 % → 78 %" braucht.
 	 */
 	stempelStatements(releaseId: number): D1PreparedStatement[] {
 		return [
@@ -133,6 +135,7 @@ export class PlayStatusRepository {
 					"UPDATE trophy_progress SET " +
 						"reviewed_earned_total = earned_bronze + earned_silver + earned_gold + earned_platinum, " +
 						"reviewed_defined_total = defined_bronze + defined_silver + defined_gold + defined_platinum, " +
+						"reviewed_progress_pct = progress_pct, " +
 						"reviewed_at = datetime('now') WHERE release_id = ?",
 				)
 				.bind(releaseId),

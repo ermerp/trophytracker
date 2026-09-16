@@ -14,11 +14,11 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 12 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 13 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
-Die Prüfliste führt einmal durch den ganzen Bestand (Use Case 8, vorerst nur
+Die Prüfliste führt einmal durch den ganzen Bestand (Use Case 8, zunächst nur
 `erstimport`). **Die Ersteinrichtung ist am 14.09.2026 durchlaufen:** alle 431
 Trophäenlisten sind bewertet, die Warteschlange ist leer. Damit steht der
 Datenbestand – und ab hier steckt darin Arbeit, die PlayStation nicht
@@ -35,7 +35,12 @@ Besitz (Use Cases 5a und 5b); nach der ersten Durchsicht am 16.09.2026 sind
 beide Listen mit der Bewertung gekoppelt (To-Do = am Spielen, Backlog =
 pausiert, Migration 0015), IGDB-Einträge ohne PlayStation-Plattform sind
 nirgends mehr ein Treffer, und die Listen haben ein Suchfeld.
-**Abgenommen am 16.09.2026.**
+**Abgenommen am 16.09.2026.** Stufe 13 macht Use Case 8 vollständig: Der Sync
+vergleicht jede Liste mit dem Stempel ihrer letzten Durchsicht und legt in der
+Prüfliste vor, was sich seither geändert hat – „Du hast weitergespielt"
+(`neue_trophaeen`, nicht bei `am_spielen`) und „Neue DLC-Trophäen erschienen"
+(`dlc_erweitert`), mit Vorher-Nachher in Prozent (Migration 0016). Der Sync
+ändert dabei nie einen Status.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -64,7 +69,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Navigation | `react-router-dom`, Leiste unten (Handy) bzw. seitlich (Desktop), Filter in der URL |
 | Bewertung | Status, Bewertung 1–10, Begonnen/Beendet, Notiz je Release; Vorbelegung beim ersten Auftreten einer Trophäenliste, danach nie mehr automatisch angefasst |
 | Abweichungen | Trophäenstand und Bewertung passen nicht zusammen – zur Durchsicht in den Einstellungen |
-| Prüfliste | Ein Spiel pro Bildschirm, sechs Aktionen (Tasten 1–6; „Spiele gerade" ging mit der Kopplung in „Auf To-Do" auf), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung. 100 % wird nicht vorgelegt, sondern still gestempelt |
+| Prüfliste | Ein Spiel pro Bildschirm, sechs Aktionen (Tasten 1–6; „Spiele gerade" ging mit der Kopplung in „Auf To-Do" auf), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung. 100 % wird nicht vorgelegt, sondern still gestempelt. Drei Gründe: `erstimport`, `neue_trophaeen` („40 % → 55 %, 3 neue Trophäen erspielt"), `dlc_erweitert` („100 % → 78 %, Liste um 12 Trophäen gewachsen") – der Vergleich läuft gegen den Stempel der letzten Durchsicht, Migration 0016 |
 | Datenbestand | 431 Trophäenlisten, 420 Spiele; bewertet: 167 komplettiert, 119 abgebrochen, 118 durchgespielt, 25 pausiert, 2 am Spielen |
 | Offene Posten | Hinweisblock in der Sammlung: Prüfliste, `unentschieden`, nicht zugeordnete Listen, überfällige Sicherung – bis es das Dashboard gibt |
 | Sicherung geprüft | Der Export wird vor der Migration gegen die Zeilenzahlen der Datenbank gehalten; Datenmigrationen protokollieren ihre Wirkung |
@@ -85,10 +90,9 @@ Was steht und in Betrieb nachgewiesen ist:
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 13 – Änderungserkennung im Sync** (`neue_trophaeen`,
-`dlc_erweitert`, Use Case 8 vollständig). Sie braucht einen zweiten Sync, der
-gegen `reviewed_*` vergleicht; die Prüfliste und der Stempel stehen seit
-Stufe 7.
+**Als Nächstes: Stufe 14 – Lücken** (`physical_release_status` von Hand
+pflegbar, Lückenansicht, Lücken verwerfen; Use Case 3). Die Views `v_luecken`
+und die Spalte stehen seit Stufe 1, gepflegt wurde der Status bisher nicht.
 
 ## Architektur in einem Absatz
 
@@ -268,6 +272,15 @@ POST /api/sync/normalize     # setzt zurück, danach normalisiert POST /api/sync
 
 Das ist der praktische Nutzen der Trennung: Ist die Abbildung falsch, wird sie
 korrigiert und erneut ausgeführt, statt die Daten neu von Sony zu holen.
+
+**Am Ende jeder Normalisierung** (und nach jeder Zuordnung) läuft ein Batch
+`ReviewRepository.einreihen`: 100-%-Titel werden still gestempelt, nie
+durchgesehene Listen als `erstimport` eingereiht, und gestempelte Listen mit
+dem Stempel ihrer letzten Durchsicht verglichen – mehr erspielt (außer bei
+`am_spielen`) heißt `neue_trophaeen`, eine gewachsene Liste `dlc_erweitert`
+(Abschnitt 8.1). Das Sync-Ergebnis meldet die neuen Einträge je Grund
+(`eingereihtNachGrund`). Der Sync schreibt nur in die Warteschlange, nie
+einen Status.
 
 Läuft das NPSSO ab, ist das kein Fehlerfall, sondern ein regulärer Zustand:
 `status` wird `abgelaufen`, vorhandene Daten bleiben stehen, und in den
@@ -481,8 +494,10 @@ aus. Die Reihenfolge ist der eigentliche Inhalt:
 3. `scripts/dump-pruefen.sh` – der Dump darf weder NPSSO noch Refresh- oder
    Access Token im Klartext enthalten
 4. `wrangler d1 migrations apply --remote`
-5. Datenmigrationen protokollieren ihre Wirkung – `play_status` (0006) und
-   `review_queue` (0007), jeweils neben der Erwartung
+5. Datenmigrationen protokollieren ihre Wirkung – `play_status` (0006),
+   `review_queue` (0007), Rangformel (0013), To-Do-Positionen (0014),
+   Kopplung (0015), `reviewed_progress_pct` (0016) –, jeweils neben der
+   Erwartung
 6. `wrangler deploy`
 
 Beide Prüfskripte liegen in `scripts/`, weil die Backup-Action dieselben
