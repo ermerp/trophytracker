@@ -99,6 +99,7 @@ jobs:
       #   app_setting  (0013): die vier Gewichte der Rangformel geloescht, erwartet 0
       #   plan_entry   (0014): offene To-Do-Eintraege ohne Position nachgefuellt, erwartet 0
       #   Kopplung     (0015): To-Do = am_spielen, Backlog = pausiert; Abweichungen erwartet 0
+      #   reviewed_progress_pct (0016): jede gestempelte Liste hat einen Prozentwert, erwartet = gestempelt
       - name: Datenmigrationen protokollieren
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -109,7 +110,8 @@ jobs:
             "SELECT (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL) AS zugeordnet,
                     (SELECT COUNT(*) FROM play_status) AS play_status,
                     (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND progress_pct > 0) AS ps_erwartet,
-                    (SELECT COUNT(*) FROM review_queue) AS review_queue,
+                    (SELECT COUNT(*) FROM review_queue WHERE reason = 'erstimport') AS review_queue,
+                    (SELECT COUNT(*) FROM review_queue WHERE reason <> 'erstimport') AS rq_aenderungen,
                     (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND reviewed_at IS NULL) AS rq_erwartet,
                     (SELECT COUNT(*) FROM trophy_progress WHERE release_id IS NOT NULL AND progress_pct >= 100 AND reviewed_at IS NOT NULL) AS komplett,
                     (SELECT COUNT(*) FROM app_setting WHERE key LIKE 'w\_%' ESCAPE '\\') AS gewichte,
@@ -122,15 +124,18 @@ jobs:
                                          AND pe.kind IN ('todo','backlog') AND pe.status = 'offen')) AS status_ohne_eintrag,
                     (SELECT COUNT(*) FROM plan_entry pe JOIN play_status ps ON ps.release_id = pe.release_id
                        WHERE pe.kind IN ('todo','backlog') AND pe.status = 'offen'
-                         AND ps.status IN ('durchgespielt','komplettiert','abgebrochen')) AS offen_trotz_erledigt" \
+                         AND ps.status IN ('durchgespielt','komplettiert','abgebrochen')) AS offen_trotz_erledigt,
+                    (SELECT COUNT(*) FROM trophy_progress WHERE reviewed_at IS NOT NULL) AS gestempelt,
+                    (SELECT COUNT(*) FROM trophy_progress WHERE reviewed_progress_pct IS NOT NULL) AS mit_prozent" \
             | jq -r '.[0].results[0] |
                 "zugeordnete Listen: \(.zugeordnet)",
                 "play_status: \(.play_status) Zeilen, erwartet mindestens \(.ps_erwartet) (zugeordnete Listen mit Fortschritt)",
-                "review_queue: \(.review_queue) Zeilen, erwartet \(.rq_erwartet) (zugeordnete Listen, nie durchgesehen, unter 100 %)",
+                "review_queue: \(.review_queue) erstimport, erwartet \(.rq_erwartet) (zugeordnete Listen, nie durchgesehen, unter 100 %); dazu \(.rq_aenderungen) aus der Aenderungserkennung",
                 "davon nicht vorgelegt, weil 100 %: \(.komplett)",
                 "app_setting: \(.gewichte) Gewichte der Rangformel, erwartet 0 (Migration 0013)",
                 "plan_entry: \(.todo_offen) offene To-Do-Eintraege, davon \(.todo_ohne_position) ohne Position, erwartet 0 (Migration 0014)",
-                "Kopplung: \(.todo_nicht_am_spielen) To-Do-Eintraege nicht am_spielen, \(.status_ohne_eintrag) am_spielen/pausiert ohne Eintrag, \(.offen_trotz_erledigt) offen trotz erledigter Bewertung, erwartet je 0 (Migration 0015)"'
+                "Kopplung: \(.todo_nicht_am_spielen) To-Do-Eintraege nicht am_spielen, \(.status_ohne_eintrag) am_spielen/pausiert ohne Eintrag, \(.offen_trotz_erledigt) offen trotz erledigter Bewertung, erwartet je 0 (Migration 0015)",
+                "reviewed_progress_pct: \(.mit_prozent) Listen mit Prozentwert, erwartet \(.gestempelt) (gestempelte Listen, Migration 0016)"'
 
       - name: Worker und Assets deployen
         uses: cloudflare/wrangler-action@v4

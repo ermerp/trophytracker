@@ -154,3 +154,38 @@ describe("Migration 0015", () => {
 		await env.DB.batch(["plan_entry", "play_status", "release", "game"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
 	});
 });
+
+describe("Migration 0016", () => {
+	// Dieselbe Probe: das UPDATE aus der Datei gegen einen Bestand mit
+	// gestempelten und ungestempelten Listen.
+	it("gibt gestempelten Listen den aktuellen Prozentwert als Referenz, ungestempelte bleiben NULL", async () => {
+		const datei = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0016"));
+		expect(datei).toBeDefined();
+		const update = datei!.queries.find((q) => q.trim().startsWith("UPDATE trophy_progress"));
+		expect(update).toBeDefined();
+
+		await env.DB.prepare("DELETE FROM trophy_progress").run();
+		const liste = env.DB.prepare(
+			"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, progress_pct, synced_at, reviewed_at, reviewed_progress_pct) " +
+				"VALUES (?, 'trophy', ?, 'PS4', ?, '2026-01-01', ?, ?)",
+		);
+		await env.DB.batch([
+			liste.bind("NPWR1", "gestempelt", 78, "2026-01-02", null),
+			liste.bind("NPWR2", "ungestempelt", 45, null, null),
+			liste.bind("NPWR3", "schon befuellt", 90, "2026-01-02", 60),
+		]);
+
+		const { meta } = await env.DB.prepare(update!).run();
+		expect(meta.changes).toBe(1);
+
+		const { results } = await env.DB.prepare(
+			"SELECT np_communication_id AS id, reviewed_progress_pct AS pct FROM trophy_progress ORDER BY id",
+		).all();
+		expect(results).toEqual([
+			{ id: "NPWR1", pct: 78 },
+			{ id: "NPWR2", pct: null },
+			{ id: "NPWR3", pct: 60 },
+		]);
+		await env.DB.prepare("DELETE FROM trophy_progress").run();
+	});
+});

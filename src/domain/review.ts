@@ -49,7 +49,7 @@ export function wirkung(aktion: ReviewAktion): Wirkung {
 export const REVIEW_GRUENDE = ["erstimport", "neue_trophaeen", "dlc_erweitert"] as const;
 export type ReviewGrund = (typeof REVIEW_GRUENDE)[number];
 
-/** Ueberschrift je Grund. Die beiden letzten fuellt erst Stufe 13. */
+/** Ueberschrift je Grund (Abschnitt 8.1). */
 export const GRUND_TEXT: Record<ReviewGrund, string> = {
 	erstimport: "Zum ersten Mal gesehen",
 	neue_trophaeen: "Du hast weitergespielt",

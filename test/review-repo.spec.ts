@@ -43,16 +43,16 @@ describe("einreihen", () => {
 		await release(2, 95);
 
 		const e = await repos().review.einreihen();
-		expect(e).toEqual({ eingereiht: 1, alsKomplettGestempelt: 1 });
+		expect(e).toEqual({ erstimport: 1, neueTrophaeen: 0, dlcErweitert: 0, alsKomplettGestempelt: 1 });
 
 		const { results } = await env.DB.prepare("SELECT release_id FROM review_queue").all();
 		expect(results).toEqual([{ release_id: 2 }]);
 
 		// Der Stempel ist der Referenzpunkt fuer die Aenderungserkennung.
 		const t = await env.DB.prepare(
-			"SELECT reviewed_earned_total, reviewed_defined_total, reviewed_at FROM trophy_progress WHERE release_id = 1",
-		).first<{ reviewed_earned_total: number; reviewed_defined_total: number; reviewed_at: string | null }>();
-		expect(t).toMatchObject({ reviewed_earned_total: 5, reviewed_defined_total: 11 });
+			"SELECT reviewed_earned_total, reviewed_defined_total, reviewed_progress_pct, reviewed_at FROM trophy_progress WHERE release_id = 1",
+		).first<{ reviewed_earned_total: number; reviewed_defined_total: number; reviewed_progress_pct: number; reviewed_at: string | null }>();
+		expect(t).toMatchObject({ reviewed_earned_total: 5, reviewed_defined_total: 11, reviewed_progress_pct: 100 });
 		expect(t?.reviewed_at).not.toBeNull();
 
 		// play_status bleibt unberuehrt - dort steht die Vorbelegung.
@@ -62,7 +62,7 @@ describe("einreihen", () => {
 	it("legt einen 100-%-Titel auch beim zweiten Lauf nicht vor", async () => {
 		await release(1, 100);
 		await repos().review.einreihen();
-		expect(await repos().review.einreihen()).toEqual({ eingereiht: 0, alsKomplettGestempelt: 0 });
+		expect(await repos().review.einreihen()).toEqual({ erstimport: 0, neueTrophaeen: 0, dlcErweitert: 0, alsKomplettGestempelt: 0 });
 		expect(await offen()).toBe(0);
 	});
 
@@ -76,7 +76,7 @@ describe("einreihen", () => {
 				"VALUES ('NPWR9', 'trophy', 'Offen', 'PS4', 80, '2026-01-01')",
 		).run(); // nicht zugeordnet
 
-		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 2 });
+		expect(await repos().review.einreihen()).toMatchObject({ erstimport: 2 });
 		const { results } = await env.DB.prepare("SELECT release_id, reason FROM review_queue ORDER BY release_id").all();
 		expect(results).toEqual([
 			{ release_id: 1, reason: "erstimport" },
@@ -86,14 +86,118 @@ describe("einreihen", () => {
 
 	it("ist idempotent", async () => {
 		await release(1, 45);
-		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 1 });
-		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 0 });
+		expect(await repos().review.einreihen()).toMatchObject({ erstimport: 1 });
+		expect(await repos().review.einreihen()).toMatchObject({ erstimport: 0, neueTrophaeen: 0, dlcErweitert: 0 });
 	});
 
 	it("laesst ein manuell bewertetes Release aus", async () => {
 		await release(1, 45);
 		await repos().playStatus.setzen(1, { status: "abgebrochen" });
-		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 0 });
+		expect(await repos().review.einreihen()).toMatchObject({ erstimport: 0, neueTrophaeen: 0, dlcErweitert: 0 });
+	});
+});
+
+/**
+ * Aenderungserkennung (Abschnitt 8.1, Stufe 13): eine gestempelte Liste mit
+ * frei waehlbaren Zaehlern. Standard: Stempel 40 % mit 4 von 11, aktuell
+ * dasselbe - also keine Aenderung.
+ */
+async function gestempelt(
+	id: number,
+	status: string | null,
+	werte: { earned?: number; defined?: number; pct?: number; reviewedEarned?: number; reviewedDefined?: number; reviewedPct?: number } = {},
+): Promise<number> {
+	const w = { earned: 4, defined: 11, pct: 40, reviewedEarned: 4, reviewedDefined: 11, reviewedPct: 40, ...werte };
+	await env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (?, ?, ?)").bind(id, `Spiel ${id}`, `spiel ${id}`).run();
+	await env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (?, ?, 'PS4')").bind(id, id).run();
+	await env.DB.prepare(
+		"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, progress_pct, " +
+			"defined_bronze, earned_bronze, synced_at, release_id, " +
+			"reviewed_earned_total, reviewed_defined_total, reviewed_progress_pct, reviewed_at) " +
+			"VALUES (?, 'trophy', ?, 'PS4', ?, ?, ?, '2026-01-03', ?, ?, ?, ?, '2026-01-02')",
+	)
+		.bind(`NPWR${id}`, `Spiel ${id}`, w.pct, w.defined, w.earned, id, w.reviewedEarned, w.reviewedDefined, w.reviewedPct)
+		.run();
+	if (status) await env.DB.prepare("INSERT INTO play_status (release_id, status) VALUES (?, ?)").bind(id, status).run();
+	return id;
+}
+
+const eintrag = async (id: number) =>
+	env.DB.prepare("SELECT reason, detail, enqueued_at FROM review_queue WHERE release_id = ?")
+		.bind(id)
+		.first<{ reason: string; detail: string | null; enqueued_at: string }>();
+
+describe("einreihen: Aenderungserkennung", () => {
+	it("legt mehr erspielte Trophaeen als neue_trophaeen vor, mit Vorher-Nachher in Prozent", async () => {
+		await gestempelt(1, "durchgespielt", { earned: 7, pct: 55 });
+		expect(await repos().review.einreihen()).toMatchObject({ neueTrophaeen: 1, dlcErweitert: 0, erstimport: 0 });
+		expect(await eintrag(1)).toMatchObject({ reason: "neue_trophaeen", detail: "40 % → 55 %, 3 neue Trophäen erspielt" });
+	});
+
+	it("uebergeht eigenen Fortschritt bei am_spielen - das ist der Normalfall, keine Nachricht", async () => {
+		await gestempelt(1, "am_spielen", { earned: 7, pct: 55 });
+		expect(await repos().review.einreihen()).toMatchObject({ neueTrophaeen: 0 });
+		expect(await offen()).toBe(0);
+	});
+
+	it.each(["pausiert", "unentschieden", "abgebrochen", "komplettiert"])("legt Fortschritt bei %s vor", async (st) => {
+		await gestempelt(1, st, { earned: 7, pct: 55 });
+		expect(await repos().review.einreihen()).toMatchObject({ neueTrophaeen: 1 });
+	});
+
+	it("legt eine gewachsene Liste als dlc_erweitert vor - auch bei 100 % und auch bei am_spielen", async () => {
+		await gestempelt(1, "komplettiert", { earned: 11, defined: 23, pct: 78, reviewedEarned: 11, reviewedPct: 100 });
+		await gestempelt(2, "am_spielen", { defined: 15, pct: 30 });
+		expect(await repos().review.einreihen()).toMatchObject({ dlcErweitert: 2, neueTrophaeen: 0 });
+		expect(await eintrag(1)).toMatchObject({ reason: "dlc_erweitert", detail: "100 % → 78 %, Liste um 12 Trophäen gewachsen" });
+		expect(await eintrag(2)).toMatchObject({ reason: "dlc_erweitert", detail: "40 % → 30 %, Liste um 4 Trophäen gewachsen" });
+	});
+
+	it("nennt bei DLC und Fortschritt zugleich beides, der Grund ist dlc_erweitert", async () => {
+		await gestempelt(1, "durchgespielt", { earned: 7, defined: 23, pct: 35 });
+		await repos().review.einreihen();
+		expect(await eintrag(1)).toMatchObject({
+			reason: "dlc_erweitert",
+			detail: "40 % → 35 %, Liste um 12 Trophäen gewachsen, 3 davon erspielt",
+		});
+	});
+
+	it("aktualisiert einen offenen Eintrag statt ihn zu verdoppeln und behaelt enqueued_at", async () => {
+		await gestempelt(1, "durchgespielt", { earned: 7, pct: 55 });
+		await repos().review.einreihen();
+		await env.DB.prepare("UPDATE review_queue SET enqueued_at = '2026-01-05 10:00:00' WHERE release_id = 1").run();
+
+		// Weiterer Sync: noch mehr erspielt, und die Liste ist gewachsen.
+		await env.DB.prepare("UPDATE trophy_progress SET earned_bronze = 9, defined_bronze = 15, progress_pct = 50 WHERE release_id = 1").run();
+		expect(await repos().review.einreihen()).toMatchObject({ neueTrophaeen: -1, dlcErweitert: 1 });
+		expect(await offen()).toBe(1);
+		expect(await eintrag(1)).toEqual({
+			reason: "dlc_erweitert",
+			detail: "40 % → 50 %, Liste um 4 Trophäen gewachsen, 5 davon erspielt",
+			enqueued_at: "2026-01-05 10:00:00",
+		});
+	});
+
+	it("laesst unveraenderte und geschrumpfte Listen in Ruhe", async () => {
+		await gestempelt(1, "durchgespielt");
+		await gestempelt(2, "durchgespielt", { earned: 2, defined: 9, pct: 20 });
+		expect(await repos().review.einreihen()).toEqual({ erstimport: 0, neueTrophaeen: 0, dlcErweitert: 0, alsKomplettGestempelt: 0 });
+		expect(await offen()).toBe(0);
+	});
+
+	it("vergleicht nie durchgesehene Listen nicht - sie bleiben erstimport", async () => {
+		await release(1, 45);
+		await env.DB.prepare("UPDATE trophy_progress SET reviewed_earned_total = 0, reviewed_defined_total = 0 WHERE release_id = 1").run();
+		await repos().playStatus.vorbelegen();
+		expect(await repos().review.einreihen()).toMatchObject({ erstimport: 1, neueTrophaeen: 0, dlcErweitert: 0 });
+		expect(await eintrag(1)).toMatchObject({ reason: "erstimport", detail: null });
+	});
+
+	it("zaehlt je Grund nur neue Zeilen, nicht aktualisierte", async () => {
+		for (let id = 1; id <= 30; id++) await gestempelt(id, "durchgespielt", { earned: id % 3 === 0 ? 7 : 4 });
+		expect(await repos().review.einreihen()).toMatchObject({ neueTrophaeen: 10 });
+		expect(await repos().review.einreihen()).toMatchObject({ neueTrophaeen: 0 });
+		expect(await offen()).toBe(10);
 	});
 });
 
@@ -127,17 +231,23 @@ describe("entscheiden", () => {
 		const r = await offenerFall(100);
 		expect(await status(r)).toBe("komplettiert");
 
-		// 100 % wird nicht mehr eingereiht; den Eintrag hier von Hand
-		// anlegen, wie ihn Stufe 13 bei einer DLC-Aenderung erzeugen wuerde.
-		await env.DB.prepare("INSERT OR IGNORE INTO review_queue (release_id, reason) VALUES (?, 'erstimport')")
+		// 100 % wird nicht eingereiht; der Eintrag kommt wie bei einer
+		// DLC-Erweiterung aus der Aenderungserkennung.
+		await env.DB.prepare("UPDATE trophy_progress SET defined_bronze = 20, progress_pct = 60 WHERE release_id = ?")
 			.bind(r)
 			.run();
+		expect(await repos().review.einreihen()).toMatchObject({ dlcErweitert: 1 });
 
 		const e = await repos().review.entscheiden(r, "unveraendert");
 		expect(e).toEqual({ status: "komplettiert", planAngelegt: false });
 		expect(await status(r)).toBe("komplettiert");
 		expect(await offen()).toBe(0);
-		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 0 });
+		// Der Stempel steht neu, der naechste Lauf legt nichts mehr vor.
+		const t = await env.DB.prepare(
+			"SELECT reviewed_earned_total, reviewed_defined_total, reviewed_progress_pct FROM trophy_progress WHERE release_id = ?",
+		).bind(r).first();
+		expect(t).toEqual({ reviewed_earned_total: 5, reviewed_defined_total: 21, reviewed_progress_pct: 60 });
+		expect(await repos().review.einreihen()).toMatchObject({ erstimport: 0, neueTrophaeen: 0, dlcErweitert: 0 });
 	});
 
 	// Kopplung (5.5): To-Do heisst am_spielen, Backlog pausiert.

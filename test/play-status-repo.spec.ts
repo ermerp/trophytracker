@@ -106,10 +106,10 @@ describe("setzen", () => {
 		await repos().playStatus.setzen(1, { status: "abgebrochen" });
 
 		const t = await env.DB.prepare(
-			"SELECT reviewed_earned_total, reviewed_defined_total, reviewed_at FROM trophy_progress WHERE release_id = 1",
-		).first<{ reviewed_earned_total: number; reviewed_defined_total: number; reviewed_at: string | null }>();
-		// Fixture: earned 4 Bronze, defined 10 Bronze + 1 Platin
-		expect(t).toMatchObject({ reviewed_earned_total: 4, reviewed_defined_total: 11 });
+			"SELECT reviewed_earned_total, reviewed_defined_total, reviewed_progress_pct, reviewed_at FROM trophy_progress WHERE release_id = 1",
+		).first<{ reviewed_earned_total: number; reviewed_defined_total: number; reviewed_progress_pct: number; reviewed_at: string | null }>();
+		// Fixture: earned 4 Bronze, defined 10 Bronze + 1 Platin, 45 %
+		expect(t).toMatchObject({ reviewed_earned_total: 4, reviewed_defined_total: 11, reviewed_progress_pct: 45 });
 		expect(t?.reviewed_at).not.toBeNull();
 		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM review_queue").first()).toEqual({ n: 0 });
 	});

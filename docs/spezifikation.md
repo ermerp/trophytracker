@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 31 – Nur PlayStation (Entscheidung des Nutzers vom 16.09.2026): IGDB-Einträge ohne nachgewiesene PS3/PS4/PS5/Vita-Plattform sind nirgends ein Treffer – auch nicht ohne Plattformangabe; jede Suche trägt den Plattformfilter (7.6). Suchfeld in Wunschliste, To-Do und Backlog (`suche=`, 5.2). Version 30 – Titel aus IGDB (Entscheidung des Nutzers vom 16.09.2026): Ein Spiel ohne Trophäenliste übernimmt beim Verknüpfen den IGDB-Namen als Titel, änderbar im Spieldetail (7.6). Version 29 – Nachbesserung Stufe 12 (Entscheidung des Nutzers vom 16.09.2026): To-Do und Backlog sind mit der Bewertung gekoppelt – To-Do heißt `am_spielen`, Backlog `pausiert` (nie gestartete bleiben `nicht_gespielt`), durchgespielt/komplettiert/abgebrochen schließt den Eintrag automatisch statt als Vorschlag (neuer Abschnitt 5.5, Migration 0015); die Triage-Aktion „Spiele gerade" geht in „Auf To-Do" auf (sechs Aktionen); `PATCH /api/releases/:id/play-status` nur für den Status. Version 28: Stufe 12 – To-Do mit manueller Reihenfolge, Backlog mit Kandidaten und „nicht vorgesehen" (Migration 0014), Listen-Knöpfe im Spieldetail, Waisen beim Löschen eines Eintrags.*
+*Version 32 – Stufe 13, Änderungserkennung (Entscheidungen des Nutzers vom 16.09.2026): Der Sync vergleicht den Trophäenstand mit dem Stempel der letzten Durchsicht und legt `neue_trophaeen` und `dlc_erweitert` in der Prüfliste vor; `dlc_erweitert` ohne Statusfilter; neue Spalte `trophy_progress.reviewed_progress_pct` (Migration 0016) für den Vorher-Nachher-Vergleich in Prozent (4.1, 8.1). Version 31 – Nur PlayStation (Entscheidung des Nutzers vom 16.09.2026): IGDB-Einträge ohne nachgewiesene PS3/PS4/PS5/Vita-Plattform sind nirgends ein Treffer – auch nicht ohne Plattformangabe; jede Suche trägt den Plattformfilter (7.6). Suchfeld in Wunschliste, To-Do und Backlog (`suche=`, 5.2). Version 30 – Titel aus IGDB (Entscheidung des Nutzers vom 16.09.2026): Ein Spiel ohne Trophäenliste übernimmt beim Verknüpfen den IGDB-Namen als Titel, änderbar im Spieldetail (7.6). Version 29 – Nachbesserung Stufe 12 (Entscheidung des Nutzers vom 16.09.2026): To-Do und Backlog sind mit der Bewertung gekoppelt – To-Do heißt `am_spielen`, Backlog `pausiert` (nie gestartete bleiben `nicht_gespielt`), durchgespielt/komplettiert/abgebrochen schließt den Eintrag automatisch statt als Vorschlag (neuer Abschnitt 5.5, Migration 0015); die Triage-Aktion „Spiele gerade" geht in „Auf To-Do" auf (sechs Aktionen); `PATCH /api/releases/:id/play-status` nur für den Status. Version 28: Stufe 12 – To-Do mit manueller Reihenfolge, Backlog mit Kandidaten und „nicht vorgesehen" (Migration 0014), Listen-Knöpfe im Spieldetail, Waisen beim Löschen eines Eintrags.*
 
 ## 1. Use Cases
 
@@ -284,6 +284,7 @@ CREATE TABLE trophy_progress (
   -- Syncs zwischen zwei Durchsichten ansammeln.
   reviewed_earned_total   INTEGER,
   reviewed_defined_total  INTEGER,
+  reviewed_progress_pct   INTEGER,   -- Migration 0016, siehe unten
   reviewed_at             TEXT,
 
   release_id          INTEGER REFERENCES release(id) ON DELETE SET NULL
@@ -292,6 +293,12 @@ CREATE TABLE trophy_progress (
 CREATE INDEX idx_trophy_unmatched ON trophy_progress(release_id) WHERE release_id IS NULL;
 CREATE INDEX idx_trophy_release   ON trophy_progress(release_id);   -- Migration 0008, siehe Abschnitt 2
 ```
+
+`reviewed_progress_pct` (Migration 0016) hält den Prozentwert zum Zeitpunkt der Durchsicht, damit der
+Prüflisten-Eintrag „100 % → 78 %" sagen kann. Aus den gestempelten Zählern lässt er sich nicht
+rekonstruieren: Sony gewichtet nach Trophäenwert, bei **243 von 431** Listen der Sammlung weicht
+`progress_pct` vom Verhältnis erspielt/definiert ab. Jeder Stempel schreibt alle vier `reviewed_*`-
+Felder zugleich; die Migration hat den Bestand mit dem damals aktuellen Wert nachgefüllt.
 
 Migration 0005 ergänzt `matched_at` und `matched_source` (`automatisch` | `manuell`). Sie halten
 fest, wann und wodurch `release_id` gesetzt wurde — die Grundlage dafür, eine Zuordnung später
@@ -764,15 +771,26 @@ CREATE TABLE review_queue (
 |---|---|
 | `reviewed_at IS NULL` und `progress_pct < 100` – noch nie durchgesehen, nicht komplett | `erstimport` |
 | `earned_total` gestiegen, Status ist gesetzt und nicht `am_spielen` | `neue_trophaeen` |
-| `defined_total` gestiegen | `dlc_erweitert` |
+| `defined_total` gestiegen – ohne Statusfilter | `dlc_erweitert` |
 
-Der Sync **schreibt nur in die Warteschlange**, er ändert nie einen Status. Steht ein Release schon in der Warteschlange, wird `detail` aktualisiert statt ein zweiter Eintrag angelegt.
+Der Sync **schreibt nur in die Warteschlange**, er ändert nie einen Status. Steht ein Release schon in der Warteschlange, werden Grund und `detail` aktualisiert statt ein zweiter Eintrag angelegt; `enqueued_at` bleibt.
+
+**Warum `dlc_erweitert` keinen Statusfilter hat** (Entscheidung des Nutzers vom 16.09.2026): Der Filter bei `neue_trophaeen` existiert, weil eigener Fortschritt bei einem laufenden Spiel erwartbar ist. Eine DLC-Erweiterung ist dagegen eine Änderung am Spiel selbst und gerade bei einem aktiv gespielten Titel relevant.
+
+**Regeln der Änderungserkennung (Stufe 13).** Verglichen wird ausschließlich bei gestempelten Listen (`reviewed_at IS NOT NULL`), und zwar gegen den letzten *geprüften* Stand, nicht den letzten Sync (4.1) – Änderungen sammeln sich über mehrere Syncs an, bis jemand hinsieht. Treffen beide Bedingungen zu, ist der Grund `dlc_erweitert` (die Neuigkeit; die View sortiert ihn ohnehin nach vorn), und `detail` nennt beides. Ein `erstimport`-Eintrag kann nie mit einem Änderungseintrag kollidieren, weil er `reviewed_at IS NULL` voraussetzt und jeder Stempel die Zeile löscht. Sinkende Zähler (Sony zieht Trophäen zurück) erzeugen nichts; der Stempel bleibt stehen. Nach einer Zuordnung läuft dieselbe Einreihung, die frisch zugeordnete Liste ist dort aber `erstimport`.
+
+`detail` wird set-basiert in SQL gebildet, mit `reviewed_progress_pct` als Vorher-Wert:
+
+| Grund | `detail` |
+|---|---|
+| `neue_trophaeen` | „40 % → 55 %, 3 neue Trophäen erspielt" |
+| `dlc_erweitert` | „100 % → 78 %, Liste um 12 Trophäen gewachsen" – bei zugleich gestiegenem `earned_total` mit „, 3 davon erspielt" |
 
 `erstimport` hängt an `reviewed_at`, nicht an der Existenz einer `play_status`-Zeile: Seit Stufe 6 belegt der Sync den Status vor (4.2), fast jedes Release hat also eine Zeile. Die Ersteinrichtung zeigt die Vorbelegung und lässt sie bestätigen oder ändern. Ein im Spieldetail von Hand gesetzter Status zählt bereits als Durchsicht und erscheint nicht mehr als `erstimport`.
 
 **100 % wird nicht vorgelegt.** Ein Titel mit 100 % hat alle Trophäen des Hauptspiels *und* aller DLC – er ist komplettiert, und die Vorbelegung (4.2) hat den Status bereits gesetzt. Da gibt es nichts zu entscheiden, und eine Prüfliste, die Unstrittiges vorlegt, verbraucht die Geduld, die für die strittigen Fälle gebraucht wird. Solche Titel werden deshalb **still als durchgesehen gestempelt** statt eingereiht: `reviewed_*` bekommt den aktuellen Stand, `play_status` bleibt unberührt. Der Stempel ist kein Urteil, sondern der Referenzpunkt – erhöht später ein DLC die Trophäenzahl, fällt der Titel unter 100 % und die Änderungserkennung (Stufe 13) legt ihn vor. Ohne Stempel gäbe es dafür keinen Vergleichswert. Beim Bestand betraf das rund ein Viertel aller Einträge.
 
-**Auslöser der Einreihung.** `ReviewRepository.einreihen` (stempeln und einreihen in einem Batch) läuft am Ende jeder Normalisierung – direkt nach der Vorbelegung – und nach jeder Zuordnung, manuell wie automatisch. Den Bestand hat Migration 0007 einmalig eingereiht, Migration 0009 die 100-%-Titel wieder herausgenommen; der Deploy-Job protokolliert beide Zahlen. Stufe 7 kennt nur `erstimport`; `neue_trophaeen` und `dlc_erweitert` füllt die Änderungserkennung in Stufe 13.
+**Auslöser der Einreihung.** `ReviewRepository.einreihen` (stempeln und einreihen in einem Batch) läuft am Ende jeder Normalisierung – direkt nach der Vorbelegung – und nach jeder Zuordnung, manuell wie automatisch. Den Bestand hat Migration 0007 einmalig eingereiht, Migration 0009 die 100-%-Titel wieder herausgenommen; der Deploy-Job protokolliert beide Zahlen und seit Stufe 13 daneben die Einträge aus der Änderungserkennung. Der Batch stempelt zuerst (100 %), reiht dann `erstimport` ein und vergleicht zuletzt die gestempelten Listen. Das Sync-Ergebnis meldet die neu eingereihten Zeilen je Grund (`eingereihtNachGrund`), aktualisierte Details zählen nicht mit. Stand beim Deploy von Stufe 13: 431 gestempelte Listen, 2 mit mehr Trophäen seit dem Stempel (beide `am_spielen`), 0 gewachsene Listen – die Erkennung legte am ersten Tag nichts vor.
 
 Der Filter "nicht `am_spielen`" ist wichtig: bei einem Spiel, das du gerade aktiv zockst, kommen bei jedem Sync neue Trophäen dazu. Das ist keine Nachricht, sondern der Normalfall – es würde die Liste sonst zumüllen.
 
@@ -789,7 +807,7 @@ Der Filter "nicht `am_spielen`" ist wichtig: bei einem Spiel, das du gerade akti
 
 Die Aktionen setzen **nur den Status**; Bewertung, Notiz und Daten bleiben stehen. „Auf To-Do" und „Ins Backlog" legen den `plan_entry` an oder hängen einen vorhandenen der anderen Art um (5.5); To-Do hängt ans Ende der Liste (5.4). Tastenkürzel 1–6 lösen die Aktionen aus.
 
-**Jede Entscheidung** löscht die Zeile aus `review_queue` und stempelt `reviewed_earned_total`, `reviewed_defined_total` und `reviewed_at` auf den aktuellen Stand. Damit ist der Referenzpunkt gesetzt, und dasselbe Spiel taucht erst bei der nächsten echten Änderung wieder auf.
+**Jede Entscheidung** löscht die Zeile aus `review_queue` und stempelt `reviewed_earned_total`, `reviewed_defined_total`, `reviewed_progress_pct` und `reviewed_at` auf den aktuellen Stand. Damit ist der Referenzpunkt gesetzt, und dasselbe Spiel taucht erst bei der nächsten echten Änderung wieder auf.
 
 "Unverändert lassen" ist deshalb keine leere Aktion: sie sagt "ich habe es gesehen und es bleibt abgebrochen". Ohne diese Möglichkeit bekämst du bei jedem Sync denselben Hinweis erneut.
 
@@ -1458,7 +1476,7 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 10 | `plan_entry`, Wunschliste, Favoriten | **Use Case 4** |
 | 11 | Wunschlisten-Import mit Suche, Ansicht "Ohne Zuordnung" | **Use Cases 9 und 12** |
 | 12 | To-Do und Backlog mit Sortierung und Kandidatenvorschlägen; Kopplung an die Bewertung (5.5) | **Use Cases 5a und 5b** – abgenommen 16.09.2026 |
-| 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` | **Use Case 8** vollständig |
+| 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` (Migration 0016) | **Use Case 8** vollständig – umgesetzt 16.09.2026 |
 | 14 | `physical_release_status` manuell pflegbar, Lückenansicht, Lücken verwerfen (5.3) | **Use Case 3** |
 | 15 | Kaufliste mit Kandidaten und Sortierung (5.2), "Erscheint bald" | **Use Cases 6, 10, 11** |
 | 16 | Barcode-Scan mit Auflösungskette (ohne Feed) | Komfort bei Erfassung |

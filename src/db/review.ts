@@ -35,12 +35,28 @@ export type ReviewFortschritt = {
 	unentschieden: number;
 };
 
+export type Einreihung = {
+	/** Neue Zeilen je Grund - aktualisierte Details zaehlen nicht mit. */
+	erstimport: number;
+	neueTrophaeen: number;
+	dlcErweitert: number;
+	alsKomplettGestempelt: number;
+};
+
+export function einreihungSumme(e: Pick<Einreihung, "erstimport" | "neueTrophaeen" | "dlcErweitert">): number {
+	return e.erstimport + e.neueTrophaeen + e.dlcErweitert;
+}
+
+const EARNED = "(t.earned_bronze + t.earned_silver + t.earned_gold + t.earned_platinum)";
+const DEFINED = "(t.defined_bronze + t.defined_silver + t.defined_gold + t.defined_platinum)";
+
 /**
  * Pruefliste (Abschnitt 8.1).
  *
- * Der Sync schreibt nur in die Warteschlange, nie einen Status. Stufe 7
- * kennt nur den Grund 'erstimport'; neue_trophaeen und dlc_erweitert kommen
- * mit der Aenderungserkennung in Stufe 13.
+ * Der Sync schreibt nur in die Warteschlange, nie einen Status. Drei Gruende:
+ * 'erstimport' fuer nie durchgesehene Listen, 'neue_trophaeen' und
+ * 'dlc_erweitert' aus dem Vergleich mit dem Stempel der letzten Durchsicht
+ * (Aenderungserkennung, Stufe 13).
  */
 export class ReviewRepository {
 	constructor(
@@ -50,42 +66,81 @@ export class ReviewRepository {
 	) {}
 
 	/**
-	 * erstimport = zugeordnet, noch nie durchgesehen (reviewed_at IS NULL)
-	 * und **unter 100 %**.
+	 * Stempeln und einreihen, ein Batch, set-basiert (CPU-Grenze). Laeuft am
+	 * Ende jeder Normalisierung und nach jeder Zuordnung. Idempotent.
 	 *
-	 * 100 % heisst: alle Trophaeen des Hauptspiels und aller DLC erspielt.
-	 * Da gibt es nichts zu entscheiden, der Status steht aus der Vorbelegung
-	 * schon auf 'komplettiert'. Solche Titel werden deshalb still gestempelt
-	 * statt vorgelegt - das erste Statement unten. Der Stempel ist kein
-	 * Urteil, sondern der Referenzpunkt: Erhoeht spaeter ein DLC die
-	 * Trophaeenzahl, faellt der Titel unter 100 % und die
-	 * Aenderungserkennung (Stufe 13) legt ihn vor. Ohne Stempel gaebe es
-	 * dafuer keinen Vergleichswert.
+	 * 1. 100 % wird nicht vorgelegt, sondern still gestempelt: alle Trophaeen
+	 *    des Hauptspiels und aller DLC erspielt, der Status steht aus der
+	 *    Vorbelegung schon auf 'komplettiert'. Der Stempel ist kein Urteil,
+	 *    sondern der Referenzpunkt fuer Schritt 3.
 	 *
-	 * Nicht "keine play_status-Zeile": seit Stufe 6 belegt der Sync den
-	 * Status vor, fast jedes Release hat also eine. Idempotent.
+	 * 2. erstimport = zugeordnet, noch nie durchgesehen (reviewed_at IS NULL)
+	 *    und - nach Schritt 1 von selbst - unter 100 %. Nicht "keine
+	 *    play_status-Zeile": seit Stufe 6 belegt der Sync den Status vor.
+	 *
+	 * 3. Aenderungserkennung, nur fuer gestempelte Listen, gegen den letzten
+	 *    *geprueften* Stand (4.1), nicht den letzten Sync:
+	 *      - Liste gewachsen (defined > Stempel)   → 'dlc_erweitert', ohne
+	 *        Statusfilter: eine Erweiterung ist eine Aenderung am Spiel
+	 *        selbst und gerade bei einem aktiv gespielten Titel relevant
+	 *      - mehr erspielt (earned > Stempel)      → 'neue_trophaeen', aber
+	 *        nicht bei 'am_spielen': eigener Fortschritt am laufenden Spiel
+	 *        ist der Normalfall, keine Nachricht
+	 *    Beides zugleich → 'dlc_erweitert', das detail nennt beides. Schon in
+	 *    der Warteschlange → Grund und detail aktualisiert, enqueued_at bleibt.
+	 *    Ein 'erstimport'-Eintrag kollidiert nie, er setzt reviewed_at IS
+	 *    NULL voraus. Sinkende Zaehler erzeugen nichts.
+	 *
+	 * Rueckgabe: neue Zeilen je Grund, als Differenz der Zaehlung vor und
+	 * nach dem Batch - meta.changes zaehlte aktualisierte Details mit.
 	 */
-	async einreihen(): Promise<{ eingereiht: number; alsKomplettGestempelt: number }> {
-		const [gestempelt, eingereiht] = await this.db.batch([
+	async einreihen(): Promise<Einreihung> {
+		const vorher = await this.zaehlungNachGrund();
+		const [gestempelt] = await this.db.batch([
 			this.db.prepare(
 				"UPDATE trophy_progress SET " +
 					"reviewed_earned_total = earned_bronze + earned_silver + earned_gold + earned_platinum, " +
 					"reviewed_defined_total = defined_bronze + defined_silver + defined_gold + defined_platinum, " +
+					"reviewed_progress_pct = progress_pct, " +
 					"reviewed_at = datetime('now') " +
 					"WHERE release_id IS NOT NULL AND reviewed_at IS NULL AND progress_pct >= 100",
 			),
-			// Nach dem Stempeln tragen die 100-%-Titel reviewed_at und fallen
-			// hier von selbst heraus - keine zweite Bedingung noetig.
 			this.db.prepare(
 				"INSERT OR IGNORE INTO review_queue (release_id, reason) " +
 					"SELECT t.release_id, 'erstimport' FROM trophy_progress t " +
 					"WHERE t.release_id IS NOT NULL AND t.reviewed_at IS NULL",
 			),
+			this.db.prepare(
+				"INSERT INTO review_queue (release_id, reason, detail) " +
+					"SELECT t.release_id, " +
+					`CASE WHEN ${DEFINED} > t.reviewed_defined_total THEN 'dlc_erweitert' ELSE 'neue_trophaeen' END, ` +
+					`CASE WHEN ${DEFINED} > t.reviewed_defined_total THEN ` +
+					`printf('%d %% → %d %%, Liste um %d Trophäen gewachsen', t.reviewed_progress_pct, t.progress_pct, ${DEFINED} - t.reviewed_defined_total) ` +
+					`|| CASE WHEN ${EARNED} > t.reviewed_earned_total THEN printf(', %d davon erspielt', ${EARNED} - t.reviewed_earned_total) ELSE '' END ` +
+					`ELSE printf('%d %% → %d %%, %d neue Trophäen erspielt', t.reviewed_progress_pct, t.progress_pct, ${EARNED} - t.reviewed_earned_total) END ` +
+					"FROM trophy_progress t JOIN play_status ps ON ps.release_id = t.release_id " +
+					"WHERE t.release_id IS NOT NULL AND t.reviewed_at IS NOT NULL " +
+					`AND (${DEFINED} > t.reviewed_defined_total ` +
+					`OR (${EARNED} > t.reviewed_earned_total AND ps.status <> 'am_spielen')) ` +
+					"ON CONFLICT(release_id) DO UPDATE SET reason = excluded.reason, detail = excluded.detail",
+			),
 		]);
+		const nachher = await this.zaehlungNachGrund();
 		return {
-			eingereiht: eingereiht.meta.changes ?? 0,
+			erstimport: nachher.erstimport - vorher.erstimport,
+			neueTrophaeen: nachher.neue_trophaeen - vorher.neue_trophaeen,
+			dlcErweitert: nachher.dlc_erweitert - vorher.dlc_erweitert,
 			alsKomplettGestempelt: gestempelt.meta.changes ?? 0,
 		};
+	}
+
+	private async zaehlungNachGrund(): Promise<Record<ReviewGrund, number>> {
+		const { results } = await this.db
+			.prepare("SELECT reason, COUNT(*) AS n FROM review_queue GROUP BY reason")
+			.all<{ reason: ReviewGrund; n: number }>();
+		const z: Record<ReviewGrund, number> = { erstimport: 0, neue_trophaeen: 0, dlc_erweitert: 0 };
+		for (const r of results) z[r.reason] = r.n;
+		return z;
 	}
 
 	async naechste(limit: number, offset: number): Promise<ReviewZeile[]> {

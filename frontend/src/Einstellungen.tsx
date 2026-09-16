@@ -36,8 +36,23 @@ type SyncAntwort = {
   offeneSeiten?: number
   vorbelegt?: number
   eingereiht?: number
+  eingereihtNachGrund?: { erstimport: number; neueTrophaeen: number; dlcErweitert: number }
   weiter: boolean
   meldung?: string
+}
+
+/** "3 neu in der Prüfliste (1 zum ersten Mal, 1 weitergespielt, 1 DLC)" - nur, was nicht null ist. */
+function eingereihtText(d: SyncAntwort): string {
+  if (!d.eingereiht) return ''
+  const teile = d.eingereihtNachGrund
+    ? [
+        [d.eingereihtNachGrund.erstimport, 'zum ersten Mal'],
+        [d.eingereihtNachGrund.neueTrophaeen, 'weitergespielt'],
+        [d.eingereihtNachGrund.dlcErweitert, 'DLC'],
+      ].filter(([n]) => n)
+    : []
+  const klammer = teile.length > 1 ? ` (${teile.map(([n, t]) => `${n} ${t}`).join(', ')})` : ''
+  return ` ${d.eingereiht} neu in der Prüfliste${klammer}.`
 }
 
 const datum = (wert: string | null) =>
@@ -128,7 +143,7 @@ export function Einstellungen() {
             ? `Auswertung: noch ${daten.offeneSeiten ?? '?'} Seiten …`
             : `Fertig: ${daten.titlesSeen ?? 0} Titel ausgewertet.` +
               (daten.vorbelegt ? ` ${daten.vorbelegt} Status vorbelegt.` : '') +
-              (daten.eingereiht ? ` ${daten.eingereiht} neu in der Prüfliste.` : ''),
+              eingereihtText(daten),
       )
       if (!daten.weiter) break
     }
