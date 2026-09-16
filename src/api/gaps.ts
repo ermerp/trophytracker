@@ -15,7 +15,9 @@ import type { AppEnv } from "../types";
  *
  * Releases mit unbekannter Disc-Fassung liefert die Route mit
  * (Entscheidung des Nutzers vom 16.09.2026): Die Ansicht zeigt sie
- * getrennt als "moeglicherweise" und laesst dort ja/nein setzen.
+ * getrennt als "moeglicherweise" und laesst dort ja/nein setzen - oder
+ * verwerfen, ohne die Frage zu beantworten: Ein verworfener Kaufeintrag
+ * haengt am Release, nicht an der Disc-Fassung, und blendet beide Listen aus.
  */
 
 function lueckeAntwort(z: LueckeZeile) {
