@@ -5,7 +5,7 @@ import { digitalEntitlementRoutes, physicalCopyRoutes } from "./api/ownership";
 import { igdbRoutes, unmatchedRoutes } from "./api/igdb";
 import { importRoutes } from "./api/imports";
 import { gapRoutes } from "./api/gaps";
-import { backlogCandidateRoutes, planRoutes } from "./api/plans";
+import { backlogCandidateRoutes, planRoutes, purchaseCandidateRoutes, upcomingRoutes } from "./api/plans";
 import { psnRoutes } from "./api/psn";
 import { releaseRoutes } from "./api/releases";
 import { reviewRoutes } from "./api/review";
@@ -59,6 +59,8 @@ export function createApp(
 	app.route("/api/releases", releaseRoutes);
 	app.route("/api/plans", planRoutes);
 	app.route("/api/backlog-candidates", backlogCandidateRoutes);
+	app.route("/api/purchase-candidates", purchaseCandidateRoutes);
+	app.route("/api/upcoming", upcomingRoutes);
 	app.route("/api/gaps", gapRoutes);
 	app.route("/api/imports/wishlist", importRoutes);
 	app.route("/api/deviations", deviationRoutes);

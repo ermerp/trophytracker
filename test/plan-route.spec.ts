@@ -559,6 +559,118 @@ describe("To-Do, Backlog und Kandidaten (Stufe 12)", () => {
 	});
 });
 
+describe("Kaufliste (Stufe 15)", () => {
+	it("nimmt eine Herkunft nur fuer die Kaufliste und nur luecke oder wunsch", async () => {
+		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
+		const a = app();
+		const p = await sende(a, "POST", "/api/plans", { art: "kauf", releaseId: ps4, herkunft: "luecke" });
+		expect(p.status).toBe(201);
+		expect(await p.json()).toMatchObject({ art: "kauf", herkunft: "luecke", aufKaufliste: null, imBesitz: false });
+
+		expect((await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps4, herkunft: "luecke" })).status).toBe(400);
+		expect((await sende(a, "POST", "/api/plans", { art: "kauf", spielId: 1, herkunft: "triage" })).status).toBe(400);
+		const ohne = await sende(a, "POST", "/api/plans", { art: "kauf", spielId: 1, plattform: "" });
+		expect(await ohne.json()).toMatchObject({ herkunft: "manuell" });
+	});
+
+	it("ein Wunsch kommt als Kopie auf die Kaufliste; der Wunsch nennt den Kaufeintrag und bleibt offen", async () => {
+		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
+		const a = app();
+		const w = await (await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps4, favorit: true })).json();
+		const k = await (await sende(a, "POST", "/api/plans", { art: "kauf", releaseId: ps4, herkunft: "wunsch", favorit: true })).json();
+		expect(k).toMatchObject({ art: "kauf", herkunft: "wunsch", favorit: true, aufKaufliste: null });
+
+		const liste = await hole(a, "/api/plans?kind=wunsch");
+		expect(liste.eintraege).toHaveLength(1);
+		expect(liste.eintraege[0]).toMatchObject({ id: w.id, status: "offen", aufKaufliste: k.id });
+		// Der Wunsch ist kein Kandidat mehr, die Kopie liegt schon dort.
+		expect(await hole(a, "/api/purchase-candidates")).toMatchObject({ anzahl: 0, wuensche: 0 });
+	});
+
+	it("Kauf erledigt erledigt den offenen Wunsch am Release und am Spiel mit; verworfen nicht", async () => {
+		const [ps4, ps5] = await spiel(1, "Bloodborne", ["PS4", "PS5"]);
+		const a = app();
+		const wRelease = await (await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps4 })).json();
+		const wSpiel = await (await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" })).json();
+		const wAnderes = await (await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps5 })).json();
+		const k = await (await sende(a, "POST", "/api/plans", { art: "kauf", releaseId: ps4, herkunft: "wunsch" })).json();
+
+		const v = await sende(a, "PATCH", `/api/plans/${k.id}`, { status: "verworfen" });
+		expect(await v.json()).toMatchObject({ status: "verworfen", wuenscheErledigt: 0 });
+		expect((await zeile(wRelease.id))?.status).toBe("offen");
+
+		await sende(a, "PATCH", `/api/plans/${k.id}`, { status: "offen" });
+		const e = await sende(a, "PATCH", `/api/plans/${k.id}`, { status: "erledigt" });
+		expect(await e.json()).toMatchObject({ status: "erledigt", wuenscheErledigt: 2 });
+		expect((await zeile(wRelease.id))?.status).toBe("erledigt");
+		expect((await zeile(wSpiel.id))?.status).toBe("erledigt");
+		// Ein Wunsch an einem anderen Release desselben Spiels ist eine andere Aussage.
+		expect((await zeile(wAnderes.id))?.status).toBe("offen");
+
+		// Nochmal erledigt (Notiz aendern) erledigt nichts erneut.
+		const n = await sende(a, "PATCH", `/api/plans/${k.id}`, { status: "erledigt", notiz: "x" });
+		expect(await n.json()).toMatchObject({ wuenscheErledigt: 0 });
+	});
+
+	it("GET /api/plans nennt imBesitz, wenn Disc oder Berechtigung am Release liegt", async () => {
+		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
+		await env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)").bind(ps4).run();
+		await repos().plan.anlegen("wunsch", { releaseId: ps4 }, "import");
+		await repos().plan.anlegen("wunsch", { gameId: 1 }, "import");
+		const liste = await hole(app(), "/api/plans?kind=wunsch&sort=angelegt");
+		expect(liste.eintraege.map((e: { imBesitz: boolean }) => e.imBesitz)).toEqual([false, true]);
+	});
+
+	it("GET /api/purchase-candidates liefert Luecken und Wuensche mit Zaehlern; Angekuendigte fehlen", async () => {
+		const [ps4] = await spiel(1, "Persona 5", ["PS4"], { cover_url: "p5.jpg", critic_score: 93 });
+		await env.DB.prepare("UPDATE release SET physical_release_status = 'ja' WHERE id = ?").bind(ps4).run();
+		await env.DB.prepare(
+			"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, progress_pct, synced_at, release_id) " +
+				"VALUES ('NPWR1', 'trophy', 'x', 'PS4', 40, '2026-01-01', ?)",
+		).bind(ps4).run();
+		await spiel(2, "Bald", [], { release_status: "angekuendigt", release_date: "2099-01-01" });
+		await spiel(3, "Wunsch", []);
+		const r = repos().plan;
+		await r.anlegen("wunsch", { gameId: 2 }, "manuell");
+		const w = await r.anlegen("wunsch", { gameId: 3 }, "manuell", { isFavorite: true });
+
+		const a = app();
+		expect(await hole(a, "/api/purchase-candidates")).toEqual({
+			anzahl: 2,
+			luecken: 1,
+			wuensche: 1,
+			kandidaten: [
+				{ quelle: "luecke", planId: null, releaseId: ps4, spielId: 1, titel: "Persona 5", plattform: "PS4", bild: "p5.jpg", kritik: 93, favorit: false, besterGebrauchtpreisCents: null },
+				{ quelle: "wunsch", planId: w, releaseId: null, spielId: 3, titel: "Wunsch", plattform: null, bild: null, kritik: null, favorit: true, besterGebrauchtpreisCents: null },
+			],
+		});
+
+		// Luecke uebernehmen: kein Kandidat mehr, Eintrag mit Herkunft luecke.
+		await sende(a, "POST", "/api/plans", { art: "kauf", releaseId: ps4, herkunft: "luecke" });
+		expect(await hole(a, "/api/purchase-candidates")).toMatchObject({ anzahl: 1, luecken: 0, wuensche: 1 });
+		const kauf = await hole(a, "/api/plans?kind=kauf");
+		expect(kauf.eintraege[0]).toMatchObject({ titel: "Persona 5", herkunft: "luecke" });
+	});
+
+	it("GET /api/upcoming nennt vorgemerkte, noch nicht erschienene Titel mit Datum zuerst", async () => {
+		const [ps5] = await spiel(1, "Bald", ["PS5"], { release_status: "angekuendigt", release_date: "2099-01-01", cover_url: "b.jpg" });
+		await spiel(2, "Irgendwann", [], { release_status: "angekuendigt", release_date: null });
+		await spiel(3, "Da", [], { release_status: "erschienen", release_date: "2020-01-01" });
+		const r = repos().plan;
+		const k = await r.anlegen("kauf", { releaseId: ps5 }, "manuell", { isFavorite: true });
+		const w = await r.anlegen("wunsch", { gameId: 2 }, "manuell");
+		await r.anlegen("wunsch", { gameId: 3 }, "manuell");
+
+		expect(await hole(app(), "/api/upcoming")).toEqual({
+			anzahl: 2,
+			eintraege: [
+				{ planId: k, art: "kauf", spielId: 1, releaseId: ps5, titel: "Bald", bild: "b.jpg", plattform: "PS5", erscheinungsdatum: "2099-01-01", favorit: true },
+				{ planId: w, art: "wunsch", spielId: 2, releaseId: null, titel: "Irgendwann", bild: null, plattform: null, erscheinungsdatum: null, favorit: false },
+			],
+		});
+	});
+});
+
 describe("GET /api/plans?suche=", () => {
 	it("filtert als Teilstring im Titel, ohne Gross-/Kleinschreibung", async () => {
 		await spiel(1, "Divinity: Original Sin II", []);

@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router-dom'
-import { PLAN_STATUSTEXT, PLATTFORMEN, STATUSTEXT, anfrage, datum, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
+import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, STATUSTEXT, anfrage, datum, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
 
 /**
  * Geteilte Bausteine der Listen (Abschnitt 5): Wunschliste (Stufe 10), To-Do
- * und Backlog (Stufe 12) zeigen dieselbe Kachel und dieselben Filter. Was
- * sich unterscheidet – die IGDB-Suche der Wunschliste, das Sortieren der
- * To-Do-Liste, die Kandidaten des Backlogs –, bleibt in den Ansichten.
+ * und Backlog (Stufe 12) und Kaufliste (Stufe 15) zeigen dieselbe Kachel und
+ * dieselben Filter. Was sich unterscheidet – die IGDB-Suche der Wunschliste,
+ * das Sortieren der To-Do-Liste, die Kandidaten von Backlog und Kaufliste –,
+ * bleibt in den Ansichten.
+ *
+ * Kaufliste (Entscheidungen des Nutzers vom 16.09.2026): Ein Wunsch kommt als
+ * Kopie auf die Kaufliste, der Wunsch bleibt; „erledigt" am Kauf erledigt
+ * den Wunsch mit. Was im Besitz ist, erledigt der Worker beim Erfassen
+ * selbst – die Kachel zeigt „im Besitz" nur noch für Altfälle.
  *
  * To-Do und Backlog sind mit der Bewertung gekoppelt (5.5): To-Do heißt
  * „am Spielen", Backlog „pausiert". Ihre Kacheln schließen deshalb nicht
@@ -68,6 +74,7 @@ export function usePlanListe(art: PlanArt) {
   const [meldung, setMeldung] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [eben, setEben] = useState<PlanEintrag | null>(null)
+  const [hinweis, setHinweis] = useState<string | null>(null)
 
   const standard: Sortierung = art === 'todo' ? 'position' : 'favorit'
   const sortierung: Sortierung = (params.get('sort') as Sortierung) in SORTIERTEXT ? (params.get('sort') as Sortierung) : standard
@@ -125,8 +132,12 @@ export function usePlanListe(art: PlanArt) {
 
   async function aendern(id: number, koerper: Record<string, unknown>) {
     setMeldung(null)
+    setHinweis(null)
     try {
-      ersetze(await anfrage<PlanEintrag>(`/api/plans/${id}`, { methode: 'PATCH', koerper }))
+      const e = await anfrage<PlanEintrag & { wuenscheErledigt?: number }>(`/api/plans/${id}`, { methode: 'PATCH', koerper })
+      ersetze(e)
+      // Kauf erledigt erledigt den Wunsch mit (Stufe 15) - das steht auf einer anderen Seite, deshalb sagen.
+      if (e.wuenscheErledigt) setHinweis(`„${e.titel}" ist damit auch auf der Wunschliste erledigt.`)
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Ändern fehlgeschlagen.')
     }
@@ -144,10 +155,11 @@ export function usePlanListe(art: PlanArt) {
     }
   }
 
-  /** Anlegen (Standard: diese Liste); der neue Eintrag steht für „Rückgängig" bereit. */
+  /** Anlegen (Standard: diese Liste; `art` im Körper übersteuert); der neue Eintrag steht für „Rückgängig" bereit. */
   async function anlegen(koerper: Record<string, unknown>): Promise<PlanEintrag | null> {
     setLaeuft(true)
     setMeldung(null)
+    setHinweis(null)
     try {
       const e = await anfrage<PlanEintrag & { spielAngelegt: boolean }>('/api/plans', {
         methode: 'POST',
@@ -186,17 +198,40 @@ export function usePlanListe(art: PlanArt) {
     setEben(null)
     try {
       await anfrage(`/api/plans/${e.id}`, { methode: 'DELETE' })
-      setDaten((d) => d && { ...d, eintraege: d.eintraege.filter((x) => x.id !== e.id) })
+      // Ein Eintrag einer anderen Liste (Kopie auf die Kaufliste): Die eigene Liste neu laden, weil ihre Kacheln ihn nennen.
+      if (e.art !== art) await laden()
+      else setDaten((d) => d && { ...d, eintraege: d.eintraege.filter((x) => x.id !== e.id) })
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Rückgängig fehlgeschlagen.')
     }
   }
 
-  return {
-    art, daten, setDaten, meldung, setMeldung, laeuft, setLaeuft, eben, setEben,
-    sortierung, nurFavoriten, alle, plattformen, suche,
-    laden, setzeParam, plattformFilterUmschalten, ersetze, aendern, entfernen, anlegen, rueckgaengig, bewerten,
+  /** Kopie eines Wunsches auf die Kaufliste (Stufe 15): dasselbe Ziel, Favorit kommt mit, Herkunft „wunsch". */
+  async function aufKaufliste(e: PlanEintrag) {
+    const ziel =
+      e.releaseId !== null ? { releaseId: e.releaseId } : e.spielId !== null ? { spielId: e.spielId, plattform: '' } : { titel: e.titel }
+    await anlegen({ art: 'kauf', herkunft: 'wunsch', favorit: e.favorit, ...ziel })
   }
+
+  return {
+    art, daten, setDaten, meldung, setMeldung, hinweis, laeuft, setLaeuft, eben, setEben,
+    sortierung, nurFavoriten, alle, plattformen, suche,
+    laden, setzeParam, plattformFilterUmschalten, ersetze, aendern, entfernen, anlegen, rueckgaengig, bewerten, aufKaufliste,
+  }
+}
+
+/** Link auf „Erscheint bald" (Use Case 11), nur wenn es dort etwas gibt. */
+export function ErscheintBaldLink() {
+  const [anzahl, setAnzahl] = useState(0)
+  useEffect(() => {
+    anfrage<{ anzahl: number }>('/api/upcoming').then((a) => setAnzahl(a.anzahl)).catch(() => {})
+  }, [])
+  if (anzahl === 0) return null
+  return (
+    <Link to="/erscheint-bald" className="zeile">
+      {anzahl === 1 ? 'Ein vorgemerkter Titel erscheint erst noch' : `${anzahl} vorgemerkte Titel erscheinen erst noch`}
+    </Link>
+  )
 }
 
 export type PlanListe = ReturnType<typeof usePlanListe>
@@ -245,10 +280,11 @@ export function Filterleiste({ liste, sortierbar = true }: { liste: PlanListe; s
 
 /** Fehlermeldung und die Rückgängig-Zeile nach dem Anlegen. */
 export function Meldungen({ liste }: { liste: PlanListe }) {
-  const { meldung, eben, rueckgaengig } = liste
+  const { meldung, hinweis, eben, rueckgaengig } = liste
   return (
     <>
       {meldung && <p role="alert" className="auffaellig">{meldung}</p>}
+      {hinweis && <p role="status" className="hinweis">{hinweis}</p>}
       {eben && (
         <p role="status" className="hinweis">
           „{eben.titel}" {gesetztText(eben)}.{' '}
@@ -317,6 +353,8 @@ export function PlanKarte({ e, liste, griff, knoepfe, liRef, style, className }:
             {e.releaseStatus === 'angekuendigt' && ` · erscheint ${e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'}`}
             {e.releaseStatus !== 'angekuendigt' && e.erscheinungsdatum && ` · ${e.erscheinungsdatum.slice(0, 4)}`}
             {e.art !== 'wunsch' && e.eigenerStatus && ` · ${STATUSTEXT[e.eigenerStatus]}`}
+            {e.art === 'kauf' && e.herkunft && ` · ${HERKUNFTTEXT[e.herkunft] ?? e.herkunft}`}
+            {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.imBesitz && ' · im Besitz'}
             {e.status !== 'offen' && ` · ${PLAN_STATUSTEXT[e.status]}`}
           </div>
         </div>

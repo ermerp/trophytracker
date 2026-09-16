@@ -145,10 +145,16 @@ export const igdbRoutes = new Hono<AppEnv>()
 		return c.json({ zurueckgesetzt });
 	})
 
+	/**
+	 * Vorweg hebt jeder Schritt angekuendigte Spiele mit verstrichenem Datum
+	 * auf `erschienen` (8.4, Stufe 15) - bis der Cron in Stufe 17 das
+	 * taeglich tut. `erschienen` nennt die Anzahl.
+	 */
 	.post("/auffrischen", async (c) => {
 		if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
+		const erschienen = await c.var.repos.games.erschieneneFreigeben();
 		const ergebnis = await igdbAuffrischSchritt(c.var.repos, c.var.igdb);
-		return c.json(ergebnis, ergebnis.status === "fehler" ? 502 : 200);
+		return c.json({ ...ergebnis, erschienen }, ergebnis.status === "fehler" ? 502 : 200);
 	})
 
 	/**

@@ -49,7 +49,13 @@ gespielt ist, als Disc existiert und nicht im Regal steht, und lässt eine Lück
 als „physisch nicht gewünscht" verwerfen (Migration 0017). **Abgenommen am
 16.09.2026**: 197 Releases aus IGDB belegt, 165 Lücken; die 249 mit
 unbekannter Disc-Fassung bleiben offen, bis der Händlerfeed (Stufe 18)
-nachfüllt – IGDB kennt Discs nur positiv (Amazon-Einträge).
+nachfüllt – IGDB kennt Discs nur positiv (Amazon-Einträge). Stufe 15 bringt
+die Kaufliste (Use Cases 6 und 10) mit Kandidaten aus Lücken und Wünschen und
+„Erscheint bald" (Use Case 11). Drei Entscheidungen vom 16.09.2026 prägen sie:
+Ein Wunsch kommt als **Kopie** auf die Kaufliste und bleibt, bis der Kauf
+erledigt ist; „erledigt" am Kauf erledigt den Wunsch mit; und wer eine Disc
+oder Berechtigung erfasst, hat gekauft – Kauf- und Wunscheintrag verschwinden
+von selbst (Migration 0018 gleicht den Bestand an, eine Zeile).
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -96,15 +102,16 @@ Was steht und in Betrieb nachgewiesen ist:
 | To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert. **Gekoppelt mit der Bewertung** (Entscheidung vom 16.09.2026): To-Do heißt „am Spielen", „ins Backlog" setzt „pausiert", „durchgespielt"/„abgebrochen" auf der Kachel schließen den Eintrag |
 | Lücken | In der Leiste: digital gespielt, Disc-Fassung belegt, nicht im Regal; „physisch nicht gewünscht" ist ein verworfener Kaufeintrag (Rückgängig, „wieder als Lücke zeigen"); darunter zugeklappt „Disc-Fassung unbekannt" mit „Disc gibt es" / „gibt es nicht" / „physisch nicht gewünscht" je Zeile. Disc-Fassung aus IGDB (`external_games`, Knopf „Disc-Fassungen prüfen" in den Einstellungen, 50 Spiele je Anfrage, nur `unbekannt` → `ja`, nach 30 Tagen erneut) oder von Hand im Spieldetail (Dropdown mit Quelle); PSN-Produkt-Id je Release pflegbar |
 | Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
+| Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 18 (Migration 0018) |
+| Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt „Metadaten auffrischen" nach (täglich erst mit dem Cron, Stufe 17) |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 15 – Kaufliste** (Kandidaten aus Lücken und Wunschliste
-über `v_kaufkandidaten`, Sortierung wie die Wunschliste, „Erscheint bald";
-Use Cases 6, 10, 11). Vorgemerkt dafür: Der Übergang `wunsch → erledigt`, wenn
-Disc oder digitale Berechtigung am Release erfasst wird (Abschnitt 5), und
-`verworfen → offen` für eine verworfene Lücke, die doch gekauft werden soll.
+**Als Nächstes:** Nach Stufe 15 steht die Entscheidung über eine Stufe
+„Oberfläche" an (Abschnitt 16 der Spezifikation) – und, gemeinsam damit, über
+ein Änderungsprotokoll je Spiel (Idee vom 16.09.2026, dort als offener Punkt
+vermerkt). Danach Stufe 16, Barcode-Scan.
 
 ## Architektur in einem Absatz
 
@@ -659,18 +666,35 @@ aus einer Sony-Antwort.
 
 Wunschliste, To-Do, Backlog und Kaufliste liegen in einer Tabelle `plan_entry`
 ([Abschnitt 5](docs/spezifikation.md#5-datenmodell--absichten-use-cases-4-5-6));
-Stufe 10 bedient die Wunschliste, Stufe 12 To-Do und Backlog, die Routen
-kennen alle vier Arten:
+Stufe 10 bedient die Wunschliste, Stufe 12 To-Do und Backlog, Stufe 15 die
+Kaufliste – die Routen kennen alle vier Arten:
 
 ```
-GET    /api/plans?kind=wunsch|todo|backlog&status=offen|alle&sort=favorit|wertung|titel|release|angelegt|position&favorit=1&plattform=PS4,PS5,ohne&suche=
-POST   /api/plans        { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz?, status? }
-PATCH  /api/plans/:id    Teilmenge von { favorit, notiz, status, art, plattform }
+GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=favorit|wertung|titel|release|angelegt|position&favorit=1&plattform=PS4,PS5,ohne&suche=
+POST   /api/plans        { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz?, status?, herkunft? }
+PATCH  /api/plans/:id    Teilmenge von { favorit, notiz, status, art, plattform }; kauf erledigt → wuenscheErledigt
 PUT    /api/plans/reorder  { art, orderedIds } – To-Do-Reihenfolge
 DELETE /api/plans/:id    räumt Release und Spiel ab, wenn sonst nichts daran hängt
 GET    /api/backlog-candidates   { anzahl, abgelehnt, kandidaten[] }
+GET    /api/purchase-candidates  { anzahl, luecken, wuensche, kandidaten[] } – aus v_kaufkandidaten
+GET    /api/upcoming             { anzahl, eintraege[] } – aus v_erscheint_bald
 PATCH  /api/releases/:id/play-status  { status } – nur der Status; koppelt wie PUT
 ```
+
+**Kaufliste** (Stufe 15, Entscheidungen vom 16.09.2026): Ein Wunsch kommt als
+**Kopie** auf die Kaufliste (`herkunft: 'wunsch'`, Favorit kommt mit) und
+bleibt offen, bis der Kauf erledigt ist – das ist die eine Stelle, an der ein
+Übergang kein Feld-Update ist. `v_kaufkandidaten` nennt belegte Lücken ohne
+Kaufeintrag und offene Wünsche, die noch nicht kopiert wurden, und lässt
+Angekündigte weg. „erledigt" am Kaufeintrag erledigt den offenen Wunsch am
+selben Ziel mit (am Release und am Spiel); `verworfen` nicht. Wer eine Disc
+oder eine digitale Berechtigung erfasst (`POST /api/physical-copies`,
+`POST /api/digital-entitlements`), hat gekauft: Der Worker erledigt offene
+Kauf- und Wunscheinträge am Release und am Spiel von selbst und nennt sie in
+der Antwort (`absichtenErledigt`, dazu `aufListe`); die Oberfläche bietet
+„ins Backlog übernehmen" an und öffnet die Einträge beim Rückgängig wieder.
+Migration 0018 hat den Bestand einmal angeglichen; der Deploy-Job zählt
+seither offene Wünsche und Käufe an Releases mit Besitz (erwartet 0).
 
 **To-Do und Backlog sind mit der Bewertung gekoppelt** (Abschnitt 5.5,
 Entscheidung vom 16.09.2026): Was auf To-Do steht, ist `am_spielen`, was im

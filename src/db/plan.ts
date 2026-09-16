@@ -20,6 +20,34 @@ export type PlanFelder = {
 	kind?: PlanArt;
 };
 
+/** Eine Zeile aus v_kaufkandidaten (Stufe 15): Luecke oder offener Wunsch, noch nicht auf der Kaufliste. */
+export type KaufKandidatZeile = {
+	quelle: "luecke" | "wunsch";
+	/** Der Wunsch, bei Luecken NULL. */
+	plan_id: number | null;
+	release_id: number | null;
+	game_id: number | null;
+	title: string;
+	platform: string | null;
+	cover_url: string | null;
+	critic_score: number | null;
+	is_favorite: number;
+	bester_gebrauchtpreis_cents: number | null;
+};
+
+/** Eine Zeile aus v_erscheint_bald (Stufe 15): vorgemerkt, noch nicht erschienen. */
+export type ErscheintBaldZeile = {
+	game_id: number;
+	title: string;
+	cover_url: string | null;
+	release_date: string | null;
+	release_id: number | null;
+	platform: string | null;
+	plan_id: number;
+	kind: PlanArt;
+	is_favorite: number;
+};
+
 /** Eine Zeile aus v_backlog_kandidaten (Stufe 12): im Besitz, nie angefasst. */
 export type KandidatZeile = {
 	game_id: number;
@@ -55,6 +83,10 @@ export type PlanZeile = {
 	release_status: string | null;
 	/** Eigene Bewertung am Release (4.2); null am Spiel, bei Freitext oder ohne Zeile. */
 	play_status: string | null;
+	/** Offener Kaufeintrag am selben Ziel (Stufe 15) - fuer den Knopf auf der Wunsch-Kachel. */
+	kauf_id: number | null;
+	/** Disc oder digitale Berechtigung am Release (1/0); am Spiel oder bei Freitext 0. */
+	im_besitz: number;
 };
 
 const SPALTEN: Record<keyof PlanFelder, string> = {
@@ -69,11 +101,21 @@ function wert(feld: keyof PlanFelder, felder: PlanFelder): unknown {
 	return felder[feld] ?? null;
 }
 
-const AUSWAHL =
+/** Die Auswahl einer Listenzeile; exportiert, damit test/lesekosten.spec.ts dieselbe Abfrage misst. */
+export const PLAN_AUSWAHL =
 	"SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position, " +
 	"pe.is_favorite, pe.note, pe.origin, pe.status, pe.created_at, pe.resolved_at, " +
 	"COALESCE(g.title, pe.title_raw) AS titel, g.id AS spiel_id, r.platform, " +
-	"g.cover_url, g.critic_score, g.release_date, g.release_status, ps.status AS play_status " +
+	"g.cover_url, g.critic_score, g.release_date, g.release_status, ps.status AS play_status, " +
+	// Alles Index-Lookups je Zeile (idx_plan_release, idx_plan_game, idx_physical_copy_release,
+	// idx_digital_release). Zwei getrennte Unterabfragen statt eines OR: Mit OR nimmt SQLite
+	// idx_plan_offen und liest alle Kaufeintraege je Zeile (gemessen in test/lesekosten.spec.ts).
+	"COALESCE((SELECT k.id FROM plan_entry k WHERE k.release_id = pe.release_id AND k.kind = 'kauf' " +
+	"   AND k.status = 'offen' AND k.id <> pe.id ORDER BY k.id LIMIT 1), " +
+	"  (SELECT k.id FROM plan_entry k WHERE k.game_id = pe.game_id AND k.kind = 'kauf' " +
+	"   AND k.status = 'offen' AND k.id <> pe.id ORDER BY k.id LIMIT 1)) AS kauf_id, " +
+	"(pe.release_id IS NOT NULL AND (EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = pe.release_id) " +
+	"   OR EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = pe.release_id))) AS im_besitz " +
 	"FROM plan_entry pe " +
 	"LEFT JOIN release r ON r.id = pe.release_id " +
 	"LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id) " +
@@ -107,7 +149,7 @@ export class PlanRepository {
 	 */
 	async liste(kind: PlanArt, status: PlanStatus | "alle"): Promise<PlanZeile[]> {
 		const sql =
-			AUSWAHL +
+			PLAN_AUSWAHL +
 			"WHERE pe.kind = ?" +
 			(status === "alle" ? "" : " AND pe.status = ?") +
 			" ORDER BY pe.position IS NULL, pe.position, pe.id";
@@ -117,7 +159,7 @@ export class PlanRepository {
 	}
 
 	async eintrag(id: number): Promise<PlanZeile | null> {
-		return this.db.prepare(AUSWAHL + "WHERE pe.id = ?").bind(id).first<PlanZeile>();
+		return this.db.prepare(PLAN_AUSWAHL + "WHERE pe.id = ?").bind(id).first<PlanZeile>();
 	}
 
 	/**
@@ -127,7 +169,7 @@ export class PlanRepository {
 	async offeneFuerSpiel(gameId: number): Promise<PlanZeile[]> {
 		const { results } = await this.db
 			.prepare(
-				AUSWAHL +
+				PLAN_AUSWAHL +
 					"WHERE pe.status = 'offen' AND (pe.game_id = ? " +
 					"OR pe.release_id IN (SELECT id FROM release WHERE game_id = ?)) ORDER BY pe.id",
 			)
@@ -249,6 +291,70 @@ export class PlanRepository {
 			.prepare("SELECT COUNT(*) AS n FROM plan_entry WHERE kind = 'backlog' AND status = 'verworfen'")
 			.first<{ n: number }>();
 		return r?.n ?? 0;
+	}
+
+	/**
+	 * Offene Eintraege der genannten Arten am Ziel (Stufe 15): am Release
+	 * und am Spiel - "das Spiel" als Wunsch ist erfuellt, sobald eine Fassung
+	 * im Regal steht. `gameId` darf fehlen, dann zaehlt das Spiel des
+	 * Releases. Zwei Index-Lookups (idx_plan_release, idx_plan_game).
+	 */
+	async offeneAmZiel(
+		kinds: readonly PlanArt[],
+		ziel: { releaseId: number | null; gameId?: number | null },
+	): Promise<PlanZeile[]> {
+		let gameId = ziel.gameId ?? null;
+		if (kinds.length === 0 || (ziel.releaseId === null && gameId === null)) return [];
+		if (gameId === null) {
+			// Vorab aufloesen statt im OR: Mit einer Unterabfrage im OR-Zweig nimmt SQLite idx_plan_offen
+			// und liest alle offenen Eintraege der Arten (gemessen in test/lesekosten.spec.ts).
+			const r = await this.db.prepare("SELECT game_id FROM release WHERE id = ?").bind(ziel.releaseId).first<{ game_id: number }>();
+			gameId = r?.game_id ?? null;
+		}
+		const platzhalter = kinds.map(() => "?").join(", ");
+		// Art und Status stehen in den Unterabfragen: Als aeussere Bedingung liessen
+		// sie SQLite auf idx_plan_offen ausweichen und alle offenen Eintraege der
+		// Arten lesen; so bleiben es zwei Index-Lookups (test/lesekosten.spec.ts).
+		const treffer = `SELECT id FROM plan_entry WHERE %s = ? AND status = 'offen' AND kind IN (${platzhalter})`;
+		const { results } = await this.db
+			.prepare(
+				PLAN_AUSWAHL +
+					`WHERE pe.id IN (${treffer.replace("%s", "release_id")} UNION ${treffer.replace("%s", "game_id")}) ORDER BY pe.id`,
+			)
+			.bind(ziel.releaseId, ...kinds, gameId, ...kinds)
+			.all<PlanZeile>();
+		return results;
+	}
+
+	/** Mehrere Eintraege auf einmal erledigen; gibt die Anzahl der geaenderten Zeilen zurueck. */
+	async erledigen(ids: number[]): Promise<number> {
+		if (ids.length === 0) return 0;
+		const update = this.db.prepare(
+			"UPDATE plan_entry SET status = 'erledigt', resolved_at = datetime('now') WHERE id = ? AND status = 'offen'",
+		);
+		const ergebnisse = await this.db.batch(ids.map((id) => update.bind(id)));
+		return ergebnisse.reduce((n, e) => n + (e.meta.changes ?? 0), 0);
+	}
+
+	/** Kandidaten fuer die Kaufliste aus v_kaufkandidaten (Migration 0018): Luecken zuerst, dann Wuensche. */
+	async kaufKandidaten(): Promise<KaufKandidatZeile[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT quelle, plan_id, release_id, game_id, title, platform, cover_url, critic_score, is_favorite, " +
+					"bester_gebrauchtpreis_cents FROM v_kaufkandidaten ORDER BY quelle, title, platform",
+			)
+			.all<KaufKandidatZeile>();
+		return results;
+	}
+
+	/** Vorgemerkte Titel, die noch erscheinen, aus v_erscheint_bald (Use Case 11). */
+	async erscheintBald(): Promise<ErscheintBaldZeile[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT game_id, title, cover_url, release_date, release_id, platform, plan_id, kind, is_favorite FROM v_erscheint_bald",
+			)
+			.all<ErscheintBaldZeile>();
+		return results;
 	}
 
 	/** Kandidaten fuer den Backlog aus v_backlog_kandidaten (Migration 0014). */

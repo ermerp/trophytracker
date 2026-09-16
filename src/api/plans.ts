@@ -2,9 +2,12 @@ import { Hono } from "hono";
 import {
 	PLAN_ARTEN,
 	PLAN_STATUS,
+	type ErscheintBaldZeile,
 	type KandidatZeile,
+	type KaufKandidatZeile,
 	type PlanArt,
 	type PlanFelder,
+	type PlanHerkunft,
 	type PlanStatus,
 	type PlanZeile,
 	type PlanZiel,
@@ -19,9 +22,16 @@ import { liesJson } from "./validierung";
 /**
  * Absichten (Abschnitt 12): GET/POST/PATCH/DELETE /api/plans.
  *
- * Stufe 10 bedient die Wunschliste, Stufe 12 To-Do und Backlog; die Routen
- * kennen alle vier Arten. PUT /reorder setzt die manuelle Reihenfolge der
- * To-Do-Liste, GET /api/backlog-candidates liest v_backlog_kandidaten.
+ * Stufe 10 bedient die Wunschliste, Stufe 12 To-Do und Backlog, Stufe 15 die
+ * Kaufliste; die Routen kennen alle vier Arten. PUT /reorder setzt die
+ * manuelle Reihenfolge der To-Do-Liste, GET /api/backlog-candidates liest
+ * v_backlog_kandidaten, GET /api/purchase-candidates v_kaufkandidaten und
+ * GET /api/upcoming v_erscheint_bald.
+ *
+ * Kaufliste (Entscheidungen des Nutzers vom 16.09.2026): Ein Wunsch kommt als
+ * Kopie auf die Kaufliste (neuer Eintrag, origin 'wunsch'), und ein
+ * erledigter Kaufeintrag erledigt den offenen Wunsch am selben Ziel mit -
+ * gekauft heisst erfuellt. "verworfen" laesst den Wunsch stehen.
  *
  * Sortierung und Filter laufen hier, nicht in SQL (5.2): Favoriten zuerst,
  * dann Kritikerwertung ist der Standard; To-Do steht nach Position.
@@ -31,6 +41,9 @@ import { liesJson } from "./validierung";
 
 const SORTIERUNGEN = ["favorit", "wertung", "titel", "angelegt", "release", "position"] as const;
 type Sortierung = (typeof SORTIERUNGEN)[number];
+
+/** Herkunft, die die Oberflaeche beim Anlegen eines Kaufeintrags nennen darf (Kandidaten, Stufe 15). */
+const KAUF_HERKUNFT = ["luecke", "wunsch"] as const;
 
 /** Plattformfilter: die vier Plattformen und "ohne" fuer Eintraege am Spiel oder Freitext. */
 const PLATTFORM_FILTER = [...ERLAUBTE_PLATTFORMEN, "ohne"] as const;
@@ -109,6 +122,40 @@ export function eintragAntwort(z: PlanZeile) {
 		erledigtAm: z.resolved_at,
 		/** Eigene Bewertung am Release (4.2); bei To-Do und Backlog gekoppelt (5.5). */
 		eigenerStatus: z.play_status,
+		/** Offener Kaufeintrag am selben Ziel (Stufe 15); null, wenn keiner. */
+		aufKaufliste: z.kauf_id,
+		/** Disc oder digitale Berechtigung am Release - der Eintrag ist damit eigentlich erfuellt. */
+		imBesitz: z.im_besitz === 1,
+	};
+}
+
+export function kaufKandidatAntwort(k: KaufKandidatZeile) {
+	return {
+		quelle: k.quelle,
+		planId: k.plan_id,
+		releaseId: k.release_id,
+		spielId: k.game_id,
+		titel: k.title,
+		plattform: k.platform,
+		bild: k.cover_url,
+		kritik: k.critic_score,
+		favorit: k.is_favorite === 1,
+		/** null heisst unbekannt - nie 0 (Darstellungsregel, Abschnitt 13). */
+		besterGebrauchtpreisCents: k.bester_gebrauchtpreis_cents,
+	};
+}
+
+function erscheintBaldAntwort(z: ErscheintBaldZeile) {
+	return {
+		planId: z.plan_id,
+		art: z.kind,
+		spielId: z.game_id,
+		releaseId: z.release_id,
+		titel: z.title,
+		bild: z.cover_url,
+		plattform: z.platform,
+		erscheinungsdatum: z.release_date,
+		favorit: z.is_favorite === 1,
 	};
 }
 
@@ -213,6 +260,16 @@ export const planRoutes = new Hono<AppEnv>()
 		// Kandidaten (Migration 0014); "erledigt" anzulegen ergibt keinen Sinn.
 		if (status === "erledigt") return c.json({ fehler: "Ein Eintrag wird nicht als erledigt angelegt." }, 400);
 
+		// Herkunft (Stufe 15): Die Kandidatenbloecke der Kaufliste nennen, woher
+		// der Eintrag kommt; alles andere ist von Hand.
+		let origin: PlanHerkunft = "manuell";
+		if ("herkunft" in k && k.herkunft !== undefined && k.herkunft !== null) {
+			const herkunft = ausWahl(typeof k.herkunft === "string" ? k.herkunft : undefined, KAUF_HERKUNFT);
+			if (!herkunft) return c.json({ fehler: `Herkunft muss eine von ${KAUF_HERKUNFT.join(", ")} sein.` }, 400);
+			if (art !== "kauf") return c.json({ fehler: "Eine Herkunft passt nur zur Kaufliste." }, 400);
+			origin = herkunft;
+		}
+
 		const gepruefteWahl = pruefePlattform(k);
 		if ("fehler" in gepruefteWahl) return c.json({ fehler: gepruefteWahl.fehler }, 400);
 		if (gepruefteWahl.wahl !== undefined && (quellen[0] === "releaseId" || quellen[0] === "titel")) {
@@ -272,7 +329,7 @@ export const planRoutes = new Hono<AppEnv>()
 			return c.json({ fehler: "Dafür gibt es schon einen offenen Eintrag.", eintragId: doppelt }, 409);
 		}
 
-		const id = await c.var.repos.plan.anlegen(art, ziel, "manuell", { isFavorite, note, status });
+		const id = await c.var.repos.plan.anlegen(art, ziel, origin, { isFavorite, note, status });
 		// Kopplung (5.5): To-Do heisst am Spielen, Backlog pausiert - nur fuer offene Eintraege am Release.
 		if ((art === "todo" || art === "backlog") && status !== "verworfen" && ziel.releaseId !== undefined) {
 			await c.var.repos.kopplung.statusNachListe(ziel.releaseId, art);
@@ -335,14 +392,20 @@ export const planRoutes = new Hono<AppEnv>()
 		await c.var.repos.plan.aendern(id, geprueft.felder);
 		const zeile = await c.var.repos.plan.eintrag(id);
 		if (!zeile) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
+		// Kaufliste (Stufe 15): Ein erledigter Kauf erfuellt den offenen Wunsch am selben Ziel.
+		let wuenscheErledigt = 0;
+		if (zeile.kind === "kauf" && geprueft.felder.status === "erledigt" && vorher.status !== "erledigt") {
+			const wuensche = await c.var.repos.plan.offeneAmZiel(["wunsch"], { releaseId: zeile.release_id, gameId: zeile.spiel_id });
+			wuenscheErledigt = await c.var.repos.plan.erledigen(wuensche.map((w) => w.id));
+		}
 		// Kopplung (5.5): Umhaengen oder Wiederoeffnen eines To-Do-/Backlog-Eintrags setzt den Status.
 		const listeGeaendert = geprueft.felder.kind !== undefined || geprueft.felder.status === "offen" || gepruefteWahl.wahl !== undefined;
 		if (listeGeaendert && zeile.status === "offen" && zeile.release_id !== null && (zeile.kind === "todo" || zeile.kind === "backlog")) {
 			await c.var.repos.kopplung.statusNachListe(zeile.release_id, zeile.kind);
 			const neu = await c.var.repos.plan.eintrag(id);
-			return c.json({ ...eintragAntwort(neu ?? zeile), geaendert: true });
+			return c.json({ ...eintragAntwort(neu ?? zeile), geaendert: true, wuenscheErledigt });
 		}
-		return c.json({ ...eintragAntwort(zeile), geaendert: true });
+		return c.json({ ...eintragAntwort(zeile), geaendert: true, wuenscheErledigt });
 	})
 
 	/**
@@ -365,4 +428,21 @@ export const backlogCandidateRoutes = new Hono<AppEnv>().get("/", async (c) => {
 	const kandidaten = (await c.var.repos.plan.backlogKandidaten()).map(kandidatAntwort);
 	const abgelehnt = await c.var.repos.plan.abgelehnteKandidaten();
 	return c.json({ anzahl: kandidaten.length, abgelehnt, kandidaten });
+});
+
+/**
+ * Use Case 6: Kandidaten fuer die Kaufliste (Abschnitt 11, Migration 0018) -
+ * belegte Luecken ohne Kaufeintrag und offene Wuensche, die noch nicht
+ * kopiert wurden; Angekuendigte fehlen (8.4).
+ */
+export const purchaseCandidateRoutes = new Hono<AppEnv>().get("/", async (c) => {
+	const kandidaten = (await c.var.repos.plan.kaufKandidaten()).map(kaufKandidatAntwort);
+	const luecken = kandidaten.filter((k) => k.quelle === "luecke").length;
+	return c.json({ anzahl: kandidaten.length, luecken, wuensche: kandidaten.length - luecken, kandidaten });
+});
+
+/** Use Case 11: vorgemerkte Titel, die noch erscheinen (v_erscheint_bald). */
+export const upcomingRoutes = new Hono<AppEnv>().get("/", async (c) => {
+	const eintraege = (await c.var.repos.plan.erscheintBald()).map(erscheintBaldAntwort);
+	return c.json({ anzahl: eintraege.length, eintraege });
 });

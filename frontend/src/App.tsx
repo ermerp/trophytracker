@@ -3,6 +3,8 @@ import { Abweichungen } from './Abweichungen'
 import { Backlog } from './Backlog'
 import { Luecken } from './Luecken'
 import { Einstellungen } from './Einstellungen'
+import { ErscheintBald } from './ErscheintBald'
+import { Kaufliste } from './Kaufliste'
 import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
 import { Navigation } from './Navigation'
@@ -37,6 +39,7 @@ function Werkzeuge() {
         <li><Link to="/igdb">IGDB-Zuordnung</Link> – Spiele ohne eindeutigen IGDB-Treffer nachziehen</li>
         <li><Link to="/import">Wunschliste importieren</Link> – Textdateien einlesen, abgleichen, durchsehen</li>
         <li><Link to="/ohne-zuordnung">Ohne Zuordnung</Link> – alles ohne IGDB-Eintrag, listenübergreifend nachziehen</li>
+        <li><Link to="/erscheint-bald">Erscheint bald</Link> – vorgemerkte Titel, die noch nicht erschienen sind</li>
         <li><Link to="/pruefen">Sammlung prüfen</Link> – alle Zuordnungen als Tabelle</li>
         <li><Link to="/trophaeen">Trophäen</Link> – die Rohliste von Sony</li>
       </ul>
@@ -57,6 +60,8 @@ function App() {
           <Route path="/todo" element={<Todo />} />
           <Route path="/backlog" element={<Backlog />} />
           <Route path="/luecken" element={<Luecken />} />
+          <Route path="/kaufliste" element={<Kaufliste />} />
+          <Route path="/erscheint-bald" element={<ErscheintBald />} />
           <Route path="/pruefliste" element={<Pruefliste />} />
           <Route
             path="/einstellungen"
