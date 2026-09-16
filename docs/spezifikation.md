@@ -1476,7 +1476,7 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 10 | `plan_entry`, Wunschliste, Favoriten | **Use Case 4** |
 | 11 | Wunschlisten-Import mit Suche, Ansicht "Ohne Zuordnung" | **Use Cases 9 und 12** |
 | 12 | To-Do und Backlog mit Sortierung und Kandidatenvorschlägen; Kopplung an die Bewertung (5.5) | **Use Cases 5a und 5b** – abgenommen 16.09.2026 |
-| 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` (Migration 0016) | **Use Case 8** vollständig – umgesetzt 16.09.2026 |
+| 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` (Migration 0016) | **Use Case 8** vollständig – abgenommen 16.09.2026; der erste echte Eintrag in der Produktion steht noch aus (am Abnahmetag 0 Änderungen) |
 | 14 | `physical_release_status` manuell pflegbar, Lückenansicht, Lücken verwerfen (5.3) | **Use Case 3** |
 | 15 | Kaufliste mit Kandidaten und Sortierung (5.2), "Erscheint bald" | **Use Cases 6, 10, 11** |
 | 16 | Barcode-Scan mit Auflösungskette (ohne Feed) | Komfort bei Erfassung |
@@ -1498,7 +1498,7 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 
 *Die Änderungserkennung (Stufe 13) kommt später als die Prüfliste selbst.* Stufe 7 baut die Oberfläche und den `erstimport`-Fall; die Erkennung von `neue_trophaeen` und `dlc_erweitert` setzt darauf auf und braucht erst dann zu existieren, wenn ein zweiter Sync überhaupt stattgefunden hat.
 
-*Die Lücken (Stufe 14) kommen spät*, obwohl Use Case 3 niedrig nummeriert ist. Sie hängen an `physical_release_status`, der ohne Feed manuell gepflegt werden muss – sinnvoll erst, wenn die Sammlung steht.
+*Die Lücken (Stufe 14) kommen spät*, obwohl Use Case 3 niedrig nummeriert ist. Sie hängen an `physical_release_status`, der ohne Feed manuell gepflegt werden muss – sinnvoll erst, wenn die Sammlung steht. **Entscheidung des Nutzers vom 16.09.2026:** Den Status von Hand je Release nachzutragen ist zu aufwändig. Stufe 14 füllt ihn deshalb aus IGDB (7.6, `external_games` mit physischem Medium, 109 von 419 Spielen) und lässt den Rest `unbekannt`; von Hand kommt nur ein `nein` oder eine Korrektur. Wie die Ansicht mit `unbekannt` umgeht (ausblenden oder als „möglicherweise" zeigen), ist zu Beginn von Stufe 14 zu entscheiden.
 
 ---
 

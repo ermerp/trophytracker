@@ -40,7 +40,8 @@ vergleicht jede Liste mit dem Stempel ihrer letzten Durchsicht und legt in der
 Prüfliste vor, was sich seither geändert hat – „Du hast weitergespielt"
 (`neue_trophaeen`, nicht bei `am_spielen`) und „Neue DLC-Trophäen erschienen"
 (`dlc_erweitert`), mit Vorher-Nachher in Prozent (Migration 0016). Der Sync
-ändert dabei nie einen Status.
+ändert dabei nie einen Status. **Abgenommen am 16.09.2026** – am Abnahmetag
+gab es keine Änderung zu melden, der erste echte Eintrag steht noch aus.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -90,9 +91,11 @@ Was steht und in Betrieb nachgewiesen ist:
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 14 – Lücken** (`physical_release_status` von Hand
-pflegbar, Lückenansicht, Lücken verwerfen; Use Case 3). Die Views `v_luecken`
-und die Spalte stehen seit Stufe 1, gepflegt wurde der Status bisher nicht.
+**Als Nächstes: Stufe 14 – Lücken** (Lückenansicht, Lücken verwerfen; Use
+Case 3). `physical_release_status` kommt aus IGDB (Abschnitt 7.6, physische
+Händlereinträge, 109 von 419 Spielen); von Hand wird nur ein `nein` gesetzt
+– Handpflege je Release ist dem Nutzer zu aufwändig (16.09.2026). Die View
+`v_luecken` und die Spalte stehen seit Stufe 1.
 
 ## Architektur in einem Absatz
 
