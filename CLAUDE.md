@@ -51,7 +51,7 @@ Dasselbe gilt für Zuordnungen: Ein einmal gesetztes `trophy_progress.release_id
 
 ### Jeder Schreibpfad protokolliert
 
-Seit Stufe 16 hält `game_event` fest, wer wann was geschrieben hat (Abschnitt 8.5). Geschrieben wird **ausschließlich in `src/db/`**: Jede Repository-Methode, die Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidung oder Release ändert, hängt `EventRepository.statement(…)` in **denselben Batch** wie ihre Änderung – nie eine Route, nie ein zweiter Aufruf danach. Set-basierte Schreiber (`vorbelegen`, `einreihen`, `discFassungAusIgdb`, `erschieneneFreigeben`, Kopplung) protokollieren per `events.insertSelect` mit **derselben Bedingung wie das UPDATE, davor im Batch**; ein Ereignis zu einem Löschen läuft **vor** dem DELETE. Wo „alt → neu" gebraucht wird, den alten Wert per Primärschlüssel lesen und bei Gleichheit **kein** Ereignis schreiben.
+Seit Stufe 16 hält `game_event` fest, wer wann was geschrieben hat (Abschnitt 8.5). Geschrieben wird **ausschließlich in `src/db/`**: Jede Repository-Methode, die Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidung oder Release ändert, hängt `EventRepository.statement(…)` in **denselben Batch** wie ihre Änderung – nie eine Route, nie ein zweiter Aufruf danach. Set-basierte Schreiber (`vorbelegen`, `einreihen`, `discFassungAusIgdb`, `erschieneneFreigeben`, Kopplung) protokollieren per `events.insertSelect` mit **derselben Bedingung wie das UPDATE, davor im Batch**; ein Ereignis zu einem Löschen läuft **vor** dem DELETE. Wo „alt → neu" gebraucht wird, den alten Wert per Primärschlüssel lesen und bei Gleichheit **kein** Ereignis schreiben. Rückgabewerte aus `meta.changes` kommen nur von der eigentlichen Änderung, nie als Summe über den Batch – sonst zählen die Protokollzeilen mit (in Stufe 16 so passiert, `PlanRepository.erledigen`).
 
 Die Quelle (`nutzer` / `sync` / `igdb` / `import`, `feed` und `migration` reserviert) wird aus vorhandenen Feldern abgeleitet (`quelleAusHerkunft`, `quelleAusMatch`), nicht durch die Routen gereicht. Der Sync protokolliert nur Erkanntes, IGDB nur Entscheidungen und Statuswechsel, nichts bei unverändertem Stand (Entscheidungen des Nutzers vom 16.09.2026). Der Satz für die Oberfläche entsteht zur Lesezeit in `src/domain/ereignis.ts` und wird nie gespeichert; eine neue Ereignisart kommt dort in `EREIGNIS_ARTEN` und bekommt einen Satz (Test hält das fest). Wer einen neuen Schreiber baut – Scanner (17), Cron (18), Feed (20) –, protokolliert von Anfang an.
 
@@ -97,6 +97,7 @@ Der Free Tier erlaubt 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit z
 - Schwere Importe (Händler-Feeds) laufen in einer GitHub Action, nicht im Worker
 - Große Fremddaten (Händler-Feeds) werden in der GitHub Action geparst und gefiltert; der Worker bekommt nur fertige Batches
 - Rohantworten seitenweise speichern, nicht am Stück parsen
+- **D1 erlaubt 100 gebundene Werte je Statement.** Ein `INSERT … VALUES (?,?,?), …` über eine ganze Seite passt nicht; in Stücke teilen (`TrophiesRepository.listeNeuStatements`: 33 Titel × 3 Werte)
 
 ### Zeilenlese-Grenze respektieren
 
