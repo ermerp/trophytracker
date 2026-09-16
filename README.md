@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 13 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 14 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -42,6 +42,12 @@ Prüfliste vor, was sich seither geändert hat – „Du hast weitergespielt"
 (`dlc_erweitert`), mit Vorher-Nachher in Prozent (Migration 0016). Der Sync
 ändert dabei nie einen Status. **Abgenommen am 16.09.2026** – am Abnahmetag
 gab es keine Änderung zu melden, der erste echte Eintrag steht noch aus.
+Stufe 14 bringt die Lücken (Use Case 3): Die Disc-Fassung je Release kommt aus
+IGDBs Händlereinträgen (199 von 481 Releases, Rest `unbekannt`), von Hand nur
+ein `nein` oder eine Korrektur; die Ansicht `/luecken` zeigt, was digital
+gespielt ist, als Disc existiert und nicht im Regal steht, und lässt eine Lücke
+als „physisch nicht gewünscht" verwerfen (Migration 0017). **Deployt am
+16.09.2026**, Abnahme steht aus.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -58,7 +64,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 21 Tabellen, 7 Views, fünfzehn Migrationen |
+| Schema | 21 Tabellen, 7 Views, siebzehn Migrationen |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
@@ -86,16 +92,17 @@ Was steht und in Betrieb nachgewiesen ist:
 | Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
 | Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
 | To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert. **Gekoppelt mit der Bewertung** (Entscheidung vom 16.09.2026): To-Do heißt „am Spielen", „ins Backlog" setzt „pausiert", „durchgespielt"/„abgebrochen" auf der Kachel schließen den Eintrag |
+| Lücken | In der Leiste: digital gespielt, Disc-Fassung belegt, nicht im Regal; „physisch nicht gewünscht" ist ein verworfener Kaufeintrag (Rückgängig, „wieder als Lücke zeigen"); darunter zugeklappt „Disc-Fassung unbekannt" mit „Disc gibt es" / „gibt es nicht" je Zeile. Disc-Fassung aus IGDB (`external_games`, Knopf „Disc-Fassungen prüfen" in den Einstellungen, 50 Spiele je Anfrage, nur `unbekannt` → `ja`, nach 30 Tagen erneut) oder von Hand im Spieldetail (Dropdown mit Quelle); PSN-Produkt-Id je Release pflegbar |
 | Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 14 – Lücken** (Lückenansicht, Lücken verwerfen; Use
-Case 3). `physical_release_status` kommt aus IGDB (Abschnitt 7.6, physische
-Händlereinträge, 109 von 419 Spielen); von Hand wird nur ein `nein` gesetzt
-– Handpflege je Release ist dem Nutzer zu aufwändig (16.09.2026). Die View
-`v_luecken` und die Spalte stehen seit Stufe 1.
+**Als Nächstes: Stufe 15 – Kaufliste** (Kandidaten aus Lücken und Wunschliste
+über `v_kaufkandidaten`, Sortierung wie die Wunschliste, „Erscheint bald";
+Use Cases 6, 10, 11). Vorgemerkt dafür: Der Übergang `wunsch → erledigt`, wenn
+Disc oder digitale Berechtigung am Release erfasst wird (Abschnitt 5), und
+`verworfen → offen` für eine verworfene Lücke, die doch gekauft werden soll.
 
 ## Architektur in einem Absatz
 
@@ -344,10 +351,24 @@ aktualisierten Spiele Wertung, Cover und Datum in einer Anfrage erneut.
 Kritikerwertungen ändern sich mit jeder Rezension; Stufe 17 hängt den Schritt
 an den Cron.
 
+**Disc-Fassungen prüfen (Stufe 14).** IGDB führt je Spiel Händlereinträge
+(`external_games`) mit Medium und Plattform. Der Knopf fragt sie für 50
+verknüpfte Spiele je Aufruf ab und setzt `Disc-Fassung: ja` (Quelle `igdb`)
+für jedes Release, dessen Plattform ein physischer Eintrag nennt – nur von
+`unbekannt` aus; ein `nein` und ein bestehendes `ja` bleiben. Geprüfte Spiele
+kommen nach 30 Tagen wieder dran, weil IGDB nachträgt. Gemessen am 16.09.2026
+gegen 469 verknüpfte Spiele: 226 mit physischem Eintrag, alle 2 020 Einträge
+mit Plattform, 199 von 481 Releases bekommen ein `ja`. Was IGDB nicht kennt,
+bleibt `unbekannt` – nie `nein`; das setzt du im Spieldetail oder in der
+Lückenansicht unter „Disc-Fassung unbekannt". Details in
+[Spezifikation 7.6](docs/spezifikation.md#76-igdb-abgleich-stufe-9) und
+[Abschnitt 3](docs/spezifikation.md#3-datenmodell--sammlung).
+
 ```
 GET  /api/igdb/status            Zähler und ob Zugangsdaten hinterlegt sind
 POST /api/igdb/abgleich          ein Schritt, { weiter } solange etwas offen ist
 POST /api/igdb/auffrischen       50 Spiele in einer IGDB-Anfrage
+POST /api/igdb/physisch          Disc-Fassung aus external_games, 50 Spiele je Aufruf, { weiter }
 GET  /api/igdb/offen             Prüfansicht mit Kandidaten
 POST /api/igdb/erneut-suchen     offene Spiele zurück in den Abgleich
 GET  /api/igdb/search?q=&plattformen=  Suche mit Rückfällen, auch für Import und Nachpflege
@@ -723,6 +744,23 @@ Release der gewählten Plattform (entsteht bei Bedarf), ohne Plattform am
 Spiel. Hängt am Ziel schon ein offener Wunsch, wird die Zeile als
 „schon auf der Wunschliste" ausgelassen – ein zweiter Import derselben Datei
 erzeugt keine Dubletten.
+
+### Lücken
+
+`/luecken` (Use Case 3, [Abschnitt 5.3](docs/spezifikation.md#53-eine-lücke-bewusst-verwerfen)):
+digital gespielt, Disc-Fassung belegt, nicht im Regal – aus `v_luecken`.
+„Physisch nicht gewünscht" legt einen Kaufeintrag mit `origin = 'luecke'` und
+`status = 'verworfen'` an; die Lücke bleibt in den Daten und wird nur
+ausgeblendet („auch verworfene zeigen"). Rückgängig und „wieder als Lücke
+zeigen" löschen den Eintrag. Darunter zugeklappt „Disc-Fassung unbekannt":
+dieselben Releases ohne Beleg für eine Disc, mit „Disc gibt es" / „gibt es
+nicht" – beides gilt als deine Entscheidung (Quelle `manuell`).
+
+```
+GET  /api/gaps?verworfene=1&unbekannte=1   { anzahl, verworfen, unbekannt, luecken[], moeglich[] }
+POST /api/gaps/:releaseId/verwerfen        physisch nicht gewünscht; 409 bei vorhandenem Kaufeintrag
+PATCH /api/releases/:id                    { discFassung: ja|nein|unbekannt, psnProductId }
+```
 
 ### Ohne Zuordnung
 

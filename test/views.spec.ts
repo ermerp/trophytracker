@@ -136,13 +136,43 @@ describe("v_luecken", () => {
 		expect(zeile).toMatchObject({ title: "Persona 5", hat_platin: 0 });
 	});
 
-	it("zeigt nichts, solange der Physisch-Status unbekannt ist", async () => {
-		// Fehlende Daten duerfen nie als "gibt es nicht" gelten - aber auch
-		// nicht als Luecke behauptet werden.
+	it("liefert 'unbekannt' als moegliche Luecke mit disc_fassung, 'nein' nie (Migration 0017)", async () => {
+		// Fehlende Daten duerfen nie als "gibt es nicht" gelten - die View
+		// nennt sie mit ihrer Fassung, die Ansicht trennt sie von den
+		// belegten (Entscheidung des Nutzers vom 16.09.2026). Ein 'nein' ist
+		// das Urteil des Nutzers und bleibt draussen.
 		const r = await spiel(1, "Nier", { physisch: "unbekannt" });
 		await trophaeen(r, 40);
+		const n = await spiel(2, "Nur digital", { physisch: "nein" });
+		await trophaeen(n, 40);
 
-		expect(await zaehle("v_luecken")).toBe(0);
+		const { results } = await env.DB.prepare("SELECT title, disc_fassung, game_id, cover_url FROM v_luecken").all();
+		expect(results).toEqual([{ title: "Nier", disc_fassung: "unbekannt", game_id: 1, cover_url: null }]);
+	});
+
+	it("kennzeichnet eine verworfene Luecke, statt sie zu verstecken (5.3)", async () => {
+		const r = await spiel(1, "Persona 5", { physisch: "ja" });
+		await trophaeen(r, 40);
+		await env.DB.prepare(
+			"INSERT INTO plan_entry (kind, release_id, origin, status, resolved_at) VALUES ('kauf', ?, 'luecke', 'verworfen', '2026-09-16')",
+		)
+			.bind(r)
+			.run();
+
+		expect(await env.DB.prepare("SELECT title, verworfen FROM v_luecken").first()).toEqual({ title: "Persona 5", verworfen: 1 });
+		// Kaufkandidat ist sie nicht mehr - vorher liess ein verworfener
+		// Eintrag den Kandidaten wieder auftauchen.
+		expect(await zaehle("v_kaufkandidaten")).toBe(0);
+	});
+
+	it("nennt als Kaufkandidat nur belegte Luecken, keine unbekannten", async () => {
+		const ja = await spiel(1, "Belegt", { physisch: "ja" });
+		await trophaeen(ja, 40);
+		const u = await spiel(2, "Unbekannt", { physisch: "unbekannt" });
+		await trophaeen(u, 40);
+
+		const { results } = await env.DB.prepare("SELECT quelle, title FROM v_kaufkandidaten").all();
+		expect(results).toEqual([{ quelle: "luecke", title: "Belegt" }]);
 	});
 
 	it("zeigt nichts, wenn die Disc bereits im Regal steht", async () => {

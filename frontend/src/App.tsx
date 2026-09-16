@@ -1,6 +1,7 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { Abweichungen } from './Abweichungen'
 import { Backlog } from './Backlog'
+import { Luecken } from './Luecken'
 import { Einstellungen } from './Einstellungen'
 import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
@@ -55,6 +56,7 @@ function App() {
           <Route path="/wunschliste" element={<Wunschliste />} />
           <Route path="/todo" element={<Todo />} />
           <Route path="/backlog" element={<Backlog />} />
+          <Route path="/luecken" element={<Luecken />} />
           <Route path="/pruefliste" element={<Pruefliste />} />
           <Route
             path="/einstellungen"

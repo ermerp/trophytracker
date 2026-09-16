@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  DISCTEXT,
+  DISCQUELLE,
+  DISC_FASSUNGEN,
   PLATINTEXT,
   PLATTFORMEN,
   PLAY_STATUS,
@@ -70,6 +71,7 @@ type Release = {
   region: string | null
   discFassung: DiscFassung
   discQuelle: string | null
+  psnProductId: string | null
   trophaeen: Trophaeen | null
   bewertung: Bewertung | null
   exemplare: Exemplar[]
@@ -463,10 +465,30 @@ export function Spieldetail() {
             {r.region && ` · ${r.region}`}
           </h2>
 
-          <p className="zeile">
-            {DISCTEXT[r.discFassung]}
-            {r.discQuelle && ` (${r.discQuelle})`}
+          {/* Disc-Fassung (Stufe 14): ja/nein von Hand traegt Quelle 'manuell' und wird von IGDB und Feed nie ueberschrieben; 'unbekannt' nimmt das Urteil zurueck. */}
+          <p className="zeile disc-zeile">
+            <label>
+              Disc-Fassung:{' '}
+              <select
+                value={r.discFassung}
+                disabled={laeuft}
+                onChange={(ev) =>
+                  tue(() => anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { discFassung: ev.target.value } }), 'Disc-Fassung gespeichert.')
+                }
+              >
+                {DISC_FASSUNGEN.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </label>
+            {r.discQuelle && ` (${DISCQUELLE[r.discQuelle] ?? r.discQuelle})`}
+            {r.discFassung === 'ja' && !r.exemplare.length && r.trophaeen && r.trophaeen.fortschritt > 0 && (
+              <>
+                {' '}· <Link to="/luecken">Lücke</Link>
+              </>
+            )}
           </p>
+          <PsnProduktId key={r.psnProductId ?? ''} release={r} laeuft={laeuft} onSpeichern={(wert) => tue(() => anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { psnProductId: wert } }), 'PSN-Produkt-Id gespeichert.')} />
 
           <div className="nebeneinander">
             <div>
@@ -823,5 +845,26 @@ function BewertungForm({
         <button type="button" onClick={() => setOffen(false)}>Abbrechen</button>
       </p>
     </form>
+  )
+}
+
+/**
+ * PSN-Produkt-Id je Release (Abschnitt 3, seit Stufe 14 pflegbar) - fuer die
+ * Store-Preisabfrage in Stufe 19. Leer heisst unbekannt, nie vorbelegt.
+ */
+function PsnProduktId({ release, laeuft, onSpeichern }: { release: Release; laeuft: boolean; onSpeichern: (wert: string) => Promise<void> }) {
+  // Der key am Aufruf setzt das Feld nach dem Speichern neu auf.
+  const [wert, setWert] = useState(release.psnProductId ?? '')
+  const geaendert = wert.trim() !== (release.psnProductId ?? '')
+  return (
+    <p className="zeile disc-zeile">
+      <label>
+        PSN-Produkt-Id:{' '}
+        <input type="text" value={wert} placeholder="unbekannt" size={20} onChange={(ev) => setWert(ev.target.value)} />
+      </label>{' '}
+      {geaendert && (
+        <button type="button" className="klein" disabled={laeuft} onClick={() => onSpeichern(wert)}>speichern</button>
+      )}
+    </p>
   )
 }

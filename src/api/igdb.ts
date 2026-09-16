@@ -5,7 +5,7 @@ import type { PlanArt } from "../db/plan";
 import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, type IgdbKandidat } from "../domain/igdb";
 import { istErlaubtePlattform, plattformenAus, titelSchluessel } from "../domain/titel";
 import { IgdbKonfigError } from "../igdb/client";
-import { igdbAbgleichSchritt, igdbAuffrischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
+import { igdbAbgleichSchritt, igdbAuffrischSchritt, igdbPhysischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
 import { zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
 import type { AppEnv } from "../types";
 import { eintragAntwort } from "./plans";
@@ -96,6 +96,7 @@ export const igdbRoutes = new Hono<AppEnv>()
 		return c.json({
 			zugangsdaten: c.var.igdb.konfiguriert(),
 			...(await c.var.repos.igdb.zaehlung()),
+			...(await c.var.repos.igdb.discZaehlung()),
 		});
 	})
 
@@ -147,6 +148,16 @@ export const igdbRoutes = new Hono<AppEnv>()
 	.post("/auffrischen", async (c) => {
 		if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
 		const ergebnis = await igdbAuffrischSchritt(c.var.repos, c.var.igdb);
+		return c.json(ergebnis, ergebnis.status === "fehler" ? 502 : 200);
+	})
+
+	/**
+	 * Disc-Fassung aus IGDB (7.6, Stufe 14): ein Schritt, 50 Spiele in einer
+	 * Anfrage; die Oberflaeche ruft, solange `weiter` gilt.
+	 */
+	.post("/physisch", async (c) => {
+		if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
+		const ergebnis = await igdbPhysischSchritt(c.var.repos, c.var.igdb);
 		return c.json(ergebnis, ergebnis.status === "fehler" ? 502 : 200);
 	});
 

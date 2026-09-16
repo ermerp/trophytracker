@@ -22,6 +22,7 @@ type AbgleichAntwort = {
 }
 
 type AuffrischAntwort = { status: 'erfolg' | 'fehler'; angefragt: number; aktualisiert: number; meldung?: string }
+type PhysischAntwort = { status: 'erfolg' | 'fehler'; angefragt: number; gesetzt: number; nochOffen: number; weiter: boolean; meldung?: string }
 
 export function Igdb() {
   const [status, setStatus] = useState<IgdbStatus | null>(null)
@@ -105,6 +106,36 @@ export function Igdb() {
     }
   }
 
+  /**
+   * Disc-Fassung aus IGDB (7.6, Stufe 14): 50 Spiele je Aufruf, solange
+   * `weiter` gilt. Setzt nur `unbekannt` → `ja`; ein `nein` bleibt.
+   */
+  async function discPruefen() {
+    setLaeuft(true)
+    setMeldung(null)
+    let gesetzt = 0
+    try {
+      for (let runde = 0; runde < 100; runde++) {
+        const a = await anfrage<PhysischAntwort>('/api/igdb/physisch', { methode: 'POST' })
+        gesetzt += a.gesetzt
+        setFortschritt(`Noch ${a.nochOffen} Spiele … (${gesetzt} Disc-Fassungen belegt)`)
+        if (a.status === 'fehler') {
+          setMeldung(a.meldung ?? 'Die Prüfung ist fehlgeschlagen.')
+          break
+        }
+        if (!a.weiter) {
+          setFortschritt(`Disc-Fassungen geprüft: ${gesetzt} Releases neu als „ja" belegt.`)
+          break
+        }
+      }
+    } catch (f) {
+      setMeldung(f instanceof Error ? f.message : 'Prüfung fehlgeschlagen.')
+    } finally {
+      setLaeuft(false)
+      await statusLaden()
+    }
+  }
+
   return (
     <section>
       <h2>IGDB</h2>
@@ -129,6 +160,7 @@ export function Igdb() {
             <tr><td>Noch nicht gesucht</td><td>{status.ungeprueft}</td></tr>
             <tr><td>Kein IGDB-Eintrag</td><td>{status.abgelehnt}</td></tr>
             <tr><td>Letzte Aktualisierung</td><td>{status.letzteAktualisierung ? zeitpunkt(status.letzteAktualisierung) : 'noch nie'}</td></tr>
+            <tr><td>Disc-Fassung aus IGDB</td><td>{status.discBelegt} Releases belegt, {status.discOffen} Spiele zu prüfen</td></tr>
           </tbody>
         </table>
       )}
@@ -141,11 +173,17 @@ export function Igdb() {
       </button>{' '}
       <button type="button" onClick={erneutSuchen} disabled={laeuft || !status?.zugangsdaten || status.zurPruefung === 0}>
         Offene erneut suchen
+      </button>{' '}
+      <button type="button" onClick={discPruefen} disabled={laeuft || !status?.zugangsdaten || status.discOffen === 0}>
+        Disc-Fassungen prüfen
       </button>
       <p className="zeile">
         „Auffrischen" holt Wertung, Cover und Datum für die 50 am längsten nicht aktualisierten
         Spiele erneut. „Offene erneut suchen" wiederholt die Suche für alle Spiele zur Prüfung –
-        sinnvoll, wenn die Suchregel besser geworden ist.
+        sinnvoll, wenn die Suchregel besser geworden ist. „Disc-Fassungen prüfen" fragt IGDBs
+        Händlereinträge ab und setzt „Disc-Fassung: ja", wo ein physischer Eintrag zur Plattform
+        existiert – nie „nein", das bleibt deine Entscheidung; geprüfte Spiele kommen nach 30 Tagen
+        wieder dran. Ergebnis: <Link to="/luecken">Lücken</Link>.
       </p>
       {fortschritt && <p>{fortschritt}</p>}
       {meldung && <p role="alert">{meldung}</p>}
