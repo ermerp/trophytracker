@@ -935,6 +935,8 @@ Die Quelle wird aus vorhandenen Feldern abgeleitet, nicht durch alle Routen gere
 
 Primär `BarcodeDetector` API (`formats: ['ean_13']`), Fallback `html5-qrcode`. Kamerazugriff braucht HTTPS – über die `workers.dev`-Adresse ohnehin gegeben.
 
+**Eingabegeräte (Entscheidung des Nutzers vom 16.09.2026, nach Abnahme von Stufe 16):** Gescannt wird mit der **Handy-Kamera** im Browser; zusätzlich muss es mit der **Webcam des Laptops** funktionieren, damit sich der Scanner am Rechner testen lässt. Andere Wege – USB-Handscanner, die als Tastatur tippen, Eingabe über Datei – werden **nicht** berücksichtigt. Folge für Stufe 17: Die Kamera-Erkennung braucht beide Pfade, denn `BarcodeDetector` gibt es in Chrome auf Android, aber nicht in Firefox und nicht auf dem Desktop ohne Flag; der Fallback ist damit kein Randfall, sondern der Testpfad am Laptop. Ein Textfeld für die EAN bleibt als Notnagel, wenn die Kamera den Code nicht liest.
+
 Serienerfassung: nach jedem erkannten Code wird die Auflösung eingeblendet, ohne den Scanner zu schliessen. Für das Ersterfassen eines Regals ist das der Unterschied zwischen zehn Minuten und einem Abend.
 
 ### 9.2 Auflösungskette
@@ -1577,7 +1579,7 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` (Migration 0016) | **Use Case 8** vollständig – abgenommen 16.09.2026; der erste echte Eintrag in der Produktion steht noch aus (am Abnahmetag 0 Änderungen) |
 | 14 | `physical_release_status` aus IGDB (7.6) und von Hand, Lückenansicht mit „Disc-Fassung unbekannt", Lücken verwerfen (5.3), Migration 0017 | **Use Case 3** – abgenommen 16.09.2026; die 249 Releases mit unbekannter Disc-Fassung bleiben bewusst offen, bis der Händlerfeed (Stufe 20) nachfüllt |
 | 15 | Kaufliste mit Kandidaten aus Lücken und Wünschen, Sortierung (5.2), „Erscheint bald", Erfassen erledigt Kauf und Wunsch (Migration 0018) | **Use Cases 6, 10, 11** – Wunsch → Kauf als Kopie, Kauf erledigt schließt den Wunsch, Erfassen schließt beide (Entscheidungen des Nutzers vom 16.09.2026); der tägliche Statuswechsel `angekuendigt → erschienen` bleibt Stufe 18 |
-| 16 | Änderungsprotokoll je Spiel: `game_event` mit Quelle je Eintrag (Migration 0019), Block „Verlauf" im Spieldetail, Ansicht „Änderungen" (8.5) | Nachvollziehbarkeit – vor allem, was danach schreibt (Idee des Nutzers vom 16.09.2026); die vier offenen Punkte am 16.09.2026 entschieden: nur Erkanntes beim Sync, nur Entscheidungen bei IGDB, unbegrenzt und exportiert, Start bei null. Umgesetzt, Abnahme offen |
+| 16 | Änderungsprotokoll je Spiel: `game_event` mit Quelle je Eintrag (Migration 0019), Block „Verlauf" im Spieldetail, Ansicht „Änderungen" (8.5) | Nachvollziehbarkeit – vor allem, was danach schreibt (Idee des Nutzers vom 16.09.2026); die vier offenen Punkte am 16.09.2026 entschieden: nur Erkanntes beim Sync, nur Entscheidungen bei IGDB, unbegrenzt und exportiert, Start bei null. **Abgenommen 16.09.2026** |
 | 17 | Barcode-Scan mit Auflösungskette (ohne Feed) | Komfort bei Erfassung |
 | 18 | Cron Trigger, PWA | Automatik und Komfort – der Cron-Sync ist der erste rein automatische Schreiber, den das Protokoll zeigt |
 | 19 | Oberfläche: Dashboard anstelle des Hinweisblocks, Kacheln und Listen vereinheitlicht, Handy-Layout | Alle Ansichten und Leisteneinträge existieren dann; hängt nicht an externen Freigaben |

@@ -63,7 +63,7 @@ Repository-Schicht, im selben Batch wie die Änderung. Der Sync protokolliert
 nur Erkanntes, IGDB nur Entscheidungen und Statuswechsel, der Verlauf beginnt
 mit dem Deploy und wird unbegrenzt aufbewahrt und mitgesichert (vier
 Entscheidungen vom 16.09.2026). Sichtbar als Block „Verlauf" im Spieldetail
-und als Ansicht „Änderungen" mit Quellenfilter. **Abnahme offen.**
+und als Ansicht „Änderungen" mit Quellenfilter. **Abgenommen am 16.09.2026.**
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -118,7 +118,7 @@ Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` au
 den Login unter `trophytracker.cloudflareaccess.com`.
 
 **Als Nächstes: Stufe 17 – Barcode-Scan** mit Auflösungskette ohne Feed
-(Abschnitt 9). Reihenfolge danach, am 16.09.2026 entschieden: 18 Cron und PWA,
+(Abschnitt 9), per Handy-Kamera und Laptop-Webcam (Entscheidung vom 16.09.2026). Reihenfolge danach, am 16.09.2026 entschieden: 18 Cron und PWA,
 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20 AWIN-Feed, 21 PSN
 Store-Preise (Abschnitt 16 der Spezifikation). Jeder neue Schreiber hängt sich
 ins Änderungsprotokoll ein (Abschnitt 8.5).
