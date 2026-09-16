@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 14 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 15 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
