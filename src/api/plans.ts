@@ -163,15 +163,18 @@ export const planRoutes = new Hono<AppEnv>()
 		const sortierung = ausWahl(c.req.query("sort"), SORTIERUNGEN) ?? (kind === "todo" ? "position" : "favorit");
 		const nurFavoriten = c.req.query("favorit") === "1";
 		const plattformen = plattformFilter(c.req.query("plattform"));
+		// Teilstringsuche im Titel wie in der Sammlung - zum Wiederfinden in 300 Wuenschen.
+		const suche = (c.req.query("suche") ?? "").trim().toLocaleLowerCase("de");
 
 		const zeilen = await c.var.repos.plan.liste(kind, status);
 		const eintraege = zeilen
 			.map((z) => eintragAntwort(z))
 			.filter((e) => !nurFavoriten || e.favorit)
 			.filter((e) => plattformen.size === 0 || plattformen.has(e.plattform ?? "ohne"))
+			.filter((e) => suche === "" || e.titel.toLocaleLowerCase("de").includes(suche))
 			.sort(vergleicher[sortierung]);
 
-		return c.json({ sortierung, plattformen: [...plattformen], eintraege });
+		return c.json({ sortierung, plattformen: [...plattformen], suche, eintraege });
 	})
 
 	/**

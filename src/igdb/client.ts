@@ -120,8 +120,7 @@ export function erstelleIgdbClient(
 		return daten as IgdbSpielRoh[];
 	}
 
-	const plattformFilter = `platforms = (${IGDB_PLATTFORM_IDS.join(",")})`;
-	const typFilter = `game_type != (${NIE_EIN_SPIEL.join(",")})`;
+	const filter = `platforms = (${IGDB_PLATTFORM_IDS.join(",")}) & game_type != (${NIE_EIN_SPIEL.join(",")})`;
 
 	return {
 		/** Sind Zugangsdaten hinterlegt? Fuer die Anzeige, nie die Werte. */
@@ -131,18 +130,17 @@ export function erstelleIgdbClient(
 
 		/**
 		 * Volltextsuche. Mods, Forks und Updates fallen schon hier heraus
-		 * (siehe NIE_EIN_SPIEL). Standardmaessig auf PlayStation-Plattformen
-		 * eingeschraenkt; der Rueckfall sucht ohne diese Einschraenkung, weil
-		 * IGDB bei manchen Eintraegen gar keine Plattform nennt.
+		 * (siehe NIE_EIN_SPIEL), ebenso alles ohne PlayStation-Plattform -
+		 * jede Suche, auch die Rueckfaelle (Entscheidung des Nutzers vom
+		 * 16.09.2026: Eintraege ohne Plattformangabe sind keine Treffer).
 		 *
 		 * 30 Treffer statt 10: Bei DLC-reichen Titeln steht das Hauptspiel
 		 * sonst gar nicht im Ergebnis (Batman: Arkham Knight an Position 13,
 		 * For Honor an 23). Die Reihenfolge stellt ordneKandidaten her.
 		 */
-		async suche(begriff: string, optionen: { limit?: number; nurPlayStation?: boolean } = {}): Promise<IgdbSpielRoh[]> {
+		async suche(begriff: string, optionen: { limit?: number } = {}): Promise<IgdbSpielRoh[]> {
 			const text = apicalypseText(begriff);
 			if (text === "") return [];
-			const filter = optionen.nurPlayStation === false ? typFilter : `${plattformFilter} & ${typFilter}`;
 			return abfrage(`search "${text}"; fields ${IGDB_FELDER}; where ${filter}; limit ${optionen.limit ?? 30};`);
 		},
 
@@ -155,7 +153,7 @@ export function erstelleIgdbClient(
 		async nameExakt(text: string, limit = 10): Promise<IgdbSpielRoh[]> {
 			const sauber = apicalypseText(text).replace(/\*/g, "");
 			if (sauber === "") return [];
-			return abfrage(`fields ${IGDB_FELDER}; where name ~ "${sauber}" & ${typFilter}; limit ${limit};`);
+			return abfrage(`fields ${IGDB_FELDER}; where name ~ "${sauber}" & ${filter}; limit ${limit};`);
 		},
 
 		/**
@@ -166,7 +164,7 @@ export function erstelleIgdbClient(
 		async nameEnthaelt(text: string, limit = 30): Promise<IgdbSpielRoh[]> {
 			const sauber = apicalypseText(text).replace(/\*/g, "");
 			if (sauber === "") return [];
-			return abfrage(`fields ${IGDB_FELDER}; where name ~ *"${sauber}"* & ${typFilter}; limit ${limit};`);
+			return abfrage(`fields ${IGDB_FELDER}; where name ~ *"${sauber}"* & ${filter}; limit ${limit};`);
 		},
 
 		/** Bis zu 50 Spiele nach ID - eine Anfrage fuer das Auffrischen. */

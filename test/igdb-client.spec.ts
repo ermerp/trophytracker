@@ -33,16 +33,17 @@ describe("IGDB-Client", () => {
 	it("baut die Apicalypse-Anfrage mit Plattform- und Typfilter", async () => {
 		const { client, aufrufe } = fakeIgdb([[]]);
 		await client.suche('Say "Hi"');
-		await client.suche("Ohne Plattform", { nurPlayStation: false, limit: 5 });
+		await client.suche("Mit Limit", { limit: 5 });
 		await client.nameEnthaelt('That*s "You"!');
 		await client.nameExakt("THE FINALS");
 		const bodies = aufrufe.filter((a) => a.url.includes("api.igdb.com")).map((a) => String(a.init?.body));
 		expect(bodies[0]).toBe(
 			`search "Say \\"Hi\\""; fields ${IGDB_FELDER}; where platforms = (9,46,48,165,167,390) & game_type != (5,12,14); limit 30;`,
 		);
-		expect(bodies[1]).toBe(`search "Ohne Plattform"; fields ${IGDB_FELDER}; where game_type != (5,12,14); limit 5;`);
-		expect(bodies[2]).toBe(`fields ${IGDB_FELDER}; where name ~ *"Thats \\"You\\"!"* & game_type != (5,12,14); limit 30;`);
-		expect(bodies[3]).toBe(`fields ${IGDB_FELDER}; where name ~ "THE FINALS" & game_type != (5,12,14); limit 10;`);
+		// Jede Suche traegt den Plattformfilter - auch die Rueckfaelle (16.09.2026).
+		expect(bodies[1]).toBe(`search "Mit Limit"; fields ${IGDB_FELDER}; where platforms = (9,46,48,165,167,390) & game_type != (5,12,14); limit 5;`);
+		expect(bodies[2]).toBe(`fields ${IGDB_FELDER}; where name ~ *"Thats \\"You\\"!"* & platforms = (9,46,48,165,167,390) & game_type != (5,12,14); limit 30;`);
+		expect(bodies[3]).toBe(`fields ${IGDB_FELDER}; where name ~ "THE FINALS" & platforms = (9,46,48,165,167,390) & game_type != (5,12,14); limit 10;`);
 	});
 
 	it("fragt nach IDs in einer Anfrage, bereinigt und begrenzt auf 50", async () => {

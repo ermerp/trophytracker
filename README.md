@@ -72,6 +72,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
 | IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar. **Abgenommen am 14.09.2026: 419 von 420 verknüpft**, eines bewusst abgelehnt (Vita-Wecker-App, IGDB kennt sie nicht) |
 | Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer (Stand vor Migration 0011; seit Migration 0012 sind es 21 Tabellen und 25 Indizes) |
+| Nur PlayStation | PS3, PS4, PS5, Vita – sonst nichts: IGDB-Einträge ohne genannte PlayStation-Plattform sind nirgends ein Treffer (auch nicht ohne Plattformangabe, seit 16.09.2026), jede IGDB-Abfrage filtert, `release.platform` erlaubt nur die vier Werte |
 | IGDB-Titel | Ein von Hand oder aus einem Wunsch angelegtes Spiel übernimmt beim Verknüpfen den IGDB-Namen als Titel (nicht beim Auffrischen, nie bei Spielen mit Trophäenliste); änderbar im Spieldetail – die Überschrift ist ein Eingabefeld |
 | Wunschliste | Eigene Ansicht in der Leiste: Favoriten zuerst, dann Kritikerwertung (auch Wertung, Titel, Erscheinungsdatum, zuletzt angelegt); Filter Favoriten, Plattformen, „ohne Plattform"; Favorit-Stern, Plattform-Dropdown je Eintrag, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform-Dropdown an jedem Treffer, vorbelegt mit dessen neuester – mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint, ohne Plattform ein Spiel ohne Release; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026**; Priorität und Rang danach auf Wunsch des Nutzers entfernt (Migration 0013) |
 | Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
@@ -619,7 +620,7 @@ Stufe 10 bedient die Wunschliste, Stufe 12 To-Do und Backlog, die Routen
 kennen alle vier Arten:
 
 ```
-GET    /api/plans?kind=wunsch|todo|backlog&status=offen|alle&sort=favorit|wertung|titel|release|angelegt|position&favorit=1&plattform=PS4,PS5,ohne
+GET    /api/plans?kind=wunsch|todo|backlog&status=offen|alle&sort=favorit|wertung|titel|release|angelegt|position&favorit=1&plattform=PS4,PS5,ohne&suche=
 POST   /api/plans        { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz?, status? }
 PATCH  /api/plans/:id    Teilmenge von { favorit, notiz, status, art, plattform }
 PUT    /api/plans/reorder  { art, orderedIds } – To-Do-Reihenfolge
