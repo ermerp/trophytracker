@@ -15,6 +15,7 @@ import {
   euro,
   type Bewertung,
   type DiscFassung,
+  type ErfasstAntwort,
   type Platin,
   type PlayStatus,
   type Plattform,
@@ -173,6 +174,26 @@ export function Spieldetail() {
     } finally {
       setLaeuft(false)
     }
+  }
+
+  /** Offener Kaufeintrag an diesem Release (Stufe 15) - sperrt den Knopf, dieselbe Regel wie bei To-Do/Backlog. */
+  const aufKaufliste = (releaseId: number) => spiel!.plaene.some((p) => p.releaseId === releaseId && p.art === 'kauf')
+
+  /**
+   * Besitz erfassen (Stufe 15): Der Worker erledigt dabei offene Kauf- und
+   * Wunscheintraege am Release und am Spiel (Abschnitt 5); die Meldung sagt es.
+   */
+  function erfassen(aktion: () => Promise<ErfasstAntwort>, erfolg: string) {
+    return tue(async () => {
+      const a = await aktion()
+      if (a.absichtenErledigt.length > 0) {
+        const arten = new Set(a.absichtenErledigt.map((x) => x.art))
+        const liste = arten.has('wunsch') && arten.has('kauf') ? 'Wunsch- und Kaufliste' : arten.has('kauf') ? 'Kaufliste' : 'Wunschliste'
+        setMeldung(`${erfolg} Von der ${liste} erledigt.`)
+        return
+      }
+      setMeldung(erfolg)
+    })
   }
 
   /** Offener To-Do- oder Backlog-Eintrag an diesem Release (Stufe 12). */
@@ -449,10 +470,18 @@ export function Spieldetail() {
                 {r.plattform}
                 <button type="button" disabled={laeuft || aufListe(r.id)} onClick={() => listeAnlegen('todo', r.id)}>Auf To-Do</button>
                 <button type="button" disabled={laeuft || aufListe(r.id)} onClick={() => listeAnlegen('backlog', r.id)}>Ins Backlog</button>
+                <button
+                  type="button"
+                  disabled={laeuft || aufKaufliste(r.id)}
+                  onClick={() => tue(() => anfrage('/api/plans', { methode: 'POST', koerper: { art: 'kauf', releaseId: r.id } }), 'Auf die Kaufliste gesetzt.')}
+                >
+                  Auf die Kaufliste
+                </button>
               </span>
             ))}
             <span className="zeile">To-Do heißt „am Spielen", Backlog „pausiert".</span>{' '}
-            <Link to="/todo" className="zeile">zu To-Do und Backlog</Link>
+            <Link to="/todo" className="zeile">zu To-Do und Backlog</Link>{' '}
+            <Link to="/kaufliste" className="zeile">zur Kaufliste</Link>
           </div>
         )}
       </section>
@@ -543,7 +572,7 @@ export function Spieldetail() {
               type="button"
               disabled={laeuft}
               onClick={() =>
-                tue(() => anfrage('/api/physical-copies', { methode: 'POST', koerper: { releaseId: r.id } }), 'Exemplar angelegt.')
+                erfassen(() => anfrage<ErfasstAntwort>('/api/physical-copies', { methode: 'POST', koerper: { releaseId: r.id } }), 'Exemplar angelegt.')
               }
             >
               + Exemplar
@@ -579,8 +608,8 @@ export function Spieldetail() {
             belegt={r.digital.map((d) => d.quelle)}
             laeuft={laeuft}
             onAnlegen={(quelle, erworbenAm) =>
-              tue(
-                () => anfrage('/api/digital-entitlements', { methode: 'POST', koerper: { releaseId: r.id, quelle, erworbenAm } }),
+              erfassen(
+                () => anfrage<ErfasstAntwort>('/api/digital-entitlements', { methode: 'POST', koerper: { releaseId: r.id, quelle, erworbenAm } }),
                 `„${QUELLENTEXT[quelle]}" angelegt.`,
               )
             }

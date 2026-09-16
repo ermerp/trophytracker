@@ -1,4 +1,5 @@
 import { env, SELF } from "cloudflare:test";
+import { PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
 import { EXPORT_TABELLEN } from "../src/db/export";
 
@@ -217,14 +218,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		anweisungen.push(env.DB.prepare("UPDATE plan_entry SET status = 'erledigt' WHERE id % 10 = 0"));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 
-		const auswahl = `SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position,
-			  pe.is_favorite, pe.note, pe.origin, pe.status, pe.created_at, pe.resolved_at,
-			  COALESCE(g.title, pe.title_raw) AS titel, g.id AS spiel_id, r.platform,
-			  g.cover_url, g.critic_score, g.release_date, g.release_status, ps.status AS play_status
-			 FROM plan_entry pe
-			 LEFT JOIN release r ON r.id = pe.release_id
-			 LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id)
-			 LEFT JOIN play_status ps ON ps.release_id = pe.release_id `;
+		// Seit Stufe 15 mit zwei weiteren Unterabfragen je Zeile (Kaufeintrag, Besitz) - dieselbe Abfrage wie im Repository.
+		const auswahl = PLAN_AUSWAHL;
 		const wunschliste = await zeilenGelesen(
 			auswahl + "WHERE pe.kind = ? AND pe.status = ? ORDER BY pe.position IS NULL, pe.position, pe.id",
 			"wunsch",
@@ -245,7 +240,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 
 		console.info({ wunschliste, fuerSpiel, duplikat, nachIgdb });
 
-		// Je Eintrag ein Index-Lookup auf release und game: rund drei Zeilen je Wunsch.
+		// Je Eintrag Index-Lookups auf release, game, plan_entry (Kaufeintrag), physical_copy und digital_entitlement.
 		expect(wunschliste).toBeLessThan(2_000);
 		expect(fuerSpiel).toBeLessThan(50);
 		expect(duplikat).toBeLessThan(50);
@@ -414,6 +409,62 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("DELETE FROM plan_entry"),
 			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL"),
 			env.DB.prepare("UPDATE game SET igdb_id = NULL"),
+		]);
+	});
+
+	it("misst Kaufkandidaten, Kaufliste, Erscheint bald und das Erledigen beim Erfassen (Stufe 15)", async () => {
+		// 215 belegte Luecken (gerade Ids), dazu 300 Wuensche wie nach dem
+		// Import, 30 davon schon als Kopie auf der Kaufliste, 20 angekuendigt.
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("UPDATE release SET physical_release_status = 'ja' WHERE id % 2 = 0"),
+			env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2099-01-01' WHERE id > 410"),
+		]);
+		const amSpiel = env.DB.prepare("INSERT INTO plan_entry (kind, game_id, origin) VALUES ('wunsch', ?, 'import')");
+		const amRelease = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('wunsch', ?, 'import')");
+		const kauf = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('kauf', ?, 'wunsch')");
+		const anweisungen: D1PreparedStatement[] = [];
+		for (let i = 1; i <= 300; i++) anweisungen.push(i % 3 === 0 ? amRelease.bind(i) : amSpiel.bind(i));
+		for (let i = 3; i <= 90; i += 3) anweisungen.push(kauf.bind(i));
+		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
+
+		const kandidaten = await zeilenGelesen(
+			"SELECT quelle, plan_id, release_id, game_id, title, platform, cover_url, critic_score, is_favorite, " +
+				"bester_gebrauchtpreis_cents FROM v_kaufkandidaten ORDER BY quelle, title, platform",
+		);
+		const kaufliste = await zeilenGelesen(
+			PLAN_AUSWAHL + "WHERE pe.kind = ? AND pe.status = ? ORDER BY pe.position IS NULL, pe.position, pe.id",
+			"kauf",
+			"offen",
+		);
+		const bald = await zeilenGelesen(
+			"SELECT game_id, title, cover_url, release_date, release_id, platform, plan_id, kind, is_favorite FROM v_erscheint_bald",
+		);
+		const amZiel = await zeilenGelesen(
+			PLAN_AUSWAHL +
+				"WHERE pe.id IN (SELECT id FROM plan_entry WHERE release_id = ? AND status = 'offen' AND kind IN (?, ?) " +
+				"UNION SELECT id FROM plan_entry WHERE game_id = ? AND status = 'offen' AND kind IN (?, ?)) ORDER BY pe.id",
+			6, "kauf", "wunsch", 6, "kauf", "wunsch",
+		);
+		console.info({ kandidaten, kaufliste, bald, amZiel });
+
+		// Kandidaten: v_luecken (rund 430 trophy_progress mit Index-Lookups) plus 300 Wuensche mit je zwei Lookups.
+		expect(kandidaten).toBeLessThan(4_000);
+		expect(kaufliste).toBeLessThan(500);
+		expect(bald).toBeLessThan(2_000);
+		expect(amZiel).toBeLessThan(50);
+
+		const antwort = await SELF.fetch(`${B}/api/purchase-candidates`);
+		expect(antwort.status).toBe(200);
+		const daten = (await antwort.json()) as { luecken: number; wuensche: number };
+		// 300 Wuensche minus 30 kopierte minus die angekuendigten am Spiel (id > 410 hat keinen Wunsch) → 270
+		expect(daten.wuensche).toBe(270);
+		expect(daten.luecken).toBeGreaterThan(100);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt'"),
+			env.DB.prepare("UPDATE game SET release_status = 'erschienen', release_date = NULL"),
 		]);
 	});
 

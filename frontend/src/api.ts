@@ -216,6 +216,56 @@ export type PlanEintrag = {
   erledigtAm: string | null
   /** Eigene Bewertung am Release (4.2); bei To-Do und Backlog gekoppelt (5.5). */
   eigenerStatus: PlayStatus | null
+  /** Offener Kaufeintrag am selben Ziel (Stufe 15); null, wenn keiner. */
+  aufKaufliste: number | null
+  /** Disc oder digitale Berechtigung am Release – der Eintrag ist damit eigentlich erfüllt. */
+  imBesitz: boolean
+}
+
+/** Herkunft eines Eintrags (plan_entry.origin), für die Kaufliste (Stufe 15). */
+export const HERKUNFTTEXT: Record<string, string> = {
+  luecke: 'aus Lücke',
+  wunsch: 'aus Wunsch',
+  manuell: 'von Hand',
+  import: 'aus Import',
+  triage: 'aus Prüfliste',
+}
+
+/** Kandidat für die Kaufliste aus v_kaufkandidaten: belegte Lücke oder offener Wunsch (Stufe 15). */
+export type KaufKandidat = {
+  quelle: 'luecke' | 'wunsch'
+  /** Der Wunsch, bei Lücken null. */
+  planId: number | null
+  releaseId: number | null
+  spielId: number | null
+  titel: string
+  plattform: Plattform | null
+  bild: string | null
+  kritik: number | null
+  favorit: boolean
+  /** null heißt unbekannt – nie 0. */
+  besterGebrauchtpreisCents: number | null
+}
+
+/** Vorgemerkter, noch nicht erschienener Titel aus v_erscheint_bald (Use Case 11). */
+export type ErscheintBaldEintrag = {
+  planId: number
+  art: PlanArt
+  spielId: number
+  releaseId: number | null
+  titel: string
+  bild: string | null
+  plattform: Plattform | null
+  erscheinungsdatum: string | null
+  favorit: boolean
+}
+
+/** Antwort von POST /api/physical-copies und /api/digital-entitlements (Stufe 15): erledigte Absichten. */
+export type ErfasstAntwort = {
+  id: number
+  absichtenErledigt: Array<{ id: number; art: PlanArt; titel: string }>
+  /** Offener To-Do-/Backlog-Eintrag am Release – dann kein „ins Backlog"-Angebot. */
+  aufListe: boolean
 }
 
 /** Kandidat für den Backlog aus v_backlog_kandidaten: im Besitz, nie angefasst (Stufe 12). */

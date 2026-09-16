@@ -11,6 +11,7 @@ import {
   STATUSTEXT,
   anfrage,
   type DiscFassung,
+  type ErfasstAntwort,
   type Platin,
   type PlayStatus,
   type Plattform,
@@ -60,10 +61,23 @@ type Antwort = { gesamt: number; limit: number; offset: number; spiele: Spiel[] 
 
 type Kandidat = { spielId: number; titel: string; plattformen: string[] }
 
-/** Zuletzt angelegter Besitz je Release – für das Rückgängig. */
+/**
+ * Zuletzt angelegter Besitz je Release – für das Rückgängig. Seit Stufe 15
+ * mit den Absichten, die der Worker dabei erledigt hat (Kauf und Wunsch,
+ * Abschnitt 5): Rückgängig öffnet sie wieder, und solange das Release auf
+ * keiner Liste steht, wird „ins Backlog" angeboten.
+ */
+type Erledigt = Pick<ErfasstAntwort, 'absichtenErledigt' | 'aufListe'>
 type Eben =
-  | { art: 'exemplar'; id: number; releaseId: number }
-  | { art: 'digital'; id: number; releaseId: number; quelle: Quelle }
+  | ({ art: 'exemplar'; id: number; releaseId: number } & Erledigt)
+  | ({ art: 'digital'; id: number; releaseId: number; quelle: Quelle } & Erledigt)
+
+/** „Von der Wunsch- und Kaufliste erledigt." – je nachdem, was der Worker erledigt hat (Stufe 15). */
+function erledigtText(absichten: ErfasstAntwort['absichtenErledigt']): string {
+  const arten = new Set(absichten.map((a) => a.art))
+  const liste = arten.has('wunsch') && arten.has('kauf') ? 'Wunsch- und Kaufliste' : arten.has('kauf') ? 'Kaufliste' : 'Wunschliste'
+  return `Von der ${liste} erledigt.`
+}
 
 const FILTER = {
   platform: { text: 'Plattform', werte: PLATTFORMEN.map((p) => [p, p] as const) },
@@ -155,7 +169,7 @@ export function Sammlung() {
   async function discAnlegen(r: Release) {
     setMeldung(null)
     try {
-      const a = await anfrage<{ id: number }>('/api/physical-copies', {
+      const a = await anfrage<ErfasstAntwort>('/api/physical-copies', {
         methode: 'POST',
         koerper: { releaseId: r.id },
       })
@@ -164,7 +178,7 @@ export function Sammlung() {
         exemplare: x.exemplare + 1,
         discFassung: x.discFassung === 'unbekannt' ? 'ja' : x.discFassung,
       }))
-      setEben({ art: 'exemplar', id: a.id, releaseId: r.id })
+      setEben({ art: 'exemplar', id: a.id, releaseId: r.id, absichtenErledigt: a.absichtenErledigt, aufListe: a.aufListe })
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Anlegen fehlgeschlagen.')
     }
@@ -174,12 +188,26 @@ export function Sammlung() {
     setMeldung(null)
     setOffen(null)
     try {
-      const a = await anfrage<{ id: number }>('/api/digital-entitlements', {
+      const a = await anfrage<ErfasstAntwort>('/api/digital-entitlements', {
         methode: 'POST',
         koerper: { releaseId: r.id, quelle },
       })
       aktualisiereRelease(r.id, (x) => ({ ...x, digital: [...x.digital, quelle] }))
-      setEben({ art: 'digital', id: a.id, releaseId: r.id, quelle })
+      setEben({ art: 'digital', id: a.id, releaseId: r.id, quelle, absichtenErledigt: a.absichtenErledigt, aufListe: a.aufListe })
+    } catch (f) {
+      setMeldung(f instanceof Error ? f.message : 'Anlegen fehlgeschlagen.')
+    }
+  }
+
+  /** „ins Backlog" nach dem Erfassen: koppelt über den bestehenden Weg (5.5); nie gestartet bleibt „nicht gespielt". */
+  async function insBacklog() {
+    if (!eben) return
+    const e = eben
+    setMeldung(null)
+    try {
+      await anfrage('/api/plans', { methode: 'POST', koerper: { art: 'backlog', releaseId: e.releaseId } })
+      setEben({ ...e, aufListe: true })
+      setMeldung('Ins Backlog gesetzt.')
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Anlegen fehlgeschlagen.')
     }
@@ -187,13 +215,17 @@ export function Sammlung() {
 
   /**
    * Rückgängig für das eben Angelegte. Die Disc-Fassung bleibt auf 'ja' –
-   * das entspricht dem Server, der beim Löschen nichts zurücksetzt.
+   * das entspricht dem Server, der beim Löschen nichts zurücksetzt. Die
+   * dabei erledigten Absichten werden wieder geöffnet.
    */
   async function rueckgaengig() {
     if (!eben) return
     const e = eben
     setEben(null)
     try {
+      for (const a of e.absichtenErledigt) {
+        await anfrage(`/api/plans/${a.id}`, { methode: 'PATCH', koerper: { status: 'offen' } })
+      }
       if (e.art === 'exemplar') {
         await anfrage(`/api/physical-copies/${e.id}`, { methode: 'DELETE' })
         aktualisiereRelease(e.releaseId, (x) => ({ ...x, exemplare: x.exemplare - 1 }))
@@ -296,7 +328,13 @@ export function Sammlung() {
       {meldung && <p role="alert" className="auffaellig">{meldung}</p>}
       {eben && (
         <p role="status" className="hinweis">
-          {eben.art === 'exemplar' ? 'Disc angelegt.' : `„${QUELLENTEXT[eben.quelle]}" angelegt.`}{' '}
+          {eben.art === 'exemplar' ? 'Disc angelegt.' : `„${QUELLENTEXT[eben.quelle]}" angelegt.`}
+          {eben.absichtenErledigt.length > 0 && ` ${erledigtText(eben.absichtenErledigt)}`}{' '}
+          {eben.absichtenErledigt.length > 0 && !eben.aufListe && (
+            <>
+              <button type="button" onClick={insBacklog}>ins Backlog übernehmen</button>{' '}
+            </>
+          )}
           <button type="button" onClick={rueckgaengig}>Rückgängig</button>
         </p>
       )}

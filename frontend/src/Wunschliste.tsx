@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { type IgdbKandidat } from './api'
-import { Filterleiste, Meldungen, PlanKarte, usePlanListe } from './Absichten'
+import { ErscheintBaldLink, Filterleiste, Meldungen, PlanKarte, usePlanListe } from './Absichten'
 import { IgdbSuche } from './IgdbSuche'
 
 /**
@@ -19,7 +19,8 @@ import { IgdbSuche } from './IgdbSuche'
  * aus Wunsch zählt nicht zur Sammlung (Abschnitt 3).
  *
  * Kachel, Filter und Schreibzugriffe teilt sie sich seit Stufe 12 mit
- * To-Do und Backlog (Absichten.tsx).
+ * To-Do und Backlog (Absichten.tsx). „auf die Kaufliste" (Stufe 15) legt
+ * eine Kopie an – der Wunsch bleibt, bis der Kauf erledigt ist.
  */
 export function Wunschliste() {
   const liste = usePlanListe('wunsch')
@@ -41,7 +42,8 @@ export function Wunschliste() {
         <button type="button" onClick={() => setHinzufuegen(!hinzufuegen)} disabled={laeuft}>
           {hinzufuegen ? 'Schließen' : 'Wunsch hinzufügen'}
         </button>{' '}
-        <Link to="/import" className="zeile">Liste importieren</Link>
+        <Link to="/import" className="zeile">Liste importieren</Link>{' '}
+        <ErscheintBaldLink />
         {hinzufuegen && (
           <>
             <p className="zeile">
@@ -64,7 +66,18 @@ export function Wunschliste() {
           <p>{daten.eintraege.length} Einträge</p>
           <ul className="kacheln">
             {daten.eintraege.map((e) => (
-              <PlanKarte key={e.id} e={e} liste={liste} />
+              <PlanKarte
+                key={e.id}
+                e={e}
+                liste={liste}
+                knoepfe={
+                  e.aufKaufliste !== null ? (
+                    <Link to="/kaufliste" className="zeile">auf der Kaufliste</Link>
+                  ) : (
+                    <button type="button" className="klein" disabled={laeuft} onClick={() => liste.aufKaufliste(e)}>auf die Kaufliste</button>
+                  )
+                }
+              />
             ))}
           </ul>
         </>

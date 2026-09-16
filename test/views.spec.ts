@@ -184,6 +184,75 @@ describe("v_luecken", () => {
 	});
 });
 
+describe("v_kaufkandidaten und v_erscheint_bald (Stufe 15, Migration 0018)", () => {
+	const wunsch = (ziel: { release?: number; game?: number }, status = "offen") =>
+		env.DB.prepare("INSERT INTO plan_entry (kind, release_id, game_id, origin, status) VALUES ('wunsch', ?, ?, 'manuell', ?) RETURNING id")
+			.bind(ziel.release ?? null, ziel.game ?? null, status)
+			.first<{ id: number }>();
+	const kauf = (ziel: { release?: number; game?: number }, status = "offen") =>
+		env.DB.prepare("INSERT INTO plan_entry (kind, release_id, game_id, origin, status) VALUES ('kauf', ?, ?, 'wunsch', ?)")
+			.bind(ziel.release ?? null, ziel.game ?? null, status)
+			.run();
+	const kandidaten = async () =>
+		(await env.DB.prepare("SELECT quelle, plan_id, release_id, game_id, title, platform, is_favorite FROM v_kaufkandidaten ORDER BY quelle, title").all()).results;
+
+	it("nennt offene Wuensche mit Ziel, Cover und Favorit - ohne die, die schon kopiert oder verworfen sind", async () => {
+		const r1 = await spiel(1, "Astro Bot");
+		const r2 = await spiel(2, "Bloodborne");
+		const r3 = await spiel(3, "Celeste");
+		await spiel(4, "Doom");
+		const w1 = await wunsch({ release: r1 });
+		await wunsch({ release: r2 });
+		await kauf({ release: r2 }); // Kopie liegt schon auf der Kaufliste
+		await wunsch({ release: r3 });
+		await kauf({ release: r3 }, "verworfen"); // dort verworfen: kein Kandidat mehr
+		const w4 = await wunsch({ game: 4 }); // am Spiel, ohne Release
+		await wunsch({ release: r1 }, "erledigt"); // erledigte zaehlen nicht
+
+		expect(await kandidaten()).toEqual([
+			{ quelle: "wunsch", plan_id: w1!.id, release_id: r1, game_id: 1, title: "Astro Bot", platform: "PS4", is_favorite: 0 },
+			{ quelle: "wunsch", plan_id: w4!.id, release_id: null, game_id: 4, title: "Doom", platform: null, is_favorite: 0 },
+		]);
+
+		// Ein Kaufeintrag am Spiel nimmt den Wunsch am Spiel heraus.
+		await kauf({ game: 4 });
+		expect((await kandidaten()).map((k) => k.title)).toEqual(["Astro Bot"]);
+	});
+
+	it("blendet Angekuendigte aus und rechnet ein verstrichenes Datum als erschienen (8.4)", async () => {
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title, release_status, release_date) VALUES (1, 'Bald', 'bald', 'angekuendigt', '2099-01-01')").run();
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title, release_status, release_date) VALUES (2, 'Ohne Datum', 'ohne datum', 'angekuendigt', NULL)").run();
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title, release_status, release_date) VALUES (3, 'Verstrichen', 'verstrichen', 'angekuendigt', '2020-01-01')").run();
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title, release_status, release_date) VALUES (4, 'Erschienen', 'erschienen', 'erschienen', '2020-01-01')").run();
+		for (const game of [1, 2, 3, 4]) await wunsch({ game });
+
+		expect((await kandidaten()).map((k) => k.title)).toEqual(["Erschienen", "Verstrichen"]);
+
+		const { results } = await env.DB.prepare("SELECT game_id, title, release_date, kind, is_favorite FROM v_erscheint_bald").all();
+		expect(results).toEqual([
+			{ game_id: 1, title: "Bald", release_date: "2099-01-01", kind: "wunsch", is_favorite: 0 },
+			{ game_id: 2, title: "Ohne Datum", release_date: null, kind: "wunsch", is_favorite: 0 },
+		]);
+	});
+
+	it("v_erscheint_bald nennt Release und Plattform eines Wunsches am Release, nur offene", async () => {
+		const r = await spiel(1, "Bald");
+		await env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2099-06-01' WHERE id = 1").run();
+		await wunsch({ release: r });
+		await wunsch({ release: r }, "verworfen");
+		const { results } = await env.DB.prepare("SELECT release_id, platform, plan_id IS NOT NULL AS mit_plan FROM v_erscheint_bald").all();
+		expect(results).toEqual([{ release_id: r, platform: "PS4", mit_plan: 1 }]);
+	});
+
+	it("nennt eine Luecke mit Cover und Wertung des Spiels", async () => {
+		const r = await spiel(1, "Persona 5", { physisch: "ja" });
+		await env.DB.prepare("UPDATE game SET cover_url = 'p5.jpg', critic_score = 93 WHERE id = 1").run();
+		await trophaeen(r, 40);
+		const { results } = await env.DB.prepare("SELECT quelle, plan_id, game_id, cover_url, critic_score FROM v_kaufkandidaten").all();
+		expect(results).toEqual([{ quelle: "luecke", plan_id: null, game_id: 1, cover_url: "p5.jpg", critic_score: 93 }]);
+	});
+});
+
 describe("v_abweichungen", () => {
 	it("meldet 'durchgespielt' bei sehr geringem Trophaeenfortschritt", async () => {
 		const r = await spiel(1, "Yakuza");

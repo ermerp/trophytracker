@@ -7,6 +7,7 @@ import {
 	type PhysicalCopyZeile,
 	type Zustand,
 } from "../db/ownership";
+import type { Repositories } from "../db";
 import type { AppEnv } from "../types";
 import { ISO_DATUM, liesJson } from "./validierung";
 
@@ -16,7 +17,25 @@ import { ISO_DATUM, liesJson } from "./validierung";
  *
  * Die Eingabefelder sind deutsch, die Spalten englisch. Uebersetzt wird
  * genau hier, nirgends sonst.
+ *
+ * Seit Stufe 15 (Entscheidung des Nutzers vom 16.09.2026) erledigt das
+ * Erfassen offene Kauf- und Wunscheintraege am Release und am Spiel von
+ * selbst - gekauft heisst erfuellt; Abschnitt 5 nennt das als zweite
+ * Ausnahme neben der Kopplung 5.5. Die Antwort zaehlt sie auf, damit die
+ * Oberflaeche es sagen und mit "Rueckgaengig" wieder oeffnen kann, und nennt
+ * mit `aufListe`, ob das Release schon auf To-Do oder im Backlog steht -
+ * sonst bietet sie "ins Backlog uebernehmen" an.
  */
+
+async function absichtenErledigen(repos: Repositories, releaseId: number) {
+	const offen = await repos.plan.offeneAmZiel(["kauf", "wunsch"], { releaseId });
+	await repos.plan.erledigen(offen.map((e) => e.id));
+	const listen = await repos.plan.offeneAmZiel(["todo", "backlog"], { releaseId });
+	return {
+		absichtenErledigt: offen.map((e) => ({ id: e.id, art: e.kind, titel: e.titel })),
+		aufListe: listen.some((e) => e.release_id === releaseId),
+	};
+}
 
 const EAN = /^\d{8,14}$/;
 
@@ -113,7 +132,8 @@ export const physicalCopyRoutes = new Hono<AppEnv>()
 		}
 
 		const ergebnis = await c.var.repos.ownership.addPhysicalCopy(releaseId, geprueft.felder);
-		return c.json({ id: ergebnis.id, releaseId, physischStatusGesetzt: ergebnis.physischStatusGesetzt }, 201);
+		const absichten = await absichtenErledigen(c.var.repos, releaseId);
+		return c.json({ id: ergebnis.id, releaseId, physischStatusGesetzt: ergebnis.physischStatusGesetzt, ...absichten }, 201);
 	})
 
 	.patch("/:id", async (c) => {
@@ -172,7 +192,8 @@ export const digitalEntitlementRoutes = new Hono<AppEnv>()
 		if (!ergebnis) {
 			return c.json({ fehler: "Diese Quelle ist an dem Release bereits eingetragen." }, 409);
 		}
-		return c.json({ id: ergebnis.id, releaseId, quelle: k.quelle, erworbenAm }, 201);
+		const absichten = await absichtenErledigen(c.var.repos, releaseId);
+		return c.json({ id: ergebnis.id, releaseId, quelle: k.quelle, erworbenAm, ...absichten }, 201);
 	})
 
 	.delete("/:id", async (c) => {

@@ -189,3 +189,47 @@ describe("Migration 0016", () => {
 		await env.DB.prepare("DELETE FROM trophy_progress").run();
 	});
 });
+
+describe("Migration 0018", () => {
+	// Dieselbe Probe: das UPDATE aus der Datei gegen einen Bestand mit
+	// Wuenschen und Kaeufen an Releases mit und ohne Besitz (Abschnitt 5,
+	// Erfassen erledigt Absichten - Entscheidung des Nutzers vom 16.09.2026).
+	it("erledigt offene Wuensche und Kaeufe an Releases mit Besitz und am Spiel davon, sonst nichts", async () => {
+		const datei = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0018"));
+		expect(datei).toBeDefined();
+		const update = datei!.queries.find((q) => q.trim().startsWith("UPDATE plan_entry"));
+		expect(update).toBeDefined();
+
+		const tabellen = ["plan_entry", "physical_copy", "digital_entitlement", "release", "game"];
+		await env.DB.batch(tabellen.map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+		await env.DB.batch([1, 2, 3].map((id) => env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (?, 'x', 'x')").bind(id)));
+		const release = env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (?, ?, ?)");
+		const eintrag = env.DB.prepare("INSERT INTO plan_entry (id, kind, release_id, game_id, origin, status) VALUES (?, ?, ?, ?, 'manuell', ?)");
+		await env.DB.batch([
+			release.bind(1, 1, "PS4"), release.bind(2, 1, "PS5"), release.bind(3, 2, "PS4"), release.bind(4, 3, "PS4"),
+			env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (1)"),
+			env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (4, 'kauf')"),
+			eintrag.bind(1, "wunsch", 1, null, "offen"), // Disc am Release → erledigt (Anno 117)
+			eintrag.bind(2, "wunsch", 2, null, "offen"), // anderes Release desselben Spiels, kein Besitz → bleibt
+			eintrag.bind(3, "wunsch", null, 1, "offen"), // am Spiel, dessen PS4 im Regal steht → erledigt
+			eintrag.bind(4, "kauf", 4, null, "offen"), // digital erworben → erledigt
+			eintrag.bind(5, "wunsch", 3, null, "offen"), // kein Besitz → bleibt
+			eintrag.bind(6, "todo", 1, null, "offen"), // To-Do ist keine Kauf-Absicht → bleibt
+			eintrag.bind(7, "wunsch", 1, null, "verworfen"), // nicht offen → bleibt verworfen
+		]);
+
+		const { meta } = await env.DB.prepare(update!).run();
+		expect(meta.changes).toBe(3);
+		const { results } = await env.DB.prepare("SELECT id, status, resolved_at IS NOT NULL AS r FROM plan_entry ORDER BY id").all();
+		expect(results).toEqual([
+			{ id: 1, status: "erledigt", r: 1 },
+			{ id: 2, status: "offen", r: 0 },
+			{ id: 3, status: "erledigt", r: 1 },
+			{ id: 4, status: "erledigt", r: 1 },
+			{ id: 5, status: "offen", r: 0 },
+			{ id: 6, status: "offen", r: 0 },
+			{ id: 7, status: "verworfen", r: 0 },
+		]);
+		await env.DB.batch(tabellen.map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+	});
+});

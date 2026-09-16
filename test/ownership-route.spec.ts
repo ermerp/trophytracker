@@ -17,7 +17,7 @@ const sende = (methode: "POST" | "PATCH" | "DELETE", pfad: string, koerper?: unk
 
 async function leeren() {
 	await env.DB.batch(
-		["physical_copy", "digital_entitlement", "trophy_progress", "release", "game"].map((t) =>
+		["plan_entry", "play_status", "physical_copy", "digital_entitlement", "trophy_progress", "release", "game"].map((t) =>
 			env.DB.prepare(`DELETE FROM ${t}`),
 		),
 	);
@@ -85,6 +85,50 @@ describe("POST /api/physical-copies", () => {
 		expect((await sende("POST", "/api/physical-copies", {})).status).toBe(400);
 		expect((await sende("POST", "/api/physical-copies", "kaputt")).status).toBe(400);
 		expect((await sende("POST", "/api/physical-copies", { releaseId: 999 })).status).toBe(404);
+	});
+});
+
+describe("Erfassen erledigt Kauf und Wunsch (Stufe 15, Abschnitt 5)", () => {
+	const eintrag = (kind: string, ziel: { release?: number; game?: number }, status = "offen") =>
+		env.DB.prepare("INSERT INTO plan_entry (kind, release_id, game_id, origin, status) VALUES (?, ?, ?, 'manuell', ?) RETURNING id")
+			.bind(kind, ziel.release ?? null, ziel.game ?? null, status)
+			.first<{ id: number }>();
+	const status = async (id: number) => (await env.DB.prepare("SELECT status FROM plan_entry WHERE id = ?").bind(id).first<{ status: string }>())?.status;
+
+	it("eine Disc erledigt offene Kauf- und Wunscheintraege am Release und am Spiel, nicht To-Do/Backlog oder andere Releases", async () => {
+		const r = await release(1);
+		await env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (2, 1, 'PS5')").run();
+		const kauf = await eintrag("kauf", { release: r });
+		const wunsch = await eintrag("wunsch", { game: 1 });
+		const anderes = await eintrag("wunsch", { release: 2 });
+		const backlog = await eintrag("backlog", { release: r });
+		const verworfen = await eintrag("kauf", { release: 2 }, "verworfen");
+
+		const antwort = await sende("POST", "/api/physical-copies", { releaseId: r });
+		expect(antwort.status).toBe(201);
+		expect(await antwort.json()).toMatchObject({
+			absichtenErledigt: [
+				{ id: kauf!.id, art: "kauf", titel: "Spiel 1" },
+				{ id: wunsch!.id, art: "wunsch", titel: "Spiel 1" },
+			],
+			aufListe: true,
+		});
+		expect(await status(kauf!.id)).toBe("erledigt");
+		expect(await status(wunsch!.id)).toBe("erledigt");
+		expect(await status(anderes!.id)).toBe("offen");
+		expect(await status(backlog!.id)).toBe("offen");
+		expect(await status(verworfen!.id)).toBe("verworfen");
+	});
+
+	it("eine digitale Berechtigung ebenso; ohne Eintraege bleibt die Liste leer und aufListe false", async () => {
+		const r = await release(1);
+		const leer = await (await sende("POST", "/api/digital-entitlements", { releaseId: r, quelle: "plus" })).json();
+		expect(leer).toMatchObject({ absichtenErledigt: [], aufListe: false });
+
+		const wunsch = await eintrag("wunsch", { release: r });
+		const voll = await (await sende("POST", "/api/digital-entitlements", { releaseId: r, quelle: "kauf" })).json();
+		expect(voll).toMatchObject({ absichtenErledigt: [{ id: wunsch!.id, art: "wunsch", titel: "Spiel 1" }], aufListe: false });
+		expect(await status(wunsch!.id)).toBe("erledigt");
 	});
 });
 

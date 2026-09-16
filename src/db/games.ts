@@ -668,6 +668,20 @@ aeenliste haengt
 		return results;
 	}
 
+	/**
+	 * Angekuendigte Spiele, deren Datum verstrichen ist, gelten als erschienen
+	 * (8.4). Ein Scan ueber game (rund 470 Zeilen), nur bei Handausloesung
+	 * ("Metadaten auffrischen"); der taegliche Lauf kommt mit dem Cron in
+	 * Stufe 17. Die Views v_kaufkandidaten und v_erscheint_bald vergleichen
+	 * das Datum ohnehin selbst.
+	 */
+	async erschieneneFreigeben(): Promise<number> {
+		const ergebnis = await this.db
+			.prepare("UPDATE game SET release_status = 'erschienen' WHERE release_status = 'angekuendigt' AND release_date <= date('now')")
+			.run();
+		return ergebnis.meta.changes ?? 0;
+	}
+
 	async spielExistiert(id: number): Promise<boolean> {
 		const r = await this.db.prepare("SELECT 1 AS x FROM game WHERE id = ?").bind(id).first();
 		return r !== null;
