@@ -1456,7 +1456,7 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 9 | IGDB-Anbindung: Cover, Suche, Kritikerwertung, Erscheinungsdaten | Grundlage für 10 bis 13 |
 | 10 | `plan_entry`, Wunschliste, Favoriten | **Use Case 4** |
 | 11 | Wunschlisten-Import mit Suche, Ansicht "Ohne Zuordnung" | **Use Cases 9 und 12** |
-| 12 | To-Do und Backlog mit Sortierung und Kandidatenvorschlägen | **Use Cases 5a und 5b** |
+| 12 | To-Do und Backlog mit Sortierung und Kandidatenvorschlägen; Kopplung an die Bewertung (5.5) | **Use Cases 5a und 5b** – abgenommen 16.09.2026 |
 | 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` | **Use Case 8** vollständig |
 | 14 | `physical_release_status` manuell pflegbar, Lückenansicht, Lücken verwerfen (5.3) | **Use Case 3** |
 | 15 | Kaufliste mit Kandidaten und Sortierung (5.2), "Erscheint bald" | **Use Cases 6, 10, 11** |

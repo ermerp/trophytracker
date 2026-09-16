@@ -33,7 +33,9 @@ alles ohne IGDB-Eintrag in einer Ansicht zum Nachziehen (Use Case 12).
 bringt To-Do in eigener Reihenfolge und das Backlog mit Kandidaten aus dem
 Besitz (Use Cases 5a und 5b); nach der ersten Durchsicht am 16.09.2026 sind
 beide Listen mit der Bewertung gekoppelt (To-Do = am Spielen, Backlog =
-pausiert, Migration 0015); die Abnahme steht aus.
+pausiert, Migration 0015), IGDB-Einträge ohne PlayStation-Plattform sind
+nirgends mehr ein Treffer, und die Listen haben ein Suchfeld.
+**Abgenommen am 16.09.2026.**
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -78,7 +80,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
 | Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
 | To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert. **Gekoppelt mit der Bewertung** (Entscheidung vom 16.09.2026): To-Do heißt „am Spielen", „ins Backlog" setzt „pausiert", „durchgespielt"/„abgebrochen" auf der Kachel schließen den Eintrag |
-| Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt |
+| Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
