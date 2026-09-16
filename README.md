@@ -48,7 +48,7 @@ ein `nein` oder eine Korrektur; die Ansicht `/luecken` zeigt, was digital
 gespielt ist, als Disc existiert und nicht im Regal steht, und lässt eine Lücke
 als „physisch nicht gewünscht" verwerfen (Migration 0017). **Abgenommen am
 16.09.2026**: 197 Releases aus IGDB belegt, 165 Lücken; die 249 mit
-unbekannter Disc-Fassung bleiben offen, bis der Händlerfeed (Stufe 18)
+unbekannter Disc-Fassung bleiben offen, bis der Händlerfeed (Stufe 20)
 nachfüllt – IGDB kennt Discs nur positiv (Amazon-Einträge). Stufe 15 bringt
 die Kaufliste (Use Cases 6 und 10) mit Kandidaten aus Lücken und Wünschen und
 „Erscheint bald" (Use Case 11). Drei Entscheidungen vom 16.09.2026 prägen sie:
@@ -102,16 +102,17 @@ Was steht und in Betrieb nachgewiesen ist:
 | To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert. **Gekoppelt mit der Bewertung** (Entscheidung vom 16.09.2026): To-Do heißt „am Spielen", „ins Backlog" setzt „pausiert", „durchgespielt"/„abgebrochen" auf der Kachel schließen den Eintrag |
 | Lücken | In der Leiste: digital gespielt, Disc-Fassung belegt, nicht im Regal; „physisch nicht gewünscht" ist ein verworfener Kaufeintrag (Rückgängig, „wieder als Lücke zeigen"); darunter zugeklappt „Disc-Fassung unbekannt" mit „Disc gibt es" / „gibt es nicht" / „physisch nicht gewünscht" je Zeile. Disc-Fassung aus IGDB (`external_games`, Knopf „Disc-Fassungen prüfen" in den Einstellungen, 50 Spiele je Anfrage, nur `unbekannt` → `ja`, nach 30 Tagen erneut) oder von Hand im Spieldetail (Dropdown mit Quelle); PSN-Produkt-Id je Release pflegbar |
 | Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
-| Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 18 (Migration 0018) |
-| Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt „Metadaten auffrischen" nach (täglich erst mit dem Cron, Stufe 17) |
+| Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 20 (Migration 0018) |
+| Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt „Metadaten auffrischen" nach (täglich erst mit dem Cron, Stufe 18) |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes:** Nach Stufe 15 steht die Entscheidung über eine Stufe
-„Oberfläche" an (Abschnitt 16 der Spezifikation) – und, gemeinsam damit, über
-ein Änderungsprotokoll je Spiel (Idee vom 16.09.2026, dort als offener Punkt
-vermerkt). Danach Stufe 16, Barcode-Scan.
+**Als Nächstes: Stufe 16 – Änderungsprotokoll je Spiel** (`game_event` mit
+Quelle je Eintrag, Verlauf im Spieldetail, Ansicht „Änderungen"; Idee vom
+16.09.2026). Reihenfolge danach, am 16.09.2026 entschieden: 17 Barcode-Scan,
+18 Cron und PWA, 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
+AWIN-Feed, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation).
 
 ## Architektur in einem Absatz
 
@@ -233,7 +234,7 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
 
 6. **Geheimnisse für die externen Anbindungen** kommen als Cloudflare Secrets
    dazu, sobald die jeweilige Stufe erreicht ist (NPSSO und PSN-Refresh-Token ab
-   Stufe 2, IGDB/Twitch ab Stufe 9 – siehe oben –, AWIN-Feed-URL ab Stufe 18).
+   Stufe 2, IGDB/Twitch ab Stufe 9 – siehe oben –, AWIN-Feed-URL ab Stufe 20).
    Lokal gehören sie in `.dev.vars`, niemals ins Repository.
 
 ## PlayStation-Anbindung
@@ -357,7 +358,7 @@ Stufe) überschreibt IGDB nie.
 
 **Auffrischen.** „Metadaten auffrischen" holt für die 50 am längsten nicht
 aktualisierten Spiele Wertung, Cover und Datum in einer Anfrage erneut.
-Kritikerwertungen ändern sich mit jeder Rezension; Stufe 17 hängt den Schritt
+Kritikerwertungen ändern sich mit jeder Rezension; Stufe 18 hängt den Schritt
 an den Cron.
 
 **Disc-Fassungen prüfen (Stufe 14).** IGDB führt je Spiel Händlereinträge
@@ -554,7 +555,7 @@ Er sichert diesen einen Lauf ab. Die dauerhafte Sicherung ins private Repository
 Pull Requests durchlaufen Tests und Build, deployen aber nicht.
 
 **Nach einem Deploy zeigt ein offener Tab noch die alte Fassung.** Das Frontend
-hat bis Stufe 17 (PWA) keine Aktualisierungslogik: einmal hart neu laden
+hat bis Stufe 18 (PWA) keine Aktualisierungslogik: einmal hart neu laden
 (Strg+F5; auf dem Handy Tab schließen und neu öffnen). Ob die neue Fassung
 ausgeliefert wird, lässt sich am Asset-Hash prüfen – der Name von
 `/assets/index-*.js` in der ausgelieferten Seite muss dem in `frontend/dist`

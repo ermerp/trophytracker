@@ -186,7 +186,7 @@ export type AuffrischErgebnis = {
 /**
  * Metadaten verknuepfter Spiele erneut holen - eine IGDB-Anfrage fuer bis
  * zu 50 Spiele. Kritikerwertungen aendern sich mit jeder neuen Rezension;
- * Stufe 17 haengt diesen Schritt an den Cron.
+ * Stufe 18 haengt diesen Schritt an den Cron.
  */
 export async function igdbAuffrischSchritt(
 	repos: Repositories,

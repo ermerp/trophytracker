@@ -100,7 +100,7 @@ export class OwnershipRepository {
 	 *
 	 * physical_release_region bleibt NULL. Der Besitz belegt die Existenz der
 	 * Disc, nicht ihre Region; ein geratenes 'PAL' wuerde den Feed-Abgleich in
-	 * Stufe 18 irrefuehren.
+	 * Stufe 20 irrefuehren.
 	 */
 	async addPhysicalCopy(
 		releaseId: number,

@@ -14,7 +14,7 @@ import { STATUSTEXT, anfrage, euro, type DiscFassung, type PlayStatus } from './
  * B). Dort entsteht das „nein" von Hand – oder ein „ja", wenn er es besser
  * weiß als IGDB; „physisch nicht gewünscht" gibt es auch hier (Wunsch des
  * Nutzers vom 16.09.2026): Die Frage nach der Disc bleibt offen, die Absicht
- * ist trotzdem entschieden. Preise kommen mit Stufe 18; bis dahin steht
+ * ist trotzdem entschieden. Preise kommen mit Stufe 20; bis dahin steht
  * „unbekannt".
  */
 

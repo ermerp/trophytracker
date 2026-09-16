@@ -37,7 +37,7 @@ import { IgdbSuche, datumOderUnbekannt } from './IgdbSuche'
  * Spieldetail (Use Cases 1, 2, 7): Releases, Exemplare, Trophäen.
  *
  * Trophäenfortschritt und eigene Bewertung stehen nebeneinander, nie
- * verrechnet (Abschnitt 1). Preise kommen in Stufe 18/19.
+ * verrechnet (Abschnitt 1). Preise kommen in Stufe 20/21.
  */
 
 type Stufen = { bronze: number; silber: number; gold: number; platin: number }
@@ -879,7 +879,7 @@ function BewertungForm({
 
 /**
  * PSN-Produkt-Id je Release (Abschnitt 3, seit Stufe 14 pflegbar) - fuer die
- * Store-Preisabfrage in Stufe 19. Leer heisst unbekannt, nie vorbelegt.
+ * Store-Preisabfrage in Stufe 21. Leer heisst unbekannt, nie vorbelegt.
  */
 function PsnProduktId({ release, laeuft, onSpeichern }: { release: Release; laeuft: boolean; onSpeichern: (wert: string) => Promise<void> }) {
   // Der key am Aufruf setzt das Feld nach dem Speichern neu auf.

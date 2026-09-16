@@ -9,7 +9,7 @@ import { PLAN_ARTTEXT, anfrage, datum, type ErscheintBaldEintrag } from './api'
  * lesen – geändert wird auf den Listen selbst. Ein verstrichenes Datum
  * nimmt den Titel hier heraus und macht ihn zum Kaufkandidaten; den
  * gespeicherten Status hebt „Metadaten auffrischen" nach, täglich erst der
- * Cron ab Stufe 17.
+ * Cron ab Stufe 18.
  */
 export function ErscheintBald() {
   const [daten, setDaten] = useState<{ anzahl: number; eintraege: ErscheintBaldEintrag[] } | null>(null)

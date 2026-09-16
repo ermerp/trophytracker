@@ -53,7 +53,7 @@ Spiele anderer Plattformen dürfen nirgends auftauchen – nicht in Suche, Kandi
 
 ### Dreiwertige Felder nicht zu Booleans vereinfachen
 
-`release.physical_release_status` ist `ja` / `nein` / `unbekannt`. Fehlende Daten sind `unbekannt`, niemals `nein`. Ein `nein` setzt ausschließlich der Nutzer von Hand. Automatische Quellen (IGDB seit Stufe 14, Feed ab Stufe 18) setzen **nur** `unbekannt → ja` und fassen weder ein `nein` noch ein bestehendes `ja` an; `physical_source` sagt, wer es war (Abschnitt 3).
+`release.physical_release_status` ist `ja` / `nein` / `unbekannt`. Fehlende Daten sind `unbekannt`, niemals `nein`. Ein `nein` setzt ausschließlich der Nutzer von Hand. Automatische Quellen (IGDB seit Stufe 14, Feed ab Stufe 20) setzen **nur** `unbekannt → ja` und fassen weder ein `nein` noch ein bestehendes `ja` an; `physical_source` sagt, wer es war (Abschnitt 3).
 
 Das gilt auch in der Oberfläche: fehlende Preise und unbekannte Werte werden als "unbekannt" angezeigt, nie als "0", "–" oder "nicht verfügbar".
 

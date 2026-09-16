@@ -672,7 +672,7 @@ aeenliste haengt
 	 * Angekuendigte Spiele, deren Datum verstrichen ist, gelten als erschienen
 	 * (8.4). Ein Scan ueber game (rund 470 Zeilen), nur bei Handausloesung
 	 * ("Metadaten auffrischen"); der taegliche Lauf kommt mit dem Cron in
-	 * Stufe 17. Die Views v_kaufkandidaten und v_erscheint_bald vergleichen
+	 * Stufe 18. Die Views v_kaufkandidaten und v_erscheint_bald vergleichen
 	 * das Datum ohnehin selbst.
 	 */
 	async erschieneneFreigeben(): Promise<number> {

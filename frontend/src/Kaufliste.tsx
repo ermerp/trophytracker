@@ -15,7 +15,7 @@ import { ErscheintBaldLink, Filterleiste, Meldungen, PlanKarte, usePlanListe } f
  * und verworfene", „wieder öffnen" macht ihn zum offenen Kauf. „erledigt"
  * erledigt den Wunsch dazu mit; das Erfassen einer Disc oder Berechtigung
  * erledigt beides von selbst (Abschnitt 5). Angekündigte Titel sind keine
- * Kandidaten (8.4). Gebrauchtpreise kommen mit Stufe 18 – bis dahin
+ * Kandidaten (8.4). Gebrauchtpreise kommen mit Stufe 20 – bis dahin
  * „unbekannt", nie „0".
  */
 type Kandidaten = { anzahl: number; luecken: number; wuensche: number; kandidaten: KaufKandidat[] }

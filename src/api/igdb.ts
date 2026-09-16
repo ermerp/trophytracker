@@ -147,7 +147,7 @@ export const igdbRoutes = new Hono<AppEnv>()
 
 	/**
 	 * Vorweg hebt jeder Schritt angekuendigte Spiele mit verstrichenem Datum
-	 * auf `erschienen` (8.4, Stufe 15) - bis der Cron in Stufe 17 das
+	 * auf `erschienen` (8.4, Stufe 15) - bis der Cron in Stufe 18 das
 	 * taeglich tut. `erschienen` nennt die Anzahl.
 	 */
 	.post("/auffrischen", async (c) => {
