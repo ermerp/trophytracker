@@ -49,6 +49,12 @@ Dasselbe gilt für Zuordnungen: Ein einmal gesetztes `trophy_progress.release_id
 
 **Besitz erfassen erledigt Kauf und Wunsch** (Abschnitt 5, Entscheidung des Nutzers vom 16.09.2026): Wer eine Disc oder eine digitale Berechtigung anlegt, hat gekauft – offene `kauf`- und `wunsch`-Einträge am Release und am Spiel werden ohne Rückfrage `erledigt`, die Antwort nennt sie (`absichtenErledigen`, `src/api/ownership.ts`). Jeder neue Weg, `physical_copy` oder `digital_entitlement` anzulegen – der Barcode-Scan in Stufe 17 zuerst –, läuft dort durch. Umgekehrt ist ein Wunsch auf der Kaufliste eine **Kopie** (`origin='wunsch'`, der Wunsch bleibt offen), keine Umhängung – die eine Stelle, an der ein Übergang kein Feld-Update ist.
 
+### Jeder Schreibpfad protokolliert
+
+Seit Stufe 16 hält `game_event` fest, wer wann was geschrieben hat (Abschnitt 8.5). Geschrieben wird **ausschließlich in `src/db/`**: Jede Repository-Methode, die Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidung oder Release ändert, hängt `EventRepository.statement(…)` in **denselben Batch** wie ihre Änderung – nie eine Route, nie ein zweiter Aufruf danach. Set-basierte Schreiber (`vorbelegen`, `einreihen`, `discFassungAusIgdb`, `erschieneneFreigeben`, Kopplung) protokollieren per `events.insertSelect` mit **derselben Bedingung wie das UPDATE, davor im Batch**; ein Ereignis zu einem Löschen läuft **vor** dem DELETE. Wo „alt → neu" gebraucht wird, den alten Wert per Primärschlüssel lesen und bei Gleichheit **kein** Ereignis schreiben.
+
+Die Quelle (`nutzer` / `sync` / `igdb` / `import`, `feed` und `migration` reserviert) wird aus vorhandenen Feldern abgeleitet (`quelleAusHerkunft`, `quelleAusMatch`), nicht durch die Routen gereicht. Der Sync protokolliert nur Erkanntes, IGDB nur Entscheidungen und Statuswechsel, nichts bei unverändertem Stand (Entscheidungen des Nutzers vom 16.09.2026). Der Satz für die Oberfläche entsteht zur Lesezeit in `src/domain/ereignis.ts` und wird nie gespeichert; eine neue Ereignisart kommt dort in `EREIGNIS_ARTEN` und bekommt einen Satz (Test hält das fest). Wer einen neuen Schreiber baut – Scanner (17), Cron (18), Feed (20) –, protokolliert von Anfang an.
+
 ### Nur PS3, PS4, PS5 und PS Vita
 
 Spiele anderer Plattformen dürfen nirgends auftauchen – nicht in Suche, Kandidaten, Listen oder Zuordnung. Ein IGDB-Eintrag ist nur ein Treffer, wenn er eine der vier Plattformen **nennt**; fehlende Angabe ist kein „vielleicht" (7.6 – die frühere Ausnahme ließ einen PC-Eintrag als PS4-Wunsch durch, vom Nutzer am 16.09.2026 zweimal angemahnt). Jede neue Datenquelle (Feed, Store, Barcode) bekommt dieselbe Prüfung und wird gegen die echten Verknüpfungen gemessen, bevor sie live geht.
@@ -99,6 +105,7 @@ D1 zählt **gelesene Zeilen** (Scans, nicht Ergebniszeilen), und der Free Tier e
 - **Jeder Fremdschlüssel hat einen Index** (Migration 0008). Wer eine Tabelle mit `REFERENCES` anlegt, legt den Index in derselben Migration an
 - **Korrelierte Unterabfragen nur über indizierte Spalten.** Ein Unterselect je Ergebniszeile ist in Ordnung, wenn er ein Index-Lookup ist; als Tabellenscan multipliziert er sich mit der Zeilenzahl
 - **Kein `OR` über zwei Spalten in einer Unterabfrage**, auch wenn beide indiziert sind: SQLite weicht dann auf `idx_plan_offen` aus und liest alle Einträge der Art je Zeile (gemessen in Stufe 15: 12 000 statt 3 200 Zeilen). Stattdessen zwei Unterabfragen (`NOT EXISTS … AND NOT EXISTS …`, `COALESCE((…), (…))`) oder eine `UNION` zweier Index-Lookups mit den Filtern **innerhalb** der Teilabfragen (`PlanRepository.offeneAmZiel`)
+- **Keyset statt `(? IS NULL OR id < ?)`:** Eine optionale Bedingung gehört als eigener Text ins Statement, nicht als Bind mit `IS NULL OR` – damit las die zweite Seite des Änderungsprotokolls 2 052 statt 51 Zeilen (Stufe 16)
 - `test/lesekosten.spec.ts` misst die heißen Abfragen gegen einen Bestand in Produktionsgröße über `meta.rows_read` der lokalen D1. Neue Listenabfragen kommen dort dazu, bevor sie deployt werden
 - `npx wrangler d1 info trophytracker` zeigt `rows_read_24h`; bei mehr als einer Million ohne Import stimmt etwas nicht
 

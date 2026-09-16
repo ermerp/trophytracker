@@ -30,8 +30,11 @@ import {
   zeitpunkt,
   type IgdbKandidat,
   type ReleaseStatus,
+  type Ereignis,
+  type EreignisSeite,
 } from './api'
 import { IgdbSuche, datumOderUnbekannt } from './IgdbSuche'
+import { Verlauf } from './Verlauf'
 
 /**
  * Spieldetail (Use Cases 1, 2, 7): Releases, Exemplare, Trophäen.
@@ -128,14 +131,26 @@ export function Spieldetail() {
   const [wunschWahl, setWunschWahl] = useState<string | null>(null)
   const wunschPlattform = wunschWahl ?? neuestePlattform((spiel?.releases ?? []).map((r) => r.plattform))
 
+  // Verlauf (8.5): die letzten 20 Ereignisse, „mehr" hängt die nächste Seite an.
+  const [verlauf, setVerlauf] = useState<EreignisSeite>({ weiter: false, ereignisse: [] })
+
+  const verlaufLaden = useCallback(
+    async (vor: number | null) => {
+      const seite = await anfrage<EreignisSeite>(`/api/games/${id}/events?limit=20${vor === null ? '' : `&vor=${vor}`}`)
+      setVerlauf((alt) => ({ weiter: seite.weiter, ereignisse: vor === null ? seite.ereignisse : [...alt.ereignisse, ...seite.ereignisse] }))
+    },
+    [id],
+  )
+
   const laden = useCallback(async () => {
     try {
       setSpiel(await anfrage<Spiel>(`/api/games/${id}`))
       setFehler(null)
+      await verlaufLaden(null)
     } catch (f) {
       setFehler(f instanceof Error ? f.message : 'Laden fehlgeschlagen.')
     }
-  }, [id])
+  }, [id, verlaufLaden])
 
   useEffect(() => {
     void laden()
@@ -623,6 +638,22 @@ export function Spieldetail() {
         </section>
       ))}
 
+      <section className="verlauf-block">
+        <h2>Verlauf</h2>
+        {verlauf.ereignisse.length === 0 ? (
+          <p className="zeile">Noch nichts protokolliert – der Verlauf beginnt mit Stufe 16.</p>
+        ) : (
+          <Verlauf ereignisse={verlauf.ereignisse} mitTitel={false} />
+        )}
+        {verlauf.weiter && (
+          <p>
+            <button type="button" className="klein" disabled={laeuft} onClick={() => void verlaufLaden(letztesEreignis(verlauf.ereignisse))}>
+              ältere anzeigen
+            </button>
+          </p>
+        )}
+      </section>
+
       <section>
         <h2>Spiel</h2>
         {freiePlattformen.length > 0 && (
@@ -654,6 +685,8 @@ export function Spieldetail() {
     </>
   )
 }
+
+const letztesEreignis = (liste: Ereignis[]): number | null => liste[liste.length - 1]?.id ?? null
 
 type ExemplarFelder = {
   ean?: string | null

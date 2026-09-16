@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ereignisAntwort, seitenParameter } from "./events";
 import {
 	BESITZ_FILTER,
 	DISC_FILTER,
@@ -334,6 +335,16 @@ export const gameRoutes = new Hono<AppEnv>()
 		const ergebnis = await c.var.repos.games.releaseAbtrennen(releaseId, titel);
 		if (!ergebnis) return c.json({ fehler: "Release nicht gefunden." }, 404);
 		return c.json(ergebnis);
+	})
+
+	/** Verlauf eines Spiels (8.5): neueste zuerst, seitenweise ueber `vor`. */
+	.get("/:id/events", async (c) => {
+		const id = Number(c.req.param("id"));
+		if (!Number.isInteger(id)) return c.json({ fehler: "Ungültige Id." }, 400);
+		if (!(await c.var.repos.games.spielExistiert(id))) return c.json({ fehler: "Spiel nicht gefunden." }, 404);
+		const { limit, vor } = seitenParameter(c.req.query(), 20);
+		const { ereignisse, weiter } = await c.var.repos.events.fuerSpiel(id, limit, vor);
+		return c.json({ limit, weiter, ereignisse: ereignisse.map(ereignisAntwort) });
 	})
 
 	.get("/:id", async (c) => {

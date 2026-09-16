@@ -1,4 +1,5 @@
 import { CredentialsRepository } from "./credentials";
+import { EventRepository } from "./events";
 import { ExportRepository } from "./export";
 import { GamesRepository } from "./games";
 import { GapsRepository } from "./gaps";
@@ -20,21 +21,25 @@ import { WishlistImportRepository } from "./wunschliste";
  * lokalem SQLite auf src/db/ begrenzt.
  */
 export function createRepositories(db: D1Database, npssoKey: string) {
-	const playStatus = new PlayStatusRepository(db);
-	const plan = new PlanRepository(db);
-	const kopplung = new Kopplung(db, plan, playStatus);
+	// Das Protokoll (8.5) kommt zuerst: Jedes schreibende Repository haengt
+	// seine Ereignisse in denselben Batch wie die Aenderung.
+	const events = new EventRepository(db);
+	const playStatus = new PlayStatusRepository(db, events);
+	const plan = new PlanRepository(db, events);
+	const kopplung = new Kopplung(db, plan, playStatus, events);
 	return {
 		credentials: new CredentialsRepository(db, npssoKey),
 		sync: new SyncRepository(db),
-		trophies: new TrophiesRepository(db),
-		games: new GamesRepository(db),
+		trophies: new TrophiesRepository(db, events),
+		games: new GamesRepository(db, events),
 		gaps: new GapsRepository(db),
-		igdb: new IgdbRepository(db),
-		ownership: new OwnershipRepository(db),
+		igdb: new IgdbRepository(db, events),
+		ownership: new OwnershipRepository(db, events),
 		plan,
 		playStatus,
 		kopplung,
-		review: new ReviewRepository(db, playStatus, kopplung),
+		events,
+		review: new ReviewRepository(db, playStatus, kopplung, events),
 		export: new ExportRepository(db),
 		wishlistImport: new WishlistImportRepository(db),
 	};

@@ -347,3 +347,35 @@ export async function textAusDatei(datei: File): Promise<string> {
     return new TextDecoder('windows-1252').decode(bytes)
   }
 }
+
+/** Änderungsprotokoll (Abschnitt 8.5, Stufe 16): eine Zeile aus game_event, der Satz kommt vom Server. */
+export const EREIGNIS_QUELLEN = ['nutzer', 'sync', 'igdb', 'import', 'feed', 'migration'] as const
+export type EreignisQuelle = (typeof EREIGNIS_QUELLEN)[number]
+
+export const QUELLETEXT: Record<EreignisQuelle, string> = {
+  nutzer: 'du',
+  sync: 'PSN-Sync',
+  igdb: 'IGDB',
+  import: 'Import',
+  feed: 'Händlerfeed',
+  migration: 'Migration',
+}
+
+export type Ereignis = {
+  id: number
+  zeitpunkt: string
+  quelle: EreignisQuelle
+  /** null, wenn das Spiel inzwischen gelöscht ist oder die Liste noch keinem gehört. */
+  spielId: number | null
+  releaseId: number | null
+  /** Titel (und Plattform) zum Zeitpunkt des Ereignisses. */
+  titel: string
+  art: string
+  feld: string | null
+  alt: string | null
+  neu: string | null
+  detail: string | null
+  text: string
+}
+
+export type EreignisSeite = { weiter: boolean; ereignisse: Ereignis[] }

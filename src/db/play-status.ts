@@ -1,4 +1,5 @@
 import type { PlayStatus } from "../domain/play-status";
+import type { EventRepository } from "./events";
 
 export type PlayStatusZeile = {
 	release_id: number;
@@ -40,7 +41,10 @@ export type AbweichungZeile = {
  * von Fremddaten und eigener Bewertung aus.
  */
 export class PlayStatusRepository {
-	constructor(private readonly db: D1Database) {}
+	constructor(
+		private readonly db: D1Database,
+		private readonly events: EventRepository,
+	) {}
 
 	async fuerRelease(releaseId: number): Promise<PlayStatusZeile | null> {
 		return this.db
@@ -74,8 +78,10 @@ export class PlayStatusRepository {
 	async setzen(releaseId: number, felder: PlayStatusFelder): Promise<PlayStatusZeile | null> {
 		const release = await this.db.prepare("SELECT 1 AS x FROM release WHERE id = ?").bind(releaseId).first();
 		if (!release) return null;
+		const vorher = await this.fuerRelease(releaseId);
 
 		await this.db.batch([
+			...this.ereignisse(releaseId, vorher, felder),
 			this.db
 				.prepare(
 					"INSERT INTO play_status (release_id, status, started_at, finished_at, rating, notes) " +
@@ -102,8 +108,47 @@ export class PlayStatusRepository {
 	async statusSetzen(releaseId: number, status: PlayStatus): Promise<PlayStatusZeile | null> {
 		const release = await this.db.prepare("SELECT 1 AS x FROM release WHERE id = ?").bind(releaseId).first();
 		if (!release) return null;
-		await this.db.batch([this.statusStatement(releaseId, status), ...this.stempelStatements(releaseId)]);
+		const vorher = (await this.fuerRelease(releaseId))?.status ?? null;
+		await this.db.batch([
+			...this.statusStatements(releaseId, vorher, status),
+			...this.stempelStatements(releaseId),
+		]);
 		return this.fuerRelease(releaseId);
+	}
+
+	/**
+	 * statusStatement samt Protokoll (8.5): Der Aufrufer kennt den alten
+	 * Status schon, ein unveraenderter Wert erzeugt kein Ereignis.
+	 */
+	statusStatements(releaseId: number, vorher: PlayStatus | null, status: PlayStatus, detail?: string): D1PreparedStatement[] {
+		const statements = [this.statusStatement(releaseId, status)];
+		if (vorher !== status) {
+			statements.unshift(
+				this.events.statement({ source: "nutzer", kind: "status_geaendert", releaseId, alt: vorher, neu: status, detail }),
+			);
+		}
+		return statements;
+	}
+
+	/** Protokoll fuer setzen: Status und jedes geaenderte Bewertungsfeld einzeln. */
+	private ereignisse(releaseId: number, vorher: PlayStatusZeile | null, felder: PlayStatusFelder): D1PreparedStatement[] {
+		const statements: D1PreparedStatement[] = [];
+		if (vorher?.status !== felder.status) {
+			statements.push(
+				this.events.statement({ source: "nutzer", kind: "status_geaendert", releaseId, alt: vorher?.status ?? null, neu: felder.status }),
+			);
+		}
+		const paare: Array<[string, string | number | null, string | number | null]> = [
+			["started_at", vorher?.started_at ?? null, felder.startedAt ?? null],
+			["finished_at", vorher?.finished_at ?? null, felder.finishedAt ?? null],
+			["rating", vorher?.rating ?? null, felder.rating ?? null],
+			["notes", vorher?.notes ?? null, felder.notes ?? null],
+		];
+		for (const [field, alt, neu] of paare) {
+			if (String(alt ?? "") === String(neu ?? "")) continue;
+			statements.push(this.events.statement({ source: "nutzer", kind: "bewertung_geaendert", releaseId, field, alt, neu }));
+		}
+		return statements;
 	}
 
 	/**
@@ -156,15 +201,25 @@ export class PlayStatusRepository {
 	 * Rueckgabe: Zahl der angelegten oder geaenderten Zeilen.
 	 */
 	async vorbelegen(): Promise<number> {
-		const ergebnis = await this.db
-			.prepare(
+		// Protokoll (8.5) im selben Batch davor, mit derselben Bedingung wie
+		// der Konfliktzweig: nur Releases ohne Zeile oder mit 'nicht_gespielt'.
+		const [, ergebnis] = await this.db.batch([
+			this.events.insertSelect(
+				"SELECT 'sync', r.game_id, t.release_id, g.title || ' (' || r.platform || ')', 'status_vorbelegt', 'status', " +
+					"ps.status, CASE WHEN t.progress_pct >= 100 THEN 'komplettiert' ELSE 'am_spielen' END, NULL " +
+					"FROM trophy_progress t JOIN release r ON r.id = t.release_id JOIN game g ON g.id = r.game_id " +
+					"LEFT JOIN play_status ps ON ps.release_id = t.release_id " +
+					"WHERE t.release_id IS NOT NULL AND t.progress_pct > 0 " +
+					"AND (ps.release_id IS NULL OR ps.status = 'nicht_gespielt')",
+			),
+			this.db.prepare(
 				"INSERT INTO play_status (release_id, status) " +
 					"SELECT t.release_id, CASE WHEN t.progress_pct >= 100 THEN 'komplettiert' ELSE 'am_spielen' END " +
 					"FROM trophy_progress t WHERE t.release_id IS NOT NULL AND t.progress_pct > 0 " +
 					"ON CONFLICT(release_id) DO UPDATE SET status = excluded.status, updated_at = datetime('now') " +
 					"WHERE play_status.status = 'nicht_gespielt'",
-			)
-			.run();
+			),
+		]);
 		return ergebnis.meta.changes ?? 0;
 	}
 

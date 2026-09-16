@@ -396,7 +396,7 @@ export const planRoutes = new Hono<AppEnv>()
 		let wuenscheErledigt = 0;
 		if (zeile.kind === "kauf" && geprueft.felder.status === "erledigt" && vorher.status !== "erledigt") {
 			const wuensche = await c.var.repos.plan.offeneAmZiel(["wunsch"], { releaseId: zeile.release_id, gameId: zeile.spiel_id });
-			wuenscheErledigt = await c.var.repos.plan.erledigen(wuensche.map((w) => w.id));
+			wuenscheErledigt = await c.var.repos.plan.erledigen(wuensche.map((w) => w.id), "kauf");
 		}
 		// Kopplung (5.5): Umhaengen oder Wiederoeffnen eines To-Do-/Backlog-Eintrags setzt den Status.
 		const listeGeaendert = geprueft.felder.kind !== undefined || geprueft.felder.status === "offen" || gepruefteWahl.wahl !== undefined;

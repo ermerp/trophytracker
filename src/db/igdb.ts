@@ -1,5 +1,7 @@
+import { quelleAusMatch, type EreignisQuelle } from "../domain/ereignis";
 import type { IgdbKandidat, IgdbMetadaten } from "../domain/igdb";
 import { anzeigeTitel, titelSchluessel, type Plattform } from "../domain/titel";
+import type { EventRepository } from "./events";
 
 export type UngeprueftesSpiel = {
 	id: number;
@@ -56,7 +58,10 @@ export type OhneZuordnungZeile = {
  * critic_source ist genau dafuer da (Abschnitt 7.5).
  */
 export class IgdbRepository {
-	constructor(private readonly db: D1Database) {}
+	constructor(
+		private readonly db: D1Database,
+		private readonly events: EventRepository,
+	) {}
 
 	private static readonly UNGEPRUEFT =
 		"igdb_id IS NULL AND igdb_checked_at IS NULL AND igdb_declined_at IS NULL";
@@ -103,9 +108,28 @@ export class IgdbRepository {
 		gameId: number,
 		m: IgdbMetadaten,
 		quelle: Verknuepfungsquelle,
+		/** Fuer das Protokoll (8.5): 'import', wenn der Wunschlisten-Import verknuepft. */
+		anlass: EreignisQuelle = quelleAusMatch(quelle, "igdb"),
 	): Promise<boolean> {
 		const titel = anzeigeTitel(m.name);
-		const [update] = await this.db.batch([
+		const [, , update] = await this.db.batch([
+			this.events.statement({
+				source: anlass,
+				kind: "igdb_verknuepft",
+				gameId,
+				field: "igdb_matched_source",
+				neu: quelle,
+				detail: m.igdbSlug ?? String(m.igdbId),
+			}),
+			// Titel aus IGDB uebernommen - nur bei Spielen ohne Liste und nur, wenn er sich aendert.
+			this.events.insertSelect(
+				"SELECT ?, game.id, NULL, game.title, 'spiel_umbenannt', 'title', game.title, ?, 'aus IGDB' FROM game " +
+					`WHERE game.id = ? AND game.title <> ? AND ${IgdbRepository.OHNE_LISTE}`,
+				anlass,
+				titel,
+				gameId,
+				titel,
+			),
 			this.db
 				.prepare(
 					"UPDATE game SET igdb_id = ?, igdb_slug = ?, cover_url = ?, release_date = ?, release_status = ?, " +
@@ -150,23 +174,35 @@ export class IgdbRepository {
 
 	/** Metadaten eines verknuepften Spiels erneut uebernehmen. */
 	async auffrischen(gameId: number, m: IgdbMetadaten): Promise<boolean> {
-		const ergebnis = await this.db
-			.prepare(
-				"UPDATE game SET igdb_slug = ?, cover_url = ?, release_date = ?, release_status = ?, " +
-					IgdbRepository.KRITIK_SETZEN +
-					"igdb_synced_at = datetime('now') WHERE id = ? AND igdb_id = ?",
-			)
-			.bind(
-				m.igdbSlug,
-				m.coverUrl,
-				m.releaseDate,
+		const [, ergebnis] = await this.db.batch([
+			// Protokoll (8.5) nur fuer den Statuswechsel angekuendigt → erschienen;
+			// Cover, Wertung und Datum wechseln bei jedem Auffrischen und sind kein Ereignis.
+			this.events.insertSelect(
+				"SELECT 'igdb', id, NULL, title, 'erschienen', 'release_status', release_status, ?, ? FROM game " +
+					"WHERE id = ? AND igdb_id = ? AND release_status = 'angekuendigt' AND ? = 'erschienen'",
 				m.releaseStatus,
-				m.criticScore,
-				m.criticScoreCount,
+				m.releaseDate,
 				gameId,
 				m.igdbId,
-			)
-			.run();
+				m.releaseStatus,
+			),
+			this.db
+				.prepare(
+					"UPDATE game SET igdb_slug = ?, cover_url = ?, release_date = ?, release_status = ?, " +
+						IgdbRepository.KRITIK_SETZEN +
+						"igdb_synced_at = datetime('now') WHERE id = ? AND igdb_id = ?",
+				)
+				.bind(
+					m.igdbSlug,
+					m.coverUrl,
+					m.releaseDate,
+					m.releaseStatus,
+					m.criticScore,
+					m.criticScoreCount,
+					gameId,
+					m.igdbId,
+				),
+		]);
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 
@@ -213,13 +249,23 @@ export class IgdbRepository {
 	async discFassungAusIgdb(gameId: number, plattformen: readonly Plattform[]): Promise<number> {
 		const anweisungen: D1PreparedStatement[] = [];
 		if (plattformen.length > 0) {
+			const platzhalter = plattformen.map(() => "?").join(",");
 			anweisungen.push(
+				// Protokoll (8.5) vor dem UPDATE, dieselbe Bedingung.
+				this.events.insertSelect(
+					"SELECT 'igdb', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'disc_fassung_belegt', " +
+						"'physical_release_status', 'unbekannt', 'ja', NULL " +
+						"FROM release r JOIN game g ON g.id = r.game_id " +
+						`WHERE r.game_id = ? AND r.physical_release_status = 'unbekannt' AND r.platform IN (${platzhalter})`,
+					gameId,
+					...plattformen,
+				),
 				this.db
 					.prepare(
 						"UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb', " +
 							"physical_checked_at = datetime('now') " +
 							"WHERE game_id = ? AND physical_release_status = 'unbekannt' " +
-							`AND platform IN (${plattformen.map(() => "?").join(",")})`,
+							`AND platform IN (${platzhalter})`,
 					)
 					.bind(gameId, ...plattformen),
 			);
@@ -233,7 +279,7 @@ export class IgdbRepository {
 				.bind(gameId),
 		);
 		const ergebnisse = await this.db.batch(anweisungen);
-		return plattformen.length > 0 ? (ergebnisse[0]?.meta.changes ?? 0) : 0;
+		return plattformen.length > 0 ? (ergebnisse[1]?.meta.changes ?? 0) : 0;
 	}
 
 	/** Zaehler fuer die Einstellungen: aus IGDB belegte Releases und Spiele, die der Schritt noch anfragt. */
@@ -283,7 +329,12 @@ export class IgdbRepository {
 
 	/** Entscheidung des Nutzers: Diesen Titel gibt es bei IGDB nicht. */
 	async ablehnen(gameId: number): Promise<boolean> {
-		const [update] = await this.db.batch([
+		const [, update] = await this.db.batch([
+			this.events.insertSelect(
+				"SELECT 'nutzer', id, NULL, title, 'igdb_abgelehnt', NULL, NULL, NULL, NULL FROM game " +
+					"WHERE id = ? AND igdb_id IS NULL AND igdb_declined_at IS NULL",
+				gameId,
+			),
 			this.db
 				.prepare(
 					"UPDATE game SET igdb_declined_at = datetime('now'), " +
@@ -330,7 +381,12 @@ export class IgdbRepository {
 	 * die Suche. Korrigierbarkeit nach CLAUDE.md.
 	 */
 	async verknuepfungLoesen(gameId: number): Promise<boolean> {
-		const ergebnis = await this.db
+		const [, ergebnis] = await this.db.batch([
+			this.events.insertSelect(
+				"SELECT 'nutzer', id, NULL, title, 'igdb_geloest', NULL, igdb_slug, NULL, NULL FROM game WHERE id = ? AND igdb_id IS NOT NULL",
+				gameId,
+			),
+			this.db
 			.prepare(
 				"UPDATE game SET igdb_id = NULL, igdb_slug = NULL, igdb_matched_at = NULL, igdb_matched_source = NULL, " +
 					"igdb_synced_at = NULL, igdb_checked_at = NULL, igdb_declined_at = NULL, " +
@@ -341,8 +397,8 @@ export class IgdbRepository {
 					"critic_source = CASE WHEN critic_source = 'igdb' THEN NULL ELSE critic_source END " +
 					"WHERE id = ? AND igdb_id IS NOT NULL",
 			)
-			.bind(gameId)
-			.run();
+			.bind(gameId),
+		]);
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 

@@ -1,4 +1,5 @@
 import type { TrophyTitel } from "../domain/normalize";
+import { EREIGNIS_SPALTEN, type EventRepository } from "./events";
 
 export type TrophySortierung = "zuletzt" | "fortschritt" | "titel";
 
@@ -29,7 +30,10 @@ export type TrophyListe = {
  * ergaenzt, hebelt die Trennung von Fremddaten und eigener Bewertung aus.
  */
 export class TrophiesRepository {
-	constructor(private readonly db: D1Database) {}
+	constructor(
+		private readonly db: D1Database,
+		private readonly events: EventRepository,
+	) {}
 
 	/**
 	 * Schreibt eine Seite normalisierter Titel.
@@ -66,8 +70,13 @@ export class TrophiesRepository {
 			// release_id und reviewed_* stehen absichtlich nicht in dieser Liste.
 		);
 
-		await this.db.batch(
-			titel.map((t) =>
+		await this.db.batch([
+			// Protokoll (8.5): Listen, die es noch nicht gibt, VOR dem Upsert
+			// - danach waeren sie nicht mehr von bekannten zu unterscheiden.
+			// Ohne Spiel und Release, das Label ist der Sony-Titel; die
+			// Zuordnung kommt als eigenes Ereignis.
+			...this.listeNeuStatements(titel),
+			...titel.map((t) =>
 				anweisung.bind(
 					t.np_communication_id,
 					t.np_service_name,
@@ -86,8 +95,31 @@ export class TrophiesRepository {
 					t.last_played_at,
 				),
 			),
-		);
+		]);
 		return titel.length;
+	}
+
+	/**
+	 * Hoechstens 33 Titel je Statement: D1 erlaubt 100 gebundene Werte je
+	 * Abfrage, und jeder Titel braucht drei.
+	 */
+	private listeNeuStatements(titel: TrophyTitel[]): D1PreparedStatement[] {
+		const statements: D1PreparedStatement[] = [];
+		for (let i = 0; i < titel.length; i += 33) {
+			const teil = titel.slice(i, i + 33);
+			const werte = teil.map(() => "(?, ?, ?)").join(", ");
+			statements.push(
+				this.db
+					.prepare(
+						`WITH v(np, titel, plattform) AS (VALUES ${werte}) ` +
+							`INSERT INTO game_event (${EREIGNIS_SPALTEN}) ` +
+							"SELECT 'sync', NULL, NULL, v.titel || ' (' || v.plattform || ')', 'liste_neu', 'platform', NULL, v.plattform, v.np " +
+							"FROM v WHERE NOT EXISTS (SELECT 1 FROM trophy_progress t WHERE t.np_communication_id = v.np)",
+					)
+					.bind(...teil.flatMap((t) => [t.np_communication_id, t.title_name, t.platform])),
+			);
+		}
+		return statements;
 	}
 
 	/** Traegt dieses Release bereits eine Trophaeenliste? */

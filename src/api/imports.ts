@@ -232,7 +232,7 @@ export const importRoutes = new Hono<AppEnv>()
 			if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
 			let ergebnis: Awaited<ReturnType<typeof zielAusIgdbId>>;
 			try {
-				ergebnis = await zielAusIgdbId(repos, c.var.igdb, igdbId, plattform);
+				ergebnis = await zielAusIgdbId(repos, c.var.igdb, igdbId, plattform, "import");
 			} catch (fehler) {
 				if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
 				return c.json({ fehler: meldungFuer(fehler) }, 502);

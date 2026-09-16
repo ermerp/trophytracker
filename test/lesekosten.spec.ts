@@ -1,6 +1,7 @@
 import { env, SELF } from "cloudflare:test";
 import { PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
+import { EREIGNIS_AUSWAHL } from "../src/db/events";
 import { EXPORT_TABELLEN } from "../src/db/export";
 
 /**
@@ -466,6 +467,62 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt'"),
 			env.DB.prepare("UPDATE game SET release_status = 'erschienen', release_date = NULL"),
 		]);
+	});
+
+	it("misst Verlauf je Spiel, Aenderungen mit Quellenfilter und die Protokollzeilen des Syncs (Stufe 16)", async () => {
+		// 4 000 Ereignisse, wie nach einem Jahr Nutzung: je Spiel rund neun,
+		// drei Viertel davon vom Nutzer, ein Viertel vom Sync.
+		await env.DB.prepare("DELETE FROM game_event").run();
+		const ereignis = env.DB.prepare(
+			"INSERT INTO game_event (source, game_id, release_id, label, kind, field, old_value, new_value) " +
+				"VALUES (?, ?, ?, ?, 'status_geaendert', 'status', 'am_spielen', 'pausiert')",
+		);
+		const anweisungen: D1PreparedStatement[] = [];
+		for (let i = 1; i <= 4_000; i++) {
+			const spiel = (i % ANZAHL) + 1;
+			anweisungen.push(ereignis.bind(i % 4 === 0 ? "sync" : "nutzer", spiel, spiel, `Spiel ${spiel} (PS4)`));
+		}
+		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
+
+		const verlauf = await zeilenGelesen(`SELECT ${EREIGNIS_AUSWAHL} FROM game_event WHERE game_id = ? ORDER BY id DESC LIMIT ?`, 7, 21);
+		const alle = await zeilenGelesen(`SELECT ${EREIGNIS_AUSWAHL} FROM game_event WHERE 1 = 1 ORDER BY id DESC LIMIT ?`, 51);
+		const zweiteSeite = await zeilenGelesen(`SELECT ${EREIGNIS_AUSWAHL} FROM game_event WHERE 1 = 1 AND id < ? ORDER BY id DESC LIMIT ?`, 2_000, 51);
+		const nachQuelle = await zeilenGelesen(
+			`SELECT ${EREIGNIS_AUSWAHL} FROM game_event WHERE source = ? AND id < ? ORDER BY id DESC LIMIT ?`,
+			"sync", 2_000, 51,
+		);
+		console.info({ verlauf, alle, zweiteSeite, nachQuelle });
+
+		expect(verlauf).toBeLessThan(30);
+		expect(alle).toBeLessThan(60);
+		expect(zweiteSeite).toBeLessThan(60);
+		expect(nachQuelle).toBeLessThan(60);
+
+		// Die Protokollzeilen des Syncs lesen den Bestand hoechstens ein
+		// zweites Mal: dieselbe Auswahl wie das UPDATE, davor im Batch, alles
+		// ueber Primaerschluessel und idx_trophy_release / idx_review_release.
+		const vorbelegt = await zeilenGelesen(
+			"SELECT 'sync', r.game_id, t.release_id, g.title || ' (' || r.platform || ')', 'status_vorbelegt', 'status', " +
+				"ps.status, CASE WHEN t.progress_pct >= 100 THEN 'komplettiert' ELSE 'am_spielen' END, NULL " +
+				"FROM trophy_progress t JOIN release r ON r.id = t.release_id JOIN game g ON g.id = r.game_id " +
+				"LEFT JOIN play_status ps ON ps.release_id = t.release_id " +
+				"WHERE t.release_id IS NOT NULL AND t.progress_pct > 0 AND (ps.release_id IS NULL OR ps.status = 'nicht_gespielt')",
+		);
+		const eingereiht = await zeilenGelesen(
+			"SELECT t.release_id FROM trophy_progress t JOIN play_status ps ON ps.release_id = t.release_id " +
+				"JOIN release r ON r.id = t.release_id JOIN game g ON g.id = r.game_id " +
+				"WHERE t.release_id IS NOT NULL AND t.reviewed_at IS NOT NULL " +
+				"AND ((t.defined_bronze + t.defined_silver + t.defined_gold + t.defined_platinum) > t.reviewed_defined_total " +
+				"OR ((t.earned_bronze + t.earned_silver + t.earned_gold + t.earned_platinum) > t.reviewed_earned_total AND ps.status <> 'am_spielen')) " +
+				"AND NOT EXISTS (SELECT 1 FROM review_queue q WHERE q.release_id = t.release_id)",
+		);
+		console.info({ vorbelegt, eingereiht });
+		expect(vorbelegt).toBeLessThan(4 * ANZAHL + 100);
+		expect(eingereiht).toBeLessThan(4 * ANZAHL + 100);
+
+		const antwort = await SELF.fetch(`${B}/api/events?limit=5`);
+		expect(antwort.status).toBe(200);
+		await env.DB.prepare("DELETE FROM game_event").run();
 	});
 
 	it("beantwortet die Exportrouten bei 430 Listen", async () => {

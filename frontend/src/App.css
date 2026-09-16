@@ -1008,3 +1008,27 @@ button.griff:active {
 .kandidatenliste .knopfzeile {
   margin: 0;
 }
+
+/* Verlauf (Abschnitt 8.5): eine Zeile je Ereignis, Quelle als Pille. */
+.verlauf {
+  list-style: none;
+  padding: 0;
+  margin: 0.3rem 0;
+}
+
+.verlauf li {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.verlauf .titel {
+  font-weight: 600;
+}
+
+.pille.quelle-sync,
+.pille.quelle-igdb,
+.pille.quelle-import,
+.pille.quelle-feed,
+.pille.quelle-migration {
+  background: rgba(90, 120, 200, 0.2);
+}
