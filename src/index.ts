@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { deviationRoutes } from "./api/deviations";
+import { eventRoutes } from "./api/events";
 import { backupRoutes, exportRoutes } from "./api/export";
 import { digitalEntitlementRoutes, physicalCopyRoutes } from "./api/ownership";
 import { igdbRoutes, unmatchedRoutes } from "./api/igdb";
@@ -64,6 +65,7 @@ export function createApp(
 	app.route("/api/gaps", gapRoutes);
 	app.route("/api/imports/wishlist", importRoutes);
 	app.route("/api/deviations", deviationRoutes);
+	app.route("/api/events", eventRoutes);
 	app.route("/api/review", reviewRoutes);
 	app.route("/api/export", exportRoutes);
 	app.route("/api/backup", backupRoutes);

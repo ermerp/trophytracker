@@ -1,3 +1,6 @@
+import { quelleAusHerkunft } from "../domain/ereignis";
+import type { EventRepository, NeuesEreignis } from "./events";
+
 export const PLAN_ARTEN = ["wunsch", "todo", "backlog", "kauf"] as const;
 export type PlanArt = (typeof PLAN_ARTEN)[number];
 
@@ -89,6 +92,18 @@ export type PlanZeile = {
 	im_besitz: number;
 };
 
+/** Die Zeile, wie das Protokoll sie braucht (PlanRepository.kurz). */
+type PlanKurz = {
+	id: number;
+	kind: PlanArt;
+	release_id: number | null;
+	game_id: number | null;
+	title_raw: string | null;
+	status: PlanStatus;
+	is_favorite: number;
+	note: string | null;
+};
+
 const SPALTEN: Record<keyof PlanFelder, string> = {
 	isFavorite: "is_favorite",
 	note: "note",
@@ -140,7 +155,32 @@ export const POSITION_ANS_ENDE =
  * Schema. Seit Migration 0013 gibt es keine Prioritaet und keinen Rang mehr.
  */
 export class PlanRepository {
-	constructor(private readonly db: D1Database) {}
+	constructor(
+		private readonly db: D1Database,
+		private readonly events: EventRepository,
+	) {}
+
+	/**
+	 * Das Wenige, was ein Ereignis ueber einen Eintrag wissen muss - ein
+	 * Primaerschluessel-Lookup, kein PLAN_AUSWAHL.
+	 */
+	private async kurz(id: number): Promise<PlanKurz | null> {
+		return this.db
+			.prepare("SELECT id, kind, release_id, game_id, title_raw, status, is_favorite, note FROM plan_entry WHERE id = ?")
+			.bind(id)
+			.first<PlanKurz>();
+	}
+
+	/** Ereignis an einem Eintrag: Release, Spiel oder - bei Freitext - der rohe Titel als Label (8.5). */
+	private ereignis(z: PlanKurz, e: Omit<NeuesEreignis, "releaseId" | "gameId" | "label" | "field">): D1PreparedStatement {
+		return this.events.statement({
+			...e,
+			releaseId: z.release_id,
+			gameId: z.game_id,
+			label: z.title_raw ?? undefined,
+			field: z.kind,
+		});
+	}
 
 	/**
 	 * Alle Eintraege einer Art, ohne Blaetterung: Die Listen sind klein (die
@@ -205,6 +245,8 @@ export class PlanRepository {
 		ziel: PlanZiel,
 		origin: PlanHerkunft,
 		felder: Pick<PlanFelder, "isFavorite" | "note" | "status"> = {},
+		/** Fuer das Protokoll (8.5): 'kopplung', wenn die Bewertung den Eintrag anlegt. */
+		anlass: string = origin,
 	): Promise<number> {
 		const status = felder.status ?? "offen";
 		const r = await this.db
@@ -228,6 +270,16 @@ export class PlanRepository {
 			)
 			.first<{ id: number }>();
 		if (!r) throw new Error("Eintrag konnte nicht angelegt werden.");
+		await this.events.schreiben({
+			source: quelleAusHerkunft(origin),
+			kind: "liste_eintrag_angelegt",
+			releaseId: ziel.releaseId ?? null,
+			gameId: ziel.gameId ?? null,
+			label: ziel.titleRaw,
+			field: kind,
+			neu: status,
+			detail: anlass,
+		});
 		return r.id;
 	}
 
@@ -240,9 +292,11 @@ export class PlanRepository {
 	 * wird, haengt ans Ende, sofern er keine Position hat; wer To-Do
 	 * verlaesst, verliert sie.
 	 */
-	async aendern(id: number, felder: PlanFelder): Promise<boolean> {
+	async aendern(id: number, felder: PlanFelder, anlass: string | null = null): Promise<boolean> {
 		const keys = (Object.keys(felder) as Array<keyof PlanFelder>).filter((k) => felder[k] !== undefined);
 		if (keys.length === 0) return (await this.eintrag(id)) !== null;
+		const vorher = await this.kurz(id);
+		if (!vorher) return false;
 
 		const setzungen = keys.map((k) => `${SPALTEN[k]} = ?`);
 		if (felder.status !== undefined) {
@@ -257,11 +311,32 @@ export class PlanRepository {
 			// `kind` in der SET-Klausel ist der alte Wert der Zeile - hier bleibt er, weil kind nicht im Koerper ist.
 			setzungen.push(`position = CASE WHEN kind = 'todo' THEN COALESCE(position, ${POSITION_ANS_ENDE}) ELSE position END`);
 		}
-		const ergebnis = await this.db
-			.prepare(`UPDATE plan_entry SET ${setzungen.join(", ")} WHERE id = ?`)
-			.bind(...werte, id)
-			.run();
-		return (ergebnis.meta.changes ?? 0) > 0;
+		// Protokoll (8.5): je geaendertem Feld ein Ereignis, unveraenderte keines.
+		const ereignisse = keys
+			.map((k): [string, string | number | null, string | number | null] => [
+				SPALTEN[k],
+				k === "isFavorite" ? vorher.is_favorite : (vorher[SPALTEN[k] as "kind" | "status" | "note"] ?? null),
+				wert(k, felder) as string | number | null,
+			])
+			.filter(([, alt, neu]) => String(alt ?? "") !== String(neu ?? ""))
+			.map(([field, alt, neu]) =>
+				this.events.statement({
+					source: "nutzer",
+					kind: "liste_eintrag_geaendert",
+					releaseId: vorher.release_id,
+					gameId: vorher.game_id,
+					label: vorher.title_raw ?? undefined,
+					field,
+					alt: field === "is_favorite" ? alt === 1 : alt,
+					neu: field === "is_favorite" ? neu === 1 : neu,
+					detail: anlass,
+				}),
+			);
+		const ergebnisse = await this.db.batch([
+			...ereignisse,
+			this.db.prepare(`UPDATE plan_entry SET ${setzungen.join(", ")} WHERE id = ?`).bind(...werte, id),
+		]);
+		return (ergebnisse[ergebnisse.length - 1].meta.changes ?? 0) > 0;
 	}
 
 	/**
@@ -326,14 +401,29 @@ export class PlanRepository {
 		return results;
 	}
 
-	/** Mehrere Eintraege auf einmal erledigen; gibt die Anzahl der geaenderten Zeilen zurueck. */
-	async erledigen(ids: number[]): Promise<number> {
+	/**
+	 * Mehrere Eintraege auf einmal erledigen; gibt die Anzahl der geaenderten
+	 * Zeilen zurueck. `anlass` steht im Protokoll (8.5): 'besitz', wenn das
+	 * Erfassen einer Disc den Eintrag schliesst, 'kauf', wenn ein erledigter
+	 * Kauf den Wunsch mitnimmt.
+	 */
+	async erledigen(ids: number[], anlass: string | null = null): Promise<number> {
 		if (ids.length === 0) return 0;
 		const update = this.db.prepare(
 			"UPDATE plan_entry SET status = 'erledigt', resolved_at = datetime('now') WHERE id = ? AND status = 'offen'",
 		);
-		const ergebnisse = await this.db.batch(ids.map((id) => update.bind(id)));
-		return ergebnisse.reduce((n, e) => n + (e.meta.changes ?? 0), 0);
+		const statements: D1PreparedStatement[] = [];
+		const updates: number[] = [];
+		for (const id of ids) {
+			const z = await this.kurz(id);
+			if (z?.status === "offen") {
+				statements.push(this.ereignis(z, { source: "nutzer", kind: "liste_eintrag_erledigt", detail: anlass }));
+			}
+			updates.push(statements.push(update.bind(id)) - 1);
+		}
+		const ergebnisse = await this.db.batch(statements);
+		// Nur die UPDATEs zaehlen, nicht die Protokollzeilen davor.
+		return updates.reduce((n, i) => n + (ergebnisse[i].meta.changes ?? 0), 0);
 	}
 
 	/** Kandidaten fuer die Kaufliste aus v_kaufkandidaten (Migration 0018): Luecken zuerst, dann Wuensche. */
@@ -373,15 +463,32 @@ export class PlanRepository {
 	 * wenn der Nutzer die Plattform nachpflegt (Nachbesserung Stufe 11).
 	 */
 	async zielSetzen(id: number, ziel: PlanZiel): Promise<boolean> {
-		const ergebnis = await this.db
-			.prepare("UPDATE plan_entry SET release_id = ?, game_id = ?, title_raw = ? WHERE id = ?")
-			.bind(ziel.releaseId ?? null, ziel.gameId ?? null, ziel.titleRaw ?? null, id)
-			.run();
+		const vorher = await this.kurz(id);
+		if (!vorher) return false;
+		const [, ergebnis] = await this.db.batch([
+			// Das Ereignis haengt am neuen Ziel - dort wird der Verlauf gesucht.
+			this.events.statement({
+				source: "nutzer",
+				kind: "liste_eintrag_geaendert",
+				releaseId: ziel.releaseId ?? null,
+				gameId: ziel.gameId ?? null,
+				label: ziel.titleRaw ?? vorher.title_raw ?? undefined,
+				field: "ziel",
+			}),
+			this.db
+				.prepare("UPDATE plan_entry SET release_id = ?, game_id = ?, title_raw = ? WHERE id = ?")
+				.bind(ziel.releaseId ?? null, ziel.gameId ?? null, ziel.titleRaw ?? null, id),
+		]);
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 
 	async loeschen(id: number): Promise<boolean> {
-		const ergebnis = await this.db.prepare("DELETE FROM plan_entry WHERE id = ?").bind(id).run();
+		const vorher = await this.kurz(id);
+		if (!vorher) return false;
+		const [, ergebnis] = await this.db.batch([
+			this.ereignis(vorher, { source: "nutzer", kind: "liste_eintrag_geloescht" }),
+			this.db.prepare("DELETE FROM plan_entry WHERE id = ?").bind(id),
+		]);
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 }

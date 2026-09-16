@@ -1,5 +1,6 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { Abweichungen } from './Abweichungen'
+import { Aenderungen } from './Aenderungen'
 import { Backlog } from './Backlog'
 import { Luecken } from './Luecken'
 import { Einstellungen } from './Einstellungen'
@@ -40,6 +41,7 @@ function Werkzeuge() {
         <li><Link to="/import">Wunschliste importieren</Link> – Textdateien einlesen, abgleichen, durchsehen</li>
         <li><Link to="/ohne-zuordnung">Ohne Zuordnung</Link> – alles ohne IGDB-Eintrag, listenübergreifend nachziehen</li>
         <li><Link to="/erscheint-bald">Erscheint bald</Link> – vorgemerkte Titel, die noch nicht erschienen sind</li>
+        <li><Link to="/aenderungen">Änderungen</Link> – wer wann was geschrieben hat, nach Quelle</li>
         <li><Link to="/pruefen">Sammlung prüfen</Link> – alle Zuordnungen als Tabelle</li>
         <li><Link to="/trophaeen">Trophäen</Link> – die Rohliste von Sony</li>
       </ul>
@@ -82,6 +84,7 @@ function App() {
           <Route path="/import/:id" element={<WunschlisteImport />} />
           <Route path="/ohne-zuordnung" element={<OhneZuordnung />} />
           <Route path="/pruefen" element={<SammlungPruefen />} />
+          <Route path="/aenderungen" element={<Aenderungen />} />
           <Route path="/trophaeen" element={<Trophaeen />} />
           <Route path="*" element={<Navigate to="/sammlung" replace />} />
         </Routes>

@@ -1,10 +1,10 @@
 import { env } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
 
-// 16 Tabellen aus Migration 0001, dazu igdb_candidate aus Migration 0010
-// und die drei Import-Tabellen aus Migration 0012.
+// 16 Tabellen aus Migration 0001, dazu igdb_candidate aus Migration 0010,
+// die drei Import-Tabellen aus Migration 0012 und game_event aus 0019.
 const TABELLEN = [
-	"app_setting", "digital_entitlement", "ean_mapping", "game", "igdb_candidate",
+	"app_setting", "digital_entitlement", "ean_mapping", "game", "game_event", "igdb_candidate",
 	"market_offer", "physical_copy", "plan_entry", "play_status", "price_snapshot",
 	"psn_credentials", "psn_raw_response", "psn_sync_run", "release", "review_queue",
 	"trophy_progress", "unresolved_scan", "wishlist_import", "wishlist_import_candidate",
@@ -27,7 +27,7 @@ async function namen(typ: "table" | "view"): Promise<string[]> {
 }
 
 describe("Migration 0001", () => {
-	it("legt genau die 20 Tabellen aus der Spezifikation an", async () => {
+	it("legt genau die 21 Tabellen aus der Spezifikation an", async () => {
 		expect(await namen("table")).toEqual(TABELLEN);
 	});
 

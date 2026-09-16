@@ -1,5 +1,6 @@
 import type { Repositories } from "../db";
 import type { PlanZiel } from "../db/plan";
+import type { EreignisQuelle } from "../domain/ereignis";
 import { heuteIso, metadatenAus, normalisiereTrefferliste, type IgdbKandidat } from "../domain/igdb";
 import { neuestePlattform, type Plattform } from "../domain/titel";
 import type { IgdbClient } from "../igdb/client";
@@ -22,14 +23,14 @@ async function automatischePlattform(
 	return neuestePlattform(releases.map((r) => r.platform)) ?? (kandidat ? neuestePlattform(kandidat.plattformen) : null);
 }
 
-async function zielFuer(repos: Repositories, gameId: number, plattform: Plattform | null): Promise<PlanZiel> {
-	return plattform !== null ? { releaseId: await repos.games.releaseFuerPlattform(gameId, plattform) } : { gameId };
+async function zielFuer(repos: Repositories, gameId: number, plattform: Plattform | null, quelle: EreignisQuelle): Promise<PlanZiel> {
+	return plattform !== null ? { releaseId: await repos.games.releaseFuerPlattform(gameId, plattform, quelle) } : { gameId };
 }
 
 /** Ziel an einem vorhandenen Spiel, mit aufgeloester Plattformwahl. */
 export async function zielAmSpiel(repos: Repositories, gameId: number, wahl: PlattformWahl): Promise<PlanZiel> {
 	const plattform = wahl === "auto" ? await automatischePlattform(repos, gameId, null) : wahl;
-	return zielFuer(repos, gameId, plattform);
+	return zielFuer(repos, gameId, plattform, "nutzer");
 }
 
 /**
@@ -40,22 +41,24 @@ export async function zielAmSpiel(repos: Repositories, gameId: number, wahl: Pla
  * den Eintrag an das Release dieser Plattform, das bei Bedarf entsteht.
  *
  * Drei Aufrufer: POST /api/plans, der Wunschlisten-Import (8.2) und die
- * Nachpflege in "Ohne Zuordnung" (8.3).
+ * Nachpflege in "Ohne Zuordnung" (8.3). `quelle` steht im Protokoll (8.5):
+ * 'import', wenn der Wunschlisten-Import Spiel und Release anlegt.
  */
 export async function zielAusKandidat(
 	repos: Repositories,
 	kandidat: IgdbKandidat,
 	wahl: PlattformWahl,
+	quelle: EreignisQuelle = "nutzer",
 ): Promise<{ ziel: PlanZiel; spielAngelegt: boolean }> {
 	let gameId = await repos.games.spielNachIgdbId(kandidat.igdbId);
 	let spielAngelegt = false;
 	if (gameId === null) {
-		gameId = await repos.games.spielOhneRelease(kandidat.name);
-		await repos.igdb.verknuepfen(gameId, metadatenAus(kandidat, heuteIso()), "manuell");
+		gameId = await repos.games.spielOhneRelease(kandidat.name, quelle);
+		await repos.igdb.verknuepfen(gameId, metadatenAus(kandidat, heuteIso()), "manuell", quelle);
 		spielAngelegt = true;
 	}
 	const plattform = wahl === "auto" ? await automatischePlattform(repos, gameId, kandidat) : wahl;
-	return { ziel: await zielFuer(repos, gameId, plattform), spielAngelegt };
+	return { ziel: await zielFuer(repos, gameId, plattform, quelle), spielAngelegt };
 }
 
 /**
@@ -69,6 +72,7 @@ export async function zielAusIgdbId(
 	igdb: IgdbClient,
 	igdbId: number,
 	wahl: PlattformWahl,
+	quelle: EreignisQuelle = "nutzer",
 ): Promise<{ ziel: PlanZiel; spielAngelegt: boolean; kandidat: IgdbKandidat | null } | null> {
 	const vorhanden = await repos.games.spielNachIgdbId(igdbId);
 	if (vorhanden !== null) {
@@ -79,9 +83,9 @@ export async function zielAusIgdbId(
 			kandidat = normalisiereTrefferliste(await igdb.nachIds([igdbId]))[0] ?? null;
 			if (kandidat) plattform = neuestePlattform(kandidat.plattformen);
 		}
-		return { ziel: await zielFuer(repos, vorhanden, plattform), spielAngelegt: false, kandidat };
+		return { ziel: await zielFuer(repos, vorhanden, plattform, quelle), spielAngelegt: false, kandidat };
 	}
 	const kandidat = normalisiereTrefferliste(await igdb.nachIds([igdbId]))[0] ?? null;
 	if (!kandidat) return null;
-	return { ...(await zielAusKandidat(repos, kandidat, wahl)), kandidat };
+	return { ...(await zielAusKandidat(repos, kandidat, wahl, quelle)), kandidat };
 }

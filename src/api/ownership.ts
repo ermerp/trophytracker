@@ -29,7 +29,7 @@ import { ISO_DATUM, liesJson } from "./validierung";
 
 async function absichtenErledigen(repos: Repositories, releaseId: number) {
 	const offen = await repos.plan.offeneAmZiel(["kauf", "wunsch"], { releaseId });
-	await repos.plan.erledigen(offen.map((e) => e.id));
+	await repos.plan.erledigen(offen.map((e) => e.id), "besitz");
 	const listen = await repos.plan.offeneAmZiel(["todo", "backlog"], { releaseId });
 	return {
 		absichtenErledigt: offen.map((e) => ({ id: e.id, art: e.kind, titel: e.titel })),

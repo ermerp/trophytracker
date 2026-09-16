@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 15 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 16 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -56,7 +56,14 @@ Ein Wunsch kommt als **Kopie** auf die Kaufliste und bleibt, bis der Kauf
 erledigt ist; „erledigt" am Kauf erledigt den Wunsch mit; und wer eine Disc
 oder Berechtigung erfasst, hat gekauft – Kauf- und Wunscheintrag verschwinden
 von selbst (Migration 0018 gleicht den Bestand an, eine Zeile).
-**Abgenommen am 16.09.2026.**
+**Abgenommen am 16.09.2026.** Stufe 16 bringt das Änderungsprotokoll: Jede
+Zeile in `game_event` (Migration 0019) sagt, wer wann was geschrieben hat – du,
+der PSN-Sync, IGDB oder der Import –, geschrieben ausschließlich in der
+Repository-Schicht, im selben Batch wie die Änderung. Der Sync protokolliert
+nur Erkanntes, IGDB nur Entscheidungen und Statuswechsel, der Verlauf beginnt
+mit dem Deploy und wird unbegrenzt aufbewahrt und mitgesichert (vier
+Entscheidungen vom 16.09.2026). Sichtbar als Block „Verlauf" im Spieldetail
+und als Ansicht „Änderungen" mit Quellenfilter. **Abnahme offen.**
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -105,15 +112,16 @@ Was steht und in Betrieb nachgewiesen ist:
 | Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
 | Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 20 (Migration 0018). **Stufe 15 abgenommen am 16.09.2026** |
 | Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt „Metadaten auffrischen" nach (täglich erst mit dem Cron, Stufe 18) |
+| Änderungen | Werkzeug in den Einstellungen (`/aenderungen`): wer wann was geschrieben hat, neueste zuerst, nach Quelle filterbar (du, PSN-Sync, IGDB, Import), je Zeile mit Link ins Spiel; „ältere laden". Im Spieldetail derselbe Verlauf als Block. Nur lesend – Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidungen, Vorbelegung und Prüflisten-Einträge werden protokolliert, Cover/Wertung beim Auffrischen und die To-Do-Reihenfolge nicht (Migration 0019) |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 16 – Änderungsprotokoll je Spiel** (`game_event` mit
-Quelle je Eintrag, Verlauf im Spieldetail, Ansicht „Änderungen"; Idee vom
-16.09.2026). Reihenfolge danach, am 16.09.2026 entschieden: 17 Barcode-Scan,
-18 Cron und PWA, 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
-AWIN-Feed, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation).
+**Als Nächstes: Stufe 17 – Barcode-Scan** mit Auflösungskette ohne Feed
+(Abschnitt 9). Reihenfolge danach, am 16.09.2026 entschieden: 18 Cron und PWA,
+19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20 AWIN-Feed, 21 PSN
+Store-Preise (Abschnitt 16 der Spezifikation). Jeder neue Schreiber hängt sich
+ins Änderungsprotokoll ein (Abschnitt 8.5).
 
 ## Architektur in einem Absatz
 
@@ -621,7 +629,7 @@ irgendetwas geschrieben wird.
 | Datei | Inhalt |
 |---|---|
 | `backup.sql` | vollständiger D1-Dump, zum Wiedereinspielen |
-| `backup.json` | die 14 Fachtabellen als lesbare Zweitform – ohne `psn_credentials`, `psn_raw_response` und `d1_migrations` |
+| `backup.json` | die 15 Fachtabellen (seit Stufe 16 mit `game_event`) als lesbare Zweitform – ohne `psn_credentials`, `psn_raw_response` und `d1_migrations` |
 
 Zwei Formate mit Absicht: Der Dump ist die technisch exakte Sicherung, das JSON
 bleibt auswertbar, auch wenn es dieses Projekt eines Tages nicht mehr gibt.

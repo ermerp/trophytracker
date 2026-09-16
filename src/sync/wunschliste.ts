@@ -230,14 +230,14 @@ export async function importUebernahmeSchritt(
 					);
 					continue;
 				}
-				const e = await zielAusKandidat(repos, kandidat, plattform);
+				const e = await zielAusKandidat(repos, kandidat, plattform, "import");
 				ziel = e.ziel;
 				if (e.spielAngelegt) spieleAngelegt++;
 			} else if (zeile.game_id !== null) {
 				// Die Plattform der Zeile (aus der Liste oder vorgeschlagen, vom
 				// Nutzer aenderbar) entscheidet: Release, das bei Bedarf entsteht,
 				// oder ohne Plattform das Spiel.
-				if (plattform !== null) ziel = { releaseId: await repos.games.releaseFuerPlattform(zeile.game_id, plattform) };
+				if (plattform !== null) ziel = { releaseId: await repos.games.releaseFuerPlattform(zeile.game_id, plattform, "import") };
 				else ziel = { gameId: zeile.game_id };
 			} else {
 				continue;

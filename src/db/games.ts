@@ -1,6 +1,8 @@
+import { quelleAusMatch, type EreignisQuelle } from "../domain/ereignis";
 import type { TrophyEintrag } from "../domain/gruppen";
 import type { PlayStatus } from "../domain/play-status";
 import { titelSchluessel, type Plattform } from "../domain/titel";
+import type { EventRepository } from "./events";
 
 export type ZuOrdnenderRelease = {
 	npCommunicationId: string;
@@ -163,7 +165,10 @@ export type SpielDetail = {
  * Abschnitt 3 am Beispiel GTA V.
  */
 export class GamesRepository {
-	constructor(private readonly db: D1Database) {}
+	constructor(
+		private readonly db: D1Database,
+		private readonly events: EventRepository,
+	) {}
 
 	/** Alle noch nicht zugeordneten Trophaeenlisten, als Rohdaten fuer die Gruppierung. */
 	async unzugeordnet(): Promise<TrophyEintrag[]> {
@@ -208,6 +213,7 @@ export class GamesRepository {
 			.bind(titel, titelSchluessel(titel))
 			.first<{ id: number }>();
 		if (!spiel) throw new Error("Spiel konnte nicht angelegt werden.");
+		await this.events.schreiben({ source: "nutzer", kind: "spiel_angelegt", gameId: spiel.id, detail: "aus der Zuordnung" });
 
 		const releaseIds: number[] = [];
 		const uebersprungen: string[] = [];
@@ -220,14 +226,9 @@ export class GamesRepository {
 			if (!angelegt) throw new Error("Release konnte nicht angelegt werden.");
 			releaseIds.push(angelegt.id);
 
-			const ergebnis = await this.db
-				.prepare(
-					"UPDATE trophy_progress SET release_id = ?, matched_at = datetime('now'), " +
-						"matched_source = 'manuell' " +
-						"WHERE np_communication_id = ? AND release_id IS NULL",
-				)
-				.bind(angelegt.id, r.npCommunicationId)
-				.run();
+			const [, ergebnis] = await this.db.batch([
+				...this.zuordnungsStatements(r.npCommunicationId, angelegt.id, "manuell"),
+			]);
 
 			if ((ergebnis.meta.changes ?? 0) === 0) uebersprungen.push(r.npCommunicationId);
 		}
@@ -241,14 +242,33 @@ export class GamesRepository {
 		releaseId: number,
 		quelle: "automatisch" | "manuell",
 	): Promise<boolean> {
-		const ergebnis = await this.db
-			.prepare(
-				"UPDATE trophy_progress SET release_id = ?, matched_at = datetime('now'), " +
-					"matched_source = ? WHERE np_communication_id = ? AND release_id IS NULL",
-			)
-			.bind(releaseId, quelle, npCommunicationId)
-			.run();
+		const [, ergebnis] = await this.db.batch(this.zuordnungsStatements(npCommunicationId, releaseId, quelle));
 		return (ergebnis.meta.changes ?? 0) > 0;
+	}
+
+	/**
+	 * Zuordnung samt Protokoll (8.5): Das Ereignis entsteht nur, wenn die
+	 * Liste noch frei ist - dieselbe Bedingung wie das UPDATE, davor im Batch.
+	 * Eine automatische Zuordnung kommt vom Sync (7.2).
+	 */
+	private zuordnungsStatements(npCommunicationId: string, releaseId: number, quelle: "automatisch" | "manuell"): D1PreparedStatement[] {
+		return [
+			this.events.insertSelect(
+				"SELECT ?, r.game_id, r.id, g.title || ' (' || r.platform || ')', 'zugeordnet', 'matched_source', NULL, ?, t.title_name " +
+					"FROM trophy_progress t, release r JOIN game g ON g.id = r.game_id " +
+					"WHERE t.np_communication_id = ? AND t.release_id IS NULL AND r.id = ?",
+				quelleAusMatch(quelle, "sync"),
+				quelle,
+				npCommunicationId,
+				releaseId,
+			),
+			this.db
+				.prepare(
+					"UPDATE trophy_progress SET release_id = ?, matched_at = datetime('now'), " +
+						"matched_source = ? WHERE np_communication_id = ? AND release_id IS NULL",
+				)
+				.bind(releaseId, quelle, npCommunicationId),
+		];
 	}
 
 	/**
@@ -305,15 +325,23 @@ export class GamesRepository {
 	 * Korrektur, mit der IGDB den Eintrag findet (Abschnitt 7.6).
 	 */
 	async umbenennen(id: number, titel: string): Promise<boolean> {
-		const ergebnis = await this.db
-			.prepare(
-				"UPDATE game SET title = ?, sort_title = ?, " +
-					"igdb_checked_at = CASE WHEN igdb_id IS NULL AND igdb_declined_at IS NULL THEN NULL ELSE igdb_checked_at END " +
-					"WHERE id = ?",
-			)
-			.bind(titel, titelSchluessel(titel), id)
-			.run();
-		return (ergebnis.meta.changes ?? 0) > 0;
+		const vorher = await this.db.prepare("SELECT title FROM game WHERE id = ?").bind(id).first<{ title: string }>();
+		if (!vorher) return false;
+		const statements: D1PreparedStatement[] = [];
+		if (vorher.title !== titel) {
+			statements.push(this.events.statement({ source: "nutzer", kind: "spiel_umbenannt", gameId: id, alt: vorher.title, neu: titel }));
+		}
+		statements.push(
+			this.db
+				.prepare(
+					"UPDATE game SET title = ?, sort_title = ?, " +
+						"igdb_checked_at = CASE WHEN igdb_id IS NULL AND igdb_declined_at IS NULL THEN NULL ELSE igdb_checked_at END " +
+						"WHERE id = ?",
+				)
+				.bind(titel, titelSchluessel(titel), id),
+		);
+		const ergebnisse = await this.db.batch(statements);
+		return (ergebnisse[ergebnisse.length - 1].meta.changes ?? 0) > 0;
 	}
 
 	/**
@@ -345,10 +373,12 @@ aeenliste haengt
 			.first<{ id: number }>();
 		if (!neu) throw new Error("Neues Spiel konnte nicht angelegt werden.");
 
-		await this.db
-			.prepare("UPDATE release SET game_id = ? WHERE id = ?")
-			.bind(neu.id, releaseId)
-			.run();
+		await this.db.batch([
+			// Vor dem Umhaengen: Das Ereignis am alten Spiel traegt noch dessen Label.
+			this.events.statement({ source: "nutzer", kind: "release_abgetrennt", releaseId, detail: `nach „${neuerTitel}“` }),
+			this.db.prepare("UPDATE release SET game_id = ? WHERE id = ?").bind(neu.id, releaseId),
+			this.events.statement({ source: "nutzer", kind: "spiel_angelegt", gameId: neu.id, releaseId, detail: "durch Abtrennen" }),
+		]);
 
 		const leer = await this.leeresSpielLoeschen(altesSpiel);
 		return { gameId: neu.id, altesSpielGeloescht: leer };
@@ -364,14 +394,21 @@ aeenliste haengt
 	 * vom 15.09.2026, Abschnitt 5). Gibt zurueck, ob geloescht wurde.
 	 */
 	private async leeresSpielLoeschen(gameId: number): Promise<boolean> {
-		const ergebnis = await this.db
-			.prepare(
-				"DELETE FROM game WHERE id = ? " +
-					"AND NOT EXISTS (SELECT 1 FROM release WHERE game_id = game.id) " +
-					"AND NOT EXISTS (SELECT 1 FROM plan_entry WHERE game_id = game.id)",
-			)
-			.bind(gameId)
-			.run();
+		const [, ergebnis] = await this.db.batch([
+			this.events.insertSelect(
+				"SELECT 'nutzer', g.id, NULL, g.title, 'spiel_geloescht', NULL, NULL, NULL, 'ohne Releases' FROM game g WHERE g.id = ? " +
+					"AND NOT EXISTS (SELECT 1 FROM release WHERE game_id = g.id) " +
+					"AND NOT EXISTS (SELECT 1 FROM plan_entry WHERE game_id = g.id)",
+				gameId,
+			),
+			this.db
+				.prepare(
+					"DELETE FROM game WHERE id = ? " +
+						"AND NOT EXISTS (SELECT 1 FROM release WHERE game_id = game.id) " +
+						"AND NOT EXISTS (SELECT 1 FROM plan_entry WHERE game_id = game.id)",
+				)
+				.bind(gameId),
+		]);
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 
@@ -390,17 +427,21 @@ aeenliste haengt
 	): Promise<{ releaseGeloescht: boolean; spielGeloescht: boolean }> {
 		let releaseGeloescht = false;
 		if (releaseId !== null) {
-			const ergebnis = await this.db
-				.prepare(
-					"DELETE FROM release WHERE id = ? AND physical_release_status = 'unbekannt' " +
-						"AND NOT EXISTS (SELECT 1 FROM trophy_progress WHERE release_id = release.id) " +
-						"AND NOT EXISTS (SELECT 1 FROM physical_copy WHERE release_id = release.id) " +
-						"AND NOT EXISTS (SELECT 1 FROM digital_entitlement WHERE release_id = release.id) " +
-						"AND NOT EXISTS (SELECT 1 FROM play_status WHERE release_id = release.id) " +
-						"AND NOT EXISTS (SELECT 1 FROM plan_entry WHERE release_id = release.id)",
-				)
-				.bind(releaseId)
-				.run();
+			const waise =
+				"physical_release_status = 'unbekannt' " +
+				"AND NOT EXISTS (SELECT 1 FROM trophy_progress WHERE release_id = release.id) " +
+				"AND NOT EXISTS (SELECT 1 FROM physical_copy WHERE release_id = release.id) " +
+				"AND NOT EXISTS (SELECT 1 FROM digital_entitlement WHERE release_id = release.id) " +
+				"AND NOT EXISTS (SELECT 1 FROM play_status WHERE release_id = release.id) " +
+				"AND NOT EXISTS (SELECT 1 FROM plan_entry WHERE release_id = release.id)";
+			const [, ergebnis] = await this.db.batch([
+				this.events.insertSelect(
+					"SELECT 'nutzer', release.game_id, release.id, g.title || ' (' || release.platform || ')', 'release_geloescht', NULL, NULL, NULL, 'Waise' " +
+						`FROM release JOIN game g ON g.id = release.game_id WHERE release.id = ? AND ${waise}`,
+					releaseId,
+				),
+				this.db.prepare(`DELETE FROM release WHERE id = ? AND ${waise}`).bind(releaseId),
+			]);
 			releaseGeloescht = (ergebnis.meta.changes ?? 0) > 0;
 		}
 		const spielGeloescht = gameId !== null && (await this.leeresSpielLoeschen(gameId));
@@ -631,6 +672,7 @@ aeenliste haengt
 			.bind(spiel.id, plattform)
 			.first<{ id: number }>();
 		if (!release) throw new Error("Release konnte nicht angelegt werden.");
+		await this.events.schreiben({ source: "nutzer", kind: "spiel_angelegt", releaseId: release.id, detail: "von Hand" });
 
 		return { gameId: spiel.id, releaseId: release.id };
 	}
@@ -644,12 +686,13 @@ aeenliste haengt
 	 * ein Release), wohl aber im Spieldetail. Die IGDB-Metadaten schreibt der
 	 * Aufrufer ueber IgdbRepository.verknuepfen.
 	 */
-	async spielOhneRelease(titel: string): Promise<number> {
+	async spielOhneRelease(titel: string, quelle: EreignisQuelle = "nutzer"): Promise<number> {
 		const spiel = await this.db
 			.prepare("INSERT INTO game (title, sort_title) VALUES (?, ?) RETURNING id")
 			.bind(titel, titelSchluessel(titel))
 			.first<{ id: number }>();
 		if (!spiel) throw new Error("Spiel konnte nicht angelegt werden.");
+		await this.events.schreiben({ source: quelle, kind: "spiel_angelegt", gameId: spiel.id, detail: "aus IGDB" });
 		return spiel.id;
 	}
 
@@ -676,9 +719,15 @@ aeenliste haengt
 	 * das Datum ohnehin selbst.
 	 */
 	async erschieneneFreigeben(): Promise<number> {
-		const ergebnis = await this.db
-			.prepare("UPDATE game SET release_status = 'erschienen' WHERE release_status = 'angekuendigt' AND release_date <= date('now')")
-			.run();
+		const [, ergebnis] = await this.db.batch([
+			this.events.insertSelect(
+				"SELECT 'igdb', id, NULL, title, 'erschienen', 'release_status', 'angekuendigt', 'erschienen', release_date " +
+					"FROM game WHERE release_status = 'angekuendigt' AND release_date <= date('now')",
+			),
+			this.db.prepare(
+				"UPDATE game SET release_status = 'erschienen' WHERE release_status = 'angekuendigt' AND release_date <= date('now')",
+			),
+		]);
 		return ergebnis.meta.changes ?? 0;
 	}
 
@@ -730,6 +779,7 @@ aeenliste haengt
 			.bind(gameId, plattform)
 			.first<{ id: number }>();
 		if (!r) throw new Error("Release konnte nicht angelegt werden.");
+		await this.events.schreiben({ source: "nutzer", kind: "release_angelegt", releaseId: r.id, neu: plattform });
 		return { releaseId: r.id };
 	}
 
@@ -738,7 +788,7 @@ aeenliste haengt
 	 * mit gewaehlter Plattform haengt an einem Release; fehlt es, entsteht es
 	 * hier, ohne Besitz und ohne Trophaeenliste (siehe NUR_WUNSCH).
 	 */
-	async releaseFuerPlattform(gameId: number, plattform: Plattform): Promise<number> {
+	async releaseFuerPlattform(gameId: number, plattform: Plattform, quelle: EreignisQuelle = "nutzer"): Promise<number> {
 		const vorhanden = await this.db
 			.prepare(
 				"SELECT id FROM release WHERE game_id = ? AND platform = ? " +
@@ -752,6 +802,7 @@ aeenliste haengt
 			.bind(gameId, plattform)
 			.first<{ id: number }>();
 		if (!r) throw new Error("Release konnte nicht angelegt werden.");
+		await this.events.schreiben({ source: quelle, kind: "release_angelegt", releaseId: r.id, neu: plattform, detail: "für einen Listeneintrag" });
 		return r.id;
 	}
 
@@ -768,8 +819,17 @@ aeenliste haengt
 		id: number,
 		felder: { discFassung?: DiscFassung; psnProductId?: string | null },
 	): Promise<{ physical_release_status: DiscFassung; physical_source: string | null; psn_product_id: string | null } | null> {
+		const lesen = () =>
+			this.db
+				.prepare("SELECT physical_release_status, physical_source, psn_product_id FROM release WHERE id = ?")
+				.bind(id)
+				.first<{ physical_release_status: DiscFassung; physical_source: string | null; psn_product_id: string | null }>();
+		const vorher = await lesen();
+		if (!vorher) return null;
+
 		const setzungen: string[] = [];
 		const werte: unknown[] = [];
+		const ereignisse: D1PreparedStatement[] = [];
 		if (felder.discFassung !== undefined) {
 			setzungen.push(
 				"physical_release_status = ?",
@@ -777,21 +837,42 @@ aeenliste haengt
 				"physical_checked_at = datetime('now')",
 			);
 			werte.push(felder.discFassung, felder.discFassung === "unbekannt" ? null : "manuell");
+			if (felder.discFassung !== vorher.physical_release_status) {
+				ereignisse.push(
+					this.events.statement({
+						source: "nutzer",
+						kind: "release_geaendert",
+						releaseId: id,
+						field: "physical_release_status",
+						alt: vorher.physical_release_status,
+						neu: felder.discFassung,
+					}),
+				);
+			}
 		}
 		if (felder.psnProductId !== undefined) {
 			setzungen.push("psn_product_id = ?");
 			werte.push(felder.psnProductId);
+			if ((felder.psnProductId ?? null) !== vorher.psn_product_id) {
+				ereignisse.push(
+					this.events.statement({
+						source: "nutzer",
+						kind: "release_geaendert",
+						releaseId: id,
+						field: "psn_product_id",
+						alt: vorher.psn_product_id,
+						neu: felder.psnProductId,
+					}),
+				);
+			}
 		}
 		if (setzungen.length > 0) {
-			await this.db
-				.prepare(`UPDATE release SET ${setzungen.join(", ")} WHERE id = ?`)
-				.bind(...werte, id)
-				.run();
+			await this.db.batch([
+				...ereignisse,
+				this.db.prepare(`UPDATE release SET ${setzungen.join(", ")} WHERE id = ?`).bind(...werte, id),
+			]);
 		}
-		return this.db
-			.prepare("SELECT physical_release_status, physical_source, psn_product_id FROM release WHERE id = ?")
-			.bind(id)
-			.first<{ physical_release_status: DiscFassung; physical_source: string | null; psn_product_id: string | null }>();
+		return lesen();
 	}
 
 	/**
@@ -812,7 +893,13 @@ aeenliste haengt
 			.first<{ game_id: number }>();
 		if (!release) return null;
 
-		const [freigabe] = await this.db.batch([
+		const [, , freigabe] = await this.db.batch([
+			this.events.insertSelect(
+				"SELECT 'nutzer', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'zuordnung_geloest', NULL, NULL, NULL, t.title_name " +
+					"FROM trophy_progress t JOIN release r ON r.id = t.release_id JOIN game g ON g.id = r.game_id WHERE t.release_id = ?",
+				releaseId,
+			),
+			this.events.statement({ source: "nutzer", kind: "release_geloescht", releaseId }),
 			this.db
 				.prepare(
 					"UPDATE trophy_progress SET release_id = NULL, matched_at = NULL, matched_source = NULL " +
@@ -831,7 +918,13 @@ aeenliste haengt
 		const spiel = await this.db.prepare("SELECT 1 AS x FROM game WHERE id = ?").bind(id).first();
 		if (!spiel) return null;
 
-		const [freigabe] = await this.db.batch([
+		const [, , freigabe] = await this.db.batch([
+			this.events.insertSelect(
+				"SELECT 'nutzer', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'zuordnung_geloest', NULL, NULL, NULL, t.title_name " +
+					"FROM release r JOIN game g ON g.id = r.game_id JOIN trophy_progress t ON t.release_id = r.id WHERE r.game_id = ?",
+				id,
+			),
+			this.events.statement({ source: "nutzer", kind: "spiel_geloescht", gameId: id }),
 			this.db
 				.prepare(
 					"UPDATE trophy_progress SET release_id = NULL, matched_at = NULL, matched_source = NULL " +

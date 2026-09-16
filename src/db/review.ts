@@ -1,5 +1,6 @@
 import { wirkung, type ReviewAktion, type ReviewGrund } from "../domain/review";
 import type { PlayStatus } from "../domain/play-status";
+import type { EventRepository } from "./events";
 import type { Kopplung } from "./kopplung";
 import type { PlayStatusRepository } from "./play-status";
 
@@ -63,6 +64,7 @@ export class ReviewRepository {
 		private readonly db: D1Database,
 		private readonly playStatus: PlayStatusRepository,
 		private readonly kopplung: Kopplung,
+		private readonly events: EventRepository,
 	) {}
 
 	/**
@@ -96,7 +98,26 @@ export class ReviewRepository {
 	 */
 	async einreihen(): Promise<Einreihung> {
 		const vorher = await this.zaehlungNachGrund();
-		const [gestempelt] = await this.db.batch([
+		const [, gestempelt] = await this.db.batch([
+			// Protokoll (8.5) zuerst, mit der Bedingung von Schritt 3 und nur
+			// fuer Listen, die noch nicht in der Warteschlange stehen: Ein
+			// offener Eintrag, dessen Detail aktualisiert wird, ist kein neues
+			// Ereignis - sonst stuende er nach jedem Sync noch einmal da.
+			this.events.insertSelect(
+				"SELECT 'sync', r.game_id, t.release_id, g.title || ' (' || r.platform || ')', 'pruefliste_eingereiht', " +
+					`CASE WHEN ${DEFINED} > t.reviewed_defined_total THEN 'dlc_erweitert' ELSE 'neue_trophaeen' END, ` +
+					"NULL, NULL, " +
+					`CASE WHEN ${DEFINED} > t.reviewed_defined_total THEN ` +
+					`printf('%d %% → %d %%, Liste um %d Trophäen gewachsen', t.reviewed_progress_pct, t.progress_pct, ${DEFINED} - t.reviewed_defined_total) ` +
+					`|| CASE WHEN ${EARNED} > t.reviewed_earned_total THEN printf(', %d davon erspielt', ${EARNED} - t.reviewed_earned_total) ELSE '' END ` +
+					`ELSE printf('%d %% → %d %%, %d neue Trophäen erspielt', t.reviewed_progress_pct, t.progress_pct, ${EARNED} - t.reviewed_earned_total) END ` +
+					"FROM trophy_progress t JOIN play_status ps ON ps.release_id = t.release_id " +
+					"JOIN release r ON r.id = t.release_id JOIN game g ON g.id = r.game_id " +
+					"WHERE t.release_id IS NOT NULL AND t.reviewed_at IS NOT NULL " +
+					`AND (${DEFINED} > t.reviewed_defined_total ` +
+					`OR (${EARNED} > t.reviewed_earned_total AND ps.status <> 'am_spielen')) ` +
+					"AND NOT EXISTS (SELECT 1 FROM review_queue q WHERE q.release_id = t.release_id)",
+			),
 			this.db.prepare(
 				"UPDATE trophy_progress SET " +
 					"reviewed_earned_total = earned_bronze + earned_silver + earned_gold + earned_platinum, " +
@@ -199,8 +220,10 @@ export class ReviewRepository {
 		const aktuell = (await this.playStatus.fuerRelease(releaseId))?.status ?? null;
 		const status = w.plan === "backlog" && (aktuell === null || aktuell === "nicht_gespielt") ? null : w.status;
 
-		const statements: D1PreparedStatement[] = [];
-		if (status) statements.push(this.playStatus.statusStatement(releaseId, status));
+		const statements: D1PreparedStatement[] = [
+			this.events.statement({ source: "nutzer", kind: "pruefliste_entschieden", releaseId, field: aktion }),
+		];
+		if (status) statements.push(...this.playStatus.statusStatements(releaseId, aktuell, status, "aus der Prüfliste"));
 		statements.push(...this.playStatus.stempelStatements(releaseId));
 		await this.db.batch(statements);
 

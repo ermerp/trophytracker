@@ -1,5 +1,6 @@
 import { listeFuerStatus, statusFuerListe, type Listenart } from "../domain/kopplung";
 import type { PlayStatus } from "../domain/play-status";
+import type { EventRepository } from "./events";
 import { POSITION_ANS_ENDE, type PlanHerkunft, type PlanRepository } from "./plan";
 import type { PlayStatusRepository } from "./play-status";
 
@@ -15,6 +16,7 @@ export class Kopplung {
 		private readonly db: D1Database,
 		private readonly plan: PlanRepository,
 		private readonly playStatus: PlayStatusRepository,
+		private readonly events: EventRepository,
 	) {}
 
 	/**
@@ -57,28 +59,38 @@ export class Kopplung {
 			.bind(releaseId)
 			.first<{ id: number; kind: Listenart }>();
 		if (offen) {
-			if (offen.kind !== kind) await this.plan.aendern(offen.id, { kind });
+			if (offen.kind !== kind) await this.plan.aendern(offen.id, { kind }, "kopplung");
 			return false;
 		}
-		await this.db
-			.prepare(
-				"INSERT INTO plan_entry (kind, release_id, origin, position) " +
-					`VALUES (?, ?, ?, CASE WHEN ? = 'todo' THEN ${POSITION_ANS_ENDE} END)`,
-			)
-			.bind(kind, releaseId, origin, kind)
-			.run();
+		await this.db.batch([
+			this.events.statement({ source: "nutzer", kind: "liste_eintrag_angelegt", releaseId, field: kind, neu: "offen", detail: "kopplung" }),
+			this.db
+				.prepare(
+					"INSERT INTO plan_entry (kind, release_id, origin, position) " +
+						`VALUES (?, ?, ?, CASE WHEN ? = 'todo' THEN ${POSITION_ANS_ENDE} END)`,
+				)
+				.bind(kind, releaseId, origin, kind),
+		]);
 		return true;
 	}
 
 	/** Offene To-Do- und Backlog-Eintraege eines Releases als erledigt schliessen. */
 	async eintraegeSchliessen(releaseId: number): Promise<number> {
-		const r = await this.db
-			.prepare(
-				"UPDATE plan_entry SET status = 'erledigt', resolved_at = datetime('now') " +
-					"WHERE release_id = ? AND kind IN ('todo','backlog') AND status = 'offen'",
-			)
-			.bind(releaseId)
-			.run();
+		const [, r] = await this.db.batch([
+			// Protokoll (8.5) vor dem UPDATE, dieselbe Bedingung; idx_plan_release.
+			this.events.insertSelect(
+				"SELECT 'nutzer', r.game_id, pe.release_id, g.title || ' (' || r.platform || ')', 'liste_eintrag_erledigt', pe.kind, NULL, NULL, 'kopplung' " +
+					"FROM plan_entry pe JOIN release r ON r.id = pe.release_id JOIN game g ON g.id = r.game_id " +
+					"WHERE pe.release_id = ? AND pe.kind IN ('todo','backlog') AND pe.status = 'offen'",
+				releaseId,
+			),
+			this.db
+				.prepare(
+					"UPDATE plan_entry SET status = 'erledigt', resolved_at = datetime('now') " +
+						"WHERE release_id = ? AND kind IN ('todo','backlog') AND status = 'offen'",
+				)
+				.bind(releaseId),
+		]);
 		return r.meta.changes ?? 0;
 	}
 }

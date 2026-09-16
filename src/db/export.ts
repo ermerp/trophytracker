@@ -44,6 +44,7 @@ export const EXPORT_TABELLEN = [
 	"price_snapshot",
 	"app_setting",
 	"psn_sync_run",
+	"game_event",
 ] as const;
 
 /** Tabellen, die es gibt und die absichtlich nicht exportiert werden. */

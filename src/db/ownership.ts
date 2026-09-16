@@ -1,3 +1,5 @@
+import type { EventRepository } from "./events";
+
 export const ZUSTAENDE = ["neu", "sehr gut", "gut", "akzeptabel"] as const;
 export type Zustand = (typeof ZUSTAENDE)[number];
 
@@ -54,7 +56,10 @@ function wert(feld: keyof PhysicalCopyFelder, felder: PhysicalCopyFelder): unkno
  * Nichts hier liest oder schreibt trophy_progress oder play_status.
  */
 export class OwnershipRepository {
-	constructor(private readonly db: D1Database) {}
+	constructor(
+		private readonly db: D1Database,
+		private readonly events: EventRepository,
+	) {}
 
 	async releaseExistiert(releaseId: number): Promise<boolean> {
 		const r = await this.db
@@ -105,8 +110,19 @@ export class OwnershipRepository {
 	async addPhysicalCopy(
 		releaseId: number,
 		felder: PhysicalCopyFelder = {},
+		/** Fuer das Protokoll (8.5): 'scan' ab Stufe 17, sonst von Hand. */
+		anlass: string | null = null,
 	): Promise<{ id: number; physischStatusGesetzt: boolean }> {
-		const [eingefuegt, status] = await this.db.batch([
+		const [, , eingefuegt, status] = await this.db.batch([
+			this.events.statement({ source: "nutzer", kind: "exemplar_angelegt", releaseId, neu: felder.condition ?? null, detail: anlass }),
+			// Die Disc-Fassung geht mit auf 'ja' - als eigenes Ereignis, damit
+			// die Aenderung am Release im Verlauf steht (dieselbe Bedingung wie das UPDATE).
+			this.events.insertSelect(
+				"SELECT 'nutzer', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'release_geaendert', " +
+					"'physical_release_status', r.physical_release_status, 'ja', 'durch Erfassen' " +
+					"FROM release r JOIN game g ON g.id = r.game_id WHERE r.id = ? AND r.physical_release_status = 'unbekannt'",
+				releaseId,
+			),
 			this.db
 				.prepare(
 					"INSERT INTO physical_copy (release_id, ean, condition, has_manual, " +
@@ -141,19 +157,40 @@ export class OwnershipRepository {
 		const keys = (Object.keys(felder) as Array<keyof PhysicalCopyFelder>).filter(
 			(k) => felder[k] !== undefined,
 		);
-		if (keys.length === 0) return this.physicalCopyExistiert(id);
+		const vorher = await this.physicalCopy(id);
+		if (!vorher) return false;
+		if (keys.length === 0) return true;
 
+		// Protokoll (8.5): je geaendertem Feld ein Ereignis.
+		const ereignisse = keys
+			.map((k) => ({ field: SPALTEN[k], alt: vorher[SPALTEN[k] as keyof PhysicalCopyZeile], neu: wert(k, felder) as string | number | null }))
+			.filter(({ alt, neu }) => String(alt ?? "") !== String(neu ?? ""))
+			.map(({ field, alt, neu }) =>
+				this.events.statement({
+					source: "nutzer",
+					kind: "exemplar_geaendert",
+					releaseId: vorher.release_id,
+					field,
+					alt: field === "has_manual" ? alt === 1 : alt,
+					neu: field === "has_manual" ? neu === 1 : neu,
+				}),
+			);
 		const setzungen = keys.map((k) => `${SPALTEN[k]} = ?`).join(", ");
-		const ergebnis = await this.db
-			.prepare(`UPDATE physical_copy SET ${setzungen} WHERE id = ?`)
-			.bind(...keys.map((k) => wert(k, felder)), id)
-			.run();
-		return (ergebnis.meta.changes ?? 0) > 0;
+		const ergebnisse = await this.db.batch([
+			...ereignisse,
+			this.db.prepare(`UPDATE physical_copy SET ${setzungen} WHERE id = ?`).bind(...keys.map((k) => wert(k, felder)), id),
+		]);
+		return (ergebnisse[ergebnisse.length - 1].meta.changes ?? 0) > 0;
 	}
 
-	private async physicalCopyExistiert(id: number): Promise<boolean> {
-		const r = await this.db.prepare("SELECT 1 AS x FROM physical_copy WHERE id = ?").bind(id).first();
-		return r !== null;
+	private async physicalCopy(id: number): Promise<PhysicalCopyZeile | null> {
+		return this.db
+			.prepare(
+				"SELECT id, release_id, ean, condition, has_manual, purchase_date, purchase_price_cents, notes, created_at " +
+					"FROM physical_copy WHERE id = ?",
+			)
+			.bind(id)
+			.first<PhysicalCopyZeile>();
 	}
 
 	/**
@@ -161,7 +198,12 @@ export class OwnershipRepository {
 	 * ein Exemplar weg ist, sagt nichts darueber, ob es die Disc gibt.
 	 */
 	async deletePhysicalCopy(id: number): Promise<boolean> {
-		const ergebnis = await this.db.prepare("DELETE FROM physical_copy WHERE id = ?").bind(id).run();
+		const vorher = await this.physicalCopy(id);
+		if (!vorher) return false;
+		const [, ergebnis] = await this.db.batch([
+			this.events.statement({ source: "nutzer", kind: "exemplar_geloescht", releaseId: vorher.release_id, alt: vorher.condition }),
+			this.db.prepare("DELETE FROM physical_copy WHERE id = ?").bind(id),
+		]);
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 
@@ -191,21 +233,38 @@ export class OwnershipRepository {
 		source: DigitaleQuelle,
 		acquiredAt: string | null = null,
 	): Promise<{ id: number } | null> {
-		const r = await this.db
-			.prepare(
-				"INSERT OR IGNORE INTO digital_entitlement (release_id, source, acquired_at) " +
-					"VALUES (?, ?, ?) RETURNING id",
-			)
-			.bind(releaseId, source, acquiredAt)
-			.first<{ id: number }>();
+		const [, eingefuegt] = await this.db.batch([
+			// Protokoll (8.5) nur, wenn die Zeile auch entsteht - dieselbe
+			// Bedingung wie das OR IGNORE (UNIQUE release_id, source).
+			this.events.insertSelect(
+				"SELECT 'nutzer', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'berechtigung_angelegt', 'source', NULL, ?, NULL " +
+					"FROM release r JOIN game g ON g.id = r.game_id WHERE r.id = ? " +
+					"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = ?)",
+				source,
+				releaseId,
+				source,
+			),
+			this.db
+				.prepare(
+					"INSERT OR IGNORE INTO digital_entitlement (release_id, source, acquired_at) " +
+						"VALUES (?, ?, ?) RETURNING id",
+				)
+				.bind(releaseId, source, acquiredAt),
+		]);
+		const r = eingefuegt.results[0] as { id: number } | undefined;
 		return r ?? null;
 	}
 
 	async deleteDigitalEntitlement(id: number): Promise<boolean> {
-		const ergebnis = await this.db
-			.prepare("DELETE FROM digital_entitlement WHERE id = ?")
+		const vorher = await this.db
+			.prepare("SELECT release_id, source FROM digital_entitlement WHERE id = ?")
 			.bind(id)
-			.run();
+			.first<{ release_id: number; source: string }>();
+		if (!vorher) return false;
+		const [, ergebnis] = await this.db.batch([
+			this.events.statement({ source: "nutzer", kind: "berechtigung_geloescht", releaseId: vorher.release_id, field: "source", alt: vorher.source }),
+			this.db.prepare("DELETE FROM digital_entitlement WHERE id = ?").bind(id),
+		]);
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 }
