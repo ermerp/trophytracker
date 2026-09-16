@@ -47,6 +47,8 @@ Dasselbe gilt für Zuordnungen: Ein einmal gesetztes `trophy_progress.release_id
 
 **To-Do und Backlog sind mit `play_status` gekoppelt** (Abschnitt 5.5, Entscheidung des Nutzers vom 16.09.2026): To-Do heißt `am_spielen`, Backlog `pausiert` (nie gestartete bleiben `nicht_gespielt`); eine Bewertung legt den Eintrag an, hängt ihn um oder erledigt ihn. Das ist kein dritter automatischer Pfad, sondern dieselbe Nutzerentscheidung in zwei Darstellungen – jeder Schreibpfad läuft über `src/db/kopplung.ts`, der Sync nie. Wer einen neuen Weg auf eine der beiden Listen oder einen neuen Weg zum Status baut, koppelt dort mit.
 
+**Besitz erfassen erledigt Kauf und Wunsch** (Abschnitt 5, Entscheidung des Nutzers vom 16.09.2026): Wer eine Disc oder eine digitale Berechtigung anlegt, hat gekauft – offene `kauf`- und `wunsch`-Einträge am Release und am Spiel werden ohne Rückfrage `erledigt`, die Antwort nennt sie (`absichtenErledigen`, `src/api/ownership.ts`). Jeder neue Weg, `physical_copy` oder `digital_entitlement` anzulegen – der Barcode-Scan in Stufe 17 zuerst –, läuft dort durch. Umgekehrt ist ein Wunsch auf der Kaufliste eine **Kopie** (`origin='wunsch'`, der Wunsch bleibt offen), keine Umhängung – die eine Stelle, an der ein Übergang kein Feld-Update ist.
+
 ### Nur PS3, PS4, PS5 und PS Vita
 
 Spiele anderer Plattformen dürfen nirgends auftauchen – nicht in Suche, Kandidaten, Listen oder Zuordnung. Ein IGDB-Eintrag ist nur ein Treffer, wenn er eine der vier Plattformen **nennt**; fehlende Angabe ist kein „vielleicht" (7.6 – die frühere Ausnahme ließ einen PC-Eintrag als PS4-Wunsch durch, vom Nutzer am 16.09.2026 zweimal angemahnt). Jede neue Datenquelle (Feed, Store, Barcode) bekommt dieselbe Prüfung und wird gegen die echten Verknüpfungen gemessen, bevor sie live geht.
@@ -96,6 +98,7 @@ D1 zählt **gelesene Zeilen** (Scans, nicht Ergebniszeilen), und der Free Tier e
 
 - **Jeder Fremdschlüssel hat einen Index** (Migration 0008). Wer eine Tabelle mit `REFERENCES` anlegt, legt den Index in derselben Migration an
 - **Korrelierte Unterabfragen nur über indizierte Spalten.** Ein Unterselect je Ergebniszeile ist in Ordnung, wenn er ein Index-Lookup ist; als Tabellenscan multipliziert er sich mit der Zeilenzahl
+- **Kein `OR` über zwei Spalten in einer Unterabfrage**, auch wenn beide indiziert sind: SQLite weicht dann auf `idx_plan_offen` aus und liest alle Einträge der Art je Zeile (gemessen in Stufe 15: 12 000 statt 3 200 Zeilen). Stattdessen zwei Unterabfragen (`NOT EXISTS … AND NOT EXISTS …`, `COALESCE((…), (…))`) oder eine `UNION` zweier Index-Lookups mit den Filtern **innerhalb** der Teilabfragen (`PlanRepository.offeneAmZiel`)
 - `test/lesekosten.spec.ts` misst die heißen Abfragen gegen einen Bestand in Produktionsgröße über `meta.rows_read` der lokalen D1. Neue Listenabfragen kommen dort dazu, bevor sie deployt werden
 - `npx wrangler d1 info trophytracker` zeigt `rows_read_24h`; bei mehr als einer Million ohne Import stimmt etwas nicht
 
