@@ -46,8 +46,10 @@ Stufe 14 bringt die Lücken (Use Case 3): Die Disc-Fassung je Release kommt aus
 IGDBs Händlereinträgen (199 von 481 Releases, Rest `unbekannt`), von Hand nur
 ein `nein` oder eine Korrektur; die Ansicht `/luecken` zeigt, was digital
 gespielt ist, als Disc existiert und nicht im Regal steht, und lässt eine Lücke
-als „physisch nicht gewünscht" verwerfen (Migration 0017). **Deployt am
-16.09.2026**, Abnahme steht aus.
+als „physisch nicht gewünscht" verwerfen (Migration 0017). **Abgenommen am
+16.09.2026**: 197 Releases aus IGDB belegt, 165 Lücken; die 249 mit
+unbekannter Disc-Fassung bleiben offen, bis der Händlerfeed (Stufe 18)
+nachfüllt – IGDB kennt Discs nur positiv (Amazon-Einträge).
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die

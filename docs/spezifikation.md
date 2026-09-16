@@ -1511,7 +1511,7 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 11 | Wunschlisten-Import mit Suche, Ansicht "Ohne Zuordnung" | **Use Cases 9 und 12** |
 | 12 | To-Do und Backlog mit Sortierung und Kandidatenvorschlägen; Kopplung an die Bewertung (5.5) | **Use Cases 5a und 5b** – abgenommen 16.09.2026 |
 | 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` (Migration 0016) | **Use Case 8** vollständig – abgenommen 16.09.2026; der erste echte Eintrag in der Produktion steht noch aus (am Abnahmetag 0 Änderungen) |
-| 14 | `physical_release_status` aus IGDB (7.6) und von Hand, Lückenansicht mit „Disc-Fassung unbekannt", Lücken verwerfen (5.3), Migration 0017 | **Use Case 3** – deployt 16.09.2026, Abnahme steht aus |
+| 14 | `physical_release_status` aus IGDB (7.6) und von Hand, Lückenansicht mit „Disc-Fassung unbekannt", Lücken verwerfen (5.3), Migration 0017 | **Use Case 3** – abgenommen 16.09.2026; die 249 Releases mit unbekannter Disc-Fassung bleiben bewusst offen, bis der Händlerfeed (Stufe 18) nachfüllt |
 | 15 | Kaufliste mit Kandidaten und Sortierung (5.2), "Erscheint bald" | **Use Cases 6, 10, 11** |
 | 16 | Barcode-Scan mit Auflösungskette (ohne Feed) | Komfort bei Erfassung |
 | 17 | Cron Trigger, PWA | Automatik und Komfort |
@@ -1519,6 +1519,8 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 19 | PSN Store-Preise | **Use Case 7**, Teil 2 |
 
 **Offen: eine Stufe „Oberfläche" nach Stufe 15** (Frage des Nutzers vom 15.09.2026). Bis dahin zählt Funktion vor Form; danach steht ein Durchgang an, der die gewachsenen Ansichten vereinheitlicht – Kacheln und Listen, Handy-Layout, das Dashboard anstelle des Hinweisblocks. Umfang und Platz in der Reihenfolge werden nach Stufe 15 entschieden.
+
+**Offen aus Stufe 14 (Entscheidung des Nutzers vom 16.09.2026):** IGDB belegt Disc-Fassungen nur positiv (Amazon-Artikelnummern); 249 Releases blieben `unbekannt` (208 mit Händlereinträgen ohne Medium, 13 mit Disc auf einer anderen PS-Plattform, 13 nur auf fremden Plattformen, 11 nur digital, 3 ohne Eintrag). Keine Handrecherche und keine dritte Quelle jetzt – Stufe 18 (AWIN) füllt nach; MobyGames (einzige bekannte Quelle, die auch „nur Download" sagt) bleibt als Option „14b" vermerkt, erst gegen die Restmenge zu messen.
 
 Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 17 hängen an externen Freigaben beziehungsweise inoffiziellen Schnittstellen und stehen deshalb am Ende – die Tabellen dafür existieren aber ab Stufe 1.
 
