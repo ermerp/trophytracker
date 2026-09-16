@@ -5,8 +5,7 @@ describe("wirkung (Abschnitt 8.1)", () => {
 	it.each([
 		["durchgespielt", "durchgespielt", null],
 		["abgebrochen", "abgebrochen", null],
-		["spiele_gerade", "am_spielen", null],
-		["auf_todo", "pausiert", "todo"],
+		["auf_todo", "am_spielen", "todo"],
 		["ins_backlog", "pausiert", "backlog"],
 		["unveraendert", null, null],
 		["ueberspringen", "unentschieden", null],

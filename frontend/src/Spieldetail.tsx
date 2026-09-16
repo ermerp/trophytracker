@@ -20,7 +20,6 @@ import {
   type Quelle,
   type Zustand,
   KRITIKQUELLE,
-  ERLEDIGT_STATUS,
   PLAN_ARTTEXT,
   RELEASE_STATUS_TEXT,
   type PlanArt,
@@ -442,7 +441,7 @@ export function Spieldetail() {
         </div>
         {spiel.releases.length > 0 && (
           <div className="knopfzeile">
-            {/* To-Do und Backlog haengen am Release (Stufe 12); ein offener Eintrag einer der beiden Listen sperrt beide, wie in der Triage (8.1). */}
+            {/* To-Do und Backlog haengen am Release (Stufe 12) und sind mit der Bewertung gekoppelt (5.5): To-Do heisst am Spielen, Backlog pausiert. Ein offener Eintrag sperrt beide Knoepfe, wie in der Triage (8.1). */}
             {spiel.releases.map((r) => (
               <span key={r.id} className="pille">
                 {r.plattform}
@@ -450,6 +449,7 @@ export function Spieldetail() {
                 <button type="button" disabled={laeuft || aufListe(r.id)} onClick={() => listeAnlegen('backlog', r.id)}>Ins Backlog</button>
               </span>
             ))}
+            <span className="zeile">To-Do heißt „am Spielen", Backlog „pausiert".</span>{' '}
             <Link to="/todo" className="zeile">zu To-Do und Backlog</Link>
           </div>
         )}
@@ -489,20 +489,6 @@ export function Spieldetail() {
             </div>
             <div>
               <h3>Eigene Bewertung</h3>
-              {r.bewertung && ERLEDIGT_STATUS.includes(r.bewertung.status) && listenEintrag(r.id) && (
-                /* Uebergang aus Abschnitt 5: vorgeschlagen, nicht erzwungen. */
-                <p className="hinweis vorschlag">
-                  Steht auf {PLAN_ARTTEXT[listenEintrag(r.id)!.art]}, die Bewertung sagt „{STATUSTEXT[r.bewertung.status]}".{' '}
-                  <button
-                    type="button"
-                    className="klein"
-                    disabled={laeuft}
-                    onClick={() => tue(() => anfrage(`/api/plans/${listenEintrag(r.id)!.id}`, { methode: 'PATCH', koerper: { status: 'erledigt' } }), 'Eintrag erledigt.')}
-                  >
-                    erledigt setzen
-                  </button>
-                </p>
-              )}
               <BewertungForm
                 bewertung={r.bewertung}
                 laeuft={laeuft}

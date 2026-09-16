@@ -6,7 +6,9 @@ import { Filterleiste, Meldungen, PlanKarte, Reiter, usePlanListe } from './Absi
 /**
  * Backlog (Use Case 5b, Stufe 12): der große Haufen, sortiert wie die
  * Wunschliste (5.2). „auf To-Do" zieht einen Eintrag hoch – ans Ende der
- * To-Do-Liste. Darunter die Kandidaten aus v_backlog_kandidaten: im Besitz,
+ * To-Do-Liste, mit Status „am Spielen"; Backlog heißt „pausiert", nur nie
+ * gestartete bleiben „nicht gespielt" (Kopplung, 5.5). Darunter die
+ * Kandidaten aus v_backlog_kandidaten: im Besitz,
  * nie angefasst, auf keiner Liste. „nicht vorgesehen" ist ein verworfener
  * Backlog-Eintrag (Migration 0014) – die Ablehnung bleibt gespeichert, die
  * View blendet den Kandidaten aus; „entfernen" unter „auch erledigte und
@@ -44,7 +46,7 @@ export function Backlog() {
     <>
       <h1>Backlog</h1>
       <Reiter />
-      <p className="zeile">Irgendwann mal. „auf To-Do" zieht einen Eintrag ans Ende der To-Do-Liste.</p>
+      <p className="zeile">Pausiert oder nie gestartet. „auf To-Do" zieht einen Eintrag ans Ende der To-Do-Liste und setzt „am Spielen".</p>
 
       <Filterleiste liste={liste} />
       <Meldungen liste={{ ...liste, rueckgaengig }} />

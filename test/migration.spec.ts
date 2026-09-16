@@ -104,3 +104,53 @@ describe("Migration 0014", () => {
 		await env.DB.batch(["plan_entry", "game"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
 	});
 });
+
+describe("Migration 0015", () => {
+	// Dieselbe Probe wie fuer 0014: die drei Statements aus der Datei gegen
+	// einen Bestand wie den der Produktion vor der Kopplung (5.5).
+	it("gleicht To-Do an am_spielen an und legt Eintraege fuer am_spielen und pausiert nach", async () => {
+		const datei = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0015"));
+		expect(datei).toBeDefined();
+		const statements = datei!.queries.map((q) => q.trim()).filter((q) => /^(UPDATE|INSERT)/.test(q));
+		expect(statements).toHaveLength(4);
+
+		await env.DB.batch(["plan_entry", "play_status", "release", "game"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (1, 'x', 'x')").run();
+		const release = env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (?, 1, 'PS4')");
+		const status = env.DB.prepare("INSERT INTO play_status (release_id, status) VALUES (?, ?)");
+		const eintrag = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin, status, position) VALUES (?, ?, 'triage', ?, ?)");
+		await env.DB.batch([
+			...[1, 2, 3, 4, 5, 6].map((id) => release.bind(id)),
+			status.bind(1, "pausiert"), eintrag.bind("todo", 1, "offen", 1), // To-Do, bisher pausiert → am_spielen
+			status.bind(2, "am_spielen"), // am_spielen ohne Eintrag → To-Do ans Ende
+			status.bind(3, "pausiert"), // pausiert ohne Eintrag → Backlog
+			status.bind(4, "pausiert"), eintrag.bind("backlog", 4, "offen", null), // Backlog, bleibt
+			status.bind(5, "am_spielen"), eintrag.bind("todo", 5, "erledigt", null), // erledigter Eintrag zaehlt nicht → neuer To-Do
+			status.bind(6, "durchgespielt"), eintrag.bind("backlog", 6, "offen", null), // durchgespielt → Eintrag erledigt
+		]);
+
+		for (const sql of statements) await env.DB.prepare(sql).run();
+
+		const { results: stati } = await env.DB.prepare("SELECT release_id, status FROM play_status ORDER BY release_id").all();
+		expect(stati).toEqual([
+			{ release_id: 1, status: "am_spielen" },
+			{ release_id: 2, status: "am_spielen" },
+			{ release_id: 3, status: "pausiert" },
+			{ release_id: 4, status: "pausiert" },
+			{ release_id: 5, status: "am_spielen" },
+			{ release_id: 6, status: "durchgespielt" },
+		]);
+		const { results: offen } = await env.DB
+			.prepare("SELECT release_id, kind, position FROM plan_entry WHERE status = 'offen' ORDER BY release_id")
+			.all();
+		expect(offen).toEqual([
+			{ release_id: 1, kind: "todo", position: 1 },
+			{ release_id: 2, kind: "todo", position: 2 },
+			{ release_id: 3, kind: "backlog", position: null },
+			{ release_id: 4, kind: "backlog", position: null },
+			{ release_id: 5, kind: "todo", position: 3 },
+		]);
+		expect(await env.DB.prepare("SELECT status, resolved_at IS NOT NULL AS r FROM plan_entry WHERE release_id = 6").first()).toEqual({ status: "erledigt", r: 1 });
+		await env.DB.batch(["plan_entry", "play_status", "release", "game"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)));
+	});
+});

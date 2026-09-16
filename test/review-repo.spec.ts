@@ -108,7 +108,6 @@ describe("entscheiden", () => {
 	it.each([
 		["durchgespielt", "durchgespielt"],
 		["abgebrochen", "abgebrochen"],
-		["spiele_gerade", "am_spielen"],
 		["ueberspringen", "unentschieden"],
 	] as const)("%s setzt den Status, stempelt und entfernt den Eintrag", async (aktion, erwartet) => {
 		const r = await offenerFall();
@@ -141,12 +140,14 @@ describe("entscheiden", () => {
 		expect(await repos().review.einreihen()).toMatchObject({ eingereiht: 0 });
 	});
 
-	it.each([["auf_todo", "todo"], ["ins_backlog", "backlog"]] as const)(
-		"%s setzt pausiert und legt genau einen plan_entry an",
-		async (aktion, kind) => {
+	// Kopplung (5.5): To-Do heisst am_spielen, Backlog pausiert.
+	it.each([["auf_todo", "todo", "am_spielen"], ["ins_backlog", "backlog", "pausiert"]] as const)(
+		"%s setzt den Status der Liste und legt genau einen plan_entry an",
+		async (aktion, kind, erwartet) => {
 			const r = await offenerFall();
 			const e = await repos().review.entscheiden(r, aktion);
-			expect(e).toEqual({ status: "pausiert", planAngelegt: true });
+			expect(e).toEqual({ status: erwartet, planAngelegt: true });
+			expect(await status(r)).toBe(erwartet);
 
 			const { results } = await env.DB.prepare("SELECT kind, origin, status, position FROM plan_entry WHERE release_id = ?")
 				.bind(r)
@@ -156,10 +157,38 @@ describe("entscheiden", () => {
 
 			// Zweite Runde (wieder eingereiht) legt keinen zweiten offenen Eintrag an.
 			await env.DB.prepare("INSERT INTO review_queue (release_id, reason) VALUES (?, 'erstimport')").bind(r).run();
-			expect(await repos().review.entscheiden(r, aktion)).toEqual({ status: "pausiert", planAngelegt: false });
+			expect(await repos().review.entscheiden(r, aktion)).toEqual({ status: erwartet, planAngelegt: false });
 			expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM plan_entry").first()).toEqual({ n: 1 });
 		},
 	);
+
+	it("ins_backlog laesst ein nie gestartetes Spiel nicht_gespielt (5.5)", async () => {
+		const r = await offenerFall();
+		await env.DB.prepare("UPDATE play_status SET status = 'nicht_gespielt' WHERE release_id = ?").bind(r).run();
+		expect(await repos().review.entscheiden(r, "ins_backlog")).toEqual({ status: "nicht_gespielt", planAngelegt: true });
+		expect(await status(r)).toBe("nicht_gespielt");
+		expect(await env.DB.prepare("SELECT kind FROM plan_entry WHERE release_id = ?").bind(r).first()).toEqual({ kind: "backlog" });
+	});
+
+	it("auf_todo haengt einen Backlog-Eintrag um, durchgespielt schliesst ihn (5.5)", async () => {
+		const r = await offenerFall();
+		await repos().review.entscheiden(r, "ins_backlog");
+		await env.DB.prepare("INSERT INTO review_queue (release_id, reason) VALUES (?, 'erstimport')").bind(r).run();
+		expect(await repos().review.entscheiden(r, "auf_todo")).toEqual({ status: "am_spielen", planAngelegt: false });
+		expect(await env.DB.prepare("SELECT kind, status, position FROM plan_entry WHERE release_id = ?").bind(r).all()).toMatchObject({
+			results: [{ kind: "todo", status: "offen", position: 1 }],
+		});
+
+		await env.DB.prepare("INSERT INTO review_queue (release_id, reason) VALUES (?, 'erstimport')").bind(r).run();
+		await repos().review.entscheiden(r, "durchgespielt");
+		expect(await env.DB.prepare("SELECT status FROM plan_entry WHERE release_id = ?").bind(r).first()).toEqual({ status: "erledigt" });
+	});
+
+	it("unveraendert lassen bei am_spielen zieht den To-Do-Eintrag nach (5.5)", async () => {
+		const r = await offenerFall();
+		expect(await repos().review.entscheiden(r, "unveraendert")).toEqual({ status: "am_spielen", planAngelegt: true });
+		expect(await env.DB.prepare("SELECT kind FROM plan_entry WHERE release_id = ?").bind(r).first()).toEqual({ kind: "todo" });
+	});
 
 	it("laesst Notiz, Bewertung und Datum stehen", async () => {
 		const r = await offenerFall();

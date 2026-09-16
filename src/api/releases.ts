@@ -19,7 +19,9 @@ export function bewertungAntwort(z: PlayStatusZeile) {
 
 /**
  * Releases von Hand anlegen und loeschen, eigene Bewertung setzen
- * (Abschnitt 12).
+ * (Abschnitt 12). Jede Bewertung zieht seit der Kopplung (5.5) To-Do und
+ * Backlog nach: am_spielen → To-Do, pausiert → Backlog, durchgespielt /
+ * komplettiert / abgebrochen → Eintrag erledigt.
  *
  * PATCH /:id (physical_release_status, psn_product_id) kommt in Stufe 14.
  */
@@ -64,7 +66,27 @@ export const releaseRoutes = new Hono<AppEnv>()
 			notes,
 		});
 		if (!zeile) return c.json({ fehler: "Release nicht gefunden." }, 404);
-		return c.json(bewertungAntwort(zeile));
+		const liste = await c.var.repos.kopplung.listeNachStatus(id, k.status, "manuell");
+		return c.json({ ...bewertungAntwort(zeile), ...liste });
+	})
+
+	/**
+	 * Nur der Status - Datum, Bewertung und Notiz bleiben stehen. Fuer die
+	 * Knoepfe "durchgespielt" / "abgebrochen" auf To-Do und Backlog (5.5);
+	 * gilt wie PUT als Durchsicht und zieht die Liste nach.
+	 */
+	.patch("/:id/play-status", async (c) => {
+		const id = Number(c.req.param("id"));
+		if (!Number.isInteger(id) || id <= 0) return c.json({ fehler: "Ungültige Id." }, 400);
+		const k = await liesJson(c);
+		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
+		if (!istPlayStatus(k.status)) {
+			return c.json({ fehler: `Status muss einer von ${PLAY_STATUS.join(", ")} sein.` }, 400);
+		}
+		const zeile = await c.var.repos.playStatus.statusSetzen(id, k.status);
+		if (!zeile) return c.json({ fehler: "Release nicht gefunden." }, 404);
+		const liste = await c.var.repos.kopplung.listeNachStatus(id, k.status, "manuell");
+		return c.json({ ...bewertungAntwort(zeile), ...liste });
 	})
 
 	.post("/", async (c) => {

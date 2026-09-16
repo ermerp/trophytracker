@@ -10,7 +10,8 @@ import { Filterleiste, Meldungen, PlanKarte, Reiter, usePlanListe, type PlanList
  * mit Maus, Finger oder Tastatur (Griff fokussieren, Leertaste, Pfeile),
  * dazu Pfeilknöpfe als Rückfall. Jede Umsortierung schreibt sofort
  * (PUT /api/plans/reorder); schlägt sie fehl, lädt die Liste den
- * gespeicherten Stand zurück. „ins Backlog" hängt einen Eintrag um.
+ * gespeicherten Stand zurück. „ins Backlog" hängt einen Eintrag um – und
+ * setzt „pausiert", denn To-Do heißt „am Spielen" (Kopplung, 5.5).
  */
 export function Todo() {
   const liste = usePlanListe('todo')
@@ -52,7 +53,7 @@ export function Todo() {
     <>
       <h1>To-Do</h1>
       <Reiter />
-      <p className="zeile">Was du als Nächstes spielst, in deiner Reihenfolge. Ziehen am Griff oder mit den Pfeilen.</p>
+      <p className="zeile">Was du gerade spielst („am Spielen"), in deiner Reihenfolge. Ziehen am Griff oder mit den Pfeilen.</p>
 
       <Filterleiste liste={liste} sortierbar={false} />
       <Meldungen liste={liste} />
