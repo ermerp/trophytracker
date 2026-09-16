@@ -23,7 +23,7 @@ import { IgdbSuche } from './IgdbSuche'
  */
 export function Wunschliste() {
   const liste = usePlanListe('wunsch')
-  const { daten, laeuft, nurFavoriten, plattformen } = liste
+  const { daten, laeuft, nurFavoriten, plattformen, suche } = liste
   const [hinzufuegen, setHinzufuegen] = useState(false)
 
   async function anlegen(koerper: Record<string, unknown>) {
@@ -58,7 +58,7 @@ export function Wunschliste() {
       {!daten ? (
         <p>wird geladen …</p>
       ) : daten.eintraege.length === 0 ? (
-        <p>{nurFavoriten || plattformen.size > 0 ? 'Nichts passt zum Filter.' : 'Die Wunschliste ist leer.'}</p>
+        <p>{nurFavoriten || plattformen.size > 0 || suche ? 'Nichts passt zum Filter.' : 'Die Wunschliste ist leer.'}</p>
       ) : (
         <>
           <p>{daten.eintraege.length} Einträge</p>

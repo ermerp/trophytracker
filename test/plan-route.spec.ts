@@ -559,6 +559,20 @@ describe("To-Do, Backlog und Kandidaten (Stufe 12)", () => {
 	});
 });
 
+describe("GET /api/plans?suche=", () => {
+	it("filtert als Teilstring im Titel, ohne Gross-/Kleinschreibung", async () => {
+		await spiel(1, "Divinity: Original Sin II", []);
+		await spiel(2, "Bloodborne", []);
+		const a = app();
+		await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1 });
+		await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 2 });
+		const d = await hole(a, "/api/plans?kind=wunsch&suche=original%20sin");
+		expect(d.suche).toBe("original sin");
+		expect(d.eintraege.map((e: { titel: string }) => e.titel)).toEqual(["Divinity: Original Sin II"]);
+		expect((await hole(a, "/api/plans?kind=wunsch&suche=")).eintraege).toHaveLength(2);
+	});
+});
+
 describe("Waisen: gepflegter Physisch-Status haelt das Release", () => {
 	it("laesst ein Release mit physical_release_status stehen", async () => {
 		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);

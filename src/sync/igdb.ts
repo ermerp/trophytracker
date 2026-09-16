@@ -81,7 +81,7 @@ export async function kandidatenSuchen(
 
 	const kurz = kurzbegriff(begriff);
 	if (kurz !== "") {
-		kandidaten = normalisiereTrefferliste(await igdb.suche(kurz, { nurPlayStation: false }));
+		kandidaten = normalisiereTrefferliste(await igdb.suche(kurz));
 		if (kandidaten.length > 0) return { kandidaten, begriff, weg: "kurz" };
 
 		kandidaten = normalisiereTrefferliste(await igdb.nameEnthaelt(kurz));

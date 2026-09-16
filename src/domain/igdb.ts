@@ -119,13 +119,13 @@ export function isoDatum(unixSekunden: number): string {
  * Oberflaeche zeigt dann "unbekannt", nie "0".
  *
  * Mods, Forks und Updates fallen heraus: Sie sind nie ein Spiel der
- * Sammlung und wuerden nur die Kandidatenliste verlaengern. Ebenso
- * Eintraege, die ausschliesslich fremde Plattformen nennen: Die Rueckfaelle
- * der Suche laufen ohne Plattformfilter (manche Eintraege nennen gar keine
- * Plattform), und ohne diese Pruefung stuenden Switch- und PC-Spiele in der
- * Wunschlisten-Suche - Rueckmeldung aus der Abnahme von Stufe 10. "Keine
- * Plattform genannt" bleibt dagegen zugelassen: fehlende Daten sind kein
- * Gegenbeweis (7.6).
+ * Sammlung und wuerden nur die Kandidatenliste verlaengern. Ebenso jeder
+ * Eintrag ohne PlayStation-Plattform - fremde Plattformen (Rueckmeldung aus
+ * der Abnahme von Stufe 10) wie auch gar keine Angabe (Entscheidung des
+ * Nutzers vom 16.09.2026: ein PC-Eintrag ohne Plattformdaten war so als
+ * PS4-Wunsch durchgerutscht). Die Anwendung kennt nur PS3, PS4, PS5 und
+ * Vita; was das nicht nachweist, ist kein Treffer (7.6). Die Pruefung
+ * greift auch bei Abrufen nach Id, also beim Verknuepfen und Anlegen.
  */
 export function normalisiereTreffer(roh: IgdbSpielRoh): IgdbKandidat | null {
 	if (!roh.name || !Number.isInteger(roh.id)) return null;
@@ -136,7 +136,7 @@ export function normalisiereTreffer(roh: IgdbSpielRoh): IgdbKandidat | null {
 	const plattformen = [
 		...new Set(genannt.map((p) => IGDB_PLATTFORMEN[p]).filter((p): p is Plattform => p !== undefined)),
 	];
-	if (genannt.length > 0 && plattformen.length === 0) return null;
+	if (plattformen.length === 0) return null;
 
 	return {
 		igdbId: roh.id,

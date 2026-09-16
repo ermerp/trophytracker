@@ -55,25 +55,26 @@ describe("normalisiereTreffer", () => {
 	});
 
 	it("laesst fehlende Werte null - nie 0, nie leer", () => {
-		const k = normalisiereTreffer({ id: 7, name: "Ohne alles" });
+		const k = normalisiereTreffer({ id: 7, name: "Ohne alles", platforms: [48] });
 		expect(k).toMatchObject({
 			coverUrl: null,
 			releaseDate: null,
-			plattformen: [],
+			plattformen: ["PS4"],
 			typ: null,
 			criticScore: null,
 			criticScoreCount: null,
 		});
 	});
 
-	it("laesst Eintraege fallen, die ausschliesslich fremde Plattformen nennen", () => {
+	it("laesst jeden Eintrag ohne PlayStation-Plattform fallen - fremde wie fehlende", () => {
 		// 130 = Switch, 6 = PC: nie ein Spiel der Sammlung.
 		expect(normalisiereTreffer(spielRoh({ platforms: [130, 6] }))).toBeNull();
 		// Fremde neben einer eigenen: bleibt, nur die eigene wird gefuehrt.
 		expect(normalisiereTreffer(spielRoh({ platforms: [130, 48] }))).toMatchObject({ plattformen: ["PS4"] });
-		// Gar keine Angabe: fehlende Daten sind kein Gegenbeweis.
-		expect(normalisiereTreffer(spielRoh({ platforms: undefined }))).toMatchObject({ plattformen: [] });
-		expect(normalisiereTreffer(spielRoh({ platforms: [] }))).toMatchObject({ plattformen: [] });
+		// Gar keine Angabe: seit dem 16.09.2026 kein Treffer - so kam ein
+		// PC-Eintrag (Divinity: Original Sin II - Divine Edition) als PS4-Wunsch durch.
+		expect(normalisiereTreffer(spielRoh({ platforms: undefined }))).toBeNull();
+		expect(normalisiereTreffer(spielRoh({ platforms: [] }))).toBeNull();
 	});
 
 	it("uebersetzt nur die eigenen Plattformen, PSVR und PSVR2 als PS4 und PS5", () => {

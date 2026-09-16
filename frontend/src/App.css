@@ -226,6 +226,12 @@ main {
   font-size: 0.9rem;
 }
 
+.filterleiste input[type='search'] {
+  font: inherit;
+  padding: 0.25rem 0.4rem;
+  min-width: 10rem;
+}
+
 .filterleiste select {
   font: inherit;
 }

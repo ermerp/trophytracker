@@ -16,7 +16,7 @@ import { Filterleiste, Meldungen, PlanKarte, Reiter, usePlanListe } from './Absi
  */
 export function Backlog() {
   const liste = usePlanListe('backlog')
-  const { daten, laeuft, nurFavoriten, plattformen, aendern, alle, setzeParam } = liste
+  const { daten, laeuft, nurFavoriten, plattformen, suche, aendern, alle, setzeParam } = liste
   const [kandidaten, setKandidaten] = useState<{ kandidaten: BacklogKandidat[]; abgelehnt: number } | null>(null)
 
   const kandidatenLaden = useCallback(async () => {
@@ -54,7 +54,7 @@ export function Backlog() {
       {!daten ? (
         <p>wird geladen …</p>
       ) : daten.eintraege.length === 0 ? (
-        <p>{nurFavoriten || plattformen.size > 0 ? 'Nichts passt zum Filter.' : 'Das Backlog ist leer.'}</p>
+        <p>{nurFavoriten || plattformen.size > 0 || suche ? 'Nichts passt zum Filter.' : 'Das Backlog ist leer.'}</p>
       ) : (
         <>
           <p>{daten.eintraege.length} Einträge</p>

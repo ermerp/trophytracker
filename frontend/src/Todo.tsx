@@ -15,7 +15,7 @@ import { Filterleiste, Meldungen, PlanKarte, Reiter, usePlanListe, type PlanList
  */
 export function Todo() {
   const liste = usePlanListe('todo')
-  const { daten, setDaten, setMeldung, laden, nurFavoriten, aendern } = liste
+  const { daten, setDaten, setMeldung, laden, nurFavoriten, suche, aendern } = liste
 
   const sensoren = useSensors(
     // Erst nach ein paar Pixeln greift das Ziehen, sonst wären die Knöpfe der Kachel nicht mehr klickbar.
@@ -62,7 +62,7 @@ export function Todo() {
         <p>wird geladen …</p>
       ) : daten.eintraege.length === 0 ? (
         <p>
-          {nurFavoriten ? 'Nichts passt zum Filter.' : 'Nichts auf To-Do.'}{' '}
+          {nurFavoriten || suche ? 'Nichts passt zum Filter.' : 'Nichts auf To-Do.'}{' '}
           <Link to="/backlog">Backlog und Kandidaten</Link>
         </p>
       ) : (

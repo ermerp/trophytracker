@@ -157,7 +157,8 @@ describe("kandidatenSuchen: Rueckfaelle", () => {
 		const bodies = k.aufrufe.filter((a) => a.url.includes("api.igdb.com")).map((a) => String(a.init?.body));
 		expect(bodies[0]).toContain('search "CastleStorm - Complete Edition"');
 		expect(bodies[1]).toContain('search "CastleStorm"');
-		expect(bodies[1]).not.toContain("where platforms");
+		// Auch der Rueckfall filtert auf PlayStation (16.09.2026).
+		expect(bodies[1]).toContain("where platforms");
 
 		const t = fakeIgdb([leer, leer, [spielRoh({ name: "That's You!" })]]);
 		expect((await kandidatenSuchen(t.client, "That's You!")).weg).toBe("teilstring");

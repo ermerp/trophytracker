@@ -75,6 +75,7 @@ export function usePlanListe(art: PlanArt) {
   const alle = params.get('status') === 'alle'
   const plattformParam = params.get('plattform') ?? ''
   const plattformen = new Set(plattformParam.split(',').filter((p) => (PLATTFORM_FILTER as readonly string[]).includes(p)))
+  const suche = (params.get('suche') ?? '').trim()
 
   const laden = useCallback(async () => {
     try {
@@ -82,11 +83,12 @@ export function usePlanListe(art: PlanArt) {
       if (nurFavoriten) abfrage.set('favorit', '1')
       if (alle) abfrage.set('status', 'alle')
       if (plattformParam) abfrage.set('plattform', plattformParam)
+      if (suche) abfrage.set('suche', suche)
       setDaten(await anfrage<Antwort>(`/api/plans?${abfrage}`))
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Laden fehlgeschlagen.')
     }
-  }, [art, sortierung, nurFavoriten, alle, plattformParam])
+  }, [art, sortierung, nurFavoriten, alle, plattformParam, suche])
 
   useEffect(() => {
     void laden()
@@ -115,7 +117,8 @@ export function usePlanListe(art: PlanArt) {
         e.art === art &&
         (alle || e.status === 'offen') &&
         (!nurFavoriten || e.favorit) &&
-        (plattformen.size === 0 || plattformen.has(e.plattform ?? 'ohne'))
+        (plattformen.size === 0 || plattformen.has(e.plattform ?? 'ohne')) &&
+        (suche === '' || e.titel.toLocaleLowerCase('de').includes(suche.toLocaleLowerCase('de')))
       return { ...d, eintraege: (bleibt ? [...rest, e] : rest).sort(VERGLEICH[sortierung]) }
     })
   }
@@ -191,7 +194,7 @@ export function usePlanListe(art: PlanArt) {
 
   return {
     art, daten, setDaten, meldung, setMeldung, laeuft, setLaeuft, eben, setEben,
-    sortierung, nurFavoriten, alle, plattformen,
+    sortierung, nurFavoriten, alle, plattformen, suche,
     laden, setzeParam, plattformFilterUmschalten, ersetze, aendern, entfernen, anlegen, rueckgaengig, bewerten,
   }
 }
@@ -200,10 +203,17 @@ export type PlanListe = ReturnType<typeof usePlanListe>
 
 /** Sortierung, Favoriten, erledigte, Plattformen. Ohne `sortierbar` fehlt das Sortier-Dropdown (To-Do). */
 export function Filterleiste({ liste, sortierbar = true }: { liste: PlanListe; sortierbar?: boolean }) {
-  const { sortierung, nurFavoriten, alle, plattformen, setzeParam, plattformFilterUmschalten } = liste
+  const { sortierung, nurFavoriten, alle, plattformen, suche, setzeParam, plattformFilterUmschalten } = liste
   const standard = liste.art === 'todo' ? 'position' : 'favorit'
   return (
     <div className="filterleiste">
+      <input
+        type="search"
+        value={suche}
+        placeholder="Titel suchen"
+        aria-label="Titel suchen"
+        onChange={(e) => setzeParam('suche', e.target.value)}
+      />
       {sortierbar && (
         <label>
           Sortierung{' '}
