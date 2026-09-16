@@ -176,7 +176,13 @@ main {
   color: inherit;
   text-decoration: none;
   opacity: 0.7;
-  font-size: 0.9rem;
+  /* Fuenf Eintraege seit Stufe 14: auf dem Handy Symbol ueber Text, sonst
+     bricht "To-Do" um oder die Leiste laeuft ueber. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .nav a.active {
@@ -202,6 +208,12 @@ main {
     padding: 2rem 1rem;
     border-top: none;
     border-right: 1px solid rgba(128, 128, 128, 0.3);
+  }
+
+  .nav a {
+    flex-direction: row;
+    gap: 0.4rem;
+    font-size: 0.9rem;
   }
 
   /* Als Grid-Item wuerde main mit margin:auto auf Inhaltsbreite schrumpfen. */
@@ -349,6 +361,20 @@ button.gefaehrlich {
   font-weight: 600;
   max-width: 100%;
   margin-bottom: 0.2rem;
+}
+
+/* Disc-Fassung und PSN-Produkt-Id je Release (Stufe 14): eine Zeile, kein Blockformular. */
+.disc-zeile label,
+.disc-zeile input,
+.disc-zeile select {
+  display: inline;
+  width: auto;
+  margin: 0;
+  font-size: inherit;
+}
+
+.disc-zeile input {
+  padding: 0.15rem 0.3rem;
 }
 
 .release-block {
@@ -939,6 +965,10 @@ button.griff:active {
   padding: 0;
   display: grid;
   gap: 0.6rem;
+}
+
+.kandidatenliste li.verworfen {
+  opacity: 0.6;
 }
 
 .kandidatenliste li {

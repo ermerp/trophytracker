@@ -63,7 +63,11 @@ export const PLATINTEXT: Record<Platin, string> = {
   nicht_verfuegbar: 'kein Platin vorgesehen',
 }
 
-export type DiscFassung = 'ja' | 'nein' | 'unbekannt'
+export const DISC_FASSUNGEN = ['ja', 'nein', 'unbekannt'] as const
+export type DiscFassung = (typeof DISC_FASSUNGEN)[number]
+
+/** Herkunft der Disc-Fassung (Abschnitt 3): IGDB-Haendlereintrag, von Hand, spaeter Feed. */
+export const DISCQUELLE: Record<string, string> = { igdb: 'aus IGDB', manuell: 'von Hand', feed: 'aus dem Feed' }
 
 // 'unbekannt' bleibt "unbekannt" – nie "–" und nie "nicht verfügbar" (Abschnitt 13).
 export const DISCTEXT: Record<DiscFassung, string> = {
@@ -150,6 +154,9 @@ export type IgdbStatus = {
   ungeprueft: number
   abgelehnt: number
   letzteAktualisierung: string | null
+  /** Disc-Fassung aus IGDB (Stufe 14): belegte Releases und Spiele, die der Schritt noch anfragt. */
+  discBelegt: number
+  discOffen: number
 }
 
 export type ReleaseStatus = 'erschienen' | 'angekuendigt' | 'unbekannt'

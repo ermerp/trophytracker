@@ -162,6 +162,47 @@ export function normalisiereTrefferliste(roh: unknown): IgdbKandidat[] {
 		.filter((k): k is IgdbKandidat => k !== null);
 }
 
+/**
+ * Physische Fassung aus IGDB (7.6, Stufe 14). IGDB fuehrt unter
+ * external_games Haendler- und Store-Eintraege je Spiel mit `media`
+ * (1 = digital, 2 = physisch) und `platform`. Eigene Feldliste, damit die
+ * Suche nicht bei jedem Treffer die Haendlerliste mitschleppt.
+ */
+export const IGDB_FELDER_PHYSISCH = "id,external_games.media,external_games.platform";
+
+export const IGDB_MEDIUM_PHYSISCH = 2;
+
+export type IgdbExternalRoh = { id?: number; media?: number; platform?: number };
+export type IgdbPhysischRoh = { id: number; external_games?: IgdbExternalRoh[] };
+
+/**
+ * Die eigenen Plattformen, fuer die IGDB einen physischen Eintrag nennt.
+ * Nur ein Eintrag mit Medium 2 und einer der vier Plattformen zaehlt;
+ * fehlende Angaben sagen nichts (gemessen am 16.09.2026 gegen 469
+ * verknuepfte Spiele: alle 2.020 physischen Eintraege nennen eine
+ * Plattform, 694 davon eine fremde). Was IGDB nicht kennt, bleibt
+ * `unbekannt` - nie `nein`.
+ */
+export function physischePlattformen(roh: IgdbPhysischRoh): Plattform[] {
+	const gefunden = new Set<Plattform>();
+	for (const e of roh.external_games ?? []) {
+		if (e.media !== IGDB_MEDIUM_PHYSISCH || typeof e.platform !== "number") continue;
+		const p = IGDB_PLATTFORMEN[e.platform];
+		if (p !== undefined) gefunden.add(p);
+	}
+	return [...gefunden];
+}
+
+export function physischePlattformenListe(roh: unknown): Map<number, Plattform[]> {
+	const ergebnis = new Map<number, Plattform[]>();
+	if (!Array.isArray(roh)) return ergebnis;
+	for (const r of roh) {
+		if (typeof r !== "object" || r === null || !Number.isInteger((r as IgdbPhysischRoh).id)) continue;
+		ergebnis.set((r as IgdbPhysischRoh).id, physischePlattformen(r as IgdbPhysischRoh));
+	}
+	return ergebnis;
+}
+
 export type ReleaseStatus = "erschienen" | "angekuendigt" | "unbekannt";
 
 /** Abschnitt 8.4: Datum in der Zukunft heisst angekuendigt. Ohne Datum: unbekannt, nie erschienen. */

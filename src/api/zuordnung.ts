@@ -373,6 +373,7 @@ export const gameRoutes = new Hono<AppEnv>()
 				region: r.region,
 				discFassung: r.physical_release_status,
 				discQuelle: r.physical_source,
+				psnProductId: r.psn_product_id,
 				trophaeen:
 					r.np_communication_id === null
 						? null

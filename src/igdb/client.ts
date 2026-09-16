@@ -1,4 +1,12 @@
-import { IGDB_FELDER, IGDB_PLATTFORM_IDS, NIE_EIN_SPIEL, apicalypseText, type IgdbSpielRoh } from "../domain/igdb";
+import {
+	IGDB_FELDER,
+	IGDB_FELDER_PHYSISCH,
+	IGDB_PLATTFORM_IDS,
+	NIE_EIN_SPIEL,
+	apicalypseText,
+	type IgdbPhysischRoh,
+	type IgdbSpielRoh,
+} from "../domain/igdb";
 import { Geheimnis } from "../domain/secret";
 
 /**
@@ -95,7 +103,7 @@ export function erstelleIgdbClient(
 	 * Eine Apicalypse-Anfrage an /games. Bei 401 wird das Token genau einmal
 	 * erneuert und die Anfrage wiederholt.
 	 */
-	async function abfrage(koerper: string, zweiterVersuch = false): Promise<IgdbSpielRoh[]> {
+	async function abfrage<T = IgdbSpielRoh>(koerper: string, zweiterVersuch = false): Promise<T[]> {
 		const z = zugangOderFehler();
 		const t = await tokenBesorgen(zweiterVersuch);
 		await bremsen();
@@ -110,14 +118,14 @@ export function erstelleIgdbClient(
 			body: koerper,
 		});
 
-		if (antwort.status === 401 && !zweiterVersuch) return abfrage(koerper, true);
+		if (antwort.status === 401 && !zweiterVersuch) return abfrage<T>(koerper, true);
 		if (antwort.status === 401) throw new IgdbAuthError("IGDB hat das Token abgelehnt.");
 		if (antwort.status === 429) throw new IgdbRateError("IGDB-Ratenlimit erreicht.");
 		if (!antwort.ok) throw new IgdbAbrufError(`IGDB antwortete mit ${antwort.status}.`);
 
 		const daten: unknown = await antwort.json();
 		if (!Array.isArray(daten)) throw new IgdbAbrufError("IGDB-Antwort hat eine unerwartete Form.");
-		return daten as IgdbSpielRoh[];
+		return daten as T[];
 	}
 
 	const filter = `platforms = (${IGDB_PLATTFORM_IDS.join(",")}) & game_type != (${NIE_EIN_SPIEL.join(",")})`;
@@ -172,6 +180,19 @@ export function erstelleIgdbClient(
 			const sauber = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 50);
 			if (sauber.length === 0) return [];
 			return abfrage(`fields ${IGDB_FELDER}; where id = (${sauber.join(",")}); limit ${sauber.length};`);
+		},
+
+		/**
+		 * Haendlereintraege (external_games) fuer bis zu 50 Spiele nach ID -
+		 * eine Anfrage fuer die Disc-Fassung (7.6, Stufe 14). Ohne
+		 * Plattformfilter: Die Spiele sind bereits verknuepft und geprueft.
+		 */
+		async physischNachIds(ids: readonly number[]): Promise<IgdbPhysischRoh[]> {
+			const sauber = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 50);
+			if (sauber.length === 0) return [];
+			return abfrage<IgdbPhysischRoh>(
+				`fields ${IGDB_FELDER_PHYSISCH}; where id = (${sauber.join(",")}); limit ${sauber.length};`,
+			);
 		},
 	};
 }

@@ -369,6 +369,54 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		await env.DB.prepare("DELETE FROM release WHERE id > ?").bind(ANZAHL).run();
 	});
 
+	it("misst die Lueckenliste und die Auswahl des Disc-Schritts (Stufe 14)", async () => {
+		// Nach dem IGDB-Lauf: 200 Releases mit 'ja', der Rest 'unbekannt', 30
+		// verworfene Kaufeintraege, alle Spiele verknuepft. Die View laeuft
+		// einmal ueber trophy_progress; je Zeile drei Index-Lookups
+		// (physical_copy, plan_entry zweimal, market_offer).
+		await env.DB.prepare("DELETE FROM plan_entry").run();
+		await env.DB.batch([
+			env.DB.prepare("UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb' WHERE id % 2 = 0"),
+			env.DB.prepare("UPDATE game SET igdb_id = id + 1000"),
+		]);
+		const verworfen = env.DB.prepare(
+			"INSERT INTO plan_entry (kind, release_id, origin, status, resolved_at) VALUES ('kauf', ?, 'luecke', 'verworfen', '2026-09-16')",
+		);
+		await env.DB.batch(Array.from({ length: 30 }, (_, i) => verworfen.bind((i + 1) * 2)));
+
+		const luecken = await zeilenGelesen(
+			`SELECT l.game_id, l.title, l.cover_url, l.release_id, l.platform, l.disc_fassung, l.disc_quelle,
+			        l.progress_pct, l.hat_platin, l.eigener_status, l.verworfen, l.bester_gebrauchtpreis_cents,
+			        (SELECT pe.id FROM plan_entry pe WHERE pe.release_id = l.release_id
+			           AND pe.kind = 'kauf' AND pe.status = 'verworfen' ORDER BY pe.id LIMIT 1) AS plan_id
+			 FROM v_luecken l ORDER BY l.title, l.platform`,
+		);
+		const auswahl = await zeilenGelesen(
+			`SELECT g.id, g.igdb_id FROM game g WHERE g.igdb_id IS NOT NULL AND EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id
+			 AND r.physical_release_status = 'unbekannt'
+			 AND (r.physical_checked_at IS NULL OR r.physical_checked_at < datetime('now', '-30 days'))) ORDER BY g.id LIMIT 50`,
+		);
+		const kaufkandidaten = await zeilenGelesen("SELECT quelle, release_id, title FROM v_kaufkandidaten");
+		console.info({ luecken, auswahl, kaufkandidaten });
+
+		expect(luecken).toBeLessThan(4_000);
+		expect(auswahl).toBeLessThan(1_000);
+		expect(kaufkandidaten).toBeLessThan(4_000);
+
+		const antwort = await SELF.fetch(`${B}/api/gaps?verworfene=1&unbekannte=1`);
+		expect(antwort.status).toBe(200);
+		const daten = (await antwort.json()) as { anzahl: number; verworfen: number; unbekannt: number };
+		// 215 gerade Ids mit 'ja', zwei davon (202, 404) ohne Fortschritt, 30 verworfen
+		expect(daten).toMatchObject({ anzahl: 183, verworfen: 30 });
+		expect(daten.unbekannt).toBeGreaterThan(200);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL"),
+			env.DB.prepare("UPDATE game SET igdb_id = NULL"),
+		]);
+	});
+
 	it("beantwortet die Exportrouten bei 430 Listen", async () => {
 		for (const pfad of ["/api/export/backup.json", "/api/export/sammlung.csv", "/api/export/trophaeen.csv"]) {
 			const antwort = await SELF.fetch(`${B}${pfad}`);

@@ -6,6 +6,7 @@ import {
 	metadatenAus,
 	normalisiereTrefferliste,
 	ordneKandidaten,
+	physischePlattformenListe,
 	suchbegriff,
 	type IgdbKandidat,
 } from "../domain/igdb";
@@ -208,6 +209,53 @@ export async function igdbAuffrischSchritt(
 		return { status: "erfolg", angefragt: spiele.length, aktualisiert };
 	} catch (fehler) {
 		return { status: "fehler", angefragt: spiele.length, aktualisiert: 0, meldung: meldungFuer(fehler) };
+	}
+}
+
+export type PhysischErgebnis = {
+	status: "erfolg" | "fehler";
+	angefragt: number;
+	gesetzt: number;
+	nochOffen: number;
+	weiter: boolean;
+	meldung?: string;
+};
+
+/**
+ * Disc-Fassung aus IGDB (7.6, Stufe 14): eine Anfrage fuer bis zu 50
+ * verknuepfte Spiele mit ungeprueften `unbekannt`-Releases. Ein physischer
+ * Haendlereintrag zu einer Plattform des Releases setzt `ja` mit Quelle
+ * 'igdb' - und nur `ja`: Fehlen sagt nichts, `nein` bleibt Handarbeit.
+ * Der Fortschritt steht in release.physical_checked_at, die Oberflaeche
+ * ruft, solange `weiter` zurueckkommt.
+ */
+export async function igdbPhysischSchritt(
+	repos: Repositories,
+	igdb: IgdbClient,
+	n = AUFFRISCHEN_JE_AUFRUF,
+): Promise<PhysischErgebnis> {
+	const spiele = await repos.igdb.zurDiscPruefung(n);
+	if (spiele.length === 0) return { status: "erfolg", angefragt: 0, gesetzt: 0, nochOffen: 0, weiter: false };
+
+	try {
+		const nachId = physischePlattformenListe(await igdb.physischNachIds(spiele.map((s) => s.igdb_id)));
+		let gesetzt = 0;
+		for (const spiel of spiele) {
+			// Ein Spiel, das IGDB nicht zurueckgibt, wird trotzdem gestempelt:
+			// leere Antwort ist ein Ergebnis, kein Grund fuer eine Endlosschleife.
+			gesetzt += await repos.igdb.discFassungAusIgdb(spiel.id, nachId.get(spiel.igdb_id) ?? []);
+		}
+		const { discOffen } = await repos.igdb.discZaehlung();
+		return { status: "erfolg", angefragt: spiele.length, gesetzt, nochOffen: discOffen, weiter: discOffen > 0 };
+	} catch (fehler) {
+		return {
+			status: "fehler",
+			angefragt: spiele.length,
+			gesetzt: 0,
+			nochOffen: spiele.length,
+			weiter: false,
+			meldung: meldungFuer(fehler),
+		};
 	}
 }
 

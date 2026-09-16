@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { DISC_FILTER, type DiscFassung } from "../db/games";
 import type { PlayStatusZeile } from "../db/play-status";
 import { PLAY_STATUS, istPlayStatus } from "../domain/play-status";
 import { istErlaubtePlattform } from "../domain/titel";
@@ -22,10 +23,40 @@ export function bewertungAntwort(z: PlayStatusZeile) {
  * (Abschnitt 12). Jede Bewertung zieht seit der Kopplung (5.5) To-Do und
  * Backlog nach: am_spielen → To-Do, pausiert → Backlog, durchgespielt /
  * komplettiert / abgebrochen → Eintrag erledigt.
- *
- * PATCH /:id (physical_release_status, psn_product_id) kommt in Stufe 14.
  */
 export const releaseRoutes = new Hono<AppEnv>()
+	/**
+	 * Stufe 14: Disc-Fassung von Hand (ja / nein / unbekannt, Quelle
+	 * 'manuell') und PSN-Produkt-Id. Nur die genannten Felder aendern sich.
+	 */
+	.patch("/:id", async (c) => {
+		const id = Number(c.req.param("id"));
+		if (!Number.isInteger(id) || id <= 0) return c.json({ fehler: "Ungültige Id." }, 400);
+
+		const k = await liesJson(c);
+		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
+
+		const felder: { discFassung?: DiscFassung; psnProductId?: string | null } = {};
+		if (k.discFassung !== undefined) {
+			if (typeof k.discFassung !== "string" || !(DISC_FILTER as readonly string[]).includes(k.discFassung)) {
+				return c.json({ fehler: `discFassung muss eines von ${DISC_FILTER.join(", ")} sein.` }, 400);
+			}
+			felder.discFassung = k.discFassung as DiscFassung;
+		}
+		if (k.psnProductId !== undefined) {
+			if (k.psnProductId === null || k.psnProductId === "") felder.psnProductId = null;
+			else if (typeof k.psnProductId === "string") felder.psnProductId = k.psnProductId.trim() || null;
+			else return c.json({ fehler: "psnProductId muss Text sein." }, 400);
+		}
+		if (felder.discFassung === undefined && felder.psnProductId === undefined) {
+			return c.json({ fehler: "Nichts zu ändern: discFassung oder psnProductId angeben." }, 400);
+		}
+
+		const r = await c.var.repos.games.releaseAendern(id, felder);
+		if (!r) return c.json({ fehler: "Release nicht gefunden." }, 404);
+		return c.json({ id, discFassung: r.physical_release_status, discQuelle: r.physical_source, psnProductId: r.psn_product_id });
+	})
+
 	/**
 	 * Use Case 2: eigene Bewertung. Die einzige Stelle, an der der Nutzer
 	 * play_status schreibt - und sie gilt zugleich als Durchsicht (8.1).

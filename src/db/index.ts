@@ -1,6 +1,7 @@
 import { CredentialsRepository } from "./credentials";
 import { ExportRepository } from "./export";
 import { GamesRepository } from "./games";
+import { GapsRepository } from "./gaps";
 import { IgdbRepository } from "./igdb";
 import { Kopplung } from "./kopplung";
 import { OwnershipRepository } from "./ownership";
@@ -27,6 +28,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		sync: new SyncRepository(db),
 		trophies: new TrophiesRepository(db),
 		games: new GamesRepository(db),
+		gaps: new GapsRepository(db),
 		igdb: new IgdbRepository(db),
 		ownership: new OwnershipRepository(db),
 		plan,

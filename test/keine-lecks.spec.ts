@@ -100,6 +100,7 @@ const IGDB_ROUTEN = (app: ReturnType<typeof createApp>) => [
 	ruf(app, "/api/igdb/offen"),
 	ruf(app, "/api/igdb/abgleich", { method: "POST" }),
 	ruf(app, "/api/igdb/auffrischen", { method: "POST" }),
+	ruf(app, "/api/igdb/physisch", { method: "POST" }),
 	ruf(app, "/api/unmatched/spiel/1/link", {
 		method: "POST",
 		headers: { "content-type": "application/json" },
@@ -236,6 +237,14 @@ describe("Dichtheitsprüfung", () => {
 			}),
 			await ruf(app, "/api/plans/1", { method: "DELETE" }),
 			await ruf(app, "/api/backlog-candidates"),
+			await ruf(app, "/api/gaps?verworfene=1&unbekannte=1"),
+			await ruf(app, "/api/gaps/1/verwerfen", { method: "POST" }),
+			await ruf(app, "/api/releases/1", {
+				method: "PATCH",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ discFassung: "nein" }),
+			}),
+			await ruf(app, "/api/export/luecken.csv"),
 			await ruf(app, "/api/deviations"),
 			await ruf(app, "/api/review/queue"),
 			await ruf(app, "/api/review/progress"),

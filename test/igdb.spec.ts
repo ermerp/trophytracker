@@ -7,6 +7,8 @@ import {
 	normalisiereTreffer,
 	ordneKandidaten,
 	normalisiereTrefferliste,
+	physischePlattformen,
+	physischePlattformenListe,
 	releaseStatusAus,
 	suchbegriff,
 	type IgdbKandidat,
@@ -93,6 +95,44 @@ describe("normalisiereTreffer", () => {
 
 	it("rundet die Kritikerwertung", () => {
 		expect(normalisiereTreffer(spielRoh({ aggregated_rating: 87.5 }))?.criticScore).toBe(88);
+	});
+});
+
+describe("physischePlattformen (7.6, Stufe 14)", () => {
+	it("nennt nur eigene Plattformen physischer Eintraege, PSVR als PS4", () => {
+		expect(
+			physischePlattformen({
+				id: 1,
+				external_games: [
+					{ media: 2, platform: 48 },
+					{ media: 2, platform: 48 }, // zweiter Haendler, dieselbe Plattform
+					{ media: 2, platform: 165 }, // PSVR zaehlt als PS4
+					{ media: 1, platform: 167 }, // digital: sagt nichts ueber eine Disc
+					{ media: 2, platform: 49 }, // Xbox One: fremd
+					{ media: 2 }, // ohne Plattform: keine Aussage
+					{ platform: 9 }, // ohne Medium: keine Aussage
+				],
+			}),
+		).toEqual(["PS4"]);
+	});
+
+	it("liefert leer, wenn IGDB nichts Physisches kennt - nie ein 'nein'", () => {
+		expect(physischePlattformen({ id: 1 })).toEqual([]);
+		expect(physischePlattformen({ id: 1, external_games: [{ media: 1, platform: 48 }] })).toEqual([]);
+	});
+
+	it("ordnet eine Antwortliste nach Id und uebergeht Unbrauchbares", () => {
+		const liste = physischePlattformenListe([
+			{ id: 7, external_games: [{ media: 2, platform: 167 }, { media: 2, platform: 9 }] },
+			{ id: 8 },
+			{ name: "ohne id" },
+			null,
+		]);
+		expect([...liste.entries()]).toEqual([
+			[7, ["PS5", "PS3"]],
+			[8, []],
+		]);
+		expect(physischePlattformenListe("kaputt").size).toBe(0);
 	});
 });
 

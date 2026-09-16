@@ -59,6 +59,7 @@ export const BESITZ_FILTER = ["physisch", "digital", "beide", "keins"] as const;
 export const JA_NEIN = ["ja", "nein"] as const;
 export const PLATIN_FILTER = ["ja", "nein", "nichtverfuegbar"] as const;
 export const DISC_FILTER = ["ja", "nein", "unbekannt"] as const;
+export type DiscFassung = (typeof DISC_FILTER)[number];
 export const SORTIERUNGEN = ["titel", "zuletzt"] as const;
 
 /**
@@ -137,6 +138,7 @@ export type SpielDetail = {
 		region: string | null;
 		physical_release_status: "ja" | "nein" | "unbekannt";
 		physical_source: string | null;
+		psn_product_id: string | null;
 		np_communication_id: string | null;
 		title_name: string | null;
 		icon_url: string | null;
@@ -598,7 +600,7 @@ aeenliste haengt
 		const { results: releases } = await this.db
 			.prepare(
 				"SELECT r.id, r.platform, r.edition, r.region, r.physical_release_status, r.physical_source, " +
-					"t.np_communication_id, t.title_name, t.icon_url, t.progress_pct, " +
+					"r.psn_product_id, t.np_communication_id, t.title_name, t.icon_url, t.progress_pct, " +
 					"t.defined_bronze, t.defined_silver, t.defined_gold, t.defined_platinum, " +
 					"t.earned_bronze, t.earned_silver, t.earned_gold, t.earned_platinum, t.last_played_at " +
 					"FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id " +
@@ -737,6 +739,45 @@ aeenliste haengt
 			.first<{ id: number }>();
 		if (!r) throw new Error("Release konnte nicht angelegt werden.");
 		return r.id;
+	}
+
+	/**
+	 * Release von Hand aendern (Stufe 14): Disc-Fassung und PSN-Produkt-Id.
+	 *
+	 * `ja` und `nein` sind das Urteil des Nutzers und tragen Quelle
+	 * 'manuell' - kein automatischer Prozess (IGDB, spaeter Feed) ueberschreibt
+	 * sie. `unbekannt` nimmt das Urteil zurueck: Quelle wird NULL, der
+	 * Pruefstempel bleibt, und der IGDB-Schritt kommt nach seiner Frist von
+	 * selbst wieder vorbei. Rueckgabe null: Release nicht gefunden.
+	 */
+	async releaseAendern(
+		id: number,
+		felder: { discFassung?: DiscFassung; psnProductId?: string | null },
+	): Promise<{ physical_release_status: DiscFassung; physical_source: string | null; psn_product_id: string | null } | null> {
+		const setzungen: string[] = [];
+		const werte: unknown[] = [];
+		if (felder.discFassung !== undefined) {
+			setzungen.push(
+				"physical_release_status = ?",
+				"physical_source = ?",
+				"physical_checked_at = datetime('now')",
+			);
+			werte.push(felder.discFassung, felder.discFassung === "unbekannt" ? null : "manuell");
+		}
+		if (felder.psnProductId !== undefined) {
+			setzungen.push("psn_product_id = ?");
+			werte.push(felder.psnProductId);
+		}
+		if (setzungen.length > 0) {
+			await this.db
+				.prepare(`UPDATE release SET ${setzungen.join(", ")} WHERE id = ?`)
+				.bind(...werte, id)
+				.run();
+		}
+		return this.db
+			.prepare("SELECT physical_release_status, physical_source, psn_product_id FROM release WHERE id = ?")
+			.bind(id)
+			.first<{ physical_release_status: DiscFassung; physical_source: string | null; psn_product_id: string | null }>();
 	}
 
 	/**

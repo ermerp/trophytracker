@@ -237,22 +237,17 @@ export class ExportRepository {
 	}
 
 	/**
-	 * Luecken aus v_luecken.
-	 *
-	 * `verworfen` steht bis Stufe 14 hier und nicht in der View: Abschnitt 5.3
-	 * beschreibt die Spalte, die Migration dazu kommt mit der Lueckenansicht.
-	 * Der Unterselect laeuft ueber idx_plan_release, ist also ein
-	 * Index-Lookup je Zeile und kein Tabellenscan.
+	 * Luecken aus v_luecken - nur belegte Disc-Fassungen: Ein `unbekannt`
+	 * ist keine Luecke, die sich behaupten liesse (Migration 0017).
+	 * `verworfen` kommt seit Stufe 14 aus der View.
 	 */
 	async listeLuecken(): Promise<LueckeZeile[]> {
 		const { results } = await this.db
 			.prepare(
 				`SELECT l.title, l.platform, l.progress_pct, l.hat_platin, l.eigener_status,
-				        l.bester_gebrauchtpreis_cents,
-				        EXISTS (SELECT 1 FROM plan_entry pe
-				                 WHERE pe.release_id = l.release_id AND pe.kind = 'kauf'
-				                   AND pe.origin = 'luecke' AND pe.status = 'verworfen') AS verworfen
+				        l.bester_gebrauchtpreis_cents, l.verworfen
 				 FROM v_luecken l
+				 WHERE l.disc_fassung = 'ja'
 				 ORDER BY l.title, l.platform`,
 			)
 			.all<LueckeZeile>();

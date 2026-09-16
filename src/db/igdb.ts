@@ -1,5 +1,5 @@
 import type { IgdbKandidat, IgdbMetadaten } from "../domain/igdb";
-import { anzeigeTitel, titelSchluessel } from "../domain/titel";
+import { anzeigeTitel, titelSchluessel, type Plattform } from "../domain/titel";
 
 export type UngeprueftesSpiel = {
 	id: number;
@@ -180,6 +180,71 @@ export class IgdbRepository {
 			.bind(n)
 			.all<{ id: number; igdb_id: number }>();
 		return results;
+	}
+
+	/**
+	 * Disc-Fassung aus IGDB (7.6, Stufe 14): verknuepfte Spiele mit einem
+	 * Release, dessen physical_release_status noch `unbekannt` ist und das
+	 * nie oder vor mehr als 30 Tagen geprueft wurde. Die Frist macht den
+	 * Schritt wiederholbar - IGDB traegt Haendlereintraege nach -, ohne
+	 * dass jeder Aufruf dieselben Spiele wieder anfragt.
+	 */
+	private static readonly DISC_OFFEN =
+		"g.igdb_id IS NOT NULL AND EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id " +
+		"AND r.physical_release_status = 'unbekannt' " +
+		"AND (r.physical_checked_at IS NULL OR r.physical_checked_at < datetime('now', '-30 days')))";
+
+	async zurDiscPruefung(n: number): Promise<Array<{ id: number; igdb_id: number }>> {
+		const { results } = await this.db
+			.prepare(`SELECT g.id, g.igdb_id FROM game g WHERE ${IgdbRepository.DISC_OFFEN} ORDER BY g.id LIMIT ?`)
+			.bind(n)
+			.all<{ id: number; igdb_id: number }>();
+		return results;
+	}
+
+	/**
+	 * Setzt `ja` mit Quelle 'igdb' fuer die Releases des Spiels, deren
+	 * Plattform IGDB als physisch nennt - und nur von `unbekannt` aus: Ein
+	 * `nein` des Nutzers und ein bereits gesetztes `ja` (manuell, Exemplar,
+	 * spaeter Feed) bleiben unangetastet (Abschnitt 3). Alle uebrigen
+	 * `unbekannt`-Releases des Spiels bekommen den Pruefstempel, sonst
+	 * fragte der naechste Aufruf dasselbe Spiel erneut an.
+	 */
+	async discFassungAusIgdb(gameId: number, plattformen: readonly Plattform[]): Promise<number> {
+		const anweisungen: D1PreparedStatement[] = [];
+		if (plattformen.length > 0) {
+			anweisungen.push(
+				this.db
+					.prepare(
+						"UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb', " +
+							"physical_checked_at = datetime('now') " +
+							"WHERE game_id = ? AND physical_release_status = 'unbekannt' " +
+							`AND platform IN (${plattformen.map(() => "?").join(",")})`,
+					)
+					.bind(gameId, ...plattformen),
+			);
+		}
+		anweisungen.push(
+			this.db
+				.prepare(
+					"UPDATE release SET physical_checked_at = datetime('now') " +
+						"WHERE game_id = ? AND physical_release_status = 'unbekannt'",
+				)
+				.bind(gameId),
+		);
+		const ergebnisse = await this.db.batch(anweisungen);
+		return plattformen.length > 0 ? (ergebnisse[0]?.meta.changes ?? 0) : 0;
+	}
+
+	/** Zaehler fuer die Einstellungen: aus IGDB belegte Releases und Spiele, die der Schritt noch anfragt. */
+	async discZaehlung(): Promise<{ discBelegt: number; discOffen: number }> {
+		const z = await this.db
+			.prepare(
+				"SELECT (SELECT COUNT(*) FROM release WHERE physical_source = 'igdb') AS discBelegt, " +
+					`(SELECT COUNT(*) FROM game g WHERE ${IgdbRepository.DISC_OFFEN}) AS discOffen`,
+			)
+			.first<{ discBelegt: number; discOffen: number }>();
+		return { discBelegt: z?.discBelegt ?? 0, discOffen: z?.discOffen ?? 0 };
 	}
 
 	/**

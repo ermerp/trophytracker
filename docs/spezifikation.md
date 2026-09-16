@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 32 – Stufe 13, Änderungserkennung (Entscheidungen des Nutzers vom 16.09.2026): Der Sync vergleicht den Trophäenstand mit dem Stempel der letzten Durchsicht und legt `neue_trophaeen` und `dlc_erweitert` in der Prüfliste vor; `dlc_erweitert` ohne Statusfilter; neue Spalte `trophy_progress.reviewed_progress_pct` (Migration 0016) für den Vorher-Nachher-Vergleich in Prozent (4.1, 8.1). Version 31 – Nur PlayStation (Entscheidung des Nutzers vom 16.09.2026): IGDB-Einträge ohne nachgewiesene PS3/PS4/PS5/Vita-Plattform sind nirgends ein Treffer – auch nicht ohne Plattformangabe; jede Suche trägt den Plattformfilter (7.6). Suchfeld in Wunschliste, To-Do und Backlog (`suche=`, 5.2). Version 30 – Titel aus IGDB (Entscheidung des Nutzers vom 16.09.2026): Ein Spiel ohne Trophäenliste übernimmt beim Verknüpfen den IGDB-Namen als Titel, änderbar im Spieldetail (7.6). Version 29 – Nachbesserung Stufe 12 (Entscheidung des Nutzers vom 16.09.2026): To-Do und Backlog sind mit der Bewertung gekoppelt – To-Do heißt `am_spielen`, Backlog `pausiert` (nie gestartete bleiben `nicht_gespielt`), durchgespielt/komplettiert/abgebrochen schließt den Eintrag automatisch statt als Vorschlag (neuer Abschnitt 5.5, Migration 0015); die Triage-Aktion „Spiele gerade" geht in „Auf To-Do" auf (sechs Aktionen); `PATCH /api/releases/:id/play-status` nur für den Status. Version 28: Stufe 12 – To-Do mit manueller Reihenfolge, Backlog mit Kandidaten und „nicht vorgesehen" (Migration 0014), Listen-Knöpfe im Spieldetail, Waisen beim Löschen eines Eintrags.*
+*Version 33 – Stufe 14, Lücken (Entscheidungen des Nutzers vom 16.09.2026): `physical_release_status` kommt aus IGDBs Händlereinträgen (`external_games`, nur `unbekannt` → `ja`, gemessen 199 von 481 Releases), von Hand über `PATCH /api/releases/:id`; Lückenansicht `/luecken` mit „physisch nicht gewünscht" (5.3) und dem Block „Disc-Fassung unbekannt" (Block B); `v_luecken` mit `verworfen`, `disc_fassung`, `game_id`, `cover_url`, `v_kaufkandidaten` ohne verworfene (Migration 0017); `psn_product_id` pflegbar. Version 32 – Stufe 13, Änderungserkennung (Entscheidungen des Nutzers vom 16.09.2026): Der Sync vergleicht den Trophäenstand mit dem Stempel der letzten Durchsicht und legt `neue_trophaeen` und `dlc_erweitert` in der Prüfliste vor; `dlc_erweitert` ohne Statusfilter; neue Spalte `trophy_progress.reviewed_progress_pct` (Migration 0016) für den Vorher-Nachher-Vergleich in Prozent (4.1, 8.1). Version 31 – Nur PlayStation (Entscheidung des Nutzers vom 16.09.2026): IGDB-Einträge ohne nachgewiesene PS3/PS4/PS5/Vita-Plattform sind nirgends ein Treffer – auch nicht ohne Plattformangabe; jede Suche trägt den Plattformfilter (7.6). Suchfeld in Wunschliste, To-Do und Backlog (`suche=`, 5.2). Version 30 – Titel aus IGDB (Entscheidung des Nutzers vom 16.09.2026): Ein Spiel ohne Trophäenliste übernimmt beim Verknüpfen den IGDB-Namen als Titel, änderbar im Spieldetail (7.6). Version 29 – Nachbesserung Stufe 12 (Entscheidung des Nutzers vom 16.09.2026): To-Do und Backlog sind mit der Bewertung gekoppelt – To-Do heißt `am_spielen`, Backlog `pausiert` (nie gestartete bleiben `nicht_gespielt`), durchgespielt/komplettiert/abgebrochen schließt den Eintrag automatisch statt als Vorschlag (neuer Abschnitt 5.5, Migration 0015); die Triage-Aktion „Spiele gerade" geht in „Auf To-Do" auf (sechs Aktionen); `PATCH /api/releases/:id/play-status` nur für den Status. Version 28: Stufe 12 – To-Do mit manueller Reihenfolge, Backlog mit Kandidaten und „nicht vorgesehen" (Migration 0014), Listen-Knöpfe im Spieldetail, Waisen beim Löschen eines Eintrags.*
 
 ## 1. Use Cases
 
@@ -181,7 +181,7 @@ CREATE TABLE release (
   physical_release_status TEXT NOT NULL DEFAULT 'unbekannt'
                           CHECK (physical_release_status IN ('ja','nein','unbekannt')),
   physical_release_region TEXT,
-  physical_source         TEXT,          -- 'feed' | 'manuell' | 'igdb'
+  physical_source         TEXT,          -- 'igdb' (Stufe 14) | 'manuell' | 'feed' (Stufe 18)
   physical_checked_at     TEXT,
 
   psn_product_id          TEXT,          -- für Store-Preisabfrage (Use Case 7)
@@ -218,6 +218,15 @@ das: ein `nein` des Nutzers und ein bereits gesetztes `ja` (etwa aus dem Feed) b
 `physical_release_region` bleibt dabei NULL, denn der Besitz belegt die Existenz der Disc, nicht ihre
 Region; ein geratenes `PAL` würde den Feed-Abgleich in Stufe 18 irreführen. Das Löschen eines
 Exemplars setzt nichts zurück – dass ein Exemplar weg ist, sagt nichts darüber, ob es die Disc gibt.
+
+**Drei Quellen, eine Rangfolge (Stufe 14).** `physical_source` sagt, wer den Status gesetzt hat:
+`igdb` (Händlereintrag mit physischem Medium, 7.6), `manuell` (Exemplar angelegt oder ausdrücklich
+über `PATCH /api/releases/:id` gesetzt) oder später `feed` (Stufe 18). Automatische Quellen setzen
+**nur** `unbekannt → ja`; ein `nein` und ein bereits gesetztes `ja` fassen sie nie an – das Urteil
+des Nutzers steht über jeder Quelle. Setzt der Nutzer `unbekannt`, nimmt er sein Urteil zurück:
+`physical_source` wird NULL, `physical_checked_at` bleibt, und der IGDB-Schritt kommt nach seiner
+Frist von selbst wieder vorbei. `physical_checked_at` ist der Fortschrittsstempel des IGDB-Schritts,
+kein Gütesiegel: Er wird auch gesetzt, wenn IGDB nichts Physisches kennt.
 
 **Anlegen von Hand.** Spiel und Release entstehen nicht nur aus der Zuordnung (7.2), sondern auch
 über `POST /api/games` und `POST /api/releases` – für die Disc, die nie gestartet wurde und deshalb
@@ -472,7 +481,19 @@ späterer Sinneswandel ist ein Feld-Update auf `offen`, kein Neuanlegen.
 - Die Lückenansicht blendet verworfene Einträge **standardmäßig aus**, mit einem Umschalter für
   "auch verworfene zeigen". So verschwinden sie aus dem Blick, ohne aus den Daten zu verschwinden.
 
-Umsetzung mit Stufe 14 (Lückenansicht) und Stufe 15 (Kaufliste).
+Umgesetzt in Stufe 14 (Lückenansicht, `POST /api/gaps/:releaseId/verwerfen`); die Kaufliste kommt
+mit Stufe 15. Rückgängig ist `DELETE /api/plans/:id` – dieselbe Mechanik wie „nicht vorgesehen" im
+Backlog (5.4): Der verworfene Eintrag ist eine gespeicherte Ablehnung, kein Zustand des Releases.
+Ein zweiter Kaufeintrag am selben Release (offen oder verworfen) wird mit `409` abgewiesen.
+
+**`unbekannt` in der Ansicht (Entscheidung des Nutzers vom 16.09.2026, „Block B").** Nach dem
+IGDB-Lauf tragen rund 200 der 481 Releases ein `ja`; der Rest bleibt `unbekannt`. Die Ansicht zeigt
+belegte Lücken oben und darunter zugeklappt „Disc-Fassung unbekannt (n)": digital gespielt, nicht im
+Regal, aber ohne Beleg für eine Disc – mit „Disc gibt es" / „gibt es nicht" je Zeile. Dort entsteht
+das `nein` von Hand, das laut Entscheidung das Einzige ist, was nicht aus einer Quelle kommt. Die
+View `v_luecken` liefert dafür beide Fassungen mit einer Spalte `disc_fassung`; wer die Lücke als
+**Tatsache** braucht – `v_kaufkandidaten`, `luecken.csv` –, filtert auf `ja`. Ein `nein` ist in
+keiner der beiden Listen: Es ist ein Urteil, keine offene Frage.
 
 ### 5.2 Sortierung (Use Case 10)
 
@@ -742,7 +763,9 @@ Alles andere landet mit seinen Kandidaten in `igdb_candidate` und wartet in der 
 
 **Auffrischen.** `POST /api/igdb/auffrischen` holt für die 50 am längsten nicht aktualisierten verknüpften Spiele Wertung, Cover und Datum in **einer** Anfrage (`where id = (…)`) erneut. Kritikerwertungen ändern sich mit jeder neuen Rezension; Stufe 17 hängt den Schritt an den Cron.
 
-**Physische Fassung aus IGDB – für Stufe 14 entschieden.** IGDB führt unter `external_games` Händler- und Store-Einträge je Spiel mit `media` (1 = digital, 2 = physisch) und `platform`; gemessen am 14.09.2026 gegen die 419 verknüpften Spiele: 273 haben Einträge, **109 einen physischen** (überwiegend Amazon-Artikelnummern), 22 einen digitalen. Stufe 14 setzt daraus `physical_release_status = 'ja'` mit `physical_source = 'igdb'`, wenn ein physischer Eintrag zu einer Plattform des Releases existiert – und **nur** `ja`: Fehlen sagt nichts, `nein` bleibt Handarbeit (Abschnitt 3). Der AWIN-Feed (7.3, Stufe 18) ist die zweite Quelle; beide dürfen ein `nein` des Nutzers nicht überschreiben. Abgelehnte Spiele stehen seit Stufe 11 in `v_ohne_igdb` mit `zustand = 'abgelehnt'` und in der Ansicht „Ohne Zuordnung" hinter einem Umschalter (8.3).
+**Physische Fassung aus IGDB (Stufe 14).** IGDB führt unter `external_games` Händler- und Store-Einträge je Spiel mit `media` (1 = digital, 2 = physisch) und `platform`. Gemessen am 14.09.2026 gegen 419 verknüpfte Spiele: 109 mit physischem Eintrag; **am 16.09.2026 gegen 469: 226** (IGDB trägt nach), 2 020 physische Einträge, alle von Quelle 20 (Amazon), **alle mit Plattform** – 694 davon fremde (Xbox, Switch, PC). Die Regel braucht deshalb keinen Rückfall: `physischePlattformen` (`src/domain/igdb.ts`) nennt die eigenen Plattformen, für die ein Eintrag mit Medium 2 existiert (PSVR/PSVR2 als PS4/PS5 wie überall), und `POST /api/igdb/physisch` setzt `physical_release_status = 'ja'` mit `physical_source = 'igdb'` für die Releases dieser Plattformen – **nur** von `unbekannt` aus: Fehlen sagt nichts, `nein` bleibt Handarbeit, ein bestehendes `ja` behält seine Quelle (Abschnitt 3). Ergebnis der Messung: 199 von 481 Releases.
+
+Der Schritt arbeitet wie das Auffrischen: 50 verknüpfte Spiele je Aufruf in **einer** Anfrage (`physischNachIds`, eigene Feldliste `external_games.media,external_games.platform` – die Suche schleppt die Händlerliste nicht mit), Auswahl `igdb_id IS NOT NULL` mit mindestens einem `unbekannt`-Release, das nie oder vor mehr als 30 Tagen geprüft wurde (`physical_checked_at`). Alle `unbekannt`-Releases des Spiels werden gestempelt, auch ohne Treffer und auch bei leerer Antwort – sonst fragte der nächste Aufruf dasselbe Spiel wieder an. Die Frist macht ihn wiederholbar, Stufe 17 hängt ihn an den Cron. Antwort `{ status, angefragt, gesetzt, nochOffen, weiter }`; `GET /api/igdb/status` nennt `discBelegt` und `discOffen`. Der AWIN-Feed (7.3, Stufe 18) ist die zweite Quelle; beide dürfen ein `nein` des Nutzers nicht überschreiben. Abgelehnte Spiele stehen seit Stufe 11 in `v_ohne_igdb` mit `zustand = 'abgelehnt'` und in der Ansicht „Ohne Zuordnung" hinter einem Umschalter (8.3).
 
 ---
 
@@ -954,10 +977,15 @@ keine Zeile ("nicht eingerichtet"), `status = 'abgelaufen'` und `status = 'ok'`.
 Views listen ihre Spalten immer explizit auf, nie `SELECT *`. Bei `SELECT *` wächst die Ergebnismenge nach einem `ADD COLUMN` lautlos mit, während die Definition in `sqlite_master` unverändert bleibt – die einzige Stelle, an der SQLite bei Schemaänderungen still danebengreift.
 
 ```sql
--- Use Case 3: Lücken. Digital gespielt, Disc existiert, nicht im Regal.
+-- Use Case 3: Lücken. Digital gespielt, nicht im Regal, Disc-Fassung
+-- belegt ('ja') oder unbekannt (Migration 0017, 5.3): Die Ansicht trennt
+-- beides; Kaufkandidaten und CSV filtern auf disc_fassung = 'ja'.
 CREATE VIEW v_luecken AS
 SELECT
-  g.title, r.id AS release_id, r.platform, r.physical_release_region,
+  g.id AS game_id, g.title, g.cover_url,
+  r.id AS release_id, r.platform, r.physical_release_region,
+  r.physical_release_status AS disc_fassung,
+  r.physical_source AS disc_quelle,
   t.progress_pct,
   (t.defined_platinum > 0 AND t.earned_platinum > 0) AS hat_platin,
   ps.status AS eigener_status,
@@ -972,20 +1000,21 @@ JOIN release r ON r.id = t.release_id
 JOIN game g ON g.id = r.game_id
 LEFT JOIN play_status ps ON ps.release_id = r.id
 WHERE t.progress_pct > 0
-  AND r.physical_release_status = 'ja'
+  AND r.physical_release_status IN ('ja', 'unbekannt')
   AND NOT EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id);
 
 -- Use Case 6: Kandidaten für die Kaufliste, noch nicht übernommen.
 CREATE VIEW v_kaufkandidaten AS
 SELECT 'luecke' AS quelle, release_id, title, platform, bester_gebrauchtpreis_cents
 FROM v_luecken
--- 'offen' schliesst den bereits uebernommenen Kandidaten aus, 'verworfen' den
--- bewusst abgelehnten (5.3). Ohne 'verworfen' taeuchte eine abgelehnte Luecke
--- bei jeder Abfrage wieder als Kandidat auf.
-WHERE release_id NOT IN (
-  SELECT release_id FROM plan_entry
-  WHERE kind = 'kauf' AND status IN ('offen','verworfen') AND release_id IS NOT NULL
-)
+-- Nur belegte Luecken. 'offen' schliesst den bereits uebernommenen Kandidaten
+-- aus, 'verworfen' den bewusst abgelehnten (5.3). Ohne 'verworfen' taeuchte
+-- eine abgelehnte Luecke bei jeder Abfrage wieder als Kandidat auf.
+WHERE disc_fassung = 'ja'
+  AND release_id NOT IN (
+    SELECT release_id FROM plan_entry
+    WHERE kind = 'kauf' AND status IN ('offen','verworfen') AND release_id IS NOT NULL
+  )
 UNION ALL
 SELECT 'wunsch', pe.release_id, COALESCE(g.title, pe.title_raw),
        r.platform, NULL
@@ -1085,7 +1114,7 @@ PATCH  /api/games/:id
 DELETE /api/games/:id                 Trophäenlisten zurück in die Zuordnung
 
 POST   /api/releases                  Body: { spielId, plattform } – 409, wenn die Plattform belegt ist
-PATCH  /api/releases/:id              inkl. physical_release_status, psn_product_id (ab Stufe 14)
+PATCH  /api/releases/:id              Body: Teilmenge von { discFassung: ja|nein|unbekannt, psnProductId } – ja/nein mit Quelle 'manuell', unbekannt nimmt die Quelle zurück (Stufe 14)
 DELETE /api/releases/:id              Trophäenliste zurück in die Zuordnung; leeres Spiel wird mit gelöscht
 
 GET    /api/physical-copies
@@ -1126,10 +1155,11 @@ POST   /api/review/:releaseId/decide  Body: { aktion } – sechs Aktionen aus 8.
 GET    /api/review/progress           { offen, erledigt, gesamt, unentschieden } – unentschieden ist die zweite Runde
 
 GET    /api/igdb/search?q=&plattformen=  Eingebaute Suche mit Rückfällen und Ordnung (7.6), für Spieldetail, Prüfansicht, Import und Nachpflege
-GET    /api/igdb/status               { zugangsdaten, gesamt, verknuepft, zurPruefung, ungeprueft, abgelehnt, letzteAktualisierung }
+GET    /api/igdb/status               { zugangsdaten, gesamt, verknuepft, zurPruefung, ungeprueft, abgelehnt, letzteAktualisierung, discBelegt, discOffen }
 GET    /api/igdb/offen                Prüfansicht: Spiele ohne eindeutigen Treffer mit Kandidaten (limit, offset)
 POST   /api/igdb/abgleich             ein Schritt: acht Spiele; { geprueft, verknuepft, vorgeschlagen, ohneTreffer, nochOffen, weiter }
 POST   /api/igdb/auffrischen          ein Schritt: 50 verknüpfte Spiele in einer IGDB-Anfrage
+POST   /api/igdb/physisch             ein Schritt: Disc-Fassung aus external_games für 50 Spiele; { angefragt, gesetzt, nochOffen, weiter } (7.6, Stufe 14)
 POST   /api/igdb/erneut-suchen        alle Spiele zur Prüfung zurück in den Abgleich; { zurueckgesetzt }
 GET    /api/unmatched?abgelehnte=1    v_ohne_igdb mit zustand; abgelehnte nur mit Parameter (Stufe 11)
 POST   /api/unmatched/:quelle/:id/link  Body: { igdbId, plattform? } – Quelle 'spiel' seit Stufe 9, 'plan_wunsch|todo|backlog|kauf' seit Stufe 11 (Freitext → Spiel; plattform wie bei POST /api/plans)
@@ -1156,7 +1186,8 @@ POST   /api/backup/vermerk            Body: { zeitpunkt (ISO), commit? } – die
 
 GET    /api/upcoming                  v_erscheint_bald
 
-GET    /api/gaps                      v_luecken
+GET    /api/gaps?verworfene=1&unbekannte=1  { anzahl, verworfen, unbekannt, luecken[], moeglich[] } aus v_luecken; verworfene und unbekannte nur mit Parameter, je Zeile planId des verworfenen Kaufeintrags
+POST   /api/gaps/:releaseId/verwerfen „physisch nicht gewünscht": plan_entry kauf/luecke/verworfen (5.3); 409 bei vorhandenem Kaufeintrag; Rückgängig über DELETE /api/plans/:id
 GET    /api/purchase-candidates       v_kaufkandidaten
 GET    /api/backlog-candidates        { anzahl, abgelehnt, kandidaten[] } aus v_backlog_kandidaten (5.4)
 
@@ -1190,7 +1221,7 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Spieldetail | 1, 2, 7 | Releases, Exemplare (Zustand, Anleitung, Kaufdatum, Preis, EAN, Notiz), digitale Berechtigungen; je Release „Trophäen (Sony)" und „Eigene Bewertung" (Status, Bewertung 1–10, Begonnen/Beendet, Notiz) nebeneinander, nie verrechnet (die Bewertung zieht seit 5.5 To-Do und Backlog nach); Preisverlauf je Kanal; Release hinzufügen und löschen, Spiel löschen. Block „IGDB" (seit Stufe 9): Kritikerwertung mit Anzahl und Quelle, Erscheinungsdatum und Status, Herkunft der Verknüpfung, Link zu igdb.com; „Anderen Eintrag wählen", „Verknüpfung lösen", ohne Verknüpfung Suche und „Gibt es bei IGDB nicht" |
 | Zuordnung | – | Nicht gematchte Trophäenlisten mit Vorschlägen |
 | IGDB-Zuordnung | – | Spiele ohne eindeutigen IGDB-Treffer als Liste mit Seiten: Kandidaten (Cover, Jahr, Typ, Plattformen, Wertung) zum Übernehmen, „Anders suchen" mit vorbelegtem Begriff, „Gibt es bei IGDB nicht". Eine Liste, kein Ein-Spiel-pro-Bildschirm: Nichts erzwingt eine Reihenfolge, Ausgelassenes bleibt stehen (7.6) |
-| Lücken | 3 | Digital gespielt, Disc existiert, nicht im Regal – mit Preis sofern vorhanden. Knopf "physisch nicht gewünscht"; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar |
+| Lücken | 3 | `/luecken`, in der Leiste (seit Stufe 14): digital gespielt, Disc-Fassung belegt, nicht im Regal – Cover, Plattform, Fortschritt, Platin, eigener Status, Gebrauchtpreis („unbekannt" bis Stufe 18). Knopf „physisch nicht gewünscht" mit Rückgängig; verworfene standardmäßig ausgeblendet, per Umschalter sichtbar mit „wieder als Lücke zeigen". Darunter zugeklappt „Disc-Fassung unbekannt (n)" mit „Disc gibt es" / „gibt es nicht" je Zeile (5.3, Block B). Im Spieldetail je Release ein Dropdown ja/nein/unbekannt mit Quelle (aus IGDB, von Hand) und das Feld PSN-Produkt-Id; in den Einstellungen unter IGDB der Knopf „Disc-Fassungen prüfen" mit Zählern (7.6) |
 | Wunschliste | 4, 11 | Sortierung Favoriten zuerst → Wertung (Standard), Wertung, Titel, Erscheinungsdatum, zuletzt angelegt (5.2); Suchfeld (Titel); Filter nur Favoriten, Plattformen (Mehrfachauswahl) und „ohne Plattform" – zum Nachpflegen; erledigte und verworfene standardmäßig ausgeblendet; je Eintrag Cover, Kritikerwertung, Jahr, Favorit-Stern, Plattform-Dropdown (hängt den Wunsch um), Notiz, erledigt/verworfen/wieder öffnen, entfernen; Erscheinungsdatum statt Preis bei angekündigten Titeln. „Wunsch hinzufügen" über die IGDB-Suche, Plattform-Dropdown an jedem Treffer (vorbelegt mit dessen neuester, „ohne Plattform" wählbar); Freitext nur über „Ohne IGDB-Eintrag übernehmen" nach einer Suche; Rückgängig direkt nach dem Anlegen. Kachel, Filterleiste und Schreibzugriffe teilt sie sich seit Stufe 12 mit To-Do und Backlog (`frontend/src/Absichten.tsx`: `usePlanListe`, `PlanKarte`). Im Spieldetail ein Block „Listen" (bis Stufe 12 „Wunschliste"): offene Absichten als Pillen, auf die Wunschliste setzen (Plattform vorbelegt mit der neuesten des Spiels, auch eine ohne Release oder „ohne Plattform" wählbar), je Release „Auf To-Do" / „Ins Backlog" (Abschnitt 5) |
 | To-Do | 5a | `/todo`, Reiter „To-Do \| Backlog": eine Spalte in eigener Reihenfolge, Griff zum Ziehen (Maus, Finger, Tastatur; `@dnd-kit`) und Pfeilknöpfe, jede Umsortierung sofort gespeichert; Filter nur Favoriten und „auch erledigte", keine Sortierwahl; je Kachel wie die Wunschliste, aber statt erledigt/verworfen „ins Backlog" (setzt `pausiert`), „durchgespielt", „abgebrochen" (5.5) |
 | Backlog | 5b | `/backlog`, derselbe Reiter: sortiert und gefiltert wie die Wunschliste (5.2), „auf To-Do" hängt ans Ende der To-Do-Liste und setzt `am_spielen`; „durchgespielt"/„abgebrochen" bei gestarteten, „nicht vorgesehen" bei nie gestarteten (5.5); darunter der Block **Kandidaten** aus `v_backlog_kandidaten` mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (5.4), Anzahl der Abgelehnten mit Sprung zu „auch erledigte und verworfene"; Rückgängig nach jeder Übernahme |
@@ -1202,9 +1233,9 @@ Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein 
 | Scannen | 1 | Serienerfassung nach Abschnitt 9 |
 | Einstellungen | – | NPSSO, Sync, Sync-Historie, IGDB (Zugangsdaten ja/nein, Zähler verknüpft/zur Prüfung/nicht gesucht/abgelehnt, „Abgleich starten" mit Fortschritt, „Metadaten auffrischen", „Offene erneut suchen"), offene Scans, Abweichungen (seit Stufe 6, mit Link ins Spieldetail), Export und Backup-Status |
 
-**Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den sechs Hauptansichten (Sammlung, Wunschliste, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Die Wunschliste kam mit Stufe 10 in die Leiste (Entscheidung des Nutzers vom 14.09.2026): Sie wird oft bedient, und ein Umweg über die Einstellungen wäre für die häufigste Liste der falsche Platz. To-Do kam mit Stufe 12; das Backlog ist kein siebter Eintrag, sondern ein Reiter neben To-Do auf derselben Seite (`/todo`, `/backlog`), der Leisteneintrag bleibt auf beiden markiert. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
+**Navigation:** Auf dem Handy eine Icon-Leiste am unteren Rand mit den sechs Hauptansichten (Sammlung, Wunschliste, Lücken, Kaufliste, To-Do, Scannen); alles Weitere über die Sammlungsansicht und die Einstellungen. Seit dem fünften Eintrag (Lücken, Stufe 14) steht auf dem Handy das Symbol über dem Text, sonst bricht „To-Do" um. Die Wunschliste kam mit Stufe 10 in die Leiste (Entscheidung des Nutzers vom 14.09.2026): Sie wird oft bedient, und ein Umweg über die Einstellungen wäre für die häufigste Liste der falsche Platz. To-Do kam mit Stufe 12; das Backlog ist kein siebter Eintrag, sondern ein Reiter neben To-Do auf derselben Seite (`/todo`, `/backlog`), der Leisteneintrag bleibt auf beiden markiert. Am Desktop dieselbe Navigation als Seitenleiste. Die Prüfliste und der Import sind keine Dauernavigation, sondern werden vom Dashboard aus aufgerufen, solange sie offene Posten haben – mit Anzahl als Kennzeichen.
 
-Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/wunschliste`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/igdb`, `/pruefen`, `/trophaeen`, seit Stufe 11 `/import`, `/import/:id`, `/ohne-zuordnung`, seit Stufe 12 `/todo`, `/backlog`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen, seit Stufe 10 die Wunschliste, seit Stufe 12 To-Do (mit Backlog als Reiter); Zuordnung, IGDB-Zuordnung, Sammlung prüfen, Trophäen, Wunschliste importieren und Ohne Zuordnung hängen als Werkzeuge an den Einstellungen, der Import zusätzlich als Link auf der Wunschliste. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
+Routing über `react-router-dom` mit echten Pfaden (`/sammlung`, `/spiel/:id`, `/wunschliste`, `/pruefliste`, `/einstellungen`, `/zuordnung`, `/igdb`, `/pruefen`, `/trophaeen`, seit Stufe 11 `/import`, `/import/:id`, `/ohne-zuordnung`, seit Stufe 12 `/todo`, `/backlog`); der SPA-Fallback des Workers (15.2) liefert für jeden Pfad die `index.html`. Die Leiste zeigt jeweils nur die Hauptansichten, die es schon gibt – seit Stufe 5 Sammlung und Einstellungen, seit Stufe 10 die Wunschliste, seit Stufe 12 To-Do (mit Backlog als Reiter), seit Stufe 14 Lücken (`/luecken`); Zuordnung, IGDB-Zuordnung, Sammlung prüfen, Trophäen, Wunschliste importieren und Ohne Zuordnung hängen als Werkzeuge an den Einstellungen, der Import zusätzlich als Link auf der Wunschliste. Die Sammlungsfilter liegen in der URL, damit „Zurück" aus dem Spieldetail den Stand wiederherstellt.
 
 Bis es das Dashboard gibt, übernimmt ein Hinweisblock oben in der Sammlung dessen Rolle: offene Prüfliste, `unentschieden`-Einträge (auch bei leerer Prüfliste), nicht zugeordnete Trophäenlisten, seit Stufe 8 eine **überfällige Sicherung** (mehr als acht Tage oder noch nie, siehe 14.2) seit Stufe 9 Spiele, die noch nicht bei IGDB gesucht wurden oder auf die IGDB-Zuordnung warten, seit Stufe 11 einen Import mit offenen Zeilen sowie Freitext-Einträge ohne Spiel und seit Stufe 12 die Backlog-Kandidaten (5.4) – jeweils nur bei Anzahl > 0 und mit Link. Beim Dashboard-Bau wandert die Komponente dorthin.
 
@@ -1305,7 +1336,7 @@ Der vollständige Ablauf mit Befehlen steht in der README. Er endet nicht beim E
 
 Die Trophäen-Zahlen stehen als **getrennte Spalten** je Metall („Bronze erspielt", „Bronze definiert"), nicht als „12/20" in einem Feld: CSV ist zum Auswerten gedacht, und „12/20" lässt sich nicht summieren.
 
-Die Spalte `Verworfen` in `luecken` kommt bis Stufe 14 aus einer Unterabfrage auf `plan_entry` (Abschnitt 5.3) und nicht aus der View – `v_luecken` bekommt sie erst mit der Lückenansicht.
+Die Spalte `Verworfen` in `luecken` kommt seit Stufe 14 aus der View (`v_luecken.verworfen`, Migration 0017); die Liste enthält nur belegte Disc-Fassungen (`disc_fassung = 'ja'`) – ein `unbekannt` ist keine Lücke, die sich behaupten ließe.
 
 CSV ist für Auswertung und Weitergabe gedacht, nicht als Sicherung: Beziehungen zwischen den Tabellen gehen dabei verloren. Dafür ist der Dump aus 14.2 zuständig.
 
@@ -1477,7 +1508,7 @@ Jede Stufe ist einzeln lauffähig und deploybar.
 | 11 | Wunschlisten-Import mit Suche, Ansicht "Ohne Zuordnung" | **Use Cases 9 und 12** |
 | 12 | To-Do und Backlog mit Sortierung und Kandidatenvorschlägen; Kopplung an die Bewertung (5.5) | **Use Cases 5a und 5b** – abgenommen 16.09.2026 |
 | 13 | Änderungserkennung im Sync: `neue_trophaeen`, `dlc_erweitert` (Migration 0016) | **Use Case 8** vollständig – abgenommen 16.09.2026; der erste echte Eintrag in der Produktion steht noch aus (am Abnahmetag 0 Änderungen) |
-| 14 | `physical_release_status` manuell pflegbar, Lückenansicht, Lücken verwerfen (5.3) | **Use Case 3** |
+| 14 | `physical_release_status` aus IGDB (7.6) und von Hand, Lückenansicht mit „Disc-Fassung unbekannt", Lücken verwerfen (5.3), Migration 0017 | **Use Case 3** – deployt 16.09.2026, Abnahme steht aus |
 | 15 | Kaufliste mit Kandidaten und Sortierung (5.2), "Erscheint bald" | **Use Cases 6, 10, 11** |
 | 16 | Barcode-Scan mit Auflösungskette (ohne Feed) | Komfort bei Erfassung |
 | 17 | Cron Trigger, PWA | Automatik und Komfort |
@@ -1498,7 +1529,7 @@ Nach Stufe 15 sind alle Use Cases ausser 7 vollständig erfüllt. Stufe 16 und 1
 
 *Die Änderungserkennung (Stufe 13) kommt später als die Prüfliste selbst.* Stufe 7 baut die Oberfläche und den `erstimport`-Fall; die Erkennung von `neue_trophaeen` und `dlc_erweitert` setzt darauf auf und braucht erst dann zu existieren, wenn ein zweiter Sync überhaupt stattgefunden hat.
 
-*Die Lücken (Stufe 14) kommen spät*, obwohl Use Case 3 niedrig nummeriert ist. Sie hängen an `physical_release_status`, der ohne Feed manuell gepflegt werden muss – sinnvoll erst, wenn die Sammlung steht. **Entscheidung des Nutzers vom 16.09.2026:** Den Status von Hand je Release nachzutragen ist zu aufwändig. Stufe 14 füllt ihn deshalb aus IGDB (7.6, `external_games` mit physischem Medium, 109 von 419 Spielen) und lässt den Rest `unbekannt`; von Hand kommt nur ein `nein` oder eine Korrektur. Wie die Ansicht mit `unbekannt` umgeht (ausblenden oder als „möglicherweise" zeigen), ist zu Beginn von Stufe 14 zu entscheiden.
+*Die Lücken (Stufe 14) kommen spät*, obwohl Use Case 3 niedrig nummeriert ist. Sie hängen an `physical_release_status`, der ohne Feed manuell gepflegt werden muss – sinnvoll erst, wenn die Sammlung steht. **Entscheidung des Nutzers vom 16.09.2026:** Den Status von Hand je Release nachzutragen ist zu aufwändig. Stufe 14 füllt ihn deshalb aus IGDB (7.6, `external_games` mit physischem Medium; gemessen 199 von 481 Releases) und lässt den Rest `unbekannt`; von Hand kommt nur ein `nein` oder eine Korrektur. **Entschieden zu Beginn von Stufe 14 (16.09.2026):** Die Ansicht zeigt `unbekannt` als eigenen, zugeklappten Block „Disc-Fassung unbekannt" mit Ja/Nein-Knöpfen je Zeile (5.3, Block B) – nicht ausgeblendet, nicht in die Lücken gemischt.
 
 ---
 
