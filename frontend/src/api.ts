@@ -112,7 +112,6 @@ export type Bewertung = {
 export const REVIEW_AKTIONEN = [
   'durchgespielt',
   'abgebrochen',
-  'spiele_gerade',
   'auf_todo',
   'ins_backlog',
   'unveraendert',
@@ -123,9 +122,8 @@ export type ReviewAktion = (typeof REVIEW_AKTIONEN)[number]
 export const AKTIONSTEXT: Record<ReviewAktion, string> = {
   durchgespielt: 'Durchgespielt',
   abgebrochen: 'Abgebrochen',
-  spiele_gerade: 'Spiele gerade',
-  auf_todo: 'Auf To-Do',
-  ins_backlog: 'Ins Backlog',
+  auf_todo: 'Auf To-Do (spiele gerade)',
+  ins_backlog: 'Ins Backlog (pausiert)',
   unveraendert: 'Unverändert lassen',
   ueberspringen: 'Überspringen',
 }
@@ -209,14 +207,9 @@ export type PlanEintrag = {
   position: number | null
   angelegtAm: string
   erledigtAm: string | null
-  /** Eigene Bewertung am Release (4.2), nur zur Anzeige neben der Absicht. */
+  /** Eigene Bewertung am Release (4.2); bei To-Do und Backlog gekoppelt (5.5). */
   eigenerStatus: PlayStatus | null
-  /** Übergang aus Abschnitt 5: die Bewertung sagt durchgespielt/komplettiert/abgebrochen – vorgeschlagen, nie erzwungen. */
-  erledigtVorgeschlagen: boolean
 }
-
-/** Status, die einen To-Do- oder Backlog-Eintrag als erledigt vorschlagen (Abschnitt 5, Stufe 12). */
-export const ERLEDIGT_STATUS: readonly PlayStatus[] = ['durchgespielt', 'komplettiert', 'abgebrochen']
 
 /** Kandidat für den Backlog aus v_backlog_kandidaten: im Besitz, nie angefasst (Stufe 12). */
 export type BacklogKandidat = {

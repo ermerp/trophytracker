@@ -2,6 +2,7 @@ import { CredentialsRepository } from "./credentials";
 import { ExportRepository } from "./export";
 import { GamesRepository } from "./games";
 import { IgdbRepository } from "./igdb";
+import { Kopplung } from "./kopplung";
 import { OwnershipRepository } from "./ownership";
 import { PlanRepository } from "./plan";
 import { PlayStatusRepository } from "./play-status";
@@ -19,6 +20,8 @@ import { WishlistImportRepository } from "./wunschliste";
  */
 export function createRepositories(db: D1Database, npssoKey: string) {
 	const playStatus = new PlayStatusRepository(db);
+	const plan = new PlanRepository(db);
+	const kopplung = new Kopplung(db, plan, playStatus);
 	return {
 		credentials: new CredentialsRepository(db, npssoKey),
 		sync: new SyncRepository(db),
@@ -26,9 +29,10 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		games: new GamesRepository(db),
 		igdb: new IgdbRepository(db),
 		ownership: new OwnershipRepository(db),
-		plan: new PlanRepository(db),
+		plan,
 		playStatus,
-		review: new ReviewRepository(db, playStatus),
+		kopplung,
+		review: new ReviewRepository(db, playStatus, kopplung),
 		export: new ExportRepository(db),
 		wishlistImport: new WishlistImportRepository(db),
 	};

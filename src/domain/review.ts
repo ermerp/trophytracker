@@ -3,14 +3,15 @@ import type { PlayStatus } from "./play-status";
 /**
  * Pruefliste (Abschnitt 8.1): die Aktionen und ihre Wirkung.
  *
- * Sechs Aktionen aus der Spezifikation plus "ueberspringen", das den Fall
+ * Fuenf Aktionen aus der Spezifikation plus "ueberspringen", das den Fall
  * bewusst auf 'unentschieden' setzt - auffindbar ueber den Status-Filter der
- * Sammlung, damit die zweite Runde nicht aus dem Blick geraet.
+ * Sammlung, damit die zweite Runde nicht aus dem Blick geraet. "Spiele
+ * gerade" gab es bis zur Kopplung (5.5) als eigene Aktion; seit To-Do
+ * "am Spielen" heisst, ist es dasselbe wie "Auf To-Do".
  */
 export const REVIEW_AKTIONEN = [
 	"durchgespielt",
 	"abgebrochen",
-	"spiele_gerade",
 	"auf_todo",
 	"ins_backlog",
 	"unveraendert",
@@ -26,7 +27,11 @@ export function istReviewAktion(wert: unknown): wert is ReviewAktion {
 export type Wirkung = {
 	/** null = Status bleibt, wie er ist ("unveraendert lassen"). */
 	status: PlayStatus | null;
-	/** Zusaetzlich ein plan_entry mit origin 'triage'. */
+	/**
+	 * Zusaetzlich ein plan_entry mit origin 'triage'. Der Status folgt der
+	 * Kopplung (5.5): To-Do heisst am_spielen, Backlog pausiert - ausser bei
+	 * nie gestarteten, die nicht_gespielt bleiben (Kopplung.statusNachListe).
+	 */
 	plan: "todo" | "backlog" | null;
 };
 
@@ -34,8 +39,7 @@ export function wirkung(aktion: ReviewAktion): Wirkung {
 	switch (aktion) {
 		case "durchgespielt": return { status: "durchgespielt", plan: null };
 		case "abgebrochen": return { status: "abgebrochen", plan: null };
-		case "spiele_gerade": return { status: "am_spielen", plan: null };
-		case "auf_todo": return { status: "pausiert", plan: "todo" };
+		case "auf_todo": return { status: "am_spielen", plan: "todo" };
 		case "ins_backlog": return { status: "pausiert", plan: "backlog" };
 		case "unveraendert": return { status: null, plan: null };
 		case "ueberspringen": return { status: "unentschieden", plan: null };

@@ -31,7 +31,8 @@ export type AbweichungZeile = {
  * Eigene Bewertung (Abschnitt 4.2).
  *
  * Zwei Schreibpfade, streng getrennt:
- *   setzen      - der Nutzer entscheidet; ueberschreibt immer
+ *   setzen / statusSetzen - der Nutzer entscheidet (Spieldetail, Pruefliste,
+ *                 Listenknoepfe ueber die Kopplung, 5.5); ueberschreibt immer
  *   vorbelegen  - die einzige Automatik; schreibt nur, wo keine Zeile ist
  *                 oder 'nicht_gespielt' steht, und ruehrt sonst nichts an
  *
@@ -94,6 +95,14 @@ export class PlayStatusRepository {
 			...this.stempelStatements(releaseId),
 		]);
 
+		return this.fuerRelease(releaseId);
+	}
+
+	/** Nur den Status, mit Stempel (statusStatement + stempelStatements) - fuer Listenknoepfe und PATCH. */
+	async statusSetzen(releaseId: number, status: PlayStatus): Promise<PlayStatusZeile | null> {
+		const release = await this.db.prepare("SELECT 1 AS x FROM release WHERE id = ?").bind(releaseId).first();
+		if (!release) return null;
+		await this.db.batch([this.statusStatement(releaseId, status), ...this.stempelStatements(releaseId)]);
 		return this.fuerRelease(releaseId);
 	}
 

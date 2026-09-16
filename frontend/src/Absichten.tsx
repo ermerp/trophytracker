@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router-dom'
-import { PLAN_STATUSTEXT, PLATTFORMEN, STATUSTEXT, anfrage, datum, type PlanArt, type PlanEintrag } from './api'
+import { PLAN_STATUSTEXT, PLATTFORMEN, STATUSTEXT, anfrage, datum, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
 
 /**
  * Geteilte Bausteine der Listen (Abschnitt 5): Wunschliste (Stufe 10), To-Do
  * und Backlog (Stufe 12) zeigen dieselbe Kachel und dieselben Filter. Was
  * sich unterscheidet – die IGDB-Suche der Wunschliste, das Sortieren der
  * To-Do-Liste, die Kandidaten des Backlogs –, bleibt in den Ansichten.
+ *
+ * To-Do und Backlog sind mit der Bewertung gekoppelt (5.5): To-Do heißt
+ * „am Spielen", Backlog „pausiert". Ihre Kacheln schließen deshalb nicht
+ * mit „erledigt", sondern mit der Bewertung („durchgespielt",
+ * „abgebrochen"), und der Worker schließt den Eintrag mit; nie gestartete
+ * im Backlog kennen nur „nicht vorgesehen".
  *
  * Sortierung und Filter liegen in der URL, wie in der Sammlung.
  */
@@ -155,6 +161,21 @@ export function usePlanListe(art: PlanArt) {
     }
   }
 
+  /**
+   * Bewertung vom Listenknopf aus (5.5): nur der Status, Datum und Notiz
+   * bleiben; der Worker zieht den Eintrag nach, deshalb neu laden.
+   */
+  async function bewerten(e: PlanEintrag, status: PlayStatus) {
+    if (e.releaseId === null) return
+    setMeldung(null)
+    try {
+      await anfrage(`/api/releases/${e.releaseId}/play-status`, { methode: 'PATCH', koerper: { status } })
+      await laden()
+    } catch (f) {
+      setMeldung(f instanceof Error ? f.message : 'Bewerten fehlgeschlagen.')
+    }
+  }
+
   /** Löscht den eben angelegten Eintrag – samt Spiel und Release, falls sie nur dafür entstanden. */
   async function rueckgaengig() {
     if (!eben) return
@@ -171,7 +192,7 @@ export function usePlanListe(art: PlanArt) {
   return {
     art, daten, setDaten, meldung, setMeldung, laeuft, setLaeuft, eben, setEben,
     sortierung, nurFavoriten, alle, plattformen,
-    laden, setzeParam, plattformFilterUmschalten, ersetze, aendern, entfernen, anlegen, rueckgaengig,
+    laden, setzeParam, plattformFilterUmschalten, ersetze, aendern, entfernen, anlegen, rueckgaengig, bewerten,
   }
 }
 
@@ -253,12 +274,14 @@ type KarteProps = {
 /**
  * Eine Kachel: Cover, Titel, Kritik und Jahr, Stern, Plattform-Dropdown
  * (hängt den Eintrag um), erledigt/verworfen/wieder öffnen, entfernen,
- * Notiz. Bei To-Do und Backlog dazu der Vorschlag „erledigt", wenn die
- * eigene Bewertung durchgespielt/komplettiert/abgebrochen sagt (Abschnitt
- * 5) – ein Knopf, nie ein Automatismus.
+ * Notiz. Bei To-Do und Backlog am Release stehen statt „erledigt" die
+ * Bewertungen „durchgespielt" und „abgebrochen" (Kopplung, 5.5); nie
+ * gestartete kennen stattdessen nur „nicht vorgesehen" (verworfen).
  */
 export function PlanKarte({ e, liste, griff, knoepfe, liRef, style, className }: KarteProps) {
-  const { aendern, entfernen } = liste
+  const { aendern, entfernen, bewerten } = liste
+  const gekoppelt = (e.art === 'todo' || e.art === 'backlog') && e.releaseId !== null
+  const nieGestartet = e.eigenerStatus === null || e.eigenerStatus === 'nicht_gespielt'
   const [notizOffen, setNotizOffen] = useState(false)
   const klassen = ['kachel', e.status === 'offen' ? '' : 'erledigt', className ?? ''].filter(Boolean).join(' ')
 
@@ -289,13 +312,6 @@ export function PlanKarte({ e, liste, griff, knoepfe, liRef, style, className }:
         </div>
       </div>
 
-      {e.art !== 'wunsch' && e.erledigtVorgeschlagen && (
-        <p className="hinweis vorschlag">
-          Bewertung sagt „{STATUSTEXT[e.eigenerStatus!]}".{' '}
-          <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'erledigt' })}>erledigt setzen</button>
-        </p>
-      )}
-
       <div className="besitz">
         <button
           type="button"
@@ -324,8 +340,21 @@ export function PlanKarte({ e, liste, griff, knoepfe, liRef, style, className }:
         {e.status === 'offen' ? (
           <>
             {knoepfe}
-            <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'erledigt' })}>erledigt</button>
-            <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'verworfen' })}>verworfen</button>
+            {gekoppelt ? (
+              nieGestartet ? (
+                <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'verworfen' })}>nicht vorgesehen</button>
+              ) : (
+                <>
+                  <button type="button" className="klein" onClick={() => bewerten(e, 'durchgespielt')}>durchgespielt</button>
+                  <button type="button" className="klein" onClick={() => bewerten(e, 'abgebrochen')}>abgebrochen</button>
+                </>
+              )
+            ) : (
+              <>
+                <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'erledigt' })}>erledigt</button>
+                <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'verworfen' })}>verworfen</button>
+              </>
+            )}
           </>
         ) : (
           <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'offen' })}>wieder öffnen</button>

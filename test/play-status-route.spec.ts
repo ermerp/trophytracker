@@ -14,7 +14,7 @@ const setze = (id: number, koerper: unknown) =>
 
 async function leeren() {
 	await env.DB.batch(
-		["review_queue", "play_status", "trophy_progress", "release", "game"].map((t) =>
+		["plan_entry", "review_queue", "play_status", "trophy_progress", "release", "game"].map((t) =>
 			env.DB.prepare(`DELETE FROM ${t}`),
 		),
 	);
@@ -126,5 +126,54 @@ describe("Status in Liste und Detail", () => {
 		const d = await hole("/api/games/1");
 		expect(d.releases[0].bewertung).toMatchObject({ status: "am_spielen", bewertung: 6 });
 		expect(d.releases[1].bewertung).toBeNull();
+	});
+});
+
+describe("Kopplung von Bewertung und Liste (5.5)", () => {
+	const eintraege = (id: number) =>
+		env.DB.prepare("SELECT kind, status, origin, position FROM plan_entry WHERE release_id = ? ORDER BY id").bind(id).all().then((r) => r.results);
+
+	it("am_spielen legt einen To-Do-Eintrag an, pausiert haengt ihn ins Backlog, durchgespielt schliesst ihn", async () => {
+		const r = await release(1, 10);
+		let a = await (await setze(r, { status: "am_spielen", bewertung: 8, notiz: "gut" })).json();
+		expect(a).toMatchObject({ status: "am_spielen", eintragAngelegt: true, eintraegeErledigt: 0 });
+		expect(await eintraege(r)).toEqual([{ kind: "todo", status: "offen", origin: "manuell", position: 1 }]);
+
+		a = await (await setze(r, { status: "pausiert", bewertung: 8, notiz: "gut" })).json();
+		expect(a).toMatchObject({ eintragAngelegt: false, eintraegeErledigt: 0 });
+		expect(await eintraege(r)).toEqual([{ kind: "backlog", status: "offen", origin: "manuell", position: null }]);
+
+		a = await (await setze(r, { status: "durchgespielt", bewertung: 8, notiz: "gut" })).json();
+		expect(a).toMatchObject({ eintragAngelegt: false, eintraegeErledigt: 1 });
+		expect(await eintraege(r)).toMatchObject([{ kind: "backlog", status: "erledigt" }]);
+
+		// nicht_gespielt und unentschieden ruehren die Liste nicht an.
+		await setze(r, { status: "unentschieden" });
+		expect(await eintraege(r)).toHaveLength(1);
+	});
+
+	it("PATCH setzt nur den Status, laesst Datum, Bewertung und Notiz stehen und koppelt ebenso", async () => {
+		const r = await release(1, 10);
+		await setze(r, { status: "am_spielen", bewertung: 7, notiz: "n", begonnenAm: "2026-01-02" });
+		const p = await SELF.fetch(`${B}/api/releases/${r}/play-status`, {
+			method: "PATCH",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ status: "abgebrochen" }),
+		});
+		expect(p.status).toBe(200);
+		expect(await p.json()).toMatchObject({ status: "abgebrochen", bewertung: 7, notiz: "n", begonnenAm: "2026-01-02", eintraegeErledigt: 1 });
+		expect(await eintraege(r)).toMatchObject([{ kind: "todo", status: "erledigt" }]);
+
+		const kaputt = await SELF.fetch(`${B}/api/releases/${r}/play-status`, {
+			method: "PATCH",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ status: "weg" }),
+		});
+		expect(kaputt.status).toBe(400);
+		expect((await SELF.fetch(`${B}/api/releases/999/play-status`, {
+			method: "PATCH",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ status: "pausiert" }),
+		})).status).toBe(404);
 	});
 });

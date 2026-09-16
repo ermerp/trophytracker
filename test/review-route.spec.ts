@@ -90,11 +90,12 @@ describe("POST /api/review/:releaseId/decide", () => {
 	it("entscheidet und meldet, wie viele noch offen sind", async () => {
 		const antwort = await entscheide(2, { aktion: "unveraendert" });
 		expect(antwort.status).toBe(200);
+		// am_spielen bestaetigt heisst seit der Kopplung (5.5): steht auf To-Do.
 		expect(await antwort.json()).toEqual({
 			releaseId: 2,
 			aktion: "unveraendert",
 			status: "am_spielen",
-			planAngelegt: false,
+			planAngelegt: true,
 			nochOffen: 2,
 		});
 

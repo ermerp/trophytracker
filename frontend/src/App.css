@@ -915,12 +915,6 @@ button.griff:active {
   cursor: grabbing;
 }
 
-.hinweis.vorschlag {
-  margin: 0.4rem 0;
-  padding: 0.3rem 0.5rem;
-  font-size: 0.85rem;
-}
-
 .kandidaten {
   margin-top: 2rem;
 }

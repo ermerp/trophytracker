@@ -432,22 +432,50 @@ describe("PATCH und DELETE /api/plans/:id", () => {
 });
 
 describe("To-Do, Backlog und Kandidaten (Stufe 12)", () => {
-	it("liefert To-Do nach Position mit eigenem Status und Vorschlag erledigt", async () => {
+	it("liefert To-Do nach Position; Anlegen koppelt den Status (5.5)", async () => {
 		const [ps4, ps5] = await spiel(1, "Bloodborne", ["PS4", "PS5"]);
 		const a = app();
 		const erster = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps4 })).json();
 		const zweiter = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps5 })).json();
-		expect(erster).toMatchObject({ position: 1, eigenerStatus: null, erledigtVorgeschlagen: false });
-		await env.DB.prepare("INSERT INTO play_status (release_id, status) VALUES (?, 'durchgespielt')").bind(ps4).run();
+		// To-Do heisst am_spielen - auch fuer ein Release ohne Bewertung.
+		expect(erster).toMatchObject({ position: 1, eigenerStatus: "am_spielen" });
 
 		const liste = await hole(a, "/api/plans?kind=todo");
 		expect(liste.sortierung).toBe("position");
 		expect(liste.eintraege.map((e: { id: number }) => e.id)).toEqual([erster.id, zweiter.id]);
-		expect(liste.eintraege[0]).toMatchObject({ eigenerStatus: "durchgespielt", erledigtVorgeschlagen: true });
-		expect(liste.eintraege[1]).toMatchObject({ eigenerStatus: null, erledigtVorgeschlagen: false });
 
 		// Die Wunschliste sortiert weiter nach Favorit; Backlog ebenso.
 		expect((await hole(a, "/api/plans?kind=backlog")).sortierung).toBe("favorit");
+	});
+
+	it("Backlog heisst pausiert - ausser bei nie gestarteten; Umhaengen und Wiederoeffnen koppeln (5.5)", async () => {
+		const [ps4, ps5] = await spiel(1, "Bloodborne", ["PS4", "PS5"]);
+		await env.DB.prepare("INSERT INTO play_status (release_id, status) VALUES (?, 'am_spielen')").bind(ps4).run();
+		const a = app();
+		const status = async (r: number) => (await env.DB.prepare("SELECT status FROM play_status WHERE release_id = ?").bind(r).first<{ status: string }>())?.status ?? null;
+
+		const b = await (await sende(a, "POST", "/api/plans", { art: "backlog", releaseId: ps4 })).json();
+		expect(b.eigenerStatus).toBe("pausiert");
+		const nie = await (await sende(a, "POST", "/api/plans", { art: "backlog", releaseId: ps5 })).json();
+		expect(nie.eigenerStatus).toBeNull();
+		expect(await status(ps5)).toBeNull();
+
+		// Hochziehen: am_spielen, auch beim nie gestarteten.
+		expect((await (await sende(a, "PATCH", `/api/plans/${nie.id}`, { art: "todo" })).json()).eigenerStatus).toBe("am_spielen");
+		// Zurueck ins Backlog: pausiert.
+		expect((await (await sende(a, "PATCH", `/api/plans/${nie.id}`, { art: "backlog" })).json()).eigenerStatus).toBe("pausiert");
+		// Erledigen ruehrt den Status nicht an; wieder oeffnen koppelt erneut.
+		await sende(a, "PATCH", `/api/plans/${b.id}`, { status: "erledigt" });
+		await env.DB.prepare("UPDATE play_status SET status = 'durchgespielt' WHERE release_id = ?").bind(ps4).run();
+		expect((await (await sende(a, "PATCH", `/api/plans/${b.id}`, { status: "offen" })).json()).eigenerStatus).toBe("pausiert");
+		// Favorit oder Notiz aendern koppelt nichts.
+		await env.DB.prepare("UPDATE play_status SET status = 'durchgespielt' WHERE release_id = ?").bind(ps4).run();
+		await sende(a, "PATCH", `/api/plans/${b.id}`, { favorit: true });
+		expect(await status(ps4)).toBe("durchgespielt");
+		// "nicht vorgesehen" koppelt nichts.
+		const [ps3] = await spiel(2, "Nioh", ["PS3"]);
+		await sende(a, "POST", "/api/plans", { art: "backlog", releaseId: ps3, status: "verworfen" });
+		expect(await status(ps3)).toBeNull();
 	});
 
 	it("ordnet per PUT /api/plans/reorder neu und weist fremde Ids ab", async () => {
@@ -504,21 +532,21 @@ describe("To-Do, Backlog und Kandidaten (Stufe 12)", () => {
 		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
 		const a = app();
 
-		// Trophaeenliste am Release.
+		// Trophaeenliste am Release. Ein Wunsch, kein To-Do: To-Do wuerde den Status koppeln (5.5).
 		await env.DB.prepare(
 			"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, release_id, synced_at) VALUES ('NPWR1', 'trophy', 'Bloodborne', 'PS4', ?, datetime('now'))",
 		).bind(ps4).run();
-		let e = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps4 })).json();
+		let e = await (await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps4 })).json();
 		expect(await (await sende(a, "DELETE", `/api/plans/${e.id}`)).json()).toMatchObject({ releaseGeloescht: false, spielGeloescht: false });
 		await env.DB.prepare("DELETE FROM trophy_progress").run();
 
-		// Eigene Bewertung am Release.
-		await env.DB.prepare("INSERT INTO play_status (release_id, status) VALUES (?, 'pausiert')").bind(ps4).run();
+		// Eigene Bewertung am Release - die ein To-Do-Eintrag selbst anlegt (am_spielen).
 		e = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps4 })).json();
 		expect(await (await sende(a, "DELETE", `/api/plans/${e.id}`)).json()).toMatchObject({ releaseGeloescht: false, spielGeloescht: false });
 		await env.DB.prepare("DELETE FROM play_status").run();
 
-		// Ein erledigter Zweiteintrag am Spiel haelt Release und Spiel.
+		// Ein erledigter Zweiteintrag am Spiel haelt Release und Spiel. Backlog am nie
+		// gestarteten Release koppelt keinen Status, das Release bleibt leer.
 		const alt = await (await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" })).json();
 		await sende(a, "PATCH", `/api/plans/${alt.id}`, { status: "erledigt" });
 		e = await (await sende(a, "POST", "/api/plans", { art: "backlog", releaseId: ps4 })).json();
@@ -536,7 +564,7 @@ describe("Waisen: gepflegter Physisch-Status haelt das Release", () => {
 		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
 		await env.DB.prepare("UPDATE release SET physical_release_status = 'ja' WHERE id = ?").bind(ps4).run();
 		const a = app();
-		const e = await (await sende(a, "POST", "/api/plans", { art: "todo", releaseId: ps4 })).json();
+		const e = await (await sende(a, "POST", "/api/plans", { art: "backlog", releaseId: ps4 })).json();
 		expect(await (await sende(a, "DELETE", `/api/plans/${e.id}`)).json()).toMatchObject({ releaseGeloescht: false, spielGeloescht: false });
 	});
 });

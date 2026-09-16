@@ -99,7 +99,7 @@ export function Pruefliste() {
     [eintrag, laeuft],
   )
 
-  // Tastenkürzel 1–7, nicht in Eingabefeldern.
+  // Tastenkürzel 1–6, nicht in Eingabefeldern.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return
@@ -117,7 +117,7 @@ export function Pruefliste() {
       <h1>Prüfliste</h1>
       <p>
         noch <strong>{fortschritt.offen}</strong> von {fortschritt.gesamt}
-        <span className="zeile nur-desktop"> · Tasten 1–7 entscheiden</span>{' '}
+        <span className="zeile nur-desktop"> · Tasten 1–6 entscheiden</span>{' '}
         <Link to="/sammlung">Beenden</Link>
       </p>
       <p className="zeile hinweiszeile">Du bewertest den Spielstand, nicht den Besitz.</p>

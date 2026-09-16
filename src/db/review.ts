@@ -1,6 +1,6 @@
 import { wirkung, type ReviewAktion, type ReviewGrund } from "../domain/review";
 import type { PlayStatus } from "../domain/play-status";
-import { POSITION_ANS_ENDE } from "./plan";
+import type { Kopplung } from "./kopplung";
 import type { PlayStatusRepository } from "./play-status";
 
 export type ReviewZeile = {
@@ -46,6 +46,7 @@ export class ReviewRepository {
 	constructor(
 		private readonly db: D1Database,
 		private readonly playStatus: PlayStatusRepository,
+		private readonly kopplung: Kopplung,
 	) {}
 
 	/**
@@ -119,12 +120,15 @@ export class ReviewRepository {
 	}
 
 	/**
-	 * Eine Entscheidung, ein Batch - sofort gespeichert (Risikotabelle:
-	 * "Triage bricht in der Mitte ab").
+	 * Eine Entscheidung, ein Batch fuer Status und Stempel - sofort
+	 * gespeichert (Risikotabelle: "Triage bricht in der Mitte ab"). Danach
+	 * die Kopplung (5.5): "Auf To-Do" und "Ins Backlog" legen den Eintrag an
+	 * oder haengen einen vorhandenen um; jeder andere Status zieht die Liste
+	 * nach (am_spielen → To-Do, durchgespielt → erledigt). Ein nie gestartetes
+	 * Spiel kommt ins Backlog, ohne pausiert zu werden.
 	 *
 	 * Status ueber statusStatement, damit Datum, Bewertung und Notiz stehen
-	 * bleiben. plan_entry nur, wenn noch kein offener todo/backlog-Eintrag
-	 * am Release haengt. Gibt null zurueck, wenn kein Eintrag offen ist.
+	 * bleiben. Gibt null zurueck, wenn kein Eintrag offen ist.
 	 */
 	async entscheiden(
 		releaseId: number,
@@ -137,26 +141,21 @@ export class ReviewRepository {
 		if (!offen) return null;
 
 		const w = wirkung(aktion);
+		const aktuell = (await this.playStatus.fuerRelease(releaseId))?.status ?? null;
+		const status = w.plan === "backlog" && (aktuell === null || aktuell === "nicht_gespielt") ? null : w.status;
+
 		const statements: D1PreparedStatement[] = [];
-		if (w.status) statements.push(this.playStatus.statusStatement(releaseId, w.status));
+		if (status) statements.push(this.playStatus.statusStatement(releaseId, status));
 		statements.push(...this.playStatus.stempelStatements(releaseId));
+		await this.db.batch(statements);
+
+		let planAngelegt = false;
 		if (w.plan) {
-			statements.push(
-				this.db
-					.prepare(
-						"INSERT INTO plan_entry (kind, release_id, origin, position) " +
-							`SELECT ?, ?, 'triage', CASE WHEN ? = 'todo' THEN ${POSITION_ANS_ENDE} END ` +
-							"WHERE NOT EXISTS (SELECT 1 FROM plan_entry WHERE release_id = ? " +
-							"AND kind IN ('todo','backlog') AND status = 'offen')",
-					)
-					.bind(w.plan, releaseId, w.plan, releaseId),
-			);
+			planAngelegt = await this.kopplung.eintragSicherstellen(releaseId, w.plan, "triage");
+		} else if (status ?? aktuell) {
+			planAngelegt = (await this.kopplung.listeNachStatus(releaseId, (status ?? aktuell)!, "triage")).eintragAngelegt;
 		}
 
-		const ergebnisse = await this.db.batch(statements);
-		const planAngelegt = w.plan !== null && (ergebnisse.at(-1)?.meta.changes ?? 0) > 0;
-
-		const status = w.status ?? (await this.playStatus.fuerRelease(releaseId))?.status ?? null;
-		return { status, planAngelegt };
+		return { status: status ?? aktuell, planAngelegt };
 	}
 }

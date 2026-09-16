@@ -9,7 +9,6 @@ import {
 	type PlanZeile,
 	type PlanZiel,
 } from "../db/plan";
-import { giltAlsErledigt } from "../domain/play-status";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
 import { zielAmSpiel, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
@@ -108,10 +107,8 @@ export function eintragAntwort(z: PlanZeile) {
 		position: z.position,
 		angelegtAm: z.created_at,
 		erledigtAm: z.resolved_at,
-		/** Eigene Bewertung am Release (4.2), nur zur Anzeige neben der Absicht. */
+		/** Eigene Bewertung am Release (4.2); bei To-Do und Backlog gekoppelt (5.5). */
 		eigenerStatus: z.play_status,
-		// Uebergang aus Abschnitt 5: vorgeschlagen, nie erzwungen.
-		erledigtVorgeschlagen: z.status === "offen" && giltAlsErledigt(z.play_status),
 	};
 }
 
@@ -273,6 +270,10 @@ export const planRoutes = new Hono<AppEnv>()
 		}
 
 		const id = await c.var.repos.plan.anlegen(art, ziel, "manuell", { isFavorite, note, status });
+		// Kopplung (5.5): To-Do heisst am Spielen, Backlog pausiert - nur fuer offene Eintraege am Release.
+		if ((art === "todo" || art === "backlog") && status !== "verworfen" && ziel.releaseId !== undefined) {
+			await c.var.repos.kopplung.statusNachListe(ziel.releaseId, art);
+		}
 		const zeile = await c.var.repos.plan.eintrag(id);
 		if (!zeile) throw new Error("Eintrag nach dem Anlegen nicht gefunden.");
 		return c.json({ ...eintragAntwort(zeile), spielAngelegt }, 201);
@@ -331,6 +332,13 @@ export const planRoutes = new Hono<AppEnv>()
 		await c.var.repos.plan.aendern(id, geprueft.felder);
 		const zeile = await c.var.repos.plan.eintrag(id);
 		if (!zeile) return c.json({ fehler: "Eintrag nicht gefunden." }, 404);
+		// Kopplung (5.5): Umhaengen oder Wiederoeffnen eines To-Do-/Backlog-Eintrags setzt den Status.
+		const listeGeaendert = geprueft.felder.kind !== undefined || geprueft.felder.status === "offen" || gepruefteWahl.wahl !== undefined;
+		if (listeGeaendert && zeile.status === "offen" && zeile.release_id !== null && (zeile.kind === "todo" || zeile.kind === "backlog")) {
+			await c.var.repos.kopplung.statusNachListe(zeile.release_id, zeile.kind);
+			const neu = await c.var.repos.plan.eintrag(id);
+			return c.json({ ...eintragAntwort(neu ?? zeile), geaendert: true });
+		}
 		return c.json({ ...eintragAntwort(zeile), geaendert: true });
 	})
 

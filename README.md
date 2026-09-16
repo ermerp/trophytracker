@@ -31,7 +31,9 @@ holt die alten Wunschlisten aus Textdateien herein (Use Case 9) und sammelt
 alles ohne IGDB-Eintrag in einer Ansicht zum Nachziehen (Use Case 12).
 **Abgenommen am 15.09.2026**, die ersten drei Listen sind importiert. Stufe 12
 bringt To-Do in eigener Reihenfolge und das Backlog mit Kandidaten aus dem
-Besitz (Use Cases 5a und 5b); die Abnahme steht aus.
+Besitz (Use Cases 5a und 5b); nach der ersten Durchsicht am 16.09.2026 sind
+beide Listen mit der Bewertung gekoppelt (To-Do = am Spielen, Backlog =
+pausiert, Migration 0015); die Abnahme steht aus.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -48,7 +50,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Frontend und API | ein Worker, eine Origin, kein CORS |
 | Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
 | Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 21 Tabellen, 7 Views, vierzehn Migrationen |
+| Schema | 21 Tabellen, 7 Views, fünfzehn Migrationen |
 | Datenzugriff | Repository-Schicht in `src/db/` |
 | PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
@@ -60,7 +62,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Navigation | `react-router-dom`, Leiste unten (Handy) bzw. seitlich (Desktop), Filter in der URL |
 | Bewertung | Status, Bewertung 1–10, Begonnen/Beendet, Notiz je Release; Vorbelegung beim ersten Auftreten einer Trophäenliste, danach nie mehr automatisch angefasst |
 | Abweichungen | Trophäenstand und Bewertung passen nicht zusammen – zur Durchsicht in den Einstellungen |
-| Prüfliste | Ein Spiel pro Bildschirm, sieben Aktionen (Tasten 1–7), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung. 100 % wird nicht vorgelegt, sondern still gestempelt |
+| Prüfliste | Ein Spiel pro Bildschirm, sechs Aktionen (Tasten 1–6; „Spiele gerade" ging mit der Kopplung in „Auf To-Do" auf), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung. 100 % wird nicht vorgelegt, sondern still gestempelt |
 | Datenbestand | 431 Trophäenlisten, 420 Spiele; bewertet: 167 komplettiert, 119 abgebrochen, 118 durchgespielt, 25 pausiert, 2 am Spielen |
 | Offene Posten | Hinweisblock in der Sammlung: Prüfliste, `unentschieden`, nicht zugeordnete Listen, überfällige Sicherung – bis es das Dashboard gibt |
 | Sicherung geprüft | Der Export wird vor der Migration gegen die Zeilenzahlen der Datenbank gehalten; Datenmigrationen protokollieren ihre Wirkung |
@@ -73,8 +75,8 @@ Was steht und in Betrieb nachgewiesen ist:
 | Wunschliste | Eigene Ansicht in der Leiste: Favoriten zuerst, dann Kritikerwertung (auch Wertung, Titel, Erscheinungsdatum, zuletzt angelegt); Filter Favoriten, Plattformen, „ohne Plattform"; Favorit-Stern, Plattform-Dropdown je Eintrag, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform-Dropdown an jedem Treffer, vorbelegt mit dessen neuester – mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint, ohne Plattform ein Spiel ohne Release; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026**; Priorität und Rang danach auf Wunsch des Nutzers entfernt (Migration 0013) |
 | Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
 | Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
-| To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert; „ins Backlog"; Vorschlag „erledigt", wenn die Bewertung durchgespielt/komplettiert/abgebrochen sagt – nie automatisch |
-| Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende; Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt |
+| To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert. **Gekoppelt mit der Bewertung** (Entscheidung vom 16.09.2026): To-Do heißt „am Spielen", „ins Backlog" setzt „pausiert", „durchgespielt"/„abgebrochen" auf der Kachel schließen den Eintrag |
+| Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
@@ -622,7 +624,17 @@ PATCH  /api/plans/:id    Teilmenge von { favorit, notiz, status, art, plattform 
 PUT    /api/plans/reorder  { art, orderedIds } – To-Do-Reihenfolge
 DELETE /api/plans/:id    räumt Release und Spiel ab, wenn sonst nichts daran hängt
 GET    /api/backlog-candidates   { anzahl, abgelehnt, kandidaten[] }
+PATCH  /api/releases/:id/play-status  { status } – nur der Status; koppelt wie PUT
 ```
+
+**To-Do und Backlog sind mit der Bewertung gekoppelt** (Abschnitt 5.5,
+Entscheidung vom 16.09.2026): Was auf To-Do steht, ist `am_spielen`, was im
+Backlog steht, `pausiert` – nur ein nie gestartetes Spiel bleibt
+`nicht_gespielt`. Jeder Schreibpfad hält beides zusammen: Listenknöpfe
+setzen den Status, eine Bewertung legt den Eintrag an, hängt ihn um oder
+schließt ihn (`durchgespielt`, `komplettiert`, `abgebrochen`). Der Sync
+koppelt nie. Migration 0015 hat den Bestand angeglichen; der Deploy-Job
+zählt seither die Abweichungen (erwartet 0).
 
 **To-Do** ist die einzige Liste mit eigener Reihenfolge (`position`): Neues
 hängt ans Ende, `PUT /api/plans/reorder` schreibt die ganze Liste neu, im
@@ -633,8 +645,8 @@ Position; der Deploy-Job protokolliert, wie viele ohne Position bleiben
 Trophäenfortschritt, die auf keiner Liste stehen; „nicht vorgesehen" legt einen
 verworfenen Backlog-Eintrag an, den die View ausblendet – die Liste bleibt so
 frei von Titeln, die nie gespielt werden sollen. Wird die Bewertung eines
-Releases `durchgespielt`, `komplettiert` oder `abgebrochen`, schlagen Liste und
-Spieldetail „erledigt" vor; geschlossen wird nie automatisch.
+Releases `durchgespielt`, `komplettiert` oder `abgebrochen`, schließt der
+Worker den Eintrag (Kopplung, siehe oben).
 
 Sortiert wird bei der Abfrage aus gespeicherten Bestandteilen – Favoriten
 zuerst, dann Kritikerwertung; eine Rangformel mit Gewichten gab es bis
