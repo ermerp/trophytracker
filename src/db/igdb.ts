@@ -1,4 +1,5 @@
 import type { IgdbKandidat, IgdbMetadaten } from "../domain/igdb";
+import { anzeigeTitel, titelSchluessel } from "../domain/titel";
 
 export type UngeprueftesSpiel = {
 	id: number;
@@ -91,19 +92,28 @@ export class IgdbRepository {
 	 * Verknuepft ein Spiel mit einem IGDB-Eintrag und uebernimmt die
 	 * Metadaten. Loescht die Kandidaten und hebt eine Ablehnung auf - die
 	 * Verknuepfung ist die neuere Entscheidung.
+	 *
+	 * Titel (Entscheidung des Nutzers vom 16.09.2026): Ein Spiel ohne
+	 * Trophaeenliste - von Hand angelegt oder aus einem Wunsch - bekommt
+	 * den IGDB-Namen (anzeigeTitel) und den Schluessel dazu; ein Spiel mit
+	 * Trophaeenliste behaelt den aus Sony normalisierten Titel (7.6). Nur
+	 * hier, nicht beim Auffrischen: Was der Nutzer danach umbenennt, bleibt.
 	 */
 	async verknuepfen(
 		gameId: number,
 		m: IgdbMetadaten,
 		quelle: Verknuepfungsquelle,
 	): Promise<boolean> {
+		const titel = anzeigeTitel(m.name);
 		const [update] = await this.db.batch([
 			this.db
 				.prepare(
 					"UPDATE game SET igdb_id = ?, igdb_slug = ?, cover_url = ?, release_date = ?, release_status = ?, " +
 						IgdbRepository.KRITIK_SETZEN +
 						"igdb_matched_at = datetime('now'), igdb_matched_source = ?, " +
-						"igdb_checked_at = datetime('now'), igdb_synced_at = datetime('now'), igdb_declined_at = NULL " +
+						"igdb_checked_at = datetime('now'), igdb_synced_at = datetime('now'), igdb_declined_at = NULL, " +
+						`title = CASE WHEN ${IgdbRepository.OHNE_LISTE} THEN ? ELSE title END, ` +
+						`sort_title = CASE WHEN ${IgdbRepository.OHNE_LISTE} THEN ? ELSE sort_title END ` +
 						"WHERE id = ?",
 				)
 				.bind(
@@ -115,12 +125,18 @@ export class IgdbRepository {
 					m.criticScore,
 					m.criticScoreCount,
 					quelle,
+					titel,
+					titelSchluessel(titel),
 					gameId,
 				),
 			this.db.prepare("DELETE FROM igdb_candidate WHERE game_id = ?").bind(gameId),
 		]);
 		return (update.meta.changes ?? 0) > 0;
 	}
+
+	/** Kein Release des Spiels traegt eine Trophaeenliste (Index-Lookups ueber release.game_id und trophy_progress.release_id). */
+	private static readonly OHNE_LISTE =
+		"NOT EXISTS (SELECT 1 FROM trophy_progress t JOIN release r ON r.id = t.release_id WHERE r.game_id = game.id)";
 
 	/**
 	 * Kritikerwertung nur schreiben, wenn sie fehlt oder von IGDB stammt.

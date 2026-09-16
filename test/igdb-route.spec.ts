@@ -253,13 +253,34 @@ describe("IgdbRepository: Entscheidungen des Nutzers", () => {
 		expect((await zeile(2))?.cover_url).toContain("/neu.jpg");
 	});
 
+	it("verknuepfen uebernimmt den IGDB-Namen nur bei Spielen ohne Trophaeenliste, auffrischen nie", async () => {
+		await spiel(1, "Baldurs Gate 3", "baldurs gate 3", ["PS5"]);
+		await spiel(2, "Ragnarok", "ragnarok", ["PS5"]);
+		await env.DB.prepare(
+			"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, synced_at, release_id) " +
+				"VALUES ('NPWR2', 'trophy', 'Ragnarok', 'PS5', '2026-01-01', (SELECT id FROM release WHERE game_id = 2))",
+		).run();
+		const r = repos();
+		const meta = (name: string) => ({ igdbId: 5, name, igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt" as const, criticScore: null, criticScoreCount: null });
+
+		await r.igdb.verknuepfen(1, meta("Baldur's Gate 3™"), "manuell");
+		expect(await zeile(1)).toMatchObject({ title: "Baldur's Gate 3", sort_title: "baldurs gate 3" });
+		await r.igdb.verknuepfen(2, meta("God of War Ragnarök"), "automatisch");
+		expect(await zeile(2)).toMatchObject({ title: "Ragnarok", sort_title: "ragnarok" });
+
+		// Was der Nutzer danach umbenennt, bleibt beim Auffrischen.
+		await r.games.umbenennen(1, "BG3");
+		await r.igdb.auffrischen(1, meta("Baldur's Gate 3"));
+		expect(await zeile(1)).toMatchObject({ title: "BG3" });
+	});
+
 	it("umbenennen setzt den Suchstempel zurueck - ausser bei Verknuepfung oder Ablehnung", async () => {
 		await spiel(1, "Alt", "alt", ["PS4"]);
 		await spiel(2, "Verknuepft", "verknuepft", ["PS4"]);
 		await spiel(3, "Abgelehnt", "abgelehnt", ["PS4"]);
 		const r = repos();
 		await r.igdb.kandidatenSetzen(1, []);
-		await r.igdb.verknuepfen(2, { igdbId: 5, igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt", criticScore: null, criticScoreCount: null }, "manuell");
+		await r.igdb.verknuepfen(2, { igdbId: 5, name: "Fuenf", igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt", criticScore: null, criticScoreCount: null }, "manuell");
 		await r.igdb.ablehnen(3);
 
 		await r.games.umbenennen(1, "Neu");
@@ -377,7 +398,7 @@ describe("Routen", () => {
 		const r = repos();
 		await r.igdb.kandidatenSetzen(1, [{ igdbId: 9, name: "X", slug: null, coverUrl: null, releaseDate: null, plattformen: [], typ: null, typId: null, criticScore: null, criticScoreCount: null, versionParent: null, parentGame: null }]);
 		await r.igdb.ablehnen(2);
-		await r.igdb.verknuepfen(3, { igdbId: 5, igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt", criticScore: null, criticScoreCount: null }, "manuell");
+		await r.igdb.verknuepfen(3, { igdbId: 5, name: "Fuenf", igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt", criticScore: null, criticScoreCount: null }, "manuell");
 
 		const a = app(fakeIgdb([[]]).client);
 		expect((await json(await a.request("/api/igdb/erneut-suchen", { method: "POST" }, env))).body).toEqual({ zurueckgesetzt: 1 });
