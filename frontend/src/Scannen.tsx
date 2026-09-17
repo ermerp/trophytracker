@@ -53,12 +53,13 @@ export function Scannen() {
 
   const [letzterCode, setLetzterCode] = useState<string | null>(null)
 
-  const aufloesen = useCallback(async (roh: string) => {
+  /** `zaehlen: false` beim Öffnen aus den Einstellungen – kein neuer Scan. */
+  const aufloesen = useCallback(async (roh: string, zaehlen = true) => {
     setFehler(null)
     setHinweis(null)
     setLaeuft(true)
     try {
-      const t = await anfrage<Treffer>('/api/scan', { methode: 'POST', koerper: { ean: roh } })
+      const t = await anfrage<Treffer>('/api/scan', { methode: 'POST', koerper: { ean: roh, zaehlen } })
       setLetzterCode(t.ean)
       setZustand(t.treffer === 'mapping' ? { art: 'treffer', t } : { art: 'auswahl', t })
       return true
@@ -82,7 +83,7 @@ export function Scannen() {
     if (gestartet.current) return
     gestartet.current = true
     if (eanAusUrl) {
-      void aufloesen(eanAusUrl)
+      void aufloesen(eanAusUrl, false)
       setParams({}, { replace: true })
     } else {
       void starten()

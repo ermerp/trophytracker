@@ -59,6 +59,14 @@ describe("POST /api/scan", () => {
 		expect(await offene()).toEqual([{ ean: EAN, scan_count: 2 }]);
 	});
 
+	it("zaehlt mit zaehlen: false nicht hoch (Oeffnen aus den Einstellungen)", async () => {
+		expect(await (await sende("POST", "/api/scan", { ean: EAN, zaehlen: false })).json()).toEqual({ ean: EAN, treffer: "keiner", scans: 0 });
+		expect(await offene()).toEqual([]);
+		await scan(EAN);
+		expect(await (await sende("POST", "/api/scan", { ean: EAN, zaehlen: false })).json()).toEqual({ ean: EAN, treffer: "keiner", scans: 1 });
+		expect(await offene()).toEqual([{ ean: EAN, scan_count: 1 }]);
+	});
+
 	it("trifft ein Mapping mit Titel, Cover und Exemplaren, ohne offenen Scan", async () => {
 		const r = await release();
 		await env.DB.prepare("INSERT INTO ean_mapping (ean, release_id) VALUES (?, ?)").bind(EAN, r).run();

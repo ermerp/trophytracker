@@ -54,7 +54,9 @@ export const scanRoutes = new Hono<AppEnv>()
 				scans: 0,
 			});
 		}
-		const scans = await c.var.repos.scan.vermerken(ean);
+		// zaehlen: false – die Karte wird aus den Einstellungen geoeffnet ("zuordnen"),
+		// das ist kein neuer Scan und darf den Zaehler nicht anheben.
+		const scans = k.zaehlen === false ? await c.var.repos.scan.zaehler(ean) : await c.var.repos.scan.vermerken(ean);
 		if (angebot) {
 			return c.json({ ean, treffer: "angebot", angebot: { titel: angebot.title_raw, plattform: angebot.platform_raw }, scans });
 		}

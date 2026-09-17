@@ -71,6 +71,12 @@ export class ScanRepository {
 		return z?.scan_count ?? 1;
 	}
 
+	/** Zaehler eines offenen Scans, ohne ihn zu veraendern; 0, wenn es keinen gibt. */
+	async zaehler(ean: string): Promise<number> {
+		const z = await this.db.prepare("SELECT scan_count FROM unresolved_scan WHERE ean = ?").bind(ean).first<{ scan_count: number }>();
+		return z?.scan_count ?? 0;
+	}
+
 	/**
 	 * Code einem Release zuordnen. Ein vorhandenes Mapping wird ueberschrieben:
 	 * Das ist die Korrektur einer Nutzerentscheidung durch den Nutzer, kein
