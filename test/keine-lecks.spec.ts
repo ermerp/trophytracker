@@ -245,6 +245,30 @@ describe("Dichtheitsprüfung", () => {
 				body: JSON.stringify({ discFassung: "nein" }),
 			}),
 			await ruf(app, "/api/export/luecken.csv"),
+			// Barcode (Stufe 17): Treffer, offener Scan, Zuordnen und die Fehlerpfade.
+			await ruf(app, "/api/scan", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ ean: "4006381333931" }),
+			}),
+			await ruf(app, "/api/scan", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ ean: "4006381333913" }),
+			}),
+			await ruf(app, "/api/scan/unresolved"),
+			await ruf(app, "/api/scan/4006381333931/assign", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ releaseId: 1 }),
+			}),
+			await ruf(app, "/api/scan/4006381333931/assign", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ spielId: 999, plattform: "PS4" }),
+			}),
+			await ruf(app, "/api/scan/4006381333931", { method: "DELETE" }),
+			await ruf(app, "/api/scan/unresolved/4006381333931", { method: "DELETE" }),
 			await ruf(app, "/api/deviations"),
 			await ruf(app, "/api/review/queue"),
 			await ruf(app, "/api/review/progress"),

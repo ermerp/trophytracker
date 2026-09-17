@@ -8,6 +8,7 @@ import {
 	type Zustand,
 } from "../db/ownership";
 import type { Repositories } from "../db";
+import { EAN_MUSTER } from "../domain/ean";
 import type { AppEnv } from "../types";
 import { ISO_DATUM, liesJson } from "./validierung";
 
@@ -27,7 +28,7 @@ import { ISO_DATUM, liesJson } from "./validierung";
  * sonst bietet sie "ins Backlog uebernehmen" an.
  */
 
-async function absichtenErledigen(repos: Repositories, releaseId: number) {
+export async function absichtenErledigen(repos: Repositories, releaseId: number) {
 	const offen = await repos.plan.offeneAmZiel(["kauf", "wunsch"], { releaseId });
 	await repos.plan.erledigen(offen.map((e) => e.id), "besitz");
 	const listen = await repos.plan.offeneAmZiel(["todo", "backlog"], { releaseId });
@@ -36,8 +37,6 @@ async function absichtenErledigen(repos: Repositories, releaseId: number) {
 		aufListe: listen.some((e) => e.release_id === releaseId),
 	};
 }
-
-const EAN = /^\d{8,14}$/;
 
 type Koerper = Record<string, unknown>;
 
@@ -51,7 +50,7 @@ function pruefeExemplar(k: Koerper): { felder: PhysicalCopyFelder } | { fehler: 
 
 	if ("ean" in k) {
 		if (k.ean === null || k.ean === "") felder.ean = null;
-		else if (typeof k.ean === "string" && EAN.test(k.ean.trim())) felder.ean = k.ean.trim();
+		else if (typeof k.ean === "string" && EAN_MUSTER.test(k.ean.trim())) felder.ean = k.ean.trim();
 		else return { fehler: "EAN muss aus 8 bis 14 Ziffern bestehen." };
 	}
 	if ("zustand" in k) {

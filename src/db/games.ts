@@ -786,9 +786,17 @@ aeenliste haengt
 	/**
 	 * Release fuer eine Plattform - vorhanden oder neu (Stufe 10). Ein Wunsch
 	 * mit gewaehlter Plattform haengt an einem Release; fehlt es, entsteht es
-	 * hier, ohne Besitz und ohne Trophaeenliste (siehe NUR_WUNSCH).
+	 * hier, ohne Besitz und ohne Trophaeenliste (siehe NUR_WUNSCH). Seit
+	 * Stufe 17 auch der Weg des Scanners, wenn die Disc eine Plattform hat,
+	 * die das Spiel noch nicht kennt.
 	 */
-	async releaseFuerPlattform(gameId: number, plattform: Plattform, quelle: EreignisQuelle = "nutzer"): Promise<number> {
+	async releaseFuerPlattform(
+		gameId: number,
+		plattform: Plattform,
+		quelle: EreignisQuelle = "nutzer",
+		/** Anlass im Protokoll (8.5): Listeneintrag, seit Stufe 17 auch der Scanner. */
+		detail = "für einen Listeneintrag",
+	): Promise<number> {
 		const vorhanden = await this.db
 			.prepare(
 				"SELECT id FROM release WHERE game_id = ? AND platform = ? " +
@@ -802,7 +810,7 @@ aeenliste haengt
 			.bind(gameId, plattform)
 			.first<{ id: number }>();
 		if (!r) throw new Error("Release konnte nicht angelegt werden.");
-		await this.events.schreiben({ source: quelle, kind: "release_angelegt", releaseId: r.id, neu: plattform, detail: "für einen Listeneintrag" });
+		await this.events.schreiben({ source: quelle, kind: "release_angelegt", releaseId: r.id, neu: plattform, detail });
 		return r.id;
 	}
 
