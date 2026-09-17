@@ -268,6 +268,13 @@ export type ErfasstAntwort = {
   aufListe: boolean
 }
 
+/** „Von der Wunsch- und Kaufliste erledigt." – je nachdem, was der Worker erledigt hat (Stufe 15). */
+export function erledigtText(absichten: ErfasstAntwort['absichtenErledigt']): string {
+  const arten = new Set(absichten.map((a) => a.art))
+  const liste = arten.has('wunsch') && arten.has('kauf') ? 'Wunsch- und Kaufliste' : arten.has('kauf') ? 'Kaufliste' : 'Wunschliste'
+  return `Von der ${liste} erledigt.`
+}
+
 /** Kandidat für den Backlog aus v_backlog_kandidaten: im Besitz, nie angefasst (Stufe 12). */
 export type BacklogKandidat = {
   releaseId: number

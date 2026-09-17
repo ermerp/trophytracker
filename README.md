@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 16 abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 17 deployt, Abnahme steht aus** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -64,6 +64,12 @@ nur Erkanntes, IGDB nur Entscheidungen und Statuswechsel, der Verlauf beginnt
 mit dem Deploy und wird unbegrenzt aufbewahrt und mitgesichert (vier
 Entscheidungen vom 16.09.2026). Sichtbar als Block „Verlauf" im Spieldetail
 und als Ansicht „Änderungen" mit Quellenfilter. **Abgenommen am 16.09.2026.**
+Stufe 17 bringt den Barcode-Scan (Abschnitt 9): `/scannen` in der Leiste, mit
+der Handy-Kamera und der Laptop-Webcam, ohne externe EAN-Quelle – ein Code wird
+beim ersten Mal aus der eigenen Sammlung gewählt (oder das Spiel angelegt) und
+ist danach bekannt. Zuordnen legt Disc und Mapping an, erledigt Kauf- und
+Wunscheinträge und steht im Verlauf als „per Barcode". Keine Migration.
+**Noch nicht abgenommen** – der Test mit den echten Discs am Handy steht aus.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -112,16 +118,19 @@ Was steht und in Betrieb nachgewiesen ist:
 | Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
 | Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 20 (Migration 0018). **Stufe 15 abgenommen am 16.09.2026** |
 | Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt „Metadaten auffrischen" nach (täglich erst mit dem Cron, Stufe 18) |
+| Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer. Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen. Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. Keine externe EAN-Quelle (Messung von eBay-GTIN gegen die echten Codes nach dem Regal-Erfassen) |
 | Änderungen | Werkzeug in den Einstellungen (`/aenderungen`): wer wann was geschrieben hat, neueste zuerst, nach Quelle filterbar (du, PSN-Sync, IGDB, Import), je Zeile mit Link ins Spiel; „ältere laden". Im Spieldetail derselbe Verlauf als Block. Nur lesend – Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidungen, Vorbelegung und Prüflisten-Einträge werden protokolliert, Cover/Wertung beim Auffrischen und die To-Do-Reihenfolge nicht (Migration 0019) |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 17 – Barcode-Scan** mit Auflösungskette ohne Feed
-(Abschnitt 9), per Handy-Kamera und Laptop-Webcam (Entscheidung vom 16.09.2026). Reihenfolge danach, am 16.09.2026 entschieden: 18 Cron und PWA,
-19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20 AWIN-Feed, 21 PSN
-Store-Preise (Abschnitt 16 der Spezifikation). Jeder neue Schreiber hängt sich
-ins Änderungsprotokoll ein (Abschnitt 8.5).
+**Als Nächstes: Stufe 18 – Cron Trigger und PWA.** Reihenfolge danach, am
+16.09.2026 entschieden: 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
+AWIN-Feed, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation). Jeder neue
+Schreiber hängt sich ins Änderungsprotokoll ein (Abschnitt 8.5). Offen aus
+Stufe 17: Sobald das Regal erfasst ist, werden eBay Browse API (GTIN) und
+upcitemdb gegen die echten Codes gemessen (Abschnitt 9.2) – bei guter Quote
+wird das eine kleine Stufe 17b.
 
 ## Architektur in einem Absatz
 
@@ -147,6 +156,16 @@ was produktiv tatsächlich ausgeliefert wird, `npm run build` und dann
 
 Die lokale Entwicklung läuft gegen eine **lokale** D1 in `.wrangler/`, nicht gegen
 die produktive Datenbank. Nur Befehle mit `--remote` fassen die echten Daten an.
+
+**Scanner lokal testen:** Kamerazugriff braucht einen sicheren Kontext –
+`http://localhost:5173` und `http://localhost:8787` sind einer, eine Adresse im
+LAN vom Handy aus nicht. Am Laptop läuft der Scanner also unter `npm run dev`
+mit der Webcam (Firefox und Desktop-Chrome nehmen den Polyfill-Pfad, sichtbar
+an der Pille „Fallback"); das Handy testet gegen die Produktion, die per
+`workers.dev` ohnehin HTTPS hat. Die ZXing-WASM-Datei (rund 1 MB) liegt nach
+`npm run build` unter `frontend/dist/assets/` und kommt vom eigenen Worker,
+nicht von einem CDN. Ohne Kamera lässt sich jeder Weg über das Textfeld
+„EAN eintippen" durchspielen; eine gültige Test-EAN ist `4006381333931`.
 
 ```bash
 npm test             # Vitest

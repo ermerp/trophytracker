@@ -9,9 +9,11 @@ import { Kaufliste } from './Kaufliste'
 import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
 import { Navigation } from './Navigation'
+import { OffeneScans } from './OffeneScans'
 import { OhneZuordnung } from './OhneZuordnung'
 import { Pruefliste } from './Pruefliste'
 import { Sammlung } from './Sammlung'
+import { Scannen } from './Scannen'
 import { SammlungPruefen } from './SammlungPruefen'
 import { Sicherung } from './Sicherung'
 import { Todo } from './Todo'
@@ -64,6 +66,7 @@ function App() {
           <Route path="/luecken" element={<Luecken />} />
           <Route path="/kaufliste" element={<Kaufliste />} />
           <Route path="/erscheint-bald" element={<ErscheintBald />} />
+          <Route path="/scannen" element={<Scannen />} />
           <Route path="/pruefliste" element={<Pruefliste />} />
           <Route
             path="/einstellungen"
@@ -73,6 +76,7 @@ function App() {
                 <Einstellungen />
                 <Igdb />
                 <Sicherung />
+                <OffeneScans />
                 <Abweichungen />
                 <Werkzeuge />
               </>

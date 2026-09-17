@@ -65,6 +65,9 @@ describe("beschreibeEreignis", () => {
 		expect(beschreibeEreignis(ereignis({ kind: "liste_eintrag_erledigt", field: "wunsch", detail: "besitz" }))).toBe(
 			"Wunschliste: erledigt (durch Erfassen)",
 		);
+		// Stufe 17: der Scanner ist der erste neue Schreiber nach dem Protokoll.
+		expect(beschreibeEreignis(ereignis({ kind: "exemplar_angelegt", detail: "scan" }))).toBe("Disc erfasst (per Barcode)");
+		expect(beschreibeEreignis(ereignis({ kind: "exemplar_angelegt", new_value: "gut", detail: null }))).toBe("Disc erfasst, Zustand gut");
 		expect(beschreibeEreignis(ereignis({ kind: "liste_eintrag_geaendert", field: "kind", old_value: "backlog", new_value: "todo", detail: "kopplung" }))).toBe(
 			"Umgehängt: Backlog → To-Do (über die Bewertung)",
 		);

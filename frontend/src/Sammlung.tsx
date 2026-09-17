@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  ApiFehler,
   DISCTEXT,
   PLATINTEXT,
   PLATTFORMEN,
@@ -10,6 +9,7 @@ import {
   QUELLENTEXT,
   STATUSTEXT,
   anfrage,
+  erledigtText,
   type DiscFassung,
   type ErfasstAntwort,
   type Platin,
@@ -18,6 +18,7 @@ import {
   type Quelle,
 } from './api'
 import { Hinweise } from './Hinweise'
+import { SpielAnlegen } from './SpielAnlegen'
 
 /**
  * Sammlung (Use Case 1): Kachelraster mit Filterleiste und Suche.
@@ -59,8 +60,6 @@ type Spiel = {
 
 type Antwort = { gesamt: number; limit: number; offset: number; spiele: Spiel[] }
 
-type Kandidat = { spielId: number; titel: string; plattformen: string[] }
-
 /**
  * Zuletzt angelegter Besitz je Release – für das Rückgängig. Seit Stufe 15
  * mit den Absichten, die der Worker dabei erledigt hat (Kauf und Wunsch,
@@ -71,13 +70,6 @@ type Erledigt = Pick<ErfasstAntwort, 'absichtenErledigt' | 'aufListe'>
 type Eben =
   | ({ art: 'exemplar'; id: number; releaseId: number } & Erledigt)
   | ({ art: 'digital'; id: number; releaseId: number; quelle: Quelle } & Erledigt)
-
-/** „Von der Wunsch- und Kaufliste erledigt." – je nachdem, was der Worker erledigt hat (Stufe 15). */
-function erledigtText(absichten: ErfasstAntwort['absichtenErledigt']): string {
-  const arten = new Set(absichten.map((a) => a.art))
-  const liste = arten.has('wunsch') && arten.has('kauf') ? 'Wunsch- und Kaufliste' : arten.has('kauf') ? 'Kaufliste' : 'Wunschliste'
-  return `Von der ${liste} erledigt.`
-}
 
 const FILTER = {
   platform: { text: 'Plattform', werte: PLATTFORMEN.map((p) => [p, p] as const) },
@@ -437,113 +429,5 @@ export function Sammlung() {
         </>
       )}
     </>
-  )
-}
-
-/**
- * Spiel von Hand anlegen – für Discs, die nie gestartet wurden und deshalb
- * keine Trophäenliste haben. Bei gleichem Titelschlüssel warnt der Server
- * und nennt Kandidaten; dann ist meist ein weiteres Release gemeint.
- */
-function SpielAnlegen({ onAngelegt }: { onAngelegt: () => Promise<void> }) {
-  const [offen, setOffen] = useState(false)
-  const [titel, setTitel] = useState('')
-  const [plattform, setPlattform] = useState<Plattform>('PS4')
-  const [kandidaten, setKandidaten] = useState<Kandidat[]>([])
-  const [meldung, setMeldung] = useState<string | null>(null)
-  const [laeuft, setLaeuft] = useState(false)
-
-  function zuruecksetzen() {
-    setTitel('')
-    setKandidaten([])
-    setMeldung(null)
-    setOffen(false)
-  }
-
-  async function anlegen(trotzdem: boolean) {
-    setLaeuft(true)
-    setMeldung(null)
-    try {
-      await anfrage('/api/games', { methode: 'POST', koerper: { titel: titel.trim(), plattform, trotzdem } })
-      setMeldung(`„${titel.trim()}" (${plattform}) angelegt.`)
-      setTitel('')
-      setKandidaten([])
-      await onAngelegt()
-    } catch (f) {
-      if (f instanceof ApiFehler && f.status === 409 && Array.isArray(f.antwort.kandidaten)) {
-        setKandidaten(f.antwort.kandidaten as Kandidat[])
-      } else {
-        setMeldung(f instanceof Error ? f.message : 'Anlegen fehlgeschlagen.')
-      }
-    } finally {
-      setLaeuft(false)
-    }
-  }
-
-  async function releaseAnhaengen(k: Kandidat) {
-    setLaeuft(true)
-    try {
-      await anfrage('/api/releases', { methode: 'POST', koerper: { spielId: k.spielId, plattform } })
-      setMeldung(`${plattform}-Release an „${k.titel}" angehängt.`)
-      setTitel('')
-      setKandidaten([])
-      await onAngelegt()
-    } catch (f) {
-      setMeldung(f instanceof Error ? f.message : 'Anhängen fehlgeschlagen.')
-    } finally {
-      setLaeuft(false)
-    }
-  }
-
-  if (!offen) {
-    return (
-      <p>
-        <button type="button" onClick={() => setOffen(true)}>Spiel anlegen</button>
-        {meldung && <span role="status"> {meldung}</span>}
-      </p>
-    )
-  }
-
-  return (
-    <form
-      className="anlegen"
-      onSubmit={(e) => {
-        e.preventDefault()
-        void anlegen(false)
-      }}
-    >
-      <p className="steuerung">
-        <input
-          type="text"
-          value={titel}
-          onChange={(e) => { setTitel(e.target.value); setKandidaten([]) }}
-          placeholder="Titel"
-          aria-label="Titel"
-          autoFocus
-        />{' '}
-        <select value={plattform} onChange={(e) => setPlattform(e.target.value as Plattform)} aria-label="Plattform">
-          {PLATTFORMEN.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>{' '}
-        <button type="submit" disabled={laeuft || titel.trim() === ''}>Anlegen</button>{' '}
-        <button type="button" onClick={zuruecksetzen}>Abbrechen</button>
-      </p>
-      {kandidaten.length > 0 && (
-        <div className="hinweis">
-          <p>Ein Spiel mit diesem Titel gibt es schon:</p>
-          <ul>
-            {kandidaten.map((k) => (
-              <li key={k.spielId}>
-                <Link to={`/spiel/${k.spielId}`}>{k.titel}</Link> ({k.plattformen.join(', ') || 'ohne Release'}){' '}
-                <button type="button" disabled={laeuft || k.plattformen.includes(plattform)} onClick={() => releaseAnhaengen(k)}>
-                  {plattform}-Release anhängen
-                </button>
-              </li>
-            ))}
-          </ul>
-          <button type="button" disabled={laeuft} onClick={() => anlegen(true)}>Trotzdem als neues Spiel anlegen</button>
-        </div>
-      )}
-      {meldung && <p role="status">{meldung}</p>}
-    </form>
   )
 }

@@ -176,13 +176,16 @@ main {
   color: inherit;
   text-decoration: none;
   opacity: 0.7;
-  /* Fuenf Eintraege seit Stufe 14, sechs seit Stufe 15 (Kaufliste): auf dem
-     Handy Symbol ueber Text, sonst bricht "To-Do" um oder die Leiste laeuft
-     ueber; mit sechs Eintraegen passt 0.7rem noch auf 320 px. */
+  /* Fuenf Eintraege seit Stufe 14, sechs seit Stufe 15 (Kaufliste), sieben
+     seit Stufe 17 (Scannen): auf dem Handy Symbol ueber Text, sonst bricht
+     "To-Do" um oder die Leiste laeuft ueber; mit sieben Eintraegen braucht
+     320 px 0.6rem und enge Buchstaben ("Einstellungen" ist der breiteste).
+     Stufe 19 raeumt das Layout auf. */
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
@@ -215,6 +218,7 @@ main {
     flex-direction: row;
     gap: 0.4rem;
     font-size: 0.9rem;
+    letter-spacing: normal;
   }
 
   /* Als Grid-Item wuerde main mit margin:auto auf Inhaltsbreite schrumpfen. */
@@ -1031,4 +1035,90 @@ button.griff:active {
 .pille.quelle-feed,
 .pille.quelle-migration {
   background: rgba(90, 120, 200, 0.2);
+}
+
+/* --- Stufe 17: Scannen (Abschnitt 9) --- */
+
+/*
+ * Drei feste Zonen: Kamera, Textfeld, Ergebniskarte. Das Kamerabild ist auf
+ * dem Handy auf gut ein Drittel der Hoehe begrenzt, damit die Karte darunter
+ * ohne Scrollen bedienbar bleibt; die Karte hat eine Mindesthoehe, damit die
+ * Knoepfe bei jeder Disc an derselben Stelle stehen (Abschnitt 13).
+ */
+.scanner video[hidden] {
+  display: none;
+}
+
+.scanner video {
+  display: block;
+  width: 100%;
+  max-height: 40vh;
+  object-fit: cover;
+  background: #000;
+  border-radius: 6px;
+}
+
+.scanner .kamera-zeile {
+  margin: 0.4rem 0;
+}
+
+.scanner form {
+  margin-top: 0.4rem;
+}
+
+.scankarte {
+  min-height: 12rem;
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 6px;
+}
+
+.scankarte .pruefkarte {
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.scankarte .aktionen {
+  margin: 0.5rem 0;
+}
+
+.scankarte .aktionen button {
+  flex: 1 1 9rem;
+}
+
+.scankarte ul.treffer {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0;
+}
+
+.scankarte ul.treffer li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.scankarte ul.treffer .titel {
+  flex: 1 1 12rem;
+  font-weight: 600;
+}
+
+@media (max-width: 30rem) {
+  .scanner video {
+    max-height: 32vh;
+  }
+
+  .scankarte {
+    padding: 0.6rem;
+  }
+
+  .scankarte .pruefkarte .bild {
+    width: 4.5rem;
+    height: 4.5rem;
+    font-size: 1.8rem;
+  }
 }

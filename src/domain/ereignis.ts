@@ -134,6 +134,7 @@ const ANLASS: Record<string, string> = {
 	triage: "aus Prüfliste",
 	kopplung: "über die Bewertung",
 	besitz: "durch Erfassen",
+	scan: "per Barcode",
 	kauf: "durch erledigten Kauf",
 };
 
@@ -224,7 +225,7 @@ export function beschreibeEreignis(e: Ereignis): string {
 		case "liste_eintrag_geloescht":
 			return `Von ${wert(e.field, LISTE)} entfernt`;
 		case "exemplar_angelegt":
-			return mitDetail(e.new_value ? `Disc erfasst, Zustand ${e.new_value}` : "Disc erfasst", e.detail);
+			return mitAnlass(e.new_value ? `Disc erfasst, Zustand ${e.new_value}` : "Disc erfasst", e.detail);
 		case "exemplar_geaendert":
 			return `Disc – ${wert(e.field, EXEMPLAR_FELD)}: ${uebergang(e)}`;
 		case "exemplar_geloescht":
