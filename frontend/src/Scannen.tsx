@@ -43,6 +43,12 @@ type SuchSpiel = { id: number; titel: string; bild: string | null; releases: Suc
 /** Ein im Sammelmodus weggeschriebener Code, neueste zuerst. */
 type Gesammelt = { ean: string; titel: string | null; plattform: Plattform | null }
 
+/**
+ * Kurze Rückmeldung im Kamerabild (Rückmeldung des Nutzers vom 18.09.2026:
+ * die Liste steht zu weit unten, um sie beim Scannen zu sehen).
+ */
+type Blitz = { art: 'neu' | 'bekannt' | 'fehler'; zeichen: string; text: string }
+
 type Zustand =
   | { art: 'leer' }
   | { art: 'treffer'; t: Treffer }
@@ -64,6 +70,18 @@ export function Scannen() {
   /** Codes dieser Sitzung – dieselbe Hülle ein zweites Mal ist keine zweite Disc. */
   const gesammelteCodes = useRef(new Set<string>())
 
+  const [blitz, setBlitz] = useState<Blitz | null>(null)
+  const blitzZeit = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /** Zeigt das Zeichen für einen Moment über dem Kamerabild. */
+  const zeigeBlitz = useCallback((b: Blitz) => {
+    setBlitz(b)
+    if (blitzZeit.current) clearTimeout(blitzZeit.current)
+    blitzZeit.current = setTimeout(() => setBlitz(null), 900)
+  }, [])
+
+  useEffect(() => () => { if (blitzZeit.current) clearTimeout(blitzZeit.current) }, [])
+
   const [letzterCode, setLetzterCode] = useState<string | null>(null)
   // Die Erkennungsschleife ruft `aufloesen` aus einem Effekt heraus auf und
   // sieht den Zustand vom Beginn des Laufs; der Modus kommt deshalb aus einem Ref.
@@ -84,16 +102,25 @@ export function Scannen() {
         const schonDa = gesammelteCodes.current.has(t.ean)
         if (schonDa || t.treffer === 'mapping') tonBekannt()
         else tonNeu()
+        zeigeBlitz(
+          schonDa
+            ? { art: 'bekannt', zeichen: '↻', text: `${t.ean} – schon gescannt` }
+            : t.treffer === 'mapping'
+              ? { art: 'bekannt', zeichen: '✓', text: `${t.release?.titel} (${t.release?.plattform})` }
+              : { art: 'neu', zeichen: '✓', text: t.ean },
+        )
         if (!schonDa) {
           gesammelteCodes.current.add(t.ean)
           setGesammelt((g) => [{ ean: t.ean, titel: t.release?.titel ?? null, plattform: t.release?.plattform ?? null }, ...g])
         }
         return false
       }
+      zeigeBlitz({ art: 'neu', zeichen: '✓', text: t.ean })
       setZustand(t.treffer === 'mapping' ? { art: 'treffer', t } : { art: 'auswahl', t })
       return true
     } catch (f) {
       if (sammelnRef.current) tonFehler()
+      zeigeBlitz({ art: 'fehler', zeichen: '✗', text: f instanceof Error ? f.message : 'Fehler' })
       setFehler(f instanceof Error ? f.message : 'Auflösen fehlgeschlagen.')
       return false
     } finally {
@@ -179,15 +206,23 @@ export function Scannen() {
       <h1>Scannen</h1>
 
       <section className="scanner">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          autoPlay
-          aria-label="Kamerabild"
-          hidden={kameraStatus === 'aus' || kameraStatus === 'fehler'}
-          className={gespiegelt ? 'gespiegelt' : undefined}
-        />
+        <div className={`kamerabild${blitz ? ` blitz-${blitz.art}` : ''}`} hidden={kameraStatus === 'aus' || kameraStatus === 'fehler'}>
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            autoPlay
+            aria-label="Kamerabild"
+            className={gespiegelt ? 'gespiegelt' : undefined}
+          />
+          {blitz && (
+            <p className="blitz" role="status">
+              <span className="zeichen" aria-hidden="true">{blitz.zeichen}</span>
+              <span className="text">{blitz.text}</span>
+            </p>
+          )}
+          {sammeln && <p className="zaehler" aria-hidden="true">{gesammelt.length}</p>}
+        </div>
         <p className="steuerung kamera-zeile">
           {kameraStatus === 'laeuft' ? (
             <>

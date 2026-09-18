@@ -10,11 +10,22 @@
 /** Dieselbe Regel wie fuer physical_copy.ean: 8 bis 14 Ziffern. */
 export const EAN_MUSTER = /^\d{8,14}$/;
 
-/** Trimmt, entfernt Leerzeichen und Bindestriche; null, wenn keine 8 bis 14 Ziffern bleiben. */
+/**
+ * Trimmt, entfernt Leerzeichen und Bindestriche; null, wenn keine 8 bis 14
+ * Ziffern bleiben.
+ *
+ * Ein zwoelfstelliger UPC-A wird mit fuehrender Null zur GTIN-13 - so ist
+ * derselbe Code immer derselbe Eintrag, egal ob ihn die native Erkennung als
+ * `upc_a` oder der Polyfill als `ean_13` liefert (Rueckmeldung des Nutzers vom
+ * 18.09.2026: Horizon Forbidden West traegt einen UPC-A, 711719577997).
+ * Die Pruefziffer bleibt dabei gueltig: Die fuehrende Null verschiebt die
+ * Gewichte nicht, weil sie selbst das Gewicht 1 traegt.
+ */
 export function normalisiereEan(roh: unknown): string | null {
 	if (typeof roh !== "string" && typeof roh !== "number") return null;
 	const ean = String(roh).replace(/[\s-]/g, "");
-	return EAN_MUSTER.test(ean) ? ean : null;
+	if (!EAN_MUSTER.test(ean)) return null;
+	return ean.length === 12 ? `0${ean}` : ean;
 }
 
 /**

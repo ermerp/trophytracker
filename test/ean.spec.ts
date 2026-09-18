@@ -9,6 +9,16 @@ describe("normalisiereEan", () => {
 		expect(normalisiereEan(4012345678901)).toBe("4012345678901");
 	});
 
+	it("macht aus einem UPC-A eine GTIN-13 mit fuehrender Null", () => {
+		// Horizon Forbidden West (PS5), gemessen am 18.09.2026.
+		expect(normalisiereEan("711719577997")).toBe("0711719577997");
+		expect(normalisiereEan("0711719577997")).toBe("0711719577997");
+		expect(pruefzifferStimmt(normalisiereEan("711719577997") as string)).toBe(true);
+		// Acht- und dreizehnstellige bleiben, wie sie sind.
+		expect(normalisiereEan("96385074")).toBe("96385074");
+		expect(normalisiereEan("4005209114554")).toBe("4005209114554");
+	});
+
 	it("weist alles andere ab", () => {
 		expect(normalisiereEan("1234567")).toBeNull();
 		expect(normalisiereEan("123456789012345")).toBeNull();
