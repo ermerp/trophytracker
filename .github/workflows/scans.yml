@@ -1,0 +1,55 @@
+name: Offene Scans auflösen
+
+# Holt Titel zu gescannten Barcodes (Abschnitt 9.3, Stufe 17b).
+#
+# Warum hier und nicht im Worker: Die freie EAN-Quelle drosselt nach jeweils
+# sechs Abfragen um rund 90 Sekunden und erlaubt 100 am Tag. Ein Job darf so
+# lange brauchen, eine Anfrage im Worker nicht (10 ms CPU, und der Nutzer
+# wartet). Dieselbe Trennung wie bei den Händler-Feeds (Abschnitt 2).
+#
+# Der Job schreibt nur Titelvorschläge. Zugeordnet wird nichts automatisch -
+# das entscheidet der Nutzer in der Ansicht "Offene Scans".
+
+on:
+  schedule:
+    # Täglich 04:23 UTC, versetzt zur Sicherung (03:17) und nicht zur vollen
+    # Stunde: dort stauen sich die Cron-Jobs aller Repositories.
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+    inputs:
+      anzahl:
+        description: "Höchstens so viele Codes abfragen"
+        required: false
+        default: "100"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scans
+  cancel-in-progress: false
+
+env:
+  APP_URL: https://trophytracker.philipp-ermer-bvb.workers.dev
+
+jobs:
+  aufloesen:
+    name: Titel zu offenen Barcodes holen
+    runs-on: ubuntu-latest
+    # 100 Codes mit 8 s Abstand plus Drosselpausen: gut 20 Minuten im
+    # schlechtesten Fall. Der Standard von 6 Stunden wäre zu großzügig.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # Der Worker steht hinter Cloudflare Access (15.3); das Service Token
+      # ist derselbe Mechanismus wie für Personen, nur ohne Browser.
+      - name: Titel holen und eintragen
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: node scripts/scans-aufloesen.mjs "${{ inputs.anzahl || '100' }}"

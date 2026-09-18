@@ -9,15 +9,16 @@ import { anfrage, datum } from './api'
  * sind. Nur sichtbar, wenn es welche gibt.
  */
 
-type Scan = { ean: string; scans: number; zuerstAm: string; zuletztAm: string }
+type Scan = { ean: string; scans: number; zuerstAm: string; zuletztAm: string; titel: string | null; eindeutig: boolean }
 
 export function OffeneScans() {
   const [scans, setScans] = useState<Scan[] | null>(null)
+  const [eindeutig, setEindeutig] = useState(0)
   const [fehler, setFehler] = useState<string | null>(null)
 
   useEffect(() => {
-    anfrage<{ scans: Scan[] }>('/api/scan/unresolved')
-      .then((a) => setScans(a.scans))
+    anfrage<{ scans: Scan[]; eindeutig: number }>('/api/scan/unresolved')
+      .then((a) => { setScans(a.scans); setEindeutig(a.eindeutig) })
       .catch((f: unknown) => setFehler(f instanceof Error ? f.message : 'Laden fehlgeschlagen.'))
   }, [])
 
@@ -36,7 +37,11 @@ export function OffeneScans() {
   return (
     <section>
       <h2>Offene Scans{scans && ` (${scans.length})`}</h2>
-      <p className="zeile">Gescannte Codes ohne Zuordnung – beim Scannen mit „Später" liegen gelassen.</p>
+      <p className="zeile">
+        Gescannte Codes ohne Zuordnung – beim Scannen mit „Später" liegen gelassen.{' '}
+        <Link to="/scans">Alle zuordnen</Link>
+        {eindeutig > 0 && ` – ${eindeutig} davon mit eindeutigem Vorschlag.`}
+      </p>
       {fehler && <p role="alert">{fehler}</p>}
       {scans && scans.length > 0 && (
         <div className="tabelle">
@@ -46,6 +51,7 @@ export function OffeneScans() {
                 <th>EAN</th>
                 <th>gescannt</th>
                 <th>zuletzt</th>
+                <th>Vorschlag</th>
                 <th></th>
               </tr>
             </thead>
@@ -55,6 +61,7 @@ export function OffeneScans() {
                   <td>{s.ean}</td>
                   <td>{s.scans}×</td>
                   <td>{datum(s.zuletztAm)}</td>
+                  <td>{s.titel ?? 'unbekannt'}</td>
                   <td>
                     <Link to={`/scannen?ean=${s.ean}`}>zuordnen</Link>{' '}
                     <button type="button" className="klein" onClick={() => verwerfen(s.ean)}>verwerfen</button>

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { PLATTFORMEN, anfrage, erledigtText, type ErfasstAntwort, type Plattform } from './api'
+import { anfrage, erledigtText, scanWiederOeffnen, type ErfasstAntwort, type Plattform } from './api'
+import { ScanAuswahl } from './ScanAuswahl'
 import { useKamera } from './kamera'
-import { SpielAnlegen } from './SpielAnlegen'
 import { tonBekannt, tonFehler, tonNeu } from './ton'
 
 /**
@@ -37,9 +37,6 @@ type Zuordnung = ErfasstAntwort & {
   spiel: { spielId: number; titel: string; plattform: Plattform } | null
 }
 
-type SuchRelease = { id: number; plattform: Plattform; exemplare: number; digital: string[] }
-type SuchSpiel = { id: number; titel: string; bild: string | null; releases: SuchRelease[] }
-
 /** Ein im Sammelmodus weggeschriebener Code, neueste zuerst. */
 type Gesammelt = { ean: string; titel: string | null; plattform: Plattform | null }
 
@@ -54,8 +51,6 @@ type Zustand =
   | { art: 'treffer'; t: Treffer }
   | { art: 'auswahl'; t: Treffer }
   | { art: 'erfasst'; z: Zuordnung }
-
-const istPlattform = (w: string | null | undefined): w is Plattform => (PLATTFORMEN as readonly string[]).includes(w ?? '')
 
 export function Scannen() {
   const [params, setParams] = useSearchParams()
@@ -198,6 +193,9 @@ export function Scannen() {
       }
       await anfrage(`/api/physical-copies/${z.id}`, { methode: 'DELETE' })
       await anfrage(`/api/scan/${z.ean}`, { methode: 'DELETE' })
+      // Der Code war vor dem Zuordnen ein offener Scan und muss es wieder
+      // werden – sonst ist er weder zugeordnet noch offen.
+      await scanWiederOeffnen(z.ean)
       setSitzung((n) => Math.max(0, n - 1))
       weiter()
       setHinweis('Zurückgenommen.')
@@ -351,9 +349,11 @@ export function Scannen() {
         )}
 
         {zustand.art === 'auswahl' && (
-          <Auswahl
+          <ScanAuswahl
             key={zustand.t.ean}
-            t={zustand.t}
+            ean={zustand.t.ean}
+            scans={zustand.t.scans}
+            angebot={zustand.t.angebot ?? null}
             laeuft={laeuft}
             onWahl={(koerper) => zuordnen(zustand.t.ean, koerper)}
             onSpaeter={() => weiter()}
@@ -422,106 +422,6 @@ function TrefferKarte({
           <button type="button" disabled={laeuft} onClick={onWeiter}>Weiter</button>
         </p>
       </div>
-    </div>
-  )
-}
-
-/** Stufe 3 und 4 der Kette: aus der Sammlung wählen oder anlegen. Je Code neu aufgebaut (key). */
-function Auswahl({
-  t,
-  laeuft,
-  onWahl,
-  onSpaeter,
-}: {
-  t: Treffer
-  laeuft: boolean
-  onWahl: (koerper: { releaseId: number } | { spielId: number; plattform: Plattform }) => void
-  onSpaeter: () => void
-}) {
-  const [suchtext, setSuchtext] = useState(t.angebot?.titel ?? '')
-  const [spiele, setSpiele] = useState<SuchSpiel[] | null>(null)
-  const [sucht, setSucht] = useState(false)
-
-  // Suche entprellen wie in der Sammlung: 300 ms nach dem letzten Tastendruck.
-  useEffect(() => {
-    const suche = suchtext.trim()
-    if (suche === '') {
-      setSpiele(null)
-      return
-    }
-    const zeit = setTimeout(async () => {
-      setSucht(true)
-      try {
-        const a = await anfrage<{ spiele: SuchSpiel[] }>(`/api/games?search=${encodeURIComponent(suche)}&limit=10`)
-        setSpiele(a.spiele)
-      } catch {
-        setSpiele([])
-      } finally {
-        setSucht(false)
-      }
-    }, 300)
-    return () => clearTimeout(zeit)
-  }, [suchtext])
-
-  const plattformVorgabe: Plattform = istPlattform(t.angebot?.plattform) ? t.angebot!.plattform : 'PS4'
-
-  return (
-    <div className="auswahl">
-      <p>
-        <strong>EAN {t.ean}</strong> ist noch nicht zugeordnet
-        {t.scans > 1 && ` (zum ${t.scans}. Mal gescannt)`}.
-        {t.angebot && ` Ein Händler nennt „${t.angebot.titel}"${t.angebot.plattform ? ` (${t.angebot.plattform})` : ''}.`}
-      </p>
-      <p className="steuerung">
-        <input
-          type="search"
-          value={suchtext}
-          onChange={(e) => setSuchtext(e.target.value)}
-          placeholder="Titel in der Sammlung suchen"
-          aria-label="Titel in der Sammlung suchen"
-          autoFocus
-        />{' '}
-        <button type="button" disabled={laeuft} onClick={onSpaeter}>Später</button>
-      </p>
-      {sucht && <p>sucht …</p>}
-      {spiele && spiele.length === 0 && !sucht && <p>Kein Spiel mit diesem Titel in der Sammlung.</p>}
-      {spiele && spiele.length > 0 && (
-        <ul className="treffer">
-          {spiele.map((s) => (
-            <li key={s.id}>
-              <span className="titel">{s.titel}</span>{' '}
-              {s.releases.map((r) => (
-                <button key={r.id} type="button" disabled={laeuft} onClick={() => onWahl({ releaseId: r.id })}>
-                  {r.plattform}
-                  {r.exemplare > 0 && ` · Disc ×${r.exemplare}`}
-                </button>
-              ))}
-              {s.releases.length < PLATTFORMEN.length && (
-                <select
-                  value=""
-                  disabled={laeuft}
-                  aria-label={`Andere Plattform für ${s.titel}`}
-                  onChange={(e) => {
-                    if (istPlattform(e.target.value)) onWahl({ spielId: s.id, plattform: e.target.value })
-                  }}
-                >
-                  <option value="">andere Plattform …</option>
-                  {PLATTFORMEN.filter((p) => !s.releases.some((r) => r.plattform === p)).map((p) => (
-                    <option key={p} value={p}>{p} anlegen</option>
-                  ))}
-                </select>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      <SpielAnlegen
-        key={t.ean}
-        titelVorgabe={suchtext.trim()}
-        plattformVorgabe={plattformVorgabe}
-        vorhandenesVerwenden
-        onAngelegt={(releaseId) => onWahl({ releaseId })}
-      />
     </div>
   )
 }

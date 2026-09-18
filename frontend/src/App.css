@@ -1234,3 +1234,27 @@ button.griff:active {
 .gesammelt button.klein {
   float: right;
 }
+
+/* Offene Scans zuordnen (9.3): eine Zeile je Code, Blöcke wie im Import. */
+.scanliste {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 1rem;
+}
+
+.scanliste > li {
+  padding: 0.5rem 0;
+  border-top: 1px solid rgba(128, 128, 128, 0.3);
+}
+
+.scanliste .titel {
+  font-weight: 600;
+}
+
+.scanliste .knopfzeile {
+  margin: 0.3rem 0 0;
+}
+
+.scanliste .auswahl {
+  margin-top: 0.4rem;
+}

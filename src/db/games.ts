@@ -697,6 +697,19 @@ aeenliste haengt
 	}
 
 	/** Spiel mit dieser IGDB-Id, damit ein Wunsch ein vorhandenes Spiel wiederverwendet. */
+	/**
+	 * Alle Spieltitel - Grundlage des Abgleichs mit Haendlertiteln (9.3).
+	 *
+	 * Nur id und Titel: Die Plattformen holt der Aufrufer fuer die wenigen
+	 * Treffer nach, statt hier 430 Unterabfragen mitzuschleppen.
+	 */
+	async alleTitel(): Promise<Array<{ spielId: number; titel: string }>> {
+		const { results } = await this.db
+			.prepare("SELECT id AS spielId, title AS titel FROM game")
+			.all<{ spielId: number; titel: string }>();
+		return results;
+	}
+
 	async spielNachIgdbId(igdbId: number): Promise<number | null> {
 		const r = await this.db.prepare("SELECT id FROM game WHERE igdb_id = ?").bind(igdbId).first<{ id: number }>();
 		return r?.id ?? null;

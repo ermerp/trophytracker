@@ -72,6 +72,37 @@ describe("Grenzen der Sammlungsabfrage", () => {
 	});
 });
 
+describe("Offene Scans mit Abgleich (Stufe 17b)", () => {
+	/**
+	 * Die Ansicht liest alle offenen Scans, einmal die Titelliste der Sammlung
+	 * und die Releases der Treffer. Der Abgleich selbst laeuft im Worker; die
+	 * Sammlung wird dafuer einmal zerlegt, nicht je Code (CPU-Grenze).
+	 */
+	it("liest Sammlung und Treffer, nicht 430 Unterabfragen", async () => {
+		await env.DB.prepare("DELETE FROM unresolved_scan").run();
+		const vorschlaege = env.DB.prepare(
+			"INSERT INTO unresolved_scan (ean, title_raw, title_source, checked_at) VALUES (?, ?, 'upcitemdb', datetime('now'))",
+		);
+		// 56 offene Scans wie im Regal des Nutzers am 18.09.2026, jeder mit Treffer.
+		await env.DB.batch(
+			Array.from({ length: 56 }, (_, i) =>
+				vorschlaege.bind(`400000000${String(i).padStart(4, "0")}`, `Ps3 Game - Spiel ${i + 1} [German Version]`),
+			),
+		);
+
+		const antwort = await SELF.fetch(`${B}/api/scan/unresolved`);
+		expect(antwort.status).toBe(200);
+		const daten = (await antwort.json()) as { anzahl: number; eindeutig: number };
+		expect(daten.anzahl).toBe(56);
+		expect(daten.eindeutig).toBeGreaterThan(0);
+
+		// Sammlung (430) + Scans (56) + je Treffer ein Index-Lookup.
+		const gelesen = await zeilenGelesen("SELECT id AS spielId, title AS titel FROM game");
+		expect(gelesen).toBeLessThan(600);
+		await env.DB.prepare("DELETE FROM unresolved_scan").run();
+	});
+});
+
 describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	it("Sammlung, eine Seite nach Titel", async () => {
 		const antwort = await SELF.fetch(`${B}/api/games?limit=50`);
