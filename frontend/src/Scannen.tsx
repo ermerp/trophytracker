@@ -103,7 +103,7 @@ export function Scannen() {
 
   // Der zuletzt behandelte Code löst nicht erneut aus, bis ein anderer kam
   // (siehe useKamera); dieselbe Disc noch einmal geht über das Textfeld.
-  const { videoRef, status: kameraStatus, fehler: kameraFehler, nativ, geraete, starten, stoppen, wechseln, pausiert, setPausiert, kandidat } =
+  const { videoRef, status: kameraStatus, fehler: kameraFehler, nativ, geraete, starten, stoppen, wechseln, pausiert, setPausiert, kandidat, gespiegelt } =
     useKamera(aufloesen, letzterCode)
 
   // ?ean= aus den Einstellungen: sofort auflösen, Kamera bleibt aus, bis sie gestartet wird.
@@ -186,6 +186,7 @@ export function Scannen() {
           autoPlay
           aria-label="Kamerabild"
           hidden={kameraStatus === 'aus' || kameraStatus === 'fehler'}
+          className={gespiegelt ? 'gespiegelt' : undefined}
         />
         <p className="steuerung kamera-zeile">
           {kameraStatus === 'laeuft' ? (

@@ -1140,3 +1140,13 @@ button.griff:active {
   font-family: ui-monospace, monospace;
   font-weight: 600;
 }
+
+/*
+ * Frontkamera spiegeln: Die Laptop-Webcam zeigt die Szene so, wie die Kamera
+ * sie sieht - eine Bewegung nach rechts wandert im Bild nach links, und man
+ * korrigiert in die falsche Richtung. Nur die Darstellung; die Erkennung
+ * liest die echten Bilddaten (Rückmeldung des Nutzers vom 18.09.2026).
+ */
+.scanner video.gespiegelt {
+  transform: scaleX(-1);
+}

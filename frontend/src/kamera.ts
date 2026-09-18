@@ -44,6 +44,32 @@ async function erkenner(): Promise<{ erkenner: Erkenner; nativ: boolean }> {
 
 export type KameraStatus = 'aus' | 'startet' | 'laeuft' | 'fehler'
 
+/**
+ * Bildschirmsperre aufheben, solange die Kamera läuft. Gibt es die
+ * Schnittstelle nicht (Firefox, ältere Geräte), bleibt es beim
+ * Bildschirm-Timeout - der Scanner funktioniert weiter, man muss ihn nur
+ * wieder aufwecken.
+ */
+let sperre: WakeLockSentinel | null = null
+
+async function sperreSetzen(): Promise<void> {
+  try {
+    sperre ??= (await navigator.wakeLock?.request('screen')) ?? null
+    sperre?.addEventListener('release', () => { sperre = null }, { once: true })
+  } catch {
+    sperre = null
+  }
+}
+
+async function sperreLoesen(): Promise<void> {
+  try {
+    await sperre?.release()
+  } catch {
+    // Schon gelöst - nichts zu tun.
+  }
+  sperre = null
+}
+
 const TAKT_MS = 150
 const SPERRE_MS = 2000
 
@@ -69,6 +95,8 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
   const [nativ, setNativ] = useState<boolean | null>(null)
   const [geraete, setGeraete] = useState<MediaDeviceInfo[]>([])
   const [geraet, setGeraet] = useState<string | null>(null)
+  /** Frontkamera (Laptop, Handy-Selfiekamera): die Vorschau wird gespiegelt, sonst fühlen sich die Bewegungen falsch herum an. */
+  const [gespiegelt, setGespiegelt] = useState(false)
   const [pausiert, setPausiertState] = useState(false)
   /** Ein Code, der noch auf seine zweite Lesung wartet – die Oberflaeche zeigt „liest …". */
   const [kandidat, setKandidat] = useState<string | null>(null)
@@ -85,6 +113,7 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
     if (videoRef.current) videoRef.current.srcObject = null
+    void sperreLoesen()
     setStatus('aus')
   }, [])
 
@@ -119,7 +148,12 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
         }
         const alle = await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[])
         setGeraete(alle.filter((d) => d.kind === 'videoinput'))
-        setGeraet(deviceId ?? stream.getVideoTracks()[0]?.getSettings().deviceId ?? null)
+        const einstellungen = stream.getVideoTracks()[0]?.getSettings()
+        setGeraet(deviceId ?? einstellungen?.deviceId ?? null)
+        // Die Rückkamera zeigt die Welt, wie sie ist; alles andere (Laptop-Webcam,
+        // Selfiekamera) meldet 'user' oder gar nichts und gehört gespiegelt.
+        setGespiegelt(einstellungen?.facingMode !== 'environment')
+        await sperreSetzen()
         setStatus('laeuft')
       } catch (f) {
         stoppen()
@@ -188,5 +222,17 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
   // Beim Verlassen der Ansicht die Kamera freigeben.
   useEffect(() => stoppen, [stoppen])
 
-  return { videoRef, status, fehler, nativ, geraete, starten, stoppen, wechseln, pausiert, setPausiert, kandidat }
+  // Der Bildschirm darf im Sammelmodus nicht zumachen: Dort wird das Gerät
+  // minutenlang nicht berührt, und mit dem Sperrbildschirm endet die Kamera.
+  // Das System nimmt die Sperre beim Wegblenden zurück - danach neu anfordern.
+  useEffect(() => {
+    if (status !== 'laeuft') return
+    const beiSichtbarkeit = () => {
+      if (document.visibilityState === 'visible') void sperreSetzen()
+    }
+    document.addEventListener('visibilitychange', beiSichtbarkeit)
+    return () => document.removeEventListener('visibilitychange', beiSichtbarkeit)
+  }, [status])
+
+  return { videoRef, status, fehler, nativ, geraete, starten, stoppen, wechseln, pausiert, setPausiert, kandidat, gespiegelt }
 }
