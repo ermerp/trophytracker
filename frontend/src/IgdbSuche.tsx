@@ -108,6 +108,7 @@ export function IgdbSuche({
   plattformen = [],
   onWahl,
   onOhneTreffer,
+  ohneTrefferText,
   laeuft,
   mitPlattform = false,
   ohnePlattform = true,
@@ -125,6 +126,15 @@ export function IgdbSuche({
    * nachdem eine Suche gelaufen ist: kein Fallback, eine Entscheidung.
    */
   onOhneTreffer?: (begriff: string) => void
+  /**
+   * Beschriftung für diesen Knopf. Ohne Angabe bleibt er klein und
+   * zurückhaltend („übernehmen", Wunschliste und Import); mit Angabe ist er
+   * ein normaler Knopf – beim Anlegen einer Disc ist der Weg ohne IGDB kein
+   * Notausgang, sondern die richtige Wahl für Titel, die IGDB nicht kennt
+   * (die PlayStation Move Starter Disc etwa; der Nutzer hing am 18.09.2026
+   * genau hier fest, weil der Knopf als graue Kleinschrift unterging).
+   */
+  ohneTrefferText?: string
   laeuft?: boolean
 }) {
   const [begriff, setBegriff] = useState(vorgabe)
@@ -175,10 +185,15 @@ export function IgdbSuche({
         />
       )}
       {treffer && onOhneTreffer && begriff.trim() !== '' && (
-        <p className="zeile">
+        <p className={ohneTrefferText ? undefined : 'zeile'}>
           Nicht dabei?{' '}
-          <button type="button" className="klein" disabled={laeuft || sucht} onClick={() => onOhneTreffer(begriff.trim())}>
-            Ohne IGDB-Eintrag übernehmen: „{begriff.trim()}"
+          <button
+            type="button"
+            className={ohneTrefferText ? undefined : 'klein'}
+            disabled={laeuft || sucht}
+            onClick={() => onOhneTreffer(begriff.trim())}
+          >
+            {ohneTrefferText ?? 'Ohne IGDB-Eintrag übernehmen'}: „{begriff.trim()}"
           </button>
         </p>
       )}
