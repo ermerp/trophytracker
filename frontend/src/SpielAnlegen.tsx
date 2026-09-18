@@ -145,6 +145,7 @@ export function SpielAnlegen({
         ohnePlattform={false}
         onWahl={(k: IgdbKandidat, gewaehlt: string) => { void anlegen({ igdbId: k.igdbId }, false, gewaehlt) }}
         onOhneTreffer={(begriff) => { void anlegen({ titel: begriff }) }}
+        ohneTrefferText="Ohne IGDB-Eintrag anlegen"
       />
 
       {kandidaten.length > 0 && (
