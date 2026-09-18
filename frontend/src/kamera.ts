@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import wasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
+import { istBestaetigt, zaehleLesung, type Kandidat } from './bestaetigung'
 
 /**
  * Kamera und Barcode-Erkennung für den Scanner (Abschnitt 9.1, Stufe 17).
@@ -11,6 +12,9 @@ import wasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
  * liefert der eigene Worker aus (`?url`-Import), nicht ein CDN – wichtig
  * für die PWA in Stufe 18 und dafür, dass der Scanner nicht an einer
  * fremden Adresse hängt.
+ *
+ * Ein Code gilt erst, wenn ihn zwei Bilder gleich lesen (`bestaetigung.ts`) –
+ * die Prüfziffer allein fängt nicht jeden Fehlgriff.
  *
  * Nur EAN-13. Nach einem erkannten Code pausiert die Erkennung, bis der
  * Aufrufer sie weiterlaufen lässt (Serienerfassung: das Bild bleibt, die
@@ -53,6 +57,8 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
   const erkennerRef = useRef<Erkenner | null>(null)
   const pausiertRef = useRef(false)
   const letzterRef = useRef<{ code: string; zeit: number } | null>(null)
+  /** Zählt, wie oft der aktuelle Kandidat in Folge gelesen wurde (`bestaetigung.ts`). */
+  const kandidatRef = useRef<Kandidat>(null)
   const onCodeRef = useRef(onCode)
   onCodeRef.current = onCode
   const ignoriereRef = useRef(ignoriere)
@@ -64,10 +70,14 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
   const [geraete, setGeraete] = useState<MediaDeviceInfo[]>([])
   const [geraet, setGeraet] = useState<string | null>(null)
   const [pausiert, setPausiertState] = useState(false)
+  /** Ein Code, der noch auf seine zweite Lesung wartet – die Oberflaeche zeigt „liest …". */
+  const [kandidat, setKandidat] = useState<string | null>(null)
 
   const setPausiert = useCallback((wert: boolean) => {
     pausiertRef.current = wert
     setPausiertState(wert)
+    kandidatRef.current = null
+    setKandidat(null)
     if (!wert) letzterRef.current = { code: letzterRef.current?.code ?? '', zeit: Date.now() }
   }, [])
 
@@ -149,14 +159,20 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
         const codes = await e.detect(video)
         const code = codes.find((c) => /^\d{13}$/.test(c.rawValue))?.rawValue
         if (code && !pausiertRef.current && code !== ignoriereRef.current) {
-          const letzter = letzterRef.current
-          if (!letzter || letzter.code !== code || Date.now() - letzter.zeit > SPERRE_MS) {
-            letzterRef.current = { code, zeit: Date.now() }
-            pausiertRef.current = true
-            setPausiertState(true)
-            if (!(await onCodeRef.current(code))) {
-              pausiertRef.current = false
-              setPausiertState(false)
+          // Erst zählen, dann annehmen: ein Bild allein entscheidet nicht.
+          kandidatRef.current = zaehleLesung(kandidatRef.current, code)
+          setKandidat(istBestaetigt(kandidatRef.current) ? null : code)
+          if (istBestaetigt(kandidatRef.current)) {
+            const letzter = letzterRef.current
+            if (!letzter || letzter.code !== code || Date.now() - letzter.zeit > SPERRE_MS) {
+              kandidatRef.current = null
+              letzterRef.current = { code, zeit: Date.now() }
+              pausiertRef.current = true
+              setPausiertState(true)
+              if (!(await onCodeRef.current(code))) {
+                pausiertRef.current = false
+                setPausiertState(false)
+              }
             }
           }
         }
@@ -172,5 +188,5 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
   // Beim Verlassen der Ansicht die Kamera freigeben.
   useEffect(() => stoppen, [stoppen])
 
-  return { videoRef, status, fehler, nativ, geraete, starten, stoppen, wechseln, pausiert, setPausiert }
+  return { videoRef, status, fehler, nativ, geraete, starten, stoppen, wechseln, pausiert, setPausiert, kandidat }
 }
