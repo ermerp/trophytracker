@@ -147,6 +147,24 @@ export function Scannen() {
     }
   }, [eanAusUrl, aufloesen, setParams, starten])
 
+  /**
+   * Einen eben gesammelten Code wieder wegwerfen (Rückmeldung des Nutzers vom
+   * 18.09.2026: eine Fehllesung soll sofort raus, nicht erst beim Zuordnen).
+   * Betrifft nur offene Scans – ein Code, der schon einem Release gehört,
+   * wird hier nicht angefasst.
+   */
+  async function verwerfen(ean: string) {
+    setFehler(null)
+    try {
+      await anfrage(`/api/scan/unresolved/${ean}`, { methode: 'DELETE' })
+      gesammelteCodes.current.delete(ean)
+      setGesammelt((g) => g.filter((x) => x.ean !== ean))
+      setHinweis(`${ean} verworfen.`)
+    } catch (f) {
+      setFehler(f instanceof Error ? f.message : 'Verwerfen fehlgeschlagen.')
+    }
+  }
+
   /** Zurück zum Scannen – die Kamera nimmt den nächsten Code. */
   function weiter(neu: Zustand = { art: 'leer' }) {
     setZustand(neu)
@@ -200,6 +218,9 @@ export function Scannen() {
       setFehler(f instanceof Error ? f.message : 'Anlegen fehlgeschlagen.')
     }
   }
+
+  // Für „Letzten verwerfen": der zuletzt gesammelte Code, der noch keinem Spiel gehört.
+  const letzterNeuer = gesammelt.find((g) => g.titel === null)
 
   return (
     <>
@@ -285,15 +306,27 @@ export function Scannen() {
             Jeder erkannte Code wird weggeschrieben, die Erkennung läuft weiter – ein heller Ton heißt „neu",
             zwei tiefe „kenne ich schon". Zuordnen kannst du später in einem Rutsch (Einstellungen → Offene Scans).
           </p>
-          <p>
+          <p className="steuerung">
             <strong>Gesammelt: {gesammelt.length}</strong>
-            {gesammelt.length > 0 && ' (jede Hülle zählt einmal)'}
+            {letzterNeuer && (
+              <>
+                {' '}
+                <button type="button" onClick={() => verwerfen(letzterNeuer.ean)}>
+                  Letzten verwerfen ({letzterNeuer.ean})
+                </button>
+              </>
+            )}
           </p>
           <ul className="gesammelt">
-            {gesammelt.slice(0, 12).map((g, i) => (
-              <li key={`${g.ean}-${i}`}>
+            {gesammelt.slice(0, 12).map((g) => (
+              <li key={g.ean}>
                 <span className="titel">{g.ean}</span>{' '}
-                {g.titel ? `schon zugeordnet: ${g.titel} (${g.plattform})` : 'neu'}
+                <span className="wozu">{g.titel ? `schon zugeordnet: ${g.titel} (${g.plattform})` : 'neu'}</span>
+                {!g.titel && (
+                  <button type="button" className="klein" onClick={() => verwerfen(g.ean)}>
+                    verwerfen
+                  </button>
+                )}
               </li>
             ))}
           </ul>

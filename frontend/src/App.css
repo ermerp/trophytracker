@@ -1226,3 +1226,11 @@ button.griff:active {
   font-weight: 700;
   line-height: 1.6;
 }
+
+.gesammelt .wozu {
+  opacity: 0.8;
+}
+
+.gesammelt button.klein {
+  float: right;
+}
