@@ -28,18 +28,29 @@ import { istBestaetigt, zaehleLesung, type Kandidat } from './bestaetigung'
 type Erkenner = { detect(bild: HTMLVideoElement): Promise<Array<{ rawValue: string }>> }
 
 type NativerDetector = {
-  new (optionen: { formats: string[] }): Erkenner
+  new (optionen: { formats: Format[] }): Erkenner
   getSupportedFormats(): Promise<string[]>
 }
 
+/**
+ * Was auf Spielehüllen vorkommt: EAN-13 in Europa, UPC-A bei Sony-Titeln
+ * (Horizon Forbidden West trägt 711719577997), EAN-8 selten. Der Worker macht
+ * aus einem UPC-A eine GTIN-13 mit führender Null, damit derselbe Code nicht
+ * je nach Erkennung zwei Einträge ergibt.
+ */
+const FORMATE = ['ean_13', 'upc_a', 'ean_8'] as const
+type Format = (typeof FORMATE)[number]
+
 async function erkenner(): Promise<{ erkenner: Erkenner; nativ: boolean }> {
   const nativ = (globalThis as { BarcodeDetector?: NativerDetector }).BarcodeDetector
-  if (nativ && (await nativ.getSupportedFormats().catch(() => [] as string[])).includes('ean_13')) {
-    return { erkenner: new nativ({ formats: ['ean_13'] }), nativ: true }
+  if (nativ) {
+    const koennen = await nativ.getSupportedFormats().catch(() => [] as string[])
+    const formats: Format[] = FORMATE.filter((f) => koennen.includes(f))
+    if (formats.includes('ean_13')) return { erkenner: new nativ({ formats }), nativ: true }
   }
   const { BarcodeDetector, prepareZXingModule } = await import('barcode-detector/ponyfill')
   prepareZXingModule({ overrides: { locateFile: () => wasmUrl } })
-  return { erkenner: new BarcodeDetector({ formats: ['ean_13'] }), nativ: false }
+  return { erkenner: new BarcodeDetector({ formats: [...FORMATE] }), nativ: false }
 }
 
 export type KameraStatus = 'aus' | 'startet' | 'laeuft' | 'fehler'
@@ -191,7 +202,7 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
       beschaeftigt = true
       try {
         const codes = await e.detect(video)
-        const code = codes.find((c) => /^\d{13}$/.test(c.rawValue))?.rawValue
+        const code = codes.find((c) => /^\d{8,14}$/.test(c.rawValue))?.rawValue
         if (code && !pausiertRef.current && code !== ignoriereRef.current) {
           // Erst zählen, dann annehmen: ein Bild allein entscheidet nicht.
           kandidatRef.current = zaehleLesung(kandidatRef.current, code)

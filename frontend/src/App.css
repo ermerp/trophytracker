@@ -1150,3 +1150,79 @@ button.griff:active {
 .scanner video.gespiegelt {
   transform: scaleX(-1);
 }
+
+/*
+ * Rueckmeldung im Bild (Rueckmeldung des Nutzers vom 18.09.2026): Beim
+ * Abscannen eines Regals schaut man auf die Huelle, nicht auf eine Liste
+ * weiter unten. Der Rahmen leuchtet kurz auf, Haken und Code stehen gross
+ * im Bild, und der Zaehler sitzt in der Ecke.
+ */
+.kamerabild {
+  position: relative;
+  line-height: 0;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.kamerabild[hidden] {
+  display: none;
+}
+
+.kamerabild.blitz-neu {
+  border-color: rgba(60, 170, 100, 0.95);
+  box-shadow: 0 0 0 4px rgba(60, 170, 100, 0.25);
+}
+
+.kamerabild.blitz-bekannt {
+  border-color: rgba(70, 130, 210, 0.95);
+  box-shadow: 0 0 0 4px rgba(70, 130, 210, 0.25);
+}
+
+.kamerabild.blitz-fehler {
+  border-color: rgba(200, 70, 60, 0.95);
+  box-shadow: 0 0 0 4px rgba(200, 70, 60, 0.25);
+}
+
+.kamerabild .blitz {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin: 0;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  /* Hell genug, dass die naechste Huelle waehrenddessen ins Bild kommt. */
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.kamerabild .blitz .zeichen {
+  font-size: 4rem;
+  font-weight: 700;
+}
+
+.kamerabild .blitz .text {
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 0.6rem;
+}
+
+/* Zaehler im Sammelmodus: immer sichtbar, ohne zu scrollen. */
+.kamerabild .zaehler {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  margin: 0;
+  padding: 0.1rem 0.6rem;
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
