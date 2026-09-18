@@ -1122,3 +1122,21 @@ button.griff:active {
     font-size: 1.8rem;
   }
 }
+
+/* Sammelmodus (9.1): die zuletzt weggeschriebenen Codes, neueste zuerst. */
+.gesammelt {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+}
+
+.gesammelt li {
+  padding: 0.25rem 0;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.gesammelt .titel {
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+}
