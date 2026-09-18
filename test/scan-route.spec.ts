@@ -158,17 +158,73 @@ describe("POST /api/scan/:ean/assign", () => {
 	});
 });
 
+describe("Titelvorschlag und Abgleich (Stufe 17b)", () => {
+	const vorschlag = (ean: string, koerper: unknown) => sende("POST", `/api/scan/${ean}/vorschlag`, koerper);
+
+	it("haelt einen Vorschlag fest und zeigt den Sammlungstreffer", async () => {
+		await release(1); // "Spiel 1" (PS4)
+		await scan(EAN);
+		expect((await vorschlag(EAN, { titel: "Ps3 Game - Spiel 1 [German Version]", quelle: "upcitemdb" })).status).toBe(200);
+
+		const a = await hole("/api/scan/unresolved");
+		expect(a).toMatchObject({ anzahl: 1, ungeprueft: 0, eindeutig: 1 });
+		expect(a.scans[0]).toMatchObject({
+			ean: EAN,
+			titel: "Ps3 Game - Spiel 1 [German Version]",
+			quelle: "upcitemdb",
+			eindeutig: true,
+			kandidaten: [{ spielId: 1, titel: "Spiel 1", releases: [{ releaseId: 1, plattform: "PS4" }] }],
+		});
+		expect(a.scans[0].geprueftAm).toBeTruthy();
+	});
+
+	it("vermerkt auch, dass die Quelle den Code nicht kennt", async () => {
+		await scan(EAN);
+		expect((await vorschlag(EAN, { titel: null })).status).toBe(200);
+		const a = await hole("/api/scan/unresolved");
+		expect(a.scans[0]).toMatchObject({ titel: null, quelle: null, eindeutig: false, kandidaten: [] });
+		expect(a.scans[0].geprueftAm).toBeTruthy();
+		expect(a.ungeprueft).toBe(0);
+	});
+
+	it("nennt dem Job nur Codes, die noch keine Quelle gesehen hat", async () => {
+		await scan(EAN);
+		await scan(EAN2);
+		expect((await hole("/api/scan/ungeprueft")).eans.sort()).toEqual([EAN, EAN2].sort());
+		await vorschlag(EAN, { titel: null });
+		expect((await hole("/api/scan/ungeprueft")).eans).toEqual([EAN2]);
+	});
+
+	it("prueft die Eingaben und meldet einen unbekannten Code", async () => {
+		await scan(EAN);
+		expect((await vorschlag(EAN, { titel: 42 })).status).toBe(400);
+		expect((await vorschlag(EAN, { titel: "x" })).status).toBe(400); // ohne quelle
+		expect((await vorschlag(EAN2, { titel: null })).status).toBe(404);
+		expect((await vorschlag("12", { titel: null })).status).toBe(400);
+	});
+
+	it("laesst einen mehrdeutigen Treffer nicht als eindeutig durchgehen", async () => {
+		await release(1); // Spiel 1
+		await release(2); // Spiel 2
+		await scan(EAN);
+		await vorschlag(EAN, { titel: "Sammlung: Spiel 1 und Spiel 2", quelle: "upcitemdb" });
+		const a = await hole("/api/scan/unresolved");
+		expect(a.scans[0].eindeutig).toBe(false);
+		expect(a.scans[0].kandidaten).toHaveLength(2);
+		expect(a.eindeutig).toBe(0);
+	});
+});
+
 describe("offene Scans und Mapping loesen", () => {
 	it("listet offene Scans neueste zuerst und verwirft einzelne", async () => {
 		await env.DB.prepare("INSERT INTO unresolved_scan (ean, scan_count, first_seen_at, last_seen_at) VALUES (?, 3, '2026-09-01 10:00:00', '2026-09-02 10:00:00')").bind(EAN).run();
 		await env.DB.prepare("INSERT INTO unresolved_scan (ean, scan_count, first_seen_at, last_seen_at) VALUES (?, 1, '2026-09-03 10:00:00', '2026-09-03 10:00:00')").bind(EAN2).run();
-		expect(await hole("/api/scan/unresolved")).toEqual({
-			anzahl: 2,
-			scans: [
-				{ ean: EAN2, scans: 1, zuerstAm: "2026-09-03 10:00:00", zuletztAm: "2026-09-03 10:00:00" },
-				{ ean: EAN, scans: 3, zuerstAm: "2026-09-01 10:00:00", zuletztAm: "2026-09-02 10:00:00" },
-			],
-		});
+		const liste = await hole("/api/scan/unresolved");
+		expect(liste).toMatchObject({ anzahl: 2, ungeprueft: 2, eindeutig: 0 });
+		expect(liste.scans.map((s: any) => [s.ean, s.scans, s.zuerstAm, s.zuletztAm])).toEqual([
+			[EAN2, 1, "2026-09-03 10:00:00", "2026-09-03 10:00:00"],
+			[EAN, 3, "2026-09-01 10:00:00", "2026-09-02 10:00:00"],
+		]);
 		expect((await sende("DELETE", `/api/scan/unresolved/${EAN}`)).status).toBe(200);
 		expect((await sende("DELETE", `/api/scan/unresolved/${EAN}`)).status).toBe(404);
 		expect((await sende("DELETE", `/api/scan/unresolved/12`)).status).toBe(400);

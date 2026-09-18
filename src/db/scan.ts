@@ -22,6 +22,10 @@ export type OffenerScan = {
 	scan_count: number;
 	first_seen_at: string;
 	last_seen_at: string;
+	/** Titelvorschlag einer EAN-Quelle (Stufe 17b); null, solange keiner vorliegt. */
+	title_raw: string | null;
+	title_source: string | null;
+	checked_at: string | null;
 };
 
 /**
@@ -107,11 +111,39 @@ export class ScanRepository {
 		return (r.meta.changes ?? 0) > 0;
 	}
 
-	async offene(): Promise<OffenerScan[]> {
+	async offene(limit = 200): Promise<OffenerScan[]> {
 		const { results } = await this.db
-			.prepare("SELECT ean, scan_count, first_seen_at, last_seen_at FROM unresolved_scan ORDER BY last_seen_at DESC, ean")
+			.prepare(
+				"SELECT ean, scan_count, first_seen_at, last_seen_at, title_raw, title_source, checked_at " +
+					"FROM unresolved_scan ORDER BY last_seen_at DESC, ean LIMIT ?",
+			)
+			.bind(limit)
 			.all<OffenerScan>();
 		return results;
+	}
+
+	/**
+	 * Codes, zu denen noch niemand gefragt hat - die Arbeitsliste des Jobs
+	 * (Abschnitt 9.3). `checked_at` haelt auch einen erfolglosen Versuch fest,
+	 * damit dieselben Codes nicht jeden Tag das Kontingent aufbrauchen.
+	 */
+	async ungeprueft(limit: number): Promise<string[]> {
+		const { results } = await this.db
+			.prepare("SELECT ean FROM unresolved_scan WHERE checked_at IS NULL ORDER BY last_seen_at DESC LIMIT ?")
+			.bind(limit)
+			.all<{ ean: string }>();
+		return results.map((r) => r.ean);
+	}
+
+	/** Titelvorschlag einer Quelle festhalten; `titel` null heisst "Quelle kennt den Code nicht". */
+	async vorschlagSetzen(ean: string, titel: string | null, quelle: string): Promise<boolean> {
+		const r = await this.db
+			.prepare(
+				"UPDATE unresolved_scan SET title_raw = ?, title_source = ?, checked_at = datetime('now') WHERE ean = ?",
+			)
+			.bind(titel, titel === null ? null : quelle, ean)
+			.run();
+		return (r.meta.changes ?? 0) > 0;
 	}
 
 	async offenenLoeschen(ean: string): Promise<boolean> {

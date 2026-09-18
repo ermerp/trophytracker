@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { normalisiereEan, pruefzifferStimmt } from "../domain/ean";
+import { sammlungstreffer, vorbereiten } from "../domain/scan-titel";
 import { istErlaubtePlattform } from "../domain/titel";
 import type { AppEnv } from "../types";
 import { absichtenErledigen } from "./ownership";
@@ -63,9 +64,76 @@ export const scanRoutes = new Hono<AppEnv>()
 		return c.json({ ean, treffer: "keiner", scans });
 	})
 
+	/**
+	 * Offene Scans mit Titelvorschlag und Abgleich (9.3, Stufe 17b).
+	 *
+	 * Der Abgleich entsteht hier, nicht in der Datenbank: Er haengt an den
+	 * Spieltiteln und waere nach einer Umbenennung falsch. Die Sammlung wird
+	 * einmal zerlegt (`vorbereiten`), die Plattformen nur fuer die Treffer
+	 * nachgeholt - sonst waeren es 430 Unterabfragen fuer nichts.
+	 */
 	.get("/unresolved", async (c) => {
 		const offene = await c.var.repos.scan.offene();
-		return c.json({ anzahl: offene.length, scans: offene.map(offenerScan) });
+		const mitTitel = offene.filter((s) => s.title_raw !== null);
+		const sammlung = mitTitel.length > 0 ? vorbereiten(await c.var.repos.games.alleTitel()) : [];
+
+		const gebraucht = new Map<number, Array<{ id: number; platform: string }>>();
+		const scans = [];
+		for (const s of offene) {
+			const abgleich = s.title_raw ? sammlungstreffer(s.title_raw, sammlung) : { treffer: [], eindeutig: false };
+			for (const t of abgleich.treffer) {
+				if (!gebraucht.has(t.spielId)) gebraucht.set(t.spielId, await c.var.repos.games.releasesVon(t.spielId));
+			}
+			scans.push({
+				...offenerScan(s),
+				titel: s.title_raw,
+				quelle: s.title_source,
+				geprueftAm: s.checked_at,
+				eindeutig: abgleich.eindeutig,
+				kandidaten: abgleich.treffer.map((t) => ({
+					spielId: t.spielId,
+					titel: t.titel,
+					releases: (gebraucht.get(t.spielId) ?? []).map((r) => ({ releaseId: r.id, plattform: r.platform })),
+				})),
+			});
+		}
+		return c.json({
+			anzahl: scans.length,
+			ungeprueft: offene.filter((s) => s.checked_at === null).length,
+			eindeutig: scans.filter((s) => s.eindeutig).length,
+			scans,
+		});
+	})
+
+	/**
+	 * Titelvorschlag einer EAN-Quelle eintragen - der Job ausserhalb des
+	 * Workers (9.3). Wie Export und Backup laeuft er ueber das Access Service
+	 * Token und traegt deshalb keine eigene Token-Pruefung (15.3).
+	 * `titel: null` heisst "Quelle kennt den Code nicht" und wird ebenso
+	 * vermerkt, damit der naechste Lauf ihn nicht erneut fragt.
+	 */
+	.post("/:ean/vorschlag", async (c) => {
+		const ean = eanAus(c.req.param("ean"));
+		if (!ean) return c.json({ fehler: "Ungültige EAN." }, 400);
+		const k = await liesJson(c);
+		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
+		if (k.titel !== null && typeof k.titel !== "string") {
+			return c.json({ fehler: "Feld 'titel' muss Text oder null sein." }, 400);
+		}
+		const titel = typeof k.titel === "string" && k.titel.trim() !== "" ? k.titel.trim() : null;
+		if (titel !== null && (typeof k.quelle !== "string" || k.quelle.trim() === "")) {
+			return c.json({ fehler: "Feld 'quelle' fehlt." }, 400);
+		}
+		if (!(await c.var.repos.scan.vorschlagSetzen(ean, titel, String(k.quelle ?? "").trim()))) {
+			return c.json({ fehler: "Kein offener Scan zu dieser EAN." }, 404);
+		}
+		return c.json({ ean, titel, quelle: titel === null ? null : k.quelle });
+	})
+
+	/** Die Arbeitsliste des Jobs: Codes, die noch keine Quelle gesehen hat. */
+	.get("/ungeprueft", async (c) => {
+		const limit = Math.min(100, Math.max(1, Number(c.req.query("limit")) || 100));
+		return c.json({ eans: await c.var.repos.scan.ungeprueft(limit) });
 	})
 
 	.delete("/unresolved/:ean", async (c) => {

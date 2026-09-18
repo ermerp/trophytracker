@@ -268,6 +268,22 @@ export type ErfasstAntwort = {
   aufListe: boolean
 }
 
+/**
+ * Einen zugeordneten Code wieder zu einem offenen Scan machen.
+ *
+ * Das Zuordnen löscht den offenen Scan (er ist ja erledigt). Wird die
+ * Zuordnung zurückgenommen, muss er zurückkommen – sonst wäre der Code weder
+ * zugeordnet noch offen und damit spurlos weg. Der Zähler beginnt dabei neu
+ * bei eins; der Titelvorschlag wird mitgegeben, damit die Entscheidung
+ * dieselbe Grundlage hat wie vorher.
+ */
+export async function scanWiederOeffnen(ean: string, titel?: string | null, quelle?: string | null) {
+  await anfrage('/api/scan', { methode: 'POST', koerper: { ean } })
+  if (titel && quelle) {
+    await anfrage(`/api/scan/${ean}/vorschlag`, { methode: 'POST', koerper: { titel, quelle } })
+  }
+}
+
 /** „Von der Wunsch- und Kaufliste erledigt." – je nachdem, was der Worker erledigt hat (Stufe 15). */
 export function erledigtText(absichten: ErfasstAntwort['absichtenErledigt']): string {
   const arten = new Set(absichten.map((a) => a.art))
