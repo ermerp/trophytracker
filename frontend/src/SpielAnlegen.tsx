@@ -1,21 +1,27 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiFehler, PLATTFORMEN, anfrage, type Plattform } from './api'
+import { ApiFehler, PLATTFORMEN, anfrage, type IgdbKandidat, type Plattform } from './api'
+import { IgdbSuche } from './IgdbSuche'
 
 /**
  * Spiel von Hand anlegen – für Discs, die nie gestartet wurden und deshalb
- * keine Trophäenliste haben. Bei gleichem Titelschlüssel warnt der Server
- * und nennt Kandidaten; dann ist meist ein weiteres Release gemeint.
+ * keine Trophäenliste haben.
  *
- * Seit Stufe 17 auch Stufe 4 der Auflösungskette im Scanner (Abschnitt 9.2,
- * Entscheidung des Nutzers vom 16.09.2026): dieselbe Form, der Suchtext
- * als Titelvorgabe, und `onAngelegt` bekommt das Release, damit der Scanner
- * den Code gleich zuordnen kann. Hat ein Kandidat die Plattform schon, bietet
- * der Scanner „vorhandenes Release verwenden" an, statt zurück in die Suche
- * zu schicken.
+ * Seit Stufe 17 in einem Schritt (Rückmeldung des Nutzers vom 18.09.2026):
+ * Plattform wählen, Titel suchen, Treffer antippen – das Spiel entsteht mit
+ * dem IGDB-Namen, verknüpft, mit Cover und Wertung. Vorher legte man erst an,
+ * ging ins Spieldetail und suchte dort. „Ohne IGDB-Eintrag anlegen" bleibt für
+ * Fälle, die IGDB nicht kennt (die PlayStation Move Starter Disc etwa); dort
+ * gehört danach „Gibt es bei IGDB nicht" im Spieldetail dazu.
+ *
+ * Bei gleichem Titelschlüssel warnt der Server und nennt Kandidaten; dann ist
+ * meist ein weiteres Release gemeint. Kommt der Aufruf aus dem Scanner, wird
+ * ein vorhandenes Release angeboten, statt zurück in die Suche zu schicken.
  */
 
 type Kandidat = { spielId: number; titel: string; plattformen: string[] }
+
+type Angelegt = { spielId: number; releaseId: number; titel: string; vorhanden?: boolean }
 
 export function SpielAnlegen({
   onAngelegt,
@@ -30,41 +36,43 @@ export function SpielAnlegen({
   vorhandenesVerwenden?: boolean
 }) {
   const [offen, setOffen] = useState(false)
-  const [titel, setTitel] = useState(titelVorgabe)
   const [plattform, setPlattform] = useState<Plattform>(plattformVorgabe)
   const [kandidaten, setKandidaten] = useState<Kandidat[]>([])
   const [meldung, setMeldung] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
-
-  function oeffnen() {
-    setTitel(titelVorgabe)
-    setPlattform(plattformVorgabe)
-    setOffen(true)
-  }
+  /** Was zuletzt versucht wurde – für „Trotzdem als neues Spiel anlegen". */
+  const [versuch, setVersuch] = useState<{ titel?: string; igdbId?: number; plattform: Plattform } | null>(null)
 
   function zuruecksetzen() {
-    setTitel('')
     setKandidaten([])
     setMeldung(null)
+    setVersuch(null)
     setOffen(false)
   }
 
-  async function fertig(releaseId: number, text: string) {
-    setMeldung(text)
-    setTitel('')
+  async function fertig(a: Angelegt, ziel: Plattform = plattform) {
+    setMeldung(
+      a.vorhanden
+        ? `„${a.titel}" (${ziel}) gewählt – war schon in der Sammlung.`
+        : `„${a.titel}" (${ziel}) angelegt.`,
+    )
     setKandidaten([])
-    await onAngelegt(releaseId)
+    setVersuch(null)
+    await onAngelegt(a.releaseId)
   }
 
-  async function anlegen(trotzdem: boolean) {
+  /**
+   * Einziger Schreibweg: mit igdbId verknüpft der Server gleich mit, mit titel
+   * nicht. Die Plattform kommt vom Treffer (dort vorbelegt mit seiner
+   * neuesten), sonst aus dem Dropdown oben.
+   */
+  async function anlegen(was: { titel?: string; igdbId?: number }, trotzdem = false, gewaehlt?: string) {
+    const ziel = (PLATTFORMEN as readonly string[]).includes(gewaehlt ?? '') ? (gewaehlt as Plattform) : plattform
     setLaeuft(true)
     setMeldung(null)
+    setVersuch({ ...was, plattform: ziel })
     try {
-      const a = await anfrage<{ releaseId: number }>('/api/games', {
-        methode: 'POST',
-        koerper: { titel: titel.trim(), plattform, trotzdem },
-      })
-      await fertig(a.releaseId, `„${titel.trim()}" (${plattform}) angelegt.`)
+      await fertig(await anfrage<Angelegt>('/api/games', { methode: 'POST', koerper: { ...was, plattform: ziel, trotzdem } }), ziel)
     } catch (f) {
       if (f instanceof ApiFehler && f.status === 409 && Array.isArray(f.antwort.kandidaten)) {
         setKandidaten(f.antwort.kandidaten as Kandidat[])
@@ -79,11 +87,12 @@ export function SpielAnlegen({
   async function releaseAnhaengen(k: Kandidat) {
     setLaeuft(true)
     try {
+      const ziel = versuch?.plattform ?? plattform
       const a = await anfrage<{ releaseId: number }>('/api/releases', {
         methode: 'POST',
-        koerper: { spielId: k.spielId, plattform },
+        koerper: { spielId: k.spielId, plattform: ziel },
       })
-      await fertig(a.releaseId, `${plattform}-Release an „${k.titel}" angehängt.`)
+      await fertig({ spielId: k.spielId, releaseId: a.releaseId, titel: k.titel }, ziel)
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Anhängen fehlgeschlagen.')
     } finally {
@@ -95,10 +104,11 @@ export function SpielAnlegen({
   async function vorhandenes(k: Kandidat) {
     setLaeuft(true)
     try {
+      const ziel = versuch?.plattform ?? plattform
       const detail = await anfrage<{ releases: Array<{ id: number; plattform: string }> }>(`/api/games/${k.spielId}`)
-      const r = detail.releases.find((x) => x.plattform === plattform)
+      const r = detail.releases.find((x) => x.plattform === ziel)
       if (!r) throw new Error('Release nicht gefunden.')
-      await fertig(r.id, `„${k.titel}" (${plattform}) gewählt.`)
+      await fertig({ spielId: k.spielId, releaseId: r.id, titel: k.titel }, ziel)
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Auswahl fehlgeschlagen.')
     } finally {
@@ -109,35 +119,34 @@ export function SpielAnlegen({
   if (!offen) {
     return (
       <p>
-        <button type="button" onClick={oeffnen}>Spiel anlegen</button>
+        <button type="button" onClick={() => { setPlattform(plattformVorgabe); setOffen(true) }}>Spiel anlegen</button>
         {meldung && <span role="status"> {meldung}</span>}
       </p>
     )
   }
 
   return (
-    <form
-      className="anlegen"
-      onSubmit={(e) => {
-        e.preventDefault()
-        void anlegen(false)
-      }}
-    >
+    <div className="anlegen">
       <p className="steuerung">
-        <input
-          type="text"
-          value={titel}
-          onChange={(e) => { setTitel(e.target.value); setKandidaten([]) }}
-          placeholder="Titel"
-          aria-label="Titel"
-          autoFocus
-        />{' '}
-        <select value={plattform} onChange={(e) => setPlattform(e.target.value as Plattform)} aria-label="Plattform">
-          {PLATTFORMEN.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>{' '}
-        <button type="submit" disabled={laeuft || titel.trim() === ''}>Anlegen</button>{' '}
+        <label>
+          Plattform{' '}
+          <select value={plattform} onChange={(e) => setPlattform(e.target.value as Plattform)}>
+            {PLATTFORMEN.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </label>{' '}
+        <span className="zeile">gilt ohne IGDB-Eintrag; ein Treffer bringt seine eigene mit</span>{' '}
         <button type="button" onClick={zuruecksetzen}>Abbrechen</button>
       </p>
+
+      <IgdbSuche
+        vorgabe={titelVorgabe}
+        laeuft={laeuft}
+        mitPlattform
+        ohnePlattform={false}
+        onWahl={(k: IgdbKandidat, gewaehlt: string) => { void anlegen({ igdbId: k.igdbId }, false, gewaehlt) }}
+        onOhneTreffer={(begriff) => { void anlegen({ titel: begriff }) }}
+      />
+
       {kandidaten.length > 0 && (
         <div className="hinweis">
           <p>Ein Spiel mit diesem Titel gibt es schon:</p>
@@ -145,22 +154,30 @@ export function SpielAnlegen({
             {kandidaten.map((k) => (
               <li key={k.spielId}>
                 <Link to={`/spiel/${k.spielId}`}>{k.titel}</Link> ({k.plattformen.join(', ') || 'ohne Release'}){' '}
-                {vorhandenesVerwenden && k.plattformen.includes(plattform) ? (
+                {vorhandenesVerwenden && k.plattformen.includes(versuch?.plattform ?? plattform) ? (
                   <button type="button" disabled={laeuft} onClick={() => vorhandenes(k)}>
-                    vorhandenes {plattform}-Release verwenden
+                    vorhandenes {versuch?.plattform ?? plattform}-Release verwenden
                   </button>
                 ) : (
-                  <button type="button" disabled={laeuft || k.plattformen.includes(plattform)} onClick={() => releaseAnhaengen(k)}>
-                    {plattform}-Release anhängen
+                  <button
+                    type="button"
+                    disabled={laeuft || k.plattformen.includes(versuch?.plattform ?? plattform)}
+                    onClick={() => releaseAnhaengen(k)}
+                  >
+                    {versuch?.plattform ?? plattform}-Release anhängen
                   </button>
                 )}
               </li>
             ))}
           </ul>
-          <button type="button" disabled={laeuft} onClick={() => anlegen(true)}>Trotzdem als neues Spiel anlegen</button>
+          {versuch && (
+            <button type="button" disabled={laeuft} onClick={() => anlegen(versuch, true, versuch.plattform)}>
+              Trotzdem als neues Spiel anlegen
+            </button>
+          )}
         </div>
       )}
       {meldung && <p role="status">{meldung}</p>}
-    </form>
+    </div>
   )
 }
