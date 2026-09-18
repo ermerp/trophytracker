@@ -55,6 +55,23 @@ async function zeilenGelesen(sql: string, ...werte: unknown[]): Promise<number> 
 	return r.meta.rows_read ?? -1;
 }
 
+describe("Grenzen der Sammlungsabfrage", () => {
+	/**
+	 * Die Release-Abfrage bindet eine Id je Spiel der Seite; D1 erlaubt 100
+	 * gebundene Werte je Statement. Ein groesseres `limit` wird deshalb
+	 * gekappt, statt mit D1_ERROR zu antworten (Produktion am 18.09.2026:
+	 * limit=150 ergab 500).
+	 */
+	it("kappt limit auf 100 statt mit einem D1-Fehler zu antworten", async () => {
+		for (const limit of [100, 150, 200, 1000]) {
+			const antwort = await SELF.fetch(`${B}/api/games?limit=${limit}`);
+			expect(antwort.status, `limit=${limit}`).toBe(200);
+			const daten = (await antwort.json()) as { spiele: unknown[]; limit: number };
+			expect(daten.spiele.length, `limit=${limit}`).toBeLessThanOrEqual(100);
+		}
+	});
+});
+
 describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	it("Sammlung, eine Seite nach Titel", async () => {
 		const antwort = await SELF.fetch(`${B}/api/games?limit=50`);
