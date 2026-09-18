@@ -171,7 +171,11 @@ export const gameRoutes = new Hono<AppEnv>()
 			physicalAvailable: ausWahl(q.physicalAvailable, DISC_FILTER),
 			search: q.search ?? "",
 			sort: ausWahl(q.sort, SORTIERUNGEN) ?? "titel",
-			limit: Math.min(200, Math.max(1, Number(q.limit) || 50)),
+			// Hoechstens 100: Die Release-Abfrage bindet eine Id je Spiel, und D1
+			// erlaubt 100 gebundene Werte je Statement (CLAUDE.md). Mit 200 kam
+			// in der Produktion ein D1_ERROR zurueck, sobald so viele Spiele auf
+			// einer Seite standen (gemessen am 18.09.2026: limit=150 -> 500).
+			limit: Math.min(100, Math.max(1, Number(q.limit) || 50)),
 			offset: Math.max(0, Number(q.offset) || 0),
 		};
 		const { zeilen, releases, gesamt } = await c.var.repos.games.spieleListe(filter);

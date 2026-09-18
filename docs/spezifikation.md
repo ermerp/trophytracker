@@ -1296,7 +1296,7 @@ POST   /api/settings/npsso
 GET    /api/stats
 ```
 
-**Filter auf `/api/games`:** `platform`, `owned` (physisch/digital/beide/keins), `played` (ja/nein), `platinum` (ja/nein/nichtverfuegbar), `playStatus` (die sieben Werte; ein Release ohne Zeile zählt als `nicht_gespielt`), `physicalAvailable` (ja/nein/unbekannt), `search`, dazu `sort` (titel/zuletzt), `limit`, `offset`.
+**Filter auf `/api/games`:** `platform`, `owned` (physisch/digital/beide/keins), `played` (ja/nein), `platinum` (ja/nein/nichtverfuegbar), `playStatus` (die sieben Werte; ein Release ohne Zeile zählt als `nicht_gespielt`), `physicalAvailable` (ja/nein/unbekannt), `search`, dazu `sort` (titel/zuletzt), `limit` (höchstens 100 – die Release-Abfrage bindet eine Id je Spiel, und D1 erlaubt 100 gebundene Werte je Statement; ein größerer Wert wird gekappt, statt mit `D1_ERROR` zu antworten, gemessen am 18.09.2026), `offset`.
 
 Die Filter gelten auf Release-Ebene: Ein Spiel erscheint, wenn **mindestens ein Release alle Filter zugleich** erfüllt. Releases, die nur einen Wunsch tragen (Abschnitt 3), zählen dabei nicht mit und fehlen auch in der Release-Liste des Spiels. `platform=PS4&owned=physisch` heisst also "hat eine PS4-Disc", nicht "hat irgendeine Disc und irgendein PS4-Release". Unbekannte Filterwerte werden ignoriert, nicht mit `400` beantwortet – ein alter Link soll die Liste zeigen, keine Fehlermeldung. Die Suche ist eine einfache Teilstringsuche im Titel, keine Suche über den Titelschlüssel.
 
