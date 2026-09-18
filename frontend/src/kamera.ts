@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import wasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
-import { istBestaetigt, zaehleLesung, type Kandidat } from './bestaetigung'
+import { besterTreffer, istBestaetigt, noetigeBestaetigungen, zaehleLesung, type Kandidat } from './bestaetigung'
 
 /**
  * Kamera und Barcode-Erkennung für den Scanner (Abschnitt 9.1, Stufe 17).
@@ -25,7 +25,7 @@ import { istBestaetigt, zaehleLesung, type Kandidat } from './bestaetigung'
  * eine Sperre von zwei Sekunden für Aufrufer ohne `ignoriere`.
  */
 
-type Erkenner = { detect(bild: HTMLVideoElement): Promise<Array<{ rawValue: string }>> }
+type Erkenner = { detect(bild: HTMLVideoElement): Promise<Array<{ rawValue: string; format?: string }>> }
 
 type NativerDetector = {
   new (optionen: { formats: Format[] }): Erkenner
@@ -201,13 +201,15 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
       if (!video || !e || beschaeftigt || pausiertRef.current || video.readyState < 2) return
       beschaeftigt = true
       try {
-        const codes = await e.detect(video)
-        const code = codes.find((c) => /^\d{8,14}$/.test(c.rawValue))?.rawValue
+        const treffer = besterTreffer(await e.detect(video))
+        const code = treffer?.rawValue
         if (code && !pausiertRef.current && code !== ignoriereRef.current) {
           // Erst zählen, dann annehmen: ein Bild allein entscheidet nicht.
+          const noetig = noetigeBestaetigungen(treffer.format)
           kandidatRef.current = zaehleLesung(kandidatRef.current, code)
-          setKandidat(istBestaetigt(kandidatRef.current) ? null : code)
-          if (istBestaetigt(kandidatRef.current)) {
+          const fertig = istBestaetigt(kandidatRef.current, noetig)
+          setKandidat(fertig ? null : code)
+          if (fertig) {
             const letzter = letzterRef.current
             if (!letzter || letzter.code !== code || Date.now() - letzter.zeit > SPERRE_MS) {
               kandidatRef.current = null
