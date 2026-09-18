@@ -3,9 +3,15 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { PLATTFORMEN, anfrage, erledigtText, type ErfasstAntwort, type Plattform } from './api'
 import { useKamera } from './kamera'
 import { SpielAnlegen } from './SpielAnlegen'
+import { tonBekannt, tonFehler, tonNeu } from './ton'
 
 /**
  * Scannen (Abschnitt 9, Stufe 17): Serienerfassung des Regals.
+ *
+ * Zwei Betriebsarten: **Zuordnen** (Vorgabe) zeigt zu jedem Code seine Karte;
+ * **Nur sammeln** schreibt erkannte Codes bloß weg und scannt sofort weiter,
+ * mit einem Ton als Rückmeldung – für den ersten Durchgang durch ein volles
+ * Regal, wenn die Zuordnung später in einem Rutsch passieren soll.
  *
  * Drei feste Zonen – Kamera, Textfeld als Notnagel, Ergebniskarte –, damit
  * die Bedienelemente bei jeder Disc an derselben Stelle stehen (Darstellungs-
@@ -34,6 +40,9 @@ type Zuordnung = ErfasstAntwort & {
 type SuchRelease = { id: number; plattform: Plattform; exemplare: number; digital: string[] }
 type SuchSpiel = { id: number; titel: string; bild: string | null; releases: SuchRelease[] }
 
+/** Ein im Sammelmodus weggeschriebener Code, neueste zuerst. */
+type Gesammelt = { ean: string; titel: string | null; plattform: Plattform | null }
+
 type Zustand =
   | { art: 'leer' }
   | { art: 'treffer'; t: Treffer }
@@ -50,8 +59,16 @@ export function Scannen() {
   const [hinweis, setHinweis] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [sitzung, setSitzung] = useState(0)
+  const [sammeln, setSammeln] = useState(false)
+  const [gesammelt, setGesammelt] = useState<Gesammelt[]>([])
+  /** Codes dieser Sitzung – dieselbe Hülle ein zweites Mal ist keine zweite Disc. */
+  const gesammelteCodes = useRef(new Set<string>())
 
   const [letzterCode, setLetzterCode] = useState<string | null>(null)
+  // Die Erkennungsschleife ruft `aufloesen` aus einem Effekt heraus auf und
+  // sieht den Zustand vom Beginn des Laufs; der Modus kommt deshalb aus einem Ref.
+  const sammelnRef = useRef(sammeln)
+  sammelnRef.current = sammeln
 
   /** `zaehlen: false` beim Öffnen aus den Einstellungen – kein neuer Scan. */
   const aufloesen = useCallback(async (roh: string, zaehlen = true) => {
@@ -61,9 +78,22 @@ export function Scannen() {
     try {
       const t = await anfrage<Treffer>('/api/scan', { methode: 'POST', koerper: { ean: roh, zaehlen } })
       setLetzterCode(t.ean)
+      if (sammelnRef.current) {
+        // Nur sammeln: der Code steht als offener Scan bzw. ist längst bekannt –
+        // beides ohne Rückfrage, die Erkennung läuft sofort weiter (Rückgabe false).
+        const schonDa = gesammelteCodes.current.has(t.ean)
+        if (schonDa || t.treffer === 'mapping') tonBekannt()
+        else tonNeu()
+        if (!schonDa) {
+          gesammelteCodes.current.add(t.ean)
+          setGesammelt((g) => [{ ean: t.ean, titel: t.release?.titel ?? null, plattform: t.release?.plattform ?? null }, ...g])
+        }
+        return false
+      }
       setZustand(t.treffer === 'mapping' ? { art: 'treffer', t } : { art: 'auswahl', t })
       return true
     } catch (f) {
+      if (sammelnRef.current) tonFehler()
       setFehler(f instanceof Error ? f.message : 'Auflösen fehlgeschlagen.')
       return false
     } finally {
@@ -175,6 +205,22 @@ export function Scannen() {
         </p>
         {kameraFehler && <p role="alert" className="auffaellig">{kameraFehler}</p>}
 
+        <p className="steuerung">
+          <label>
+            <input
+              type="checkbox"
+              checked={sammeln}
+              onChange={(e) => {
+                setSammeln(e.target.checked)
+                setZustand({ art: 'leer' })
+                setPausiert(false)
+              }}
+              aria-label="Nur sammeln"
+            />{' '}
+            Nur sammeln – Codes wegschreiben, Zuordnung später
+          </label>
+        </p>
+
         <form
           className="steuerung"
           onSubmit={(e) => {
@@ -197,6 +243,26 @@ export function Scannen() {
       {fehler && <p role="alert" className="auffaellig">{fehler}</p>}
       {hinweis && <p role="status" className="hinweis">{hinweis}</p>}
 
+      {sammeln ? (
+        <section className="scankarte" aria-live="polite">
+          <p className="zeile">
+            Jeder erkannte Code wird weggeschrieben, die Erkennung läuft weiter – ein heller Ton heißt „neu",
+            zwei tiefe „kenne ich schon". Zuordnen kannst du später in einem Rutsch (Einstellungen → Offene Scans).
+          </p>
+          <p>
+            <strong>Gesammelt: {gesammelt.length}</strong>
+            {gesammelt.length > 0 && ' (jede Hülle zählt einmal)'}
+          </p>
+          <ul className="gesammelt">
+            {gesammelt.slice(0, 12).map((g, i) => (
+              <li key={`${g.ean}-${i}`}>
+                <span className="titel">{g.ean}</span>{' '}
+                {g.titel ? `schon zugeordnet: ${g.titel} (${g.plattform})` : 'neu'}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
       <section className="scankarte" aria-live="polite">
         {zustand.art === 'leer' && (
           <p className="zeile">
@@ -249,6 +315,7 @@ export function Scannen() {
           </div>
         )}
       </section>
+      )}
     </>
   )
 }
