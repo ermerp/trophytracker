@@ -68,7 +68,7 @@ export function kritikAntwort(spiel: SpielDetail["spiel"]) {
 	};
 }
 
-function ohneZugang(c: { json: (o: unknown, s: 503) => Response }) {
+export function ohneZugang(c: { json: (o: unknown, s: 503) => Response }) {
 	return c.json({ fehler: "IGDB-Zugangsdaten sind nicht hinterlegt." }, 503);
 }
 

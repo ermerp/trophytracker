@@ -16,7 +16,20 @@ import { PLATTFORMEN, anfrage, datum, igdbLink, neuestePlattform, type IgdbKandi
  * Treffer, vorbelegt mit dessen neuester – konkret, nicht „neueste des
  * Treffers" als Platzhalter. „Ohne Plattform" bleibt wählbar.
  */
-function PlattformWahl({ kandidat, wert, onChange, laeuft }: { kandidat: IgdbKandidat; wert: string; onChange: (w: string) => void; laeuft?: boolean }) {
+function PlattformWahl({
+  kandidat,
+  wert,
+  onChange,
+  laeuft,
+  ohnePlattform = true,
+}: {
+  kandidat: IgdbKandidat
+  wert: string
+  onChange: (w: string) => void
+  laeuft?: boolean
+  /** „ohne Plattform" passt zu einem Wunsch, nicht zu einer Disc im Regal. */
+  ohnePlattform?: boolean
+}) {
   return (
     <select value={wert} onChange={(e) => onChange(e.target.value)} disabled={laeuft} aria-label={`Plattform für ${kandidat.name}`}>
       {PLATTFORMEN.map((p) => (
@@ -25,7 +38,7 @@ function PlattformWahl({ kandidat, wert, onChange, laeuft }: { kandidat: IgdbKan
           {kandidat.plattformen.includes(p) ? '' : ' (nicht bei IGDB)'}
         </option>
       ))}
-      <option value="">ohne Plattform</option>
+      {ohnePlattform && <option value="">ohne Plattform</option>}
     </select>
   )
 }
@@ -35,12 +48,15 @@ export function KandidatenListe({
   onWahl,
   laeuft,
   mitPlattform = false,
+  ohnePlattform = true,
 }: {
   kandidaten: IgdbKandidat[]
   /** Mit `mitPlattform` kommt die gewählte Plattform mit ('' = ohne). */
   onWahl: (k: IgdbKandidat, plattform: string) => void
   laeuft?: boolean
   mitPlattform?: boolean
+  /** Ob „ohne Plattform" wählbar ist – beim Anlegen einer Disc nicht. */
+  ohnePlattform?: boolean
 }) {
   const [wahl, setWahl] = useState<Record<number, string>>({})
   if (kandidaten.length === 0) return null
@@ -69,7 +85,13 @@ export function KandidatenListe({
               )}
             </span>
             {mitPlattform && (
-              <PlattformWahl kandidat={k} wert={plattformVon(k)} onChange={(w) => setWahl({ ...wahl, [k.igdbId]: w })} laeuft={laeuft} />
+              <PlattformWahl
+                kandidat={k}
+                wert={plattformVon(k)}
+                onChange={(w) => setWahl({ ...wahl, [k.igdbId]: w })}
+                laeuft={laeuft}
+                ohnePlattform={ohnePlattform}
+              />
             )}
             <button type="button" disabled={laeuft} onClick={() => onWahl(k, plattformVon(k))}>
               Übernehmen
@@ -88,6 +110,7 @@ export function IgdbSuche({
   onOhneTreffer,
   laeuft,
   mitPlattform = false,
+  ohnePlattform = true,
 }: {
   vorgabe: string
   /** Plattformen des Spiels – passende Kandidaten stehen dann vorn. */
@@ -95,6 +118,8 @@ export function IgdbSuche({
   onWahl: (k: IgdbKandidat, plattform: string) => void
   /** Dropdown je Treffer (für Wünsche); ohne: Treffer werden ohne Plattform gewählt. */
   mitPlattform?: boolean
+  /** Ob „ohne Plattform" wählbar ist – beim Anlegen einer Disc nicht. */
+  ohnePlattform?: boolean
   /**
    * Freitext ohne IGDB-Eintrag übernehmen (8.2). Der Knopf erscheint erst,
    * nachdem eine Suche gelaufen ist: kein Fallback, eine Entscheidung.
@@ -140,7 +165,15 @@ export function IgdbSuche({
       </form>
       {fehler && <p role="alert">{fehler}</p>}
       {treffer && treffer.length === 0 && <p className="zeile">Nichts gefunden – anderen Begriff versuchen.</p>}
-      {treffer && <KandidatenListe kandidaten={treffer} onWahl={onWahl} laeuft={laeuft || sucht} mitPlattform={mitPlattform} />}
+      {treffer && (
+        <KandidatenListe
+          kandidaten={treffer}
+          onWahl={onWahl}
+          laeuft={laeuft || sucht}
+          mitPlattform={mitPlattform}
+          ohnePlattform={ohnePlattform}
+        />
+      )}
       {treffer && onOhneTreffer && begriff.trim() !== '' && (
         <p className="zeile">
           Nicht dabei?{' '}

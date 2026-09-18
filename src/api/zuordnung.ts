@@ -10,11 +10,14 @@ import {
 	type SpieleFilter,
 } from "../db/games";
 import { bildeGruppen } from "../domain/gruppen";
+import { heuteIso, metadatenAus, normalisiereTrefferliste, type IgdbKandidat } from "../domain/igdb";
 import { istPlayStatus } from "../domain/play-status";
-import { istErlaubtePlattform, titelSchluessel } from "../domain/titel";
+import { anzeigeTitel, istErlaubtePlattform, titelSchluessel } from "../domain/titel";
+import { IgdbKonfigError } from "../igdb/client";
+import { meldungFuer } from "../sync/igdb";
 import type { AppEnv } from "../types";
 import { platinAus } from "./antwort";
-import { igdbAntwort, kritikAntwort } from "./igdb";
+import { igdbAntwort, kritikAntwort, ohneZugang } from "./igdb";
 import { exemplarAntwort } from "./ownership";
 import { bewertungAntwort } from "./releases";
 
@@ -200,6 +203,14 @@ export const gameRoutes = new Hono<AppEnv>()
 	/**
 	 * Spiel von Hand anlegen, ohne Trophaeenliste.
 	 *
+	 * Zwei Wege: `titel` legt ein Spiel ohne IGDB-Eintrag an; `igdbId` legt es
+	 * aus dem Treffer an und verknuepft es in einem Zug - Titel, Cover und
+	 * Wertung kommen dann von IGDB, statt dass der Nutzer erst anlegt, ins
+	 * Spieldetail geht und dort sucht (Rueckmeldung des Nutzers vom
+	 * 18.09.2026). Kennt die Sammlung den IGDB-Eintrag schon, kommt dieses
+	 * Spiel zurueck (200) statt eines Duplikats; das Release der Plattform
+	 * entsteht dabei bei Bedarf.
+	 *
 	 * Gibt es schon ein Spiel mit demselben Titelschluessel, kommt 409 mit
 	 * den Kandidaten zurueck - der Nutzer entscheidet, ob er ein Release
 	 * dort anhaengt oder mit `trotzdem` ein zweites Spiel anlegt.
@@ -211,13 +222,39 @@ export const gameRoutes = new Hono<AppEnv>()
 		} catch {
 			return c.json({ fehler: "Ungültiges JSON." }, 400);
 		}
-		const k = koerper as { titel?: unknown; plattform?: unknown; trotzdem?: unknown };
+		const k = koerper as { titel?: unknown; plattform?: unknown; trotzdem?: unknown; igdbId?: unknown };
 
-		const titel = typeof k?.titel === "string" ? k.titel.trim() : "";
-		if (titel === "") return c.json({ fehler: "Feld 'titel' fehlt oder ist leer." }, 400);
 		if (typeof k?.plattform !== "string" || !istErlaubtePlattform(k.plattform)) {
 			return c.json({ fehler: `Unbekannte Plattform: ${String(k?.plattform)}` }, 400);
 		}
+
+		let titel = typeof k?.titel === "string" ? k.titel.trim() : "";
+		let treffer: IgdbKandidat | null = null;
+
+		if (k.igdbId !== undefined && k.igdbId !== null) {
+			const igdbId = Number(k.igdbId);
+			if (!Number.isInteger(igdbId) || igdbId <= 0) {
+				return c.json({ fehler: "Feld 'igdbId' ist ungültig." }, 400);
+			}
+			// Schon in der Sammlung: dieses Spiel nehmen, kein zweites anlegen.
+			const vorhanden = await c.var.repos.games.spielNachIgdbId(igdbId);
+			if (vorhanden !== null) {
+				const releaseId = await c.var.repos.games.releaseFuerPlattform(vorhanden, k.plattform);
+				const spiel = await c.var.repos.igdb.spiel(vorhanden);
+				return c.json({ spielId: vorhanden, releaseId, titel: spiel?.title ?? "", vorhanden: true });
+			}
+			try {
+				treffer = normalisiereTrefferliste(await c.var.igdb.nachIds([igdbId]))[0] ?? null;
+			} catch (fehler) {
+				if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
+				return c.json({ fehler: meldungFuer(fehler) }, 502);
+			}
+			// normalisiereTrefferliste laesst nur PlayStation-Eintraege durch (7.6).
+			if (!treffer) return c.json({ fehler: "IGDB kennt diesen Eintrag nicht." }, 404);
+			titel = anzeigeTitel(treffer.name);
+		}
+
+		if (titel === "") return c.json({ fehler: "Feld 'titel' fehlt oder ist leer." }, 400);
 
 		if (k.trotzdem !== true) {
 			const kandidaten = await c.var.repos.games.spieleNachSchluessel(titelSchluessel(titel));
@@ -237,7 +274,13 @@ export const gameRoutes = new Hono<AppEnv>()
 		}
 
 		const ergebnis = await c.var.repos.games.spielAnlegen(titel, k.plattform);
-		return c.json({ spielId: ergebnis.gameId, releaseId: ergebnis.releaseId, titel }, 201);
+		if (treffer) {
+			await c.var.repos.igdb.verknuepfen(ergebnis.gameId, metadatenAus(treffer, heuteIso()), "manuell");
+		}
+		return c.json(
+			{ spielId: ergebnis.gameId, releaseId: ergebnis.releaseId, titel, igdbVerknuepft: treffer !== null },
+			201,
+		);
 	})
 	/** Alle Zuordnungen als Tabelle. Abschnitt 12 ergaenzt. */
 	.get("/uebersicht", async (c) => {

@@ -40,6 +40,71 @@ beforeEach(async () => {
 	]);
 });
 
+describe("POST /api/games mit igdbId (Stufe 17, Rueckmeldung vom 18.09.2026)", () => {
+	const anlegen = (client: ReturnType<typeof fakeIgdb>["client"], koerper: unknown) =>
+		app(client).request(
+			"/api/games",
+			{ method: "POST", body: JSON.stringify(koerper), headers: { "content-type": "application/json" } },
+			env,
+		);
+
+	it("legt das Spiel aus dem Treffer an und verknuepft es in einem Zug", async () => {
+		const { client } = fakeIgdb([[spielRoh()]]);
+		const antwort = await anlegen(client, { igdbId: 1001, plattform: "PS4" });
+		expect(antwort.status).toBe(201);
+		const ergebnis = (await antwort.json()) as any;
+		expect(ergebnis).toMatchObject({ titel: "Bloodborne", igdbVerknuepft: true });
+
+		// Titel, Cover und Wertung kommen aus IGDB - kein zweiter Schritt noetig.
+		const g = await zeile(ergebnis.spielId);
+		expect(g).toMatchObject({ title: "Bloodborne", igdb_id: 1001, igdb_matched_source: "manuell" });
+		expect(g?.cover_url).toBeTruthy();
+		// Das Release der gewaehlten Plattform haengt daran.
+		const r = await env.DB.prepare("SELECT platform FROM release WHERE game_id = ?").bind(ergebnis.spielId).first();
+		expect(r).toEqual({ platform: "PS4" });
+	});
+
+	it("nimmt ein vorhandenes Spiel mit derselben IGDB-Id statt ein zweites anzulegen", async () => {
+		await spiel(7, "Bloodborne", "bloodborne", ["PS4"]);
+		await env.DB.prepare("UPDATE game SET igdb_id = 1001 WHERE id = 7").run();
+		const { client, aufrufe } = fakeIgdb([[spielRoh()]]);
+
+		const antwort = await anlegen(client, { igdbId: 1001, plattform: "PS5" });
+		expect(antwort.status).toBe(200);
+		expect(await antwort.json()).toMatchObject({ spielId: 7, titel: "Bloodborne", vorhanden: true });
+		// Ohne IGDB-Anfrage, und das PS5-Release entsteht am vorhandenen Spiel.
+		expect(aufrufe.length).toBe(0);
+		const r = await env.DB.prepare("SELECT platform FROM release WHERE game_id = 7 ORDER BY platform").all();
+		expect(r.results.map((x: any) => x.platform)).toEqual(["PS4", "PS5"]);
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM game").first()).toEqual({ n: 1 });
+	});
+
+	it("warnt bei gleichem Titelschluessel und legt mit trotzdem an", async () => {
+		await spiel(7, "Bloodborne", "bloodborne", ["PS4"]);
+		const { client } = fakeIgdb([[spielRoh()], [spielRoh()]]);
+
+		const antwort = await anlegen(client, { igdbId: 1001, plattform: "PS5" });
+		expect(antwort.status).toBe(409);
+		expect((await antwort.json()) as any).toMatchObject({ kandidaten: [{ spielId: 7, titel: "Bloodborne" }] });
+
+		expect((await anlegen(client, { igdbId: 1001, plattform: "PS5", trotzdem: true })).status).toBe(201);
+	});
+
+	it("meldet einen unbekannten Eintrag und prueft die Eingaben", async () => {
+		const { client } = fakeIgdb([[]]);
+		expect((await anlegen(client, { igdbId: 999999, plattform: "PS4" })).status).toBe(404);
+		expect((await anlegen(client, { igdbId: 0, plattform: "PS4" })).status).toBe(400);
+		expect((await anlegen(client, { igdbId: 1001, plattform: "PC" })).status).toBe(400);
+		expect((await anlegen(client, { plattform: "PS4" })).status).toBe(400);
+	});
+
+	it("laesst einen Eintrag ohne PlayStation-Plattform nicht durch (7.6)", async () => {
+		const { client } = fakeIgdb([[spielRoh({ platforms: [6] })]]);
+		expect((await anlegen(client, { igdbId: 1001, plattform: "PS4" })).status).toBe(404);
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM game").first()).toEqual({ n: 0 });
+	});
+});
+
 describe("igdbAbgleichSchritt", () => {
 	it("verknuepft einen eindeutigen Treffer automatisch und uebernimmt die Metadaten", async () => {
 		await spiel(1, "Bloodborne", "bloodborne", ["PS4"]);
