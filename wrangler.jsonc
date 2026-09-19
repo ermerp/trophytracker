@@ -16,6 +16,18 @@
 	"observability": {
 		"enabled": true
 	},
+	/**
+	 * Naechtliche Automatik (Stufe 18, Abschnitt 10.1): alle fuenf Minuten
+	 * zwischen 03:00 und 05:59 UTC, 36 Aufrufe je Nacht. Auf dem Free Tier
+	 * gilt fuer einen Cron-Aufruf dieselbe 10-ms-CPU-Grenze wie fuer eine
+	 * Anfrage; jeder Aufruf tut deshalb genau einen Schritt (eine Seite
+	 * holen oder auswerten), der Fortschritt liegt in der Datenbank. Ein
+	 * voller Sync braucht rund elf Aufrufe, der Rest der Nacht geht an
+	 * IGDB-Auffrischen und Disc-Fassungen. Ein Eintrag von fuenf erlaubten.
+	 */
+	"triggers": {
+		"crons": ["*/5 3-5 * * *"]
+	},
 	"upload_source_maps": true,
 	/**
 	 * Frontend und API teilen sich einen Worker und damit eine Origin.

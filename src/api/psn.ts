@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { SyncLauf } from "../db/sync";
 import { Geheimnis } from "../domain/secret";
 import { PsnAuthError } from "../psn/client";
 import { normalisierungWiederholen, syncSchritt } from "../sync/run";
@@ -67,9 +68,15 @@ export const psnRoutes = new Hono<AppEnv>()
 		return c.json({ zurueckgesetzt: ergebnis.seiten, laufId: ergebnis.laufId, weiter: true });
 	})
 
+	/**
+	 * Zustand fuer Einstellungen und Hinweisblock. `letzterAutomatischerLauf`
+	 * (Stufe 18) ist der juengste Lauf des Cron - der Hinweisblock meldet
+	 * daraus einen fehlgeschlagenen Nachtlauf, den niemand am Bildschirm sah.
+	 */
 	.get("/sync/status", async (c) => {
-		const [lauf, zugang, trophaeen] = await Promise.all([
+		const [lauf, cronLauf, zugang, trophaeen] = await Promise.all([
 			c.var.repos.sync.letzterLauf(),
+			c.var.repos.sync.letzterLauf("cron"),
 			c.var.repos.credentials.anzeige(),
 			c.var.repos.trophies.anzahl(),
 		]);
@@ -77,17 +84,22 @@ export const psnRoutes = new Hono<AppEnv>()
 		return c.json({
 			zugang,
 			trophaeen,
-			letzterLauf: lauf
-				? {
-						id: lauf.id,
-						status: lauf.status,
-						phase: lauf.phase,
-						gestartetAm: lauf.started_at,
-						beendetAm: lauf.finished_at,
-						titlesSeen: lauf.titles_seen,
-						offset: lauf.next_offset,
-						meldung: lauf.error_message,
-					}
-				: null,
+			letzterLauf: laufAntwort(lauf),
+			letzterAutomatischerLauf: laufAntwort(cronLauf),
 		});
 	});
+
+function laufAntwort(lauf: SyncLauf | null) {
+	if (!lauf) return null;
+	return {
+		id: lauf.id,
+		status: lauf.status,
+		phase: lauf.phase,
+		ausloeser: lauf.started_by,
+		gestartetAm: lauf.started_at,
+		beendetAm: lauf.finished_at,
+		titlesSeen: lauf.titles_seen,
+		offset: lauf.next_offset,
+		meldung: lauf.error_message,
+	};
+}

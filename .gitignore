@@ -175,8 +175,9 @@ dist
 *.sql
 !migrations/*.sql
 
-# Build-Ausgabe des Frontends
+# Build-Ausgabe des Frontends (dev-dist: Service Worker im Vite-Dev-Modus)
 frontend/dist/
+frontend/dev-dist/
 
 # WSL-Artefakte aus Windows-Downloads
 *:Zone.Identifier

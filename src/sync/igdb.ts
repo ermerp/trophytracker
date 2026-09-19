@@ -186,14 +186,16 @@ export type AuffrischErgebnis = {
 /**
  * Metadaten verknuepfter Spiele erneut holen - eine IGDB-Anfrage fuer bis
  * zu 50 Spiele. Kritikerwertungen aendern sich mit jeder neuen Rezension;
- * Stufe 18 haengt diesen Schritt an den Cron.
+ * seit Stufe 18 ruft der Cron diesen Schritt nachts mit einer Frist von
+ * sieben Tagen, die Handschaltflaeche ohne Frist.
  */
 export async function igdbAuffrischSchritt(
 	repos: Repositories,
 	igdb: IgdbClient,
 	n = AUFFRISCHEN_JE_AUFRUF,
+	mindestAlterTage = 0,
 ): Promise<AuffrischErgebnis> {
-	const spiele = await repos.igdb.zumAuffrischen(n);
+	const spiele = await repos.igdb.zumAuffrischen(n, mindestAlterTage);
 	if (spiele.length === 0) return { status: "erfolg", angefragt: 0, aktualisiert: 0 };
 
 	try {

@@ -21,6 +21,7 @@ Lies den relevanten Abschnitt, bevor du an einem Feature arbeitest. Diese Datei 
 ```bash
 npm run dev                                       # Frontend (Vite), proxyt /api auf :8787
 npx wrangler dev                                  # Worker + gebaute Assets, mit lokaler D1
+npx wrangler dev --test-scheduled                 # dazu der Cron-Einstieg: curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"
 npx wrangler d1 migrations create <db> <name>     # neue Migration
 npx wrangler d1 migrations apply <db> --local     # lokal anwenden
 npx wrangler d1 export <db> --remote --output=backup.sql
@@ -54,6 +55,10 @@ Dasselbe gilt für Zuordnungen: Ein einmal gesetztes `trophy_progress.release_id
 Seit Stufe 16 hält `game_event` fest, wer wann was geschrieben hat (Abschnitt 8.5). Geschrieben wird **ausschließlich in `src/db/`**: Jede Repository-Methode, die Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidung oder Release ändert, hängt `EventRepository.statement(…)` in **denselben Batch** wie ihre Änderung – nie eine Route, nie ein zweiter Aufruf danach. Set-basierte Schreiber (`vorbelegen`, `einreihen`, `discFassungAusIgdb`, `erschieneneFreigeben`, Kopplung) protokollieren per `events.insertSelect` mit **derselben Bedingung wie das UPDATE, davor im Batch**; ein Ereignis zu einem Löschen läuft **vor** dem DELETE. Wo „alt → neu" gebraucht wird, den alten Wert per Primärschlüssel lesen und bei Gleichheit **kein** Ereignis schreiben. Rückgabewerte aus `meta.changes` kommen nur von der eigentlichen Änderung, nie als Summe über den Batch – sonst zählen die Protokollzeilen mit (in Stufe 16 so passiert, `PlanRepository.erledigen`).
 
 Die Quelle (`nutzer` / `sync` / `igdb` / `import`, `feed` und `migration` reserviert) wird aus vorhandenen Feldern abgeleitet (`quelleAusHerkunft`, `quelleAusMatch`), nicht durch die Routen gereicht. Der Sync protokolliert nur Erkanntes, IGDB nur Entscheidungen und Statuswechsel, nichts bei unverändertem Stand (Entscheidungen des Nutzers vom 16.09.2026). Der Satz für die Oberfläche entsteht zur Lesezeit in `src/domain/ereignis.ts` und wird nie gespeichert; eine neue Ereignisart kommt dort in `EREIGNIS_ARTEN` und bekommt einen Satz (Test hält das fest). Wer einen neuen Schreiber baut – Cron (18), Feed (20) –, protokolliert von Anfang an; der Scanner (17) tut es über `addPhysicalCopy(…, 'scan')` und schreibt nichts Eigenes.
+
+### Keine PlayStation-Marken in der Gestaltung
+
+Keine PlayStation-Logos, -Symbole (Dreieck/Kreis/Kreuz/Quadrat, PS-Monogramm) oder -Schriftzüge in Icons, Grafiken oder Gestaltungselementen – auch nicht angedeutet oder abstrahiert (Entscheidung des Nutzers vom 19.09.2026, Abschnitt 13). Geschützte Marken, das Repository ist öffentlich. Plattformnamen als Text („PS4") sind Daten, kein Logo. Das App-Symbol ist ein eigener Pokal (`frontend/public/icon.svg`).
 
 ### Nur PS3, PS4, PS5 und PS Vita
 
@@ -95,7 +100,7 @@ Ebenso: "nur digital gespielt" und "Lücke" sind Views, keine Spalten.
 
 Der Free Tier erlaubt 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit zählen nicht mit, eigenes Rechnen schon.
 
-- **Cron Trigger helfen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz kommt aus dem Entwurf, nicht aus dem Auslöser: Arbeit pro Aufruf begrenzen und den Fortschritt in der Datenbank halten, damit der nächste Aufruf weitermacht
+- **Cron Trigger helfen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz kommt aus dem Entwurf, nicht aus dem Auslöser: Arbeit pro Aufruf begrenzen und den Fortschritt in der Datenbank halten, damit der nächste Aufruf weitermacht. So arbeitet `cronSchritt` (`src/sync/cron.ts`, Abschnitt 10.1): genau eine schwere Arbeit je Aufruf, 36 Aufrufe je Nacht. Wer dem Cron etwas hinzufügt, hängt es als weiteren Schritt in diese Reihenfolge – nie zwei Arbeiten in einen Aufruf
 - Schwere Importe (Händler-Feeds) **und gedrosselte Quellen** laufen in einer GitHub Action, nicht im Worker – upcitemdb antwortet nach je sechs Abfragen 90 Sekunden mit `429` und erlaubt 100 am Tag; ein Job darf so lange brauchen, eine Anfrage im Worker nicht (`scans.yml`, Stufe 17b)
 - Abgleiche im Worker bereiten den Bestand **einmal** vor, nicht je Eingabe: 430 Spieltitel × 56 offene Scans wären 24 000 Zerlegungen in einem Aufruf (`vorbereiten` in `src/domain/scan-titel.ts`)
 - Große Fremddaten (Händler-Feeds) werden in der GitHub Action geparst und gefiltert; der Worker bekommt nur fertige Batches

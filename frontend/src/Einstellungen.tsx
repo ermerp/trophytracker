@@ -18,6 +18,7 @@ type Zugang = {
 
 type Lauf = {
   status: string
+  ausloeser: 'nutzer' | 'cron'
   gestartetAm: string
   beendetAm: string | null
   titlesSeen: number | null
@@ -25,7 +26,8 @@ type Lauf = {
   meldung: string | null
 } | null
 
-type StatusAntwort = { zugang: Zugang; letzterLauf: Lauf; trophaeen: number }
+/** Seit Stufe 18 auch der juengste Lauf des Cron (Abschnitt 10.1). */
+export type StatusAntwort = { zugang: Zugang; letzterLauf: Lauf; letzterAutomatischerLauf: Lauf; trophaeen: number }
 
 type SyncAntwort = {
   status: 'erfolg' | 'laufend' | 'fehler'
@@ -62,6 +64,17 @@ const STATUSTEXT: Record<string, string> = {
   ok: 'in Ordnung',
   abgelaufen: 'abgelaufen – bitte ein neues NPSSO eintragen',
   fehler: 'Fehler beim letzten Versuch',
+}
+
+const AUSLOESERTEXT: Record<string, string> = { nutzer: 'von Hand', cron: 'automatisch' }
+
+/** Eine Zeile zu einem Lauf: Status, Ausloeser, Start, Titel, Meldung. */
+function laufText(lauf: NonNullable<Lauf>): string {
+  return (
+    `${lauf.status}, ${AUSLOESERTEXT[lauf.ausloeser] ?? lauf.ausloeser}, gestartet ${datum(lauf.gestartetAm)}` +
+    (lauf.titlesSeen !== null ? ` – ${lauf.titlesSeen} Titel` : '') +
+    (lauf.meldung ? ` – ${lauf.meldung}` : '')
+  )
 }
 
 export function Einstellungen() {
@@ -225,13 +238,19 @@ export function Einstellungen() {
         nicht an.
       </p>
       {fortschritt && <p>{fortschritt}</p>}
-      {status?.letzterLauf && (
-        <p>
-          Letzter Lauf: {status.letzterLauf.status}, gestartet {datum(status.letzterLauf.gestartetAm)}
-          {status.letzterLauf.titlesSeen !== null && ` – ${status.letzterLauf.titlesSeen} Titel`}
-          {status.letzterLauf.meldung && ` – ${status.letzterLauf.meldung}`}
-        </p>
-      )}
+      {status?.letzterLauf && <p>Letzter Lauf: {laufText(status.letzterLauf)}</p>}
+
+      <h2>Automatik</h2>
+      <p>
+        Nachts zwischen 5 und 8 Uhr (03:00–06:00 UTC) holt der Worker die Trophäen einmal von allein ab,
+        gibt erschienene Titel frei und frischt danach IGDB-Metadaten und Disc-Fassungen auf – in kleinen
+        Schritten alle fünf Minuten. Ein fehlgeschlagener Abruf wird erst in der nächsten Nacht wiederholt;
+        bei abgelaufenem NPSSO ruht der Abruf, bis ein neues eingetragen ist.
+      </p>
+      <p>
+        Letzter automatischer Abruf:{' '}
+        {status?.letzterAutomatischerLauf ? laufText(status.letzterAutomatischerLauf) : 'noch keiner'}
+      </p>
 
       {meldung && <p role="status">{meldung}</p>}
     </section>

@@ -1,6 +1,6 @@
-import { env } from "cloudflare:test";
+import { createExecutionContext, env } from "cloudflare:test";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { createApp } from "../src/index";
+import { createApp, createScheduled } from "../src/index";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
 import { erstelleIgdbClient } from "../src/igdb/client";
@@ -292,6 +292,25 @@ describe("Dichtheitsprüfung", () => {
 		for (const text of antworten) {
 			expect(istDicht(text), `Leck in: ${text.slice(0, 200)}`).toMatchObject({ dicht: true });
 		}
+	});
+
+	it("schreibt aus dem Cron kein Geheimnis ins Log - Erfolg und Fehlerpfade (Stufe 18)", async () => {
+		// Der Cron ist der einzige Pfad, der von sich aus console.log ruft
+		// (observability.logs ist an). Erst ein voller Lauf mit markierten
+		// Token, dann PSN und IGDB, die Markierungen im Fehlertext zurueckwerfen.
+		await createRepositories(env.DB, env.NPSSO_KEY).credentials.npssoSpeichern(new Geheimnis(MARKIERUNGEN.npsso));
+		const ctx = createExecutionContext();
+		const ereignis = { scheduledTime: Date.now(), cron: "*/5 3-5 * * *", noRetry() {} };
+
+		const gut = createScheduled(psnMarkiert, () => igdbMarkiert());
+		for (let i = 0; i < 6; i++) await gut(ereignis, env, ctx);
+
+		await env.DB.prepare("DELETE FROM psn_sync_run").run();
+		await createScheduled(psnKaputt, () => igdbKaputt(500))(ereignis, env, ctx);
+		await createScheduled(psnKaputt, () => igdbAbrufKaputt(429))(ereignis, env, ctx);
+
+		expect(ausgabe.length).toBeGreaterThan(6);
+		expect(istDicht(ausgabe.join("\n")), ausgabe.join("\n")).toMatchObject({ dicht: true });
 	});
 
 	it("gibt auf keiner IGDB-Route ein Geheimnis heraus - Fehlerpfade", async () => {

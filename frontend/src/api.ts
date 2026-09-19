@@ -26,6 +26,12 @@ export async function anfrage<T>(
     headers: init?.koerper === undefined ? undefined : { 'content-type': 'application/json' },
     body: init?.koerper === undefined ? undefined : JSON.stringify(init.koerper),
   })
+  // Keine JSON-Antwort heisst seit der PWA (Stufe 18): Die Access-Sitzung ist
+  // abgelaufen, und statt der API kam die Anmeldeseite. Ein stilles `{}`
+  // liesse die Ansicht leer aussehen; ein Neuladen geht durch die Anmeldung.
+  if (antwort.ok && !(antwort.headers.get('content-type') ?? '').includes('json')) {
+    throw new ApiFehler(antwort.status, { fehler: 'Anmeldung abgelaufen – bitte die Seite neu laden.' })
+  }
   const daten = (await antwort.json().catch(() => ({}))) as Record<string, unknown>
   if (!antwort.ok) throw new ApiFehler(antwort.status, daten)
   return daten as T

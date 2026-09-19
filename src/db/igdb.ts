@@ -206,15 +206,28 @@ export class IgdbRepository {
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 
-	/** Verknuepfte Spiele, die am laengsten nicht aufgefrischt wurden. */
-	async zumAuffrischen(n: number): Promise<Array<{ id: number; igdb_id: number }>> {
-		const { results } = await this.db
-			.prepare(
-				"SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL " +
-					"ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT ?",
-			)
-			.bind(n)
-			.all<{ id: number; igdb_id: number }>();
+	/**
+	 * Verknuepfte Spiele, die am laengsten nicht aufgefrischt wurden.
+	 *
+	 * Mit `mindestAlterTage > 0` nur solche, deren Stand aelter ist (oder
+	 * fehlt) - der Cron (Stufe 18) frischt so jedes Spiel etwa woechentlich
+	 * auf und laesst den Rest der Nacht in Ruhe; die Handschaltflaeche nimmt
+	 * ohne Frist die 50 aeltesten. Zwei SQL-Texte statt eines `IS NULL OR`-
+	 * Binds (Zeilenlese-Regel).
+	 */
+	async zumAuffrischen(n: number, mindestAlterTage = 0): Promise<Array<{ id: number; igdb_id: number }>> {
+		const frist =
+			mindestAlterTage > 0
+				? "AND (igdb_synced_at IS NULL OR igdb_synced_at < datetime('now', ?)) "
+				: "";
+		const anweisung = this.db.prepare(
+			"SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL " +
+				frist +
+				"ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT ?",
+		);
+		const { results } = await (
+			mindestAlterTage > 0 ? anweisung.bind(`-${mindestAlterTage} days`, n) : anweisung.bind(n)
+		).all<{ id: number; igdb_id: number }>();
 		return results;
 	}
 

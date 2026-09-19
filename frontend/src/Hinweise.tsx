@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { anfrage, type IgdbStatus, type ImportLauf, type ReviewFortschritt } from './api'
+import type { StatusAntwort } from './Einstellungen'
 import type { Sicherungsstand } from './Sicherung'
 
 /**
@@ -19,9 +20,12 @@ export function Hinweise() {
   const [importOffen, setImportOffen] = useState<{ id: number; offen: number } | null>(null)
   const [freitext, setFreitext] = useState(0)
   const [kandidaten, setKandidaten] = useState(0)
+  const [sync, setSync] = useState<StatusAntwort | null>(null)
 
   useEffect(() => {
     anfrage<ReviewFortschritt>('/api/review/progress').then(setReview).catch(() => {})
+    // Stufe 18: Der Nachtlauf hat keinen Zuschauer - sein Fehler muss hier stehen.
+    anfrage<StatusAntwort>('/api/sync/status').then(setSync).catch(() => {})
     anfrage<{ listenOffen: number }>('/api/zuordnung/offen?limit=1')
       .then((a) => setListenOffen(a.listenOffen))
       .catch(() => {})
@@ -46,6 +50,28 @@ export function Hinweise() {
   }, [])
 
   const zeilen: React.ReactNode[] = []
+
+  // Abschnitt 7.1: Der abgelaufene Zugang ist ein regulaerer Zustand und
+  // gehoert deutlich auf die Startseite - seit Stufe 18 steht sonst der
+  // naechtliche Abruf still, ohne dass es jemand merkt.
+  if (sync?.zugang.status === 'abgelaufen') {
+    zeilen.push(
+      <li key="npsso">
+        Der PlayStation-Zugang ist <strong>abgelaufen</strong> – der nächtliche Abruf steht still.{' '}
+        <Link to="/einstellungen">Neues NPSSO eintragen</Link>
+      </li>,
+    )
+  }
+  if (sync?.letzterAutomatischerLauf && nachtlaufFehlgeschlagen(sync.letzterAutomatischerLauf)) {
+    zeilen.push(
+      <li key="nachtlauf">
+        Der <strong>automatische Abruf</strong> ist fehlgeschlagen
+        {sync.letzterAutomatischerLauf.meldung ? `: ${sync.letzterAutomatischerLauf.meldung}` : '.'}{' '}
+        <Link to="/einstellungen">Einstellungen</Link>
+      </li>,
+    )
+  }
+
   if (review && review.offen > 0) {
     zeilen.push(
       <li key="pruefen">
@@ -139,4 +165,11 @@ export function Hinweise() {
 
   if (zeilen.length === 0) return null
   return <ul className="hinweise">{zeilen}</ul>
+}
+
+/** Fehlgeschlagen und juenger als 24 Stunden - aeltere Fehler hat ein neuer Lauf abgeloest oder der Nutzer gesehen. */
+function nachtlaufFehlgeschlagen(lauf: NonNullable<StatusAntwort['letzterAutomatischerLauf']>): boolean {
+  if (lauf.status !== 'fehler') return false
+  const gestartet = new Date(lauf.gestartetAm.replace(' ', 'T') + (lauf.gestartetAm.includes('Z') ? '' : 'Z'))
+  return Date.now() - gestartet.getTime() < 24 * 60 * 60 * 1000
 }

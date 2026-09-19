@@ -22,6 +22,15 @@ describe("Health-Route", () => {
 		expect(await response.json()).toMatchObject({ status: "ok" });
 	});
 
+	it("hat einen Cron-Einstieg, der ohne NPSSO durchlaeuft (Stufe 18)", async () => {
+		// Nur die Verdrahtung: Die Schrittfolge prueft test/cron.spec.ts.
+		const ctx = createExecutionContext();
+		await worker.scheduled({ scheduledTime: Date.now(), cron: "*/5 3-5 * * *", noRetry() {} }, env, ctx);
+		await waitOnExecutionContext(ctx);
+		const laeufe = await env.DB.prepare("SELECT COUNT(*) AS n FROM psn_sync_run").first<{ n: number }>();
+		expect(laeufe?.n).toBe(0);
+	});
+
 	it("liefert 404 für unbekannte API-Pfade", async () => {
 		const response = await SELF.fetch("https://example.com/api/gibtesnicht");
 

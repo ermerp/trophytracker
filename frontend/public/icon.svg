@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    App-Symbol: ein schlichter Pokal (Stufe 18). Eigene Zeichnung, eine Farbe,
+    kein Text. Keine PlayStation-Symbole oder -Schriftzuege, auch nicht
+    angedeutet - geschuetzte Marken, das Repository ist oeffentlich
+    (Entscheidung des Nutzers vom 19.09.2026, Spezifikation Abschnitt 13).
+  -->
+  <rect width="512" height="512" rx="96" fill="#1f2633"/>
+  <g fill="#e8b923">
+    <!-- Kelch -->
+    <path d="M152 112h208v96c0 62-46 112-104 112s-104-50-104-112z"/>
+    <!-- Henkel -->
+    <path d="M152 136h-40c-14 0-24 10-24 24v16c0 44 32 80 74 86l6-32c-26-4-44-26-44-54v-6h28z"/>
+    <path d="M360 136h40c14 0 24 10 24 24v16c0 44-32 80-74 86l-6-32c26-4 44-26 44-54v-6h-28z"/>
+    <!-- Stiel und Sockel -->
+    <rect x="236" y="318" width="40" height="52"/>
+    <path d="M188 370h136c14 0 24 10 24 24v6H164v-6c0-14 10-24 24-24z"/>
+  </g>
+</svg>
