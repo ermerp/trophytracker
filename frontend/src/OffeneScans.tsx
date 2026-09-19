@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { anfrage, datum } from './api'
+import { anfrage, zeitpunkt } from './api'
 
 /**
  * Offene Scans (Abschnitt 9, unresolved_scan): Codes, die beim Scannen mit
@@ -23,6 +23,7 @@ export function OffeneScans() {
   }, [])
 
   async function verwerfen(ean: string) {
+    if (!confirm(`Code ${ean} wirklich verwerfen? Er ist danach weg, als wäre er nie gescannt worden.`)) return
     setFehler(null)
     try {
       await anfrage(`/api/scan/unresolved/${ean}`, { methode: 'DELETE' })
@@ -60,11 +61,11 @@ export function OffeneScans() {
                 <tr key={s.ean}>
                   <td>{s.ean}</td>
                   <td>{s.scans}×</td>
-                  <td>{datum(s.zuletztAm)}</td>
+                  <td>{zeitpunkt(s.zuletztAm)}</td>
                   <td>{s.titel ?? 'unbekannt'}</td>
                   <td>
                     <Link to={`/scannen?ean=${s.ean}`}>zuordnen</Link>{' '}
-                    <button type="button" className="klein" onClick={() => verwerfen(s.ean)}>verwerfen</button>
+                    <button type="button" className="klein" onClick={() => verwerfen(s.ean)}>Scan verwerfen</button>
                   </td>
                 </tr>
               ))}

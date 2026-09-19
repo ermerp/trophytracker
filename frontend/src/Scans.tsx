@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { anfrage, datum, erledigtText, scanWiederOeffnen, type ErfasstAntwort, type Plattform } from './api'
+import { anfrage, zeitpunkt, erledigtText, scanWiederOeffnen, type ErfasstAntwort, type Plattform } from './api'
 import { ScanAuswahl, type Wahl } from './ScanAuswahl'
 
 /**
@@ -126,12 +126,36 @@ export function Scans() {
     }
   }
 
+  /** Löscht den Scan endgültig – für Codes, die kein Spiel sind. Deshalb mit Rückfrage. */
   async function verwerfen(ean: string) {
+    if (!confirm(`Code ${ean} wirklich verwerfen? Er ist danach weg, als wäre er nie gescannt worden.`)) return
     setFehler(null)
     try {
       await anfrage(`/api/scan/unresolved/${ean}`, { methode: 'DELETE' })
       entferne(ean)
       setHinweis(`${ean} verworfen.`)
+    } catch (f) {
+      setFehler(f instanceof Error ? f.message : 'Verwerfen fehlgeschlagen.')
+    }
+  }
+
+  /**
+   * „Titel ist falsch": Die Quelle hat zu einem richtigen Code einen falschen
+   * Datensatz (Zahnpasta zu einem Sony-Code, 18.09.2026). Der Vorschlag geht,
+   * der Code bleibt und rückt in „Ohne Titel".
+   */
+  async function titelFalsch(ean: string) {
+    setFehler(null)
+    try {
+      await anfrage(`/api/scan/${ean}/vorschlag`, { methode: 'DELETE' })
+      setDaten(
+        (d) =>
+          d && {
+            ...d,
+            scans: d.scans.map((s) => (s.ean === ean ? { ...s, titel: null, quelle: null, eindeutig: false, kandidaten: [] } : s)),
+          },
+      )
+      setHinweis(`Vorschlag zu ${ean} verworfen – der Code bleibt offen.`)
     } catch (f) {
       setFehler(f instanceof Error ? f.message : 'Verwerfen fehlgeschlagen.')
     }
@@ -254,8 +278,11 @@ export function Scans() {
                     <button type="button" className="klein" onClick={() => setOffenerCode(s.ean)}>
                       Suchen oder anlegen
                     </button>{' '}
+                    <button type="button" className="klein" disabled={laeuft} onClick={() => titelFalsch(s.ean)}>
+                      Titel ist falsch
+                    </button>{' '}
                     <button type="button" className="klein" disabled={laeuft} onClick={() => verwerfen(s.ean)}>
-                      verwerfen
+                      Scan verwerfen
                     </button>
                   </p>
                 )}
@@ -271,15 +298,15 @@ export function Scans() {
           <p className="zeile">
             {daten.ungeprueft > 0
               ? `${daten.ungeprueft} davon hat der Job noch nicht angefragt – er läuft täglich und schafft 100 Codes.`
-              : 'Die Quelle kennt diese Codes nicht. Hülle heraussuchen und den Titel selbst zuordnen.'}
+              : 'Die Quelle kennt diese Codes nicht oder ihr Vorschlag war falsch. Hülle heraussuchen und den Titel selbst zuordnen.'}
           </p>
           <ul className="scanliste">
             {ohneTitel.map((s) => (
               <li key={s.ean}>
                 <span className="titel">{s.ean}</span>{' '}
                 <span className="zeile">
-                  {s.scans}× gescannt, zuletzt {datum(s.zuletztAm)}
-                  {s.geprueftAm === null ? ' · noch nicht angefragt' : ' · Quelle kennt ihn nicht'}
+                  {s.scans}× gescannt, zuletzt {zeitpunkt(s.zuletztAm)}
+                  {s.geprueftAm === null ? ' · noch nicht angefragt' : ' · kein brauchbarer Titel'}
                 </span>
                 {offenerCode === s.ean ? (
                   <ScanAuswahl
@@ -296,7 +323,7 @@ export function Scans() {
                       Suchen oder anlegen
                     </button>{' '}
                     <button type="button" className="klein" disabled={laeuft} onClick={() => verwerfen(s.ean)}>
-                      verwerfen
+                      Scan verwerfen
                     </button>
                   </p>
                 )}

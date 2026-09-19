@@ -195,6 +195,19 @@ describe("Titelvorschlag und Abgleich (Stufe 17b)", () => {
 		expect((await hole("/api/scan/ungeprueft")).eans).toEqual([EAN2]);
 	});
 
+	it("verwirft einen falschen Vorschlag, behaelt aber den Code (Zahnpasta-Fall)", async () => {
+		await scan(EAN);
+		await vorschlag(EAN, { titel: "Colgate Max Fresh Knockout Toothpaste", quelle: "upcitemdb" });
+		expect((await sende("DELETE", `/api/scan/${EAN}/vorschlag`)).status).toBe(200);
+		const a = await hole("/api/scan/unresolved");
+		expect(a.scans[0]).toMatchObject({ ean: EAN, titel: null, quelle: null });
+		// Geprueft bleibt geprueft: dieselbe Quelle wuerde dasselbe antworten.
+		expect(a.scans[0].geprueftAm).toBeTruthy();
+		expect((await hole("/api/scan/ungeprueft")).eans).toEqual([]);
+		expect((await sende("DELETE", `/api/scan/${EAN}/vorschlag`)).status).toBe(404);
+		expect((await sende("DELETE", `/api/scan/${EAN2}/vorschlag`)).status).toBe(404);
+	});
+
 	it("prueft die Eingaben und meldet einen unbekannten Code", async () => {
 		await scan(EAN);
 		expect((await vorschlag(EAN, { titel: 42 })).status).toBe(400);
