@@ -83,6 +83,8 @@ Was halb- oder vollautomatisch entsteht, muss sich in der Oberfläche zurückneh
 
 Das gilt auch für seine Zwischenentscheidungen: Ein "überspringen" ist eine Entscheidung und darf ein Neuladen überstehen, nicht nur den Moment.
 
+Ein „Rückgängig" stellt den Stand **vor** der Aktion vollständig her – auch das, was der Schreibpfad nebenbei entfernt hat. Das Zuordnen eines Scans löscht den offenen Scan; das Zurücknehmen muss ihn samt Vorschlag zurückbringen, sonst ist der Code spurlos weg (in Stufe 17b zuerst vergessen).
+
 ### Berechnetes nicht speichern
 
 Sortierungen der Listen (Favorit, Kritikerwertung, Erscheinungsdatum) werden bei der Abfrage aus gespeicherten Bestandteilen gebildet, nie als Rang abgelegt. Die frühere Rangformel mit Gewichten ist seit Migration 0013 weg (Favorit statt Priorität, Entscheidung des Nutzers vom 15.09.2026, Abschnitt 5.2) – kommt so etwas zurück, gilt dieselbe Regel.
@@ -94,10 +96,11 @@ Ebenso: "nur digital gespielt" und "Lücke" sind Views, keine Spalten.
 Der Free Tier erlaubt 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit zählen nicht mit, eigenes Rechnen schon.
 
 - **Cron Trigger helfen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz kommt aus dem Entwurf, nicht aus dem Auslöser: Arbeit pro Aufruf begrenzen und den Fortschritt in der Datenbank halten, damit der nächste Aufruf weitermacht
-- Schwere Importe (Händler-Feeds) laufen in einer GitHub Action, nicht im Worker
+- Schwere Importe (Händler-Feeds) **und gedrosselte Quellen** laufen in einer GitHub Action, nicht im Worker – upcitemdb antwortet nach je sechs Abfragen 90 Sekunden mit `429` und erlaubt 100 am Tag; ein Job darf so lange brauchen, eine Anfrage im Worker nicht (`scans.yml`, Stufe 17b)
+- Abgleiche im Worker bereiten den Bestand **einmal** vor, nicht je Eingabe: 430 Spieltitel × 56 offene Scans wären 24 000 Zerlegungen in einem Aufruf (`vorbereiten` in `src/domain/scan-titel.ts`)
 - Große Fremddaten (Händler-Feeds) werden in der GitHub Action geparst und gefiltert; der Worker bekommt nur fertige Batches
 - Rohantworten seitenweise speichern, nicht am Stück parsen
-- **D1 erlaubt 100 gebundene Werte je Statement.** Ein `INSERT … VALUES (?,?,?), …` über eine ganze Seite passt nicht; in Stücke teilen (`TrophiesRepository.listeNeuStatements`: 33 Titel × 3 Werte)
+- **D1 erlaubt 100 gebundene Werte je Statement.** Ein `INSERT … VALUES (?,?,?), …` über eine ganze Seite passt nicht; in Stücke teilen (`TrophiesRepository.listeNeuStatements`: 33 Titel × 3 Werte). Dasselbe gilt für `IN (?,…)` über eine Seite: `/api/games` kappt `limit` deshalb auf 100 – mit 200 antwortete die Produktion mit `500` (18.09.2026)
 
 ### Zeilenlese-Grenze respektieren
 
@@ -175,6 +178,7 @@ Das Repository ist öffentlich, das Backup-Repository ist privat. Ein Datenbank-
 
   Offene Entscheidungen bleiben ausdrücklich als offen markiert ("in Stufe N zu
   entscheiden"), statt stillschweigend geschlossen zu werden.
+- **Nutzerdaten ändert nur der Nutzer, in der Anwendung.** Ergebnisse einer Messung oder eines Skripts werden nie über die API oder `d1 execute --remote` eingetragen – auch nicht nach Freigabe im Chat (Entscheidung des Nutzers vom 18.09.2026: die 22 eindeutigen Scans kamen erst über die Ansicht `/scans`). Fehlt der Weg in der Oberfläche, wird er gebaut. Erlaubt bleibt der Prüfaufruf nach dem Deploy, der seine Testzeile selbst wieder löscht.
 - **Vor größeren Aufgaben einen Plan vorlegen**, insbesondere bei allem, was Migrationen oder externe Schnittstellen berührt.
 - **Migrationen abwärtskompatibel halten.** Sie laufen vor dem Deployment, der alte Worker läuft in dem Moment noch. Spalten hinzufügen ist unkritisch, Umbenennen braucht zwei Deployments. Eine neue Tabelle gehört zugleich in `EXPORT_TABELLEN` oder `NICHT_EXPORTIERT` (`src/db/export.ts`), sonst fährt sie ungesichert mit.
 - **Datenmigrationen weisen ihre Wirkung nach.** Schreibt oder löscht eine Migration Zeilen, prüft der Deploy-Job vorher die Sicherung (INSERT-Zeilen im Dump gegen `COUNT(*)` der Datenbank, Abbruch vor der Migration bei Abweichung) und protokolliert danach die betroffene Zeilenzahl neben der Erwartung. Nur Zahlen ins Log, nie Inhalt — das Repository ist öffentlich. Die Zahlen gehören auch in den Bericht an den Nutzer.

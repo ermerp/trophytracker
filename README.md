@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 17 deployt, Abnahme steht aus** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 17b abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -69,7 +69,10 @@ der Handy-Kamera und der Laptop-Webcam, ohne externe EAN-Quelle – ein Code wir
 beim ersten Mal aus der eigenen Sammlung gewählt (oder das Spiel angelegt) und
 ist danach bekannt. Zuordnen legt Disc und Mapping an, erledigt Kauf- und
 Wunscheinträge und steht im Verlauf als „per Barcode". Keine Migration.
-**Noch nicht abgenommen** – der Test mit den echten Discs am Handy steht aus.
+Stufe 17b holt zu liegen gebliebenen Codes den Titel per täglichem Job und legt
+sie in `/scans` zur Entscheidung vor (Migration 0020). **Beide abgenommen am
+19.09.2026**: PS3-Regal gescannt, 34 Discs per Barcode erfasst; 22 Codes, die
+die Quelle nicht kennt, bleiben offen, bis eBay als zweite Quelle freigegeben ist.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -692,6 +695,31 @@ Ein NPSSO ist 64 alphanumerische Zeichen — im gesamten Dump gibt es keine
 solche Zeichenkette. Die eine 64-Zeichen-Kette, die es gibt, steht in
 `psn_raw_response`, enthält Leerzeichen und Satzzeichen und ist ein Spieltitel
 aus einer Sony-Antwort.
+
+## Offene Scans auflösen
+
+Ein gescannter Barcode ist nur eine Zahl. [`.github/workflows/scans.yml`](.github/workflows/scans.yml)
+holt täglich um 04:23 UTC zu jedem noch nicht angefragten Code den Titel bei
+upcitemdb und trägt ihn über `POST /api/scan/:ean/vorschlag` ein – dieselbe
+Access-Service-Token-Anmeldung wie die Sicherung, kein weiteres Geheimnis.
+Zugeordnet wird nichts automatisch; das entscheidet die Ansicht „Offene Scans"
+(Einstellungen → Offene Scans → Alle zuordnen).
+
+Warum ein Job und nicht der Worker: Die freie Quelle drosselt nach jeweils
+sechs Abfragen für rund 90 Sekunden und erlaubt 100 am Tag. 56 Codes brauchten
+17 Minuten. Der Job fragt jeden Code nur einmal – auch ein „kennt ihn nicht"
+wird vermerkt, sonst verbraucht derselbe Code täglich das Kontingent.
+
+Von Hand anstoßen, etwa direkt nach einem Scan-Durchgang:
+
+```bash
+gh workflow run scans.yml -f anzahl=100
+```
+
+Der Lauf meldet nur Zahlen („Titel gefunden: 35, Quelle kennt den Code nicht: 21"),
+nie Inhalte – das Repository ist öffentlich. Steht ein Code trotz Titel falsch da
+(die Quelle lieferte zu einem Sony-Code Zahnpasta), nimmt „Titel ist falsch" den
+Vorschlag zurück und behält den Code; „Scan verwerfen" löscht ihn endgültig.
 
 ## Wunschliste und Absichten
 
