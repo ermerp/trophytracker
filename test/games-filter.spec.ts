@@ -149,6 +149,15 @@ describe("GET /api/games – Filter", () => {
 		expect(await titel("search=xyz")).toEqual([]);
 	});
 
+	it("search uebergeht Apostrophe, gerade und typografische (19.09.2026)", async () => {
+		await spiel("Assassin's Creed II", [{ platform: "PS3", trophaeen: { pct: 10 } }]);
+		await spiel("Marvel\u2019s Spider-Man", [{ platform: "PS4", trophaeen: { pct: 10 } }]);
+		expect(await titel("search=assassins")).toEqual(["Assassin's Creed II"]);
+		expect(await titel("search=assassin's")).toEqual(["Assassin's Creed II"]);
+		expect(await titel("search=marvels")).toEqual(["Marvel\u2019s Spider-Man"]);
+		expect(await titel("search=marvel%E2%80%99s")).toEqual(["Marvel\u2019s Spider-Man"]);
+	});
+
 	it("kombiniert Filter auf Release-Ebene", async () => {
 		// GTA V hat eine PS4-Disc, aber die PS5 ist digital
 		expect(await titel("platform=PS5&owned=physisch")).toEqual([]);

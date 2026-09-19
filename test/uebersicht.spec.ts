@@ -107,6 +107,11 @@ describe("GET /api/games/uebersicht", () => {
 		const a = await hole("/api/games/uebersicht?filter=alle&suche=blood");
 		expect(a.gesamt).toBe(1);
 		expect(a.zeilen[0].titel).toBe("Bloodborne");
+
+		// Apostrophe werden uebergangen (19.09.2026).
+		await spielMit("Assassin's Creed II", [{ plattform: "PS3", struktur: { b: 40, s: 8, g: 2, p: 1 }, nr: 3 }]);
+		const b = await hole("/api/games/uebersicht?filter=alle&suche=assassins");
+		expect(b.zeilen.map((z: { titel: string }) => z.titel)).toEqual(["Assassin's Creed II"]);
 	});
 
 	it("faellt bei unbekanntem Filter auf 'auffaellig' zurueck", async () => {

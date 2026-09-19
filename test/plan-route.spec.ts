@@ -683,6 +683,14 @@ describe("GET /api/plans?suche=", () => {
 		expect(d.eintraege.map((e: { titel: string }) => e.titel)).toEqual(["Divinity: Original Sin II"]);
 		expect((await hole(a, "/api/plans?kind=wunsch&suche=")).eintraege).toHaveLength(2);
 	});
+
+	it("uebergeht Apostrophe (19.09.2026)", async () => {
+		await spiel(3, "Assassin's Creed II", []);
+		const a = app();
+		await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 3 });
+		const d = await hole(a, "/api/plans?kind=wunsch&suche=assassins%20creed");
+		expect(d.eintraege.map((e: { titel: string }) => e.titel)).toEqual(["Assassin's Creed II"]);
+	});
 });
 
 describe("Waisen: gepflegter Physisch-Status haelt das Release", () => {
