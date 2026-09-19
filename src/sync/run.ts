@@ -1,5 +1,6 @@
 import type { Repositories } from "../db";
 import { einreihungSumme, type Einreihung } from "../db/review";
+import type { SyncAusloeser } from "../db/sync";
 import { normalisiereSeite } from "../domain/normalize";
 import { Geheimnis } from "../domain/secret";
 import {
@@ -75,8 +76,12 @@ async function sitzungMerken(repos: Repositories, sitzung: Sitzung): Promise<Sit
 export async function syncSchritt(
 	repos: Repositories,
 	psn: PsnClient,
+	optionen: { ausloeser?: SyncAusloeser } = {},
 ): Promise<SyncErgebnis> {
-	const lauf = (await repos.sync.laufenderLauf()) ?? (await repos.sync.starten());
+	// Ein laufender Lauf wird fortgesetzt, egal wer ihn startete; nur ein
+	// neuer traegt den Ausloeser (Stufe 18: der Cron nimmt dieselben Pfade).
+	const lauf =
+		(await repos.sync.laufenderLauf()) ?? (await repos.sync.starten(optionen.ausloeser ?? "nutzer"));
 
 	if (lauf.phase === "normalisierung") {
 		return normalisierungsSchritt(repos, lauf.id, lauf.titles_seen);

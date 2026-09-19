@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 17b abgeschlossen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufe 18 gebaut, Abnahme offen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -73,6 +73,11 @@ Stufe 17b holt zu liegen gebliebenen Codes den Titel per täglichem Job und legt
 sie in `/scans` zur Entscheidung vor (Migration 0020). **Beide abgenommen am
 19.09.2026**: PS3-Regal gescannt, 34 Discs per Barcode erfasst; 22 Codes, die
 die Quelle nicht kennt, bleiben offen, bis eBay als zweite Quelle freigegeben ist.
+Stufe 18 bringt die [Automatik](#automatik) – ein Cron Trigger holt die Trophäen
+nachts von allein, gibt erschienene Titel frei und frischt IGDB-Metadaten auf,
+je Aufruf ein Schritt (Migration 0021) – und macht das Frontend zur
+[installierbaren App](#als-app-installieren) mit Offline-Lesezugriff. Die
+Abnahme steht aus: Der erste Nachtlauf ist am Folgemorgen zu prüfen.
 
 > **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
 > Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
@@ -120,7 +125,9 @@ Was steht und in Betrieb nachgewiesen ist:
 | Lücken | In der Leiste: digital gespielt, Disc-Fassung belegt, nicht im Regal; „physisch nicht gewünscht" ist ein verworfener Kaufeintrag (Rückgängig, „wieder als Lücke zeigen"); darunter zugeklappt „Disc-Fassung unbekannt" mit „Disc gibt es" / „gibt es nicht" / „physisch nicht gewünscht" je Zeile. Disc-Fassung aus IGDB (`external_games`, Knopf „Disc-Fassungen prüfen" in den Einstellungen, 50 Spiele je Anfrage, nur `unbekannt` → `ja`, nach 30 Tagen erneut) oder von Hand im Spieldetail (Dropdown mit Quelle); PSN-Produkt-Id je Release pflegbar |
 | Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
 | Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 20 (Migration 0018). **Stufe 15 abgenommen am 16.09.2026** |
-| Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt „Metadaten auffrischen" nach (täglich erst mit dem Cron, Stufe 18) |
+| Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt der nächtliche Cron nach, außerdem „Metadaten auffrischen" (Stufe 18) |
+| Automatik | Cron Trigger, nachts alle fünf Minuten zwischen 03:00 und 05:59 UTC, je Aufruf ein Schritt: Erschienene freigeben, hängende Läufe abbrechen, Trophäen-Sync (ein Versuch je Nacht), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen. Block „Automatik" in den Einstellungen, Hinweisblock bei Fehler oder abgelaufenem Zugang (Migration 0021) |
+| App | Installierbar (PWA) mit Pokal-Symbol; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
 | Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
 | Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen. Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. Umschalter „Nur sammeln" für den ersten Durchgang durchs Regal: Codes werden bloß weggeschrieben, Ton als Rückmeldung, Zuordnung später. Keine externe EAN-Quelle (Messung von eBay-GTIN gegen die echten Codes nach dem Regal-Erfassen) |
 | Offene Scans | Werkzeug in den Einstellungen (`/scans`): Ein täglicher GitHub-Job holt Titel zu gescannten Codes bei upcitemdb (die freie Quelle drosselt nach je sechs Abfragen um 90 Sekunden – deshalb außerhalb des Workers), die Ansicht gleicht sie mit der Sammlung ab und legt sie in Blöcken vor: eindeutig mit „Alle erfassen", ohne eindeutiges Ziel mit Kandidaten und Suche, ohne Titel mit dem Stand des Jobs. Erfassen läuft über dieselbe Route wie der Scanner, Rückgängig stellt den offenen Scan wieder her. Gemessen an 56 PS3-Codes: 35 kannte die Quelle, 22 davon eindeutig (Migration 0020) |
@@ -129,7 +136,8 @@ Was steht und in Betrieb nachgewiesen ist:
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 18 – Cron Trigger und PWA.** Offen aus 17b: eBay als zweite
+**Als Nächstes: Abnahme von Stufe 18** (erster Nachtlauf, App auf dem Handy
+installieren), dann **Stufe 19 – Oberfläche**. Offen aus 17b: eBay als zweite
 EAN-Quelle, sobald der Entwicklerzugang freigegeben ist – die Messung gegen dieselben
 Codes steht dann an (Abschnitt 9.2). Reihenfolge danach, am
 16.09.2026 entschieden: 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
@@ -171,6 +179,18 @@ an der Pille „Fallback"); das Handy testet gegen die Produktion, die per
 `npm run build` unter `frontend/dist/assets/` und kommt vom eigenen Worker,
 nicht von einem CDN. Ohne Kamera lässt sich jeder Weg über das Textfeld
 „EAN eintippen" durchspielen; eine gültige Test-EAN ist `4006381333931`.
+
+**Cron lokal auslösen:** `npx wrangler dev --test-scheduled` startet den Worker
+mit einem Testeinstieg für den Cron; ein Aufruf entspricht einem nächtlichen
+Schritt:
+
+```bash
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"
+```
+
+Der Pfad `/cdn-cgi/` läuft am Asset-Fallback vorbei; das ältere `/__scheduled`
+liefert nur die `index.html`. Das Ergebnis steht als Zeile `cron: …` im
+Terminal des Workers, ohne hinterlegtes NPSSO bleibt es beim IGDB-Teil.
 
 ```bash
 npm test             # Vitest
@@ -337,7 +357,40 @@ einen Status.
 
 Läuft das NPSSO ab, ist das kein Fehlerfall, sondern ein regulärer Zustand:
 `status` wird `abgelaufen`, vorhandene Daten bleiben stehen, und in den
-Einstellungen lässt sich ein neues NPSSO eintragen.
+Einstellungen lässt sich ein neues NPSSO eintragen. Seit Stufe 18 steht das
+auch im Hinweisblock der Sammlung – „der nächtliche Abruf steht still".
+
+## Automatik
+
+Seit Stufe 18 läuft ein Cron Trigger (`wrangler.jsonc`, `*/5 3-5 * * *`):
+**alle fünf Minuten zwischen 03:00 und 05:59 UTC**, also 5–8 Uhr Sommerzeit
+beziehungsweise 4–7 Uhr Winterzeit, 36 Aufrufe je Nacht. Der Free Tier gibt
+einem Cron-Aufruf dieselben 10 ms CPU wie einer Anfrage; deshalb tut jeder
+Aufruf genau **eine** Sache und merkt sich den Stand in der Datenbank
+([Abschnitt 10.1](docs/spezifikation.md#101-automatik-der-cron-trigger-stufe-18)):
+
+1. erschienene Titel freigeben (`angekuendigt → erschienen`, nur SQL)
+2. einen seit über drei Stunden hängenden Sync-Lauf auf `fehler` setzen
+3. läuft ein Sync, einen Schritt davon (eine Seite holen oder auswerten)
+4. sonst, wenn heute noch kein Cron-Lauf war und kein Handabruf erfolgreich: einen
+   Sync starten – **ein Versuch je Nacht**, ein Fehler wird erst in der nächsten
+   Nacht wiederholt
+5. sonst IGDB-Metadaten auffrischen – 50 Spiele, deren Stand älter als sieben Tage ist
+6. sonst Disc-Fassungen aus IGDB prüfen (30-Tage-Frist)
+
+Ein voller Sync braucht bei 431 Titeln rund elf Aufrufe. Ist der Zugang
+`abgelaufen`, legt der Cron gar keinen Lauf an; ein neues NPSSO in den
+Einstellungen genügt, dann geht es in der nächsten Nacht von allein weiter.
+
+Was der Cron tut, steht an drei Stellen: in den Einstellungen unter
+**Automatik** (letzter automatischer Abruf mit Ergebnis), im Hinweisblock der
+Sammlung, wenn der Nachtlauf fehlgeschlagen ist, und als Zeile `cron: …` in den
+Worker-Logs (Cloudflare-Dashboard → Worker → Logs) – nur Zahlen und feste Texte.
+`GET /api/sync/status` nennt `letzterAutomatischerLauf`, jeder Lauf trägt
+`ausloeser` (`nutzer` oder `cron`).
+
+Der Cron benutzt dieselben Pfade wie der Knopf „Jetzt abrufen". Ein Klick, während
+nachts ein Lauf offen ist, setzt denselben Lauf fort; die Schritte vertragen das.
 
 ## IGDB-Anbindung
 
@@ -391,8 +444,9 @@ Stufe) überschreibt IGDB nie.
 
 **Auffrischen.** „Metadaten auffrischen" holt für die 50 am längsten nicht
 aktualisierten Spiele Wertung, Cover und Datum in einer Anfrage erneut.
-Kritikerwertungen ändern sich mit jeder Rezension; Stufe 18 hängt den Schritt
-an den Cron.
+Kritikerwertungen ändern sich mit jeder Rezension; seit Stufe 18 macht das der
+nächtliche Cron mit einer Frist von sieben Tagen je Spiel – der Knopf bleibt
+für sofort.
 
 **Disc-Fassungen prüfen (Stufe 14).** IGDB führt je Spiel Händlereinträge
 (`external_games`) mit Medium und Plattform. Der Knopf fragt sie für 50
@@ -587,12 +641,41 @@ Er sichert diesen einen Lauf ab. Die dauerhafte Sicherung ins private Repository
 
 Pull Requests durchlaufen Tests und Build, deployen aber nicht.
 
-**Nach einem Deploy zeigt ein offener Tab noch die alte Fassung.** Das Frontend
-hat bis Stufe 18 (PWA) keine Aktualisierungslogik: einmal hart neu laden
-(Strg+F5; auf dem Handy Tab schließen und neu öffnen). Ob die neue Fassung
+**Nach einem Deploy genügt ein normales Neuladen.** Seit Stufe 18 liefert der
+Service Worker die Seite selbst Network-First und aktualisiert sich still
+(`autoUpdate`); nur die gehashten Assets liegen im Precache. Ob die neue Fassung
 ausgeliefert wird, lässt sich am Asset-Hash prüfen – der Name von
 `/assets/index-*.js` in der ausgelieferten Seite muss dem in `frontend/dist`
-entsprechen.
+entsprechen. Die Ausgabe von `wrangler deploy` nennt außerdem den Cron
+(`schedule: */5 3-5 * * *`); ob er läuft, zeigt am Folgemorgen
+`GET /api/sync/status` → `letzterAutomatischerLauf`.
+
+## Als App installieren
+
+Das Frontend ist seit Stufe 18 eine PWA (`vite-plugin-pwa`): Manifest, eigenes
+Symbol (ein Pokal – bewusst ohne PlayStation-Marken, das Repository ist
+öffentlich) und ein Service Worker.
+
+- **Android, Chrome:** Menü → „App installieren" beziehungsweise „Zum
+  Startbildschirm hinzufügen".
+- **iPhone, Safari:** Teilen → „Zum Home-Bildschirm".
+- **Desktop, Chrome/Edge:** Symbol „Installieren" in der Adressleiste.
+
+Die Anmeldung über Cloudflare Access läuft in der installierten App wie im
+Browser; die Kamera des Scanners funktioniert auch im Vollbildmodus.
+
+**Offline** zeigt die App den zuletzt geladenen Stand aller Leseansichten –
+Sammlung, Spieldetail, Listen, Cover – mit einem Balken „Offline – du siehst den
+zuletzt geladenen Stand". Änderungen sind erst wieder online möglich; eine
+Warteschlange gibt es nicht. Wie das mit Access zusammenspielt (Seite und API
+Network-First, nichts von einer Weiterleitung im Cache), steht in
+[Abschnitt 13](docs/spezifikation.md#13-frontend).
+
+Die PNG-Symbole entstehen aus `frontend/public/icon.svg`:
+
+```bash
+cd frontend && npx pwa-assets-generator     # Konfiguration in pwa-assets.config.ts
+```
 
 ## Wenn die Anwendung mit 500 antwortet
 
@@ -996,13 +1079,13 @@ Konto — dafür ist der wöchentliche Export in das private Repository zuständ
 ```
 migrations/    nummerierte SQL-Dateien, laufen genau einmal
 scripts/       Prüfskripte für Deploy und Backup, dazu die Wiederherstellung
-src/index.ts   Hono-App, hängt Repositories je Anfrage ein
+src/index.ts   Hono-App, hängt Repositories je Anfrage ein; dazu der Cron-Einstieg `scheduled`
 src/api/       Route-Module
 src/db/        Repository-Schicht – der einzige Ort mit D1-Zugriff
 src/domain/    reine Logik ohne Datenbank, z. B. Titelnormalisierung, IGDB-Abgleichregel
 src/psn/       PSN-Client (inoffiziell), src/igdb/ der IGDB-Client (Twitch-Token)
-src/sync/      Trophäen-Sync und IGDB-Abgleich in begrenzten Schritten
-frontend/      React + Vite, wird als Static Assets mit dem Worker ausgeliefert
+src/sync/      Trophäen-Sync und IGDB-Abgleich in begrenzten Schritten; cron.ts ordnet sie für die Nacht
+frontend/      React + Vite als PWA (vite-plugin-pwa), wird als Static Assets mit dem Worker ausgeliefert
 ```
 
 **Route-Handler rufen niemals `env.DB.prepare()` auf.** Sie greifen über
@@ -1066,7 +1149,9 @@ eine Überziehung hineinzurechnen.
 
 Der Wechsel in einen Bezahlmodus ist deshalb immer eine ausdrückliche Handlung,
 kein Nebeneffekt von Nutzung. Für einen einzelnen Nutzer sind die Grenzen um
-Größenordnungen entfernt.
+Größenordnungen entfernt. Der Cron (36 Aufrufe je Nacht, einer von fünf
+erlaubten Triggern je Konto) zählt als Anfragen und liest im Leerlauf rund
+80 000 Zeilen je Nacht.
 
 ## Was niemals ins Repository gehört
 

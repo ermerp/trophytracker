@@ -461,6 +461,16 @@ ul.digital {
   margin: 0;
 }
 
+/* --- Stufe 18: Offline-Hinweis der PWA --- */
+
+.offline {
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 6px;
+  background: rgba(128, 128, 128, 0.12);
+}
+
 /* --- Stufe 7: Pruefliste und Hinweise --- */
 
 .hinweise {

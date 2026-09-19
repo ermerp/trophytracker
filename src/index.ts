@@ -16,6 +16,7 @@ import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
 import { erstelleIgdbClient, zugangAus, type IgdbClient } from "./igdb/client";
 import { erstellePsnClient, type PsnClient } from "./psn/client";
+import { cronLogzeile, cronSchritt } from "./sync/cron";
 import type { AppEnv } from "./types";
 
 /**
@@ -92,4 +93,32 @@ function igdbJeInstanz(): (env: Env) => IgdbClient {
 	};
 }
 
-export default createApp();
+/**
+ * Der Cron-Einstieg (Stufe 18, Abschnitt 10.1). Wie createApp mit
+ * austauschbaren Clients, damit Tests keine externe Schnittstelle rufen.
+ * Ohne NPSSO_KEY passiert nichts - die Repositories entschluesseln damit,
+ * und ein Cron ohne Schluessel soll nicht jede Nacht eine Ausnahme werfen.
+ */
+export function createScheduled(
+	psnFactory: () => PsnClient = () => erstellePsnClient(),
+	igdbFactory: (env: Env) => IgdbClient = igdbJeInstanz(),
+): ExportedHandlerScheduledHandler<Env> {
+	return async (_event, env) => {
+		if (!env.NPSSO_KEY) {
+			console.log("cron: uebersprungen, NPSSO_KEY ist nicht gesetzt.");
+			return;
+		}
+		const repos = createRepositories(env.DB, env.NPSSO_KEY);
+		const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env));
+		console.log(cronLogzeile(ergebnis));
+	};
+}
+
+// Eine IGDB-Instanz fuer Anfragen und Cron: Sie haelt das Twitch-Token.
+const igdbFactory = igdbJeInstanz();
+const app = createApp(undefined, igdbFactory);
+
+export default {
+	fetch: app.fetch,
+	scheduled: createScheduled(undefined, igdbFactory),
+} satisfies ExportedHandler<Env>;

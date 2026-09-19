@@ -10,6 +10,7 @@ import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
 import { Navigation } from './Navigation'
 import { OffeneScans } from './OffeneScans'
+import { Offline } from './Offline'
 import { OhneZuordnung } from './OhneZuordnung'
 import { Pruefliste } from './Pruefliste'
 import { Sammlung } from './Sammlung'
@@ -58,6 +59,7 @@ function App() {
     <div className="app">
       <Navigation />
       <main>
+        <Offline />
         <Routes>
           <Route path="/" element={<Navigate to="/sammlung" replace />} />
           <Route path="/sammlung" element={<Sammlung />} />

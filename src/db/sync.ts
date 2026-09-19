@@ -2,6 +2,9 @@ export type SyncStatus = "laufend" | "erfolg" | "fehler";
 
 export type SyncPhase = "abruf" | "normalisierung";
 
+/** Wer den Lauf angestossen hat (Migration 0021): der Nutzer oder der Cron (Stufe 18). */
+export type SyncAusloeser = "nutzer" | "cron";
+
 export type SyncLauf = {
 	id: number;
 	started_at: string;
@@ -11,7 +14,12 @@ export type SyncLauf = {
 	titles_seen: number | null;
 	next_offset: number;
 	phase: SyncPhase;
+	started_by: SyncAusloeser;
 };
+
+/** Fester Text fuer einen abgebrochenen Haenger - nur eine Zahl, kein Fremdtext (Abschnitt 10.1). */
+export const haengerMeldung = (stunden: number) =>
+	`Abgebrochen: seit über ${stunden} Stunden kein Fortschritt.`;
 
 export type Rohantwort = { id: number; endpoint: string; payload: string };
 
@@ -31,21 +39,70 @@ export class SyncRepository {
 			.first<SyncLauf>();
 	}
 
-	async letzterLauf(): Promise<SyncLauf | null> {
+	/** Der juengste Lauf - mit `ausloeser` nur der juengste dieses Ausloesers (Stufe 18). */
+	async letzterLauf(ausloeser?: SyncAusloeser): Promise<SyncLauf | null> {
+		if (ausloeser) {
+			return this.db
+				.prepare("SELECT * FROM psn_sync_run WHERE started_by = ? ORDER BY id DESC LIMIT 1")
+				.bind(ausloeser)
+				.first<SyncLauf>();
+		}
 		return this.db
 			.prepare("SELECT * FROM psn_sync_run ORDER BY id DESC LIMIT 1")
 			.first<SyncLauf>();
 	}
 
-	async starten(): Promise<SyncLauf> {
+	/**
+	 * Alle Laeufe, die an oder nach dem UTC-Datum `datum` (YYYY-MM-DD)
+	 * gestartet wurden. Der Cron entscheidet daran, ob heute noch ein Lauf
+	 * faellig ist (Abschnitt 10.1). Wenige Zeilen: ein bis zwei je Tag.
+	 */
+	async laeufeSeit(datum: string): Promise<SyncLauf[]> {
+		const { results } = await this.db
+			.prepare("SELECT * FROM psn_sync_run WHERE started_at >= ? ORDER BY id")
+			.bind(datum)
+			.all<SyncLauf>();
+		return results;
+	}
+
+	async starten(ausloeser: SyncAusloeser = "nutzer"): Promise<SyncLauf> {
 		const zeile = await this.db
 			.prepare(
-				"INSERT INTO psn_sync_run (started_at, status, next_offset) " +
-					"VALUES (datetime('now'), 'laufend', 0) RETURNING *",
+				"INSERT INTO psn_sync_run (started_at, status, next_offset, started_by) " +
+					"VALUES (datetime('now'), 'laufend', 0, ?) RETURNING *",
 			)
+			.bind(ausloeser)
 			.first<SyncLauf>();
 		if (!zeile) throw new Error("Sync-Lauf konnte nicht angelegt werden.");
 		return zeile;
+	}
+
+	/**
+	 * Setzt haengengebliebene Laeufe auf 'fehler' (Stufe 18, Abschnitt 10.1).
+	 *
+	 * syncSchritt faengt Fehler und schliesst den Lauf ab - aber ein Abbruch
+	 * des Workers (CPU-Grenze, D1-Fehler) oder eine Ausnahme im Abschluss der
+	 * Normalisierung laesst ihn auf 'laufend' stehen, und laufenderLauf()
+	 * faende ihn jede Nacht wieder: Ein einzelner Abbruch legte den Sync
+	 * dauerhaft still.
+	 *
+	 * "Letzter Fortschritt" wird abgeleitet, nicht gespeichert: der Start des
+	 * Laufs, die juengste abgelegte Rohantwort oder die juengste
+	 * Normalisierung - was zuletzt kam. psn_raw_response.sync_run_id ist
+	 * indiziert (0008), das sind fuenf Zeilen je Lauf. Ein Lauf, der vor
+	 * weniger als `stunden` Stunden noch Fortschritt hatte, bleibt stehen und
+	 * wird fortgesetzt. Rueckgabe: Anzahl abgebrochener Laeufe.
+	 */
+	async haengendeAbbrechen(stunden: number): Promise<number> {
+		const ergebnis = await this.db
+			.prepare(
+				"UPDATE psn_sync_run SET status = 'fehler', finished_at = datetime('now'), error_message = ? " +
+					"WHERE status = 'laufend' AND MAX(started_at, COALESCE((SELECT MAX(MAX(r.fetched_at, COALESCE(r.normalized_at, ''))) " +
+					"FROM psn_raw_response r WHERE r.sync_run_id = psn_sync_run.id), '')) < datetime('now', ?)",
+			)
+			.bind(haengerMeldung(stunden), `-${stunden} hours`)
+			.run();
+		return ergebnis.meta.changes ?? 0;
 	}
 
 	/** Eine Rohantwort unveraendert ablegen. */

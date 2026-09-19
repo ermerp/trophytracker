@@ -573,6 +573,54 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		await env.DB.prepare("DELETE FROM game_event").run();
 	});
 
+	it("misst einen Leerlauf-Aufruf der Automatik (Stufe 18)", async () => {
+		// Alles verknuepft und frisch, fuenf Laeufe in der Historie: Der Cron
+		// findet nichts zu tun. 36 Aufrufe je Nacht - die Summe der Abfragen
+		// eines Leerlaufs mal 36 muss weit unter dem Tagesbudget bleiben.
+		await env.DB.batch([
+			env.DB.prepare("UPDATE game SET igdb_id = id + 1000, igdb_synced_at = datetime('now')"),
+			env.DB.prepare("UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb'"),
+			env.DB.prepare("DELETE FROM psn_sync_run"),
+			...Array.from({ length: 5 }, (_, i) =>
+				env.DB.prepare(
+					"INSERT INTO psn_sync_run (started_at, finished_at, status, next_offset, started_by) VALUES (datetime('now', ?), datetime('now', ?), 'erfolg', 0, 'cron')",
+				).bind(`-${i} days`, `-${i} days`),
+			),
+		]);
+
+		const erschienen = await zeilenGelesen(
+			"SELECT id FROM game WHERE release_status = 'angekuendigt' AND release_date <= date('now')",
+		);
+		const haenger = await zeilenGelesen(
+			`SELECT id FROM psn_sync_run WHERE status = 'laufend' AND MAX(started_at, COALESCE((SELECT MAX(MAX(r.fetched_at, COALESCE(r.normalized_at, '')))
+			 FROM psn_raw_response r WHERE r.sync_run_id = psn_sync_run.id), '')) < datetime('now', '-3 hours')`,
+		);
+		const laufend = await zeilenGelesen("SELECT * FROM psn_sync_run WHERE status = 'laufend' ORDER BY id DESC LIMIT 1");
+		const heutige = await zeilenGelesen("SELECT * FROM psn_sync_run WHERE started_at >= ? ORDER BY id", new Date().toISOString().slice(0, 10));
+		const auffrischen = await zeilenGelesen(
+			`SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL AND (igdb_synced_at IS NULL OR igdb_synced_at < datetime('now', '-7 days'))
+			 ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT 50`,
+		);
+		const disc = await zeilenGelesen(
+			`SELECT g.id, g.igdb_id FROM game g WHERE g.igdb_id IS NOT NULL AND EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id
+			 AND r.physical_release_status = 'unbekannt'
+			 AND (r.physical_checked_at IS NULL OR r.physical_checked_at < datetime('now', '-30 days'))) ORDER BY g.id LIMIT 50`,
+		);
+		const leerlauf = erschienen + haenger + laufend + heutige + auffrischen + disc;
+		console.info({ erschienen, haenger, laufend, heutige, auffrischen, disc, leerlauf });
+
+		// Gemessen 2 165: game zweimal (erschienen, auffrischen), game mit
+		// release je Spiel fuer die Disc-Auswahl (1 289), psn_sync_run dreimal
+		// (5 Zeilen). Mal 36 Aufrufe sind das rund 80 000 Zeilen je Nacht.
+		expect(leerlauf).toBeLessThan(2_500);
+
+		await env.DB.batch([
+			env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_synced_at = NULL"),
+			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL"),
+			env.DB.prepare("DELETE FROM psn_sync_run"),
+		]);
+	});
+
 	it("beantwortet die Exportrouten bei 430 Listen", async () => {
 		for (const pfad of ["/api/export/backup.json", "/api/export/sammlung.csv", "/api/export/trophaeen.csv"]) {
 			const antwort = await SELF.fetch(`${B}${pfad}`);
