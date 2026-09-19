@@ -1,7 +1,7 @@
 import { quelleAusMatch, type EreignisQuelle } from "../domain/ereignis";
 import type { TrophyEintrag } from "../domain/gruppen";
 import type { PlayStatus } from "../domain/play-status";
-import { titelSchluessel, type Plattform } from "../domain/titel";
+import { SUCHE_SQL, suchbar, titelSchluessel, type Plattform } from "../domain/titel";
 import type { EventRepository } from "./events";
 
 export type ZuOrdnenderRelease = {
@@ -496,9 +496,9 @@ aeenliste haengt
 			schluesselVeraltet: titelSchluessel(z.title) !== z.sort_title,
 		}));
 
-		const suche = optionen.suche.trim().toLowerCase();
+		const suche = suchbar(optionen.suche.trim());
 		const gefiltert = angereichert.filter((z) => {
-			if (suche && !z.title.toLowerCase().includes(suche)) return false;
+			if (suche && !suchbar(z.title).includes(suche)) return false;
 			if (optionen.filter === "mehrfach") return z.releases_im_spiel > 1;
 			if (optionen.filter === "auffaellig") {
 				return (
@@ -578,8 +578,8 @@ aeenliste haengt
 			"LEFT JOIN play_status ps ON ps.release_id = r.id " +
 			`WHERE r.game_id = g.id${releaseBedingung})`;
 
-		const suche = (filter.search ?? "").trim().toLowerCase();
-		const sucheBedingung = suche ? " AND instr(lower(g.title), ?) > 0" : "";
+		const suche = suchbar((filter.search ?? "").trim());
+		const sucheBedingung = suche ? " AND instr(" + SUCHE_SQL("g.title") + ", ?) > 0" : "";
 		if (suche) werte.push(suche);
 
 		const zuletzt =

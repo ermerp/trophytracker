@@ -116,6 +116,24 @@ export function titelSchluessel(roh: string): string {
 	return s === "" ? anzeigeTitel(roh).toLowerCase() : s;
 }
 
+/**
+ * Suchform eines Titels: Kleinschreibung, Apostrophe weg.
+ *
+ * Die Suche in Sammlung, Listen und "Sammlung pruefen" ist eine einfache
+ * Teilstringsuche (Abschnitt 12) - bewusst kein Titelschluessel, der
+ * Editionen und Zusaetze wegwirft. Aber "assassins" soll "Assassin's Creed"
+ * finden (Wunsch des Nutzers vom 19.09.2026): Apostrophe, gerade wie
+ * typografisch, werden auf beiden Seiten uebergangen. Die SQL-Seite bildet
+ * dieselbe Regel in SUCHE_SQL nach - beide muessen zusammen geaendert werden.
+ */
+export function suchbar(text: string): string {
+	return text.toLowerCase().replace(/['\u2019]/g, "");
+}
+
+/** Dieselbe Regel als SQL-Ausdruck ueber einer Spalte, fuer instr() in GamesRepository. */
+export const SUCHE_SQL = (spalte: string): string =>
+	"replace(replace(lower(" + spalte + "), '''', ''), char(8217), '')";
+
 /** Plattformen einer Trophaeenliste. "PS3,PSVITA,PS4" wird zu drei Werten. */
 export function plattformenAus(roh: string): string[] {
 	return roh

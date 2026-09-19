@@ -15,7 +15,7 @@ import {
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
 import { zielAmSpiel, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
-import { ERLAUBTE_PLATTFORMEN, istErlaubtePlattform } from "../domain/titel";
+import { ERLAUBTE_PLATTFORMEN, istErlaubtePlattform, suchbar } from "../domain/titel";
 import type { AppEnv } from "../types";
 import { liesJson } from "./validierung";
 
@@ -211,14 +211,14 @@ export const planRoutes = new Hono<AppEnv>()
 		const nurFavoriten = c.req.query("favorit") === "1";
 		const plattformen = plattformFilter(c.req.query("plattform"));
 		// Teilstringsuche im Titel wie in der Sammlung - zum Wiederfinden in 300 Wuenschen.
-		const suche = (c.req.query("suche") ?? "").trim().toLocaleLowerCase("de");
+		const suche = suchbar((c.req.query("suche") ?? "").trim());
 
 		const zeilen = await c.var.repos.plan.liste(kind, status);
 		const eintraege = zeilen
 			.map((z) => eintragAntwort(z))
 			.filter((e) => !nurFavoriten || e.favorit)
 			.filter((e) => plattformen.size === 0 || plattformen.has(e.plattform ?? "ohne"))
-			.filter((e) => suche === "" || e.titel.toLocaleLowerCase("de").includes(suche))
+			.filter((e) => suche === "" || suchbar(e.titel).includes(suche))
 			.sort(vergleicher[sortierung]);
 
 		return c.json({ sortierung, plattformen: [...plattformen], suche, eintraege });
