@@ -106,6 +106,21 @@ export class ScanRepository {
 			.first<{ game_id: number; title: string; platform: Plattform }>();
 	}
 
+	/**
+	 * Vorschlag verwerfen, Code behalten (9.3): Die Quelle hat zu einem
+	 * richtigen Code einen falschen Datensatz - gemessen am 18.09.2026 kam
+	 * fuer einen Sony-Code (711719…) Zahnpasta zurueck. `checked_at` bleibt:
+	 * Dieselbe Quelle wuerde dasselbe antworten; eine zweite Quelle findet den
+	 * Code ueber den fehlenden Titel.
+	 */
+	async vorschlagVerwerfen(ean: string): Promise<boolean> {
+		const r = await this.db
+			.prepare("UPDATE unresolved_scan SET title_raw = NULL, title_source = NULL WHERE ean = ? AND title_raw IS NOT NULL")
+			.bind(ean)
+			.run();
+		return (r.meta.changes ?? 0) > 0;
+	}
+
 	async mappingLoeschen(ean: string): Promise<boolean> {
 		const r = await this.db.prepare("DELETE FROM ean_mapping WHERE ean = ?").bind(ean).run();
 		return (r.meta.changes ?? 0) > 0;

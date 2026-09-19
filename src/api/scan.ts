@@ -130,6 +130,14 @@ export const scanRoutes = new Hono<AppEnv>()
 		return c.json({ ean, titel, quelle: titel === null ? null : k.quelle });
 	})
 
+	/** „Titel ist falsch": Vorschlag weg, Code bleibt offen (9.3). 404, wenn es keinen Vorschlag gibt. */
+	.delete("/:ean/vorschlag", async (c) => {
+		const ean = eanAus(c.req.param("ean"));
+		if (!ean) return c.json({ fehler: "Ungültige EAN." }, 400);
+		if (!(await c.var.repos.scan.vorschlagVerwerfen(ean))) return c.json({ fehler: "Kein Vorschlag zu dieser EAN." }, 404);
+		return c.json({ ean, vorschlagVerworfen: true });
+	})
+
 	/** Die Arbeitsliste des Jobs: Codes, die noch keine Quelle gesehen hat. */
 	.get("/ungeprueft", async (c) => {
 		const limit = Math.min(100, Math.max(1, Number(c.req.query("limit")) || 100));
