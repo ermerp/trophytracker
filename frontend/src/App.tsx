@@ -9,13 +9,11 @@ import { Kaufliste } from './Kaufliste'
 import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
 import { Navigation } from './Navigation'
-import { OffeneScans } from './OffeneScans'
 import { Offline } from './Offline'
 import { OhneZuordnung } from './OhneZuordnung'
 import { Pruefliste } from './Pruefliste'
 import { Sammlung } from './Sammlung'
 import { Scannen } from './Scannen'
-import { Scans } from './Scans'
 import { SammlungPruefen } from './SammlungPruefen'
 import { Sicherung } from './Sicherung'
 import { Todo } from './Todo'
@@ -45,7 +43,6 @@ function Werkzeuge() {
         <li><Link to="/import">Wunschliste importieren</Link> – Textdateien einlesen, abgleichen, durchsehen</li>
         <li><Link to="/ohne-zuordnung">Ohne Zuordnung</Link> – alles ohne IGDB-Eintrag, listenübergreifend nachziehen</li>
         <li><Link to="/erscheint-bald">Erscheint bald</Link> – vorgemerkte Titel, die noch nicht erschienen sind</li>
-        <li><Link to="/scans">Offene Scans</Link> – gescannte Codes zuordnen, mit Titelvorschlag der EAN-Quelle</li>
         <li><Link to="/aenderungen">Änderungen</Link> – wer wann was geschrieben hat, nach Quelle</li>
         <li><Link to="/pruefen">Sammlung prüfen</Link> – alle Zuordnungen als Tabelle</li>
         <li><Link to="/trophaeen">Trophäen</Link> – die Rohliste von Sony</li>
@@ -71,7 +68,6 @@ function App() {
           <Route path="/kaufliste" element={<Kaufliste />} />
           <Route path="/erscheint-bald" element={<ErscheintBald />} />
           <Route path="/scannen" element={<Scannen />} />
-          <Route path="/scans" element={<Scans />} />
           <Route path="/pruefliste" element={<Pruefliste />} />
           <Route
             path="/einstellungen"
@@ -81,7 +77,6 @@ function App() {
                 <Einstellungen />
                 <Igdb />
                 <Sicherung />
-                <OffeneScans />
                 <Abweichungen />
                 <Werkzeuge />
               </>

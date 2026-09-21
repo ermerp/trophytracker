@@ -84,12 +84,13 @@ describe("GET /api/scan/:ean/online", () => {
 		});
 	});
 
-	it("vermerkt den Titel am offenen Scan, damit er nicht zweimal geholt wird", async () => {
+	it("speichert nichts - weder Vorschlag noch offenen Scan (Stufe 17d)", async () => {
 		await spiel(1, "Killzone 3", ["PS3"]);
 		await app(fakeEbay([["Killzone 3 PS3 PAL"]]).client).request(`/api/scan/${EAN}/online`, undefined, env);
 
-		expect(await offenerScan(EAN)).toMatchObject({ title_raw: "Killzone 3 PS3 PAL", title_source: "ebay" });
-		expect((await offenerScan(EAN))?.checked_at).not.toBeNull();
+		// Seit die offenen Scans weg sind, ist ein Titel ohne Zuordnung kein
+		// Datum, das aufzubewahren waere: Die Disc liegt in der Hand.
+		expect(await offenerScan(EAN)).toMatchObject({ title_raw: null, checked_at: null });
 	});
 
 	it("meldet einen Titel ohne Spiel der Sammlung - die Vorlage zum Anlegen", async () => {
@@ -103,14 +104,28 @@ describe("GET /api/scan/:ean/online", () => {
 		expect(daten).toMatchObject({ eindeutig: false, zielSpielId: null, titel: "Ein Spiel das ich nicht besitze PS4", kandidaten: [] });
 	});
 
-	it("kennt eBay den Code nicht, wird auch das vermerkt", async () => {
-		const antwort = await app(fakeEbay([[]]).client).request(`/api/scan/${EAN}/online`, undefined, env);
+	it("kennt eBay den Code nicht, fragt upcitemdb als Rueckfall", async () => {
+		await spiel(1, "Killzone 3", ["PS3"]);
+		const upc = { titelZuGtin: async () => "Killzone 3 Sony PlayStation 3 PAL" };
+		const antwort = await createApp(psnStumm, igdbEgal, () => fakeEbay([[]]).client, () => upc).request(
+			`/api/scan/${EAN}/online`,
+			undefined,
+			env,
+		);
 		const daten = (await antwort.json()) as Record<string, unknown>;
 
-		expect(daten).toMatchObject({ angebote: 0, titel: null, eindeutig: false });
-		// checked_at gesetzt, Titel null: Der Job fragt den Code nicht erneut.
-		expect(await offenerScan(EAN)).toMatchObject({ title_raw: null, title_source: null });
-		expect((await offenerScan(EAN))?.checked_at).not.toBeNull();
+		expect(daten).toMatchObject({ quelle: "upcitemdb", angebote: 1, eindeutig: true, zielSpielId: 1 });
+	});
+
+	it("meldet ohne Treffer in beiden Quellen schlicht keinen Titel", async () => {
+		const upc = { titelZuGtin: async () => null };
+		const antwort = await createApp(psnStumm, igdbEgal, () => fakeEbay([[]]).client, () => upc).request(
+			`/api/scan/${EAN}/online`,
+			undefined,
+			env,
+		);
+
+		expect(await antwort.json()).toMatchObject({ angebote: 0, titel: null, eindeutig: false, quelle: "ebay" });
 	});
 
 	it("ordnet nichts von selbst zu", async () => {

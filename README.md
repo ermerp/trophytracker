@@ -135,9 +135,9 @@ Was steht und in Betrieb nachgewiesen ist:
 | Automatik | Cron Trigger, nachts alle fünf Minuten zwischen 03:00 und 05:59 UTC, je Aufruf ein Schritt: Erschienene freigeben, hängende Läufe abbrechen, Trophäen-Sync (ein Versuch je Nacht), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen. Block „Automatik" in den Einstellungen, Hinweisblock bei Fehler oder abgelaufenem Zugang (Migration 0021) |
 | App | Installierbar (PWA) mit Pokal-Symbol; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
 | Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
-| Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen, „Verwerfen" wirft eine Fehllesung sofort weg (mit Rückfrage). Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. Umschalter „Nur sammeln" für den ersten Durchgang durchs Regal: Codes werden bloß weggeschrieben, Ton als Rückmeldung, Zuordnung später. Unbekannte Codes löst seit Stufe 17c eBay live auf; ein Treffer aus der Sammlung erscheint als dieselbe Karte wie ein bekannter Code – mit Cover, „im Regal ×n" und „Disc erfassen" (9.2) |
+| Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen, „Verwerfen" wirft eine Fehllesung sofort weg (mit Rückfrage). Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. „Überspringen" geht weiter, ohne etwas zu speichern (seit Stufe 17d – davor „Später" und ein Sammelmodus, beides mit offenen Scans entfallen). Unbekannte Codes löst seit Stufe 17c eBay live auf; ein Treffer aus der Sammlung erscheint als dieselbe Karte wie ein bekannter Code – mit Cover, „im Regal ×n" und „Disc erfassen" (9.2) |
 | EAN-Auflösung | Kette beim Scannen: eigenes `ean_mapping` (rein lokal, kein Netz) → Händlerfeed → **eBay live** (seit Stufe 17c, Titelvorschlag mit Kandidaten der Sammlung) → Suche/Anlegen von Hand. Ein einmal zugeordneter Code wird nie wieder online nachgeschlagen |
-| Offene Scans | Werkzeug in den Einstellungen (`/scans`): Ein täglicher GitHub-Job holt Titel zu gescannten Codes bei upcitemdb (die freie Quelle drosselt nach je sechs Abfragen um 90 Sekunden – deshalb außerhalb des Workers), die Ansicht gleicht sie mit der Sammlung ab und legt sie in Blöcken vor: eindeutig mit „Alle erfassen", ohne eindeutiges Ziel mit Kandidaten und Suche, ohne Titel mit dem Stand des Jobs. Erfassen läuft über dieselbe Route wie der Scanner, Rückgängig stellt den offenen Scan wieder her. Gemessen an 56 PS3-Codes: 35 kannte die Quelle, 22 davon eindeutig (Migration 0020) |
+| Offene Scans (bis 17d) | Werkzeug in den Einstellungen (`/scans`): Ein täglicher GitHub-Job holt Titel zu gescannten Codes bei upcitemdb (die freie Quelle drosselt nach je sechs Abfragen um 90 Sekunden – deshalb außerhalb des Workers), die Ansicht gleicht sie mit der Sammlung ab und legt sie in Blöcken vor: eindeutig mit „Alle erfassen", ohne eindeutiges Ziel mit Kandidaten und Suche, ohne Titel mit dem Stand des Jobs. Erfassen läuft über dieselbe Route wie der Scanner, Rückgängig stellt den offenen Scan wieder her. Gemessen an 56 PS3-Codes: 35 kannte die Quelle, 22 davon eindeutig (Migration 0020) |
 | Änderungen | Werkzeug in den Einstellungen (`/aenderungen`): wer wann was geschrieben hat, neueste zuerst, nach Quelle filterbar (du, PSN-Sync, IGDB, Import), je Zeile mit Link ins Spiel; „ältere laden". Im Spieldetail derselbe Verlauf als Block. Nur lesend – Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidungen, Vorbelegung und Prüflisten-Einträge werden protokolliert, Cover/Wertung beim Auffrischen und die To-Do-Reihenfolge nicht (Migration 0019) |
 
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
@@ -817,30 +817,21 @@ Anwendung laufen unverändert weiter. Beim Anlegen des Keysets verlangt eBay
 einmalig eine Angabe zu „Marketplace Account Deletion" – da die Anwendung keine
 eBay-Nutzerdaten speichert, ist dort die Ausnahme („Exempt") richtig.
 
-## Offene Scans auflösen
+## Ein Code, der sich nicht zuordnen lässt
 
-Ein gescannter Barcode ist nur eine Zahl. [`.github/workflows/scans.yml`](.github/workflows/scans.yml)
-holt täglich um 04:23 UTC zu jedem noch nicht angefragten Code den Titel bei
-upcitemdb und trägt ihn über `POST /api/scan/:ean/vorschlag` ein – dieselbe
-Access-Service-Token-Anmeldung wie die Sicherung, kein weiteres Geheimnis.
-Zugeordnet wird nichts automatisch; das entscheidet die Ansicht „Offene Scans"
-(Einstellungen → Offene Scans → Alle zuordnen).
+Bis Stufe 17d legte der Scanner solche Codes als **offene Scans** ab, und ein
+nächtlicher Job holte dazu Titel. Das ist abgeschafft: Ein Barcode ohne seine
+Hülle war später nicht mehr zuzuordnen – die Liste erzeugte Arbeit statt Nutzen
+(Entscheidung vom 21.09.2026, Begründung in
+[Abschnitt 9.3](docs/spezifikation.md#93-warum-es-keine-offenen-scans-mehr-gibt-stufe-17d)).
 
-Warum ein Job und nicht der Worker: Die freie Quelle drosselt nach jeweils
-sechs Abfragen für rund 90 Sekunden und erlaubt 100 am Tag. 56 Codes brauchten
-17 Minuten. Der Job fragt jeden Code nur einmal – auch ein „kennt ihn nicht"
-wird vermerkt, sonst verbraucht derselbe Code täglich das Kontingent.
+Heute gilt: Der Titel kommt sofort (eBay, sonst upcitemdb), das Spiel lässt sich
+im selben Fenster anlegen. Wer gerade nicht zuordnen will, drückt
+**Überspringen** – gespeichert wird nichts, die Disc steht im Regal, ein
+erneuter Scan holt den Code zurück.
 
-Von Hand anstoßen, etwa direkt nach einem Scan-Durchgang:
-
-```bash
-gh workflow run scans.yml -f anzahl=100
-```
-
-Der Lauf meldet nur Zahlen („Titel gefunden: 35, Quelle kennt den Code nicht: 21"),
-nie Inhalte – das Repository ist öffentlich. Steht ein Code trotz Titel falsch da
-(die Quelle lieferte zu einem Sony-Code Zahnpasta), nimmt „Titel ist falsch" den
-Vorschlag zurück und behält den Code; „Scan verwerfen" löscht ihn endgültig.
+Die Tabelle `unresolved_scan` bleibt vorerst leer bestehen; ein `DROP TABLE`
+bräuchte zwei Deployments und hat keine Eile.
 
 ## Wunschliste und Absichten
 

@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { anfrage, erledigtText, scanWiederOeffnen, type ErfasstAntwort, type Plattform } from './api'
+import { anfrage, erledigtText, type ErfasstAntwort, type Plattform } from './api'
 import { ScanAuswahl } from './ScanAuswahl'
 import { useKamera } from './kamera'
-import { tonBekannt, tonFehler, tonNeu } from './ton'
+import { tonFehler } from './ton'
 
 /**
  * Scannen (Abschnitt 9, Stufe 17): Serienerfassung des Regals.
  *
  * Zwei Betriebsarten: **Zuordnen** (Vorgabe) zeigt zu jedem Code seine Karte;
- * **Nur sammeln** schreibt erkannte Codes bloß weg und scannt sofort weiter,
+ * Bis Stufe 17d gab es ein "Nur sammeln" und ein "Später"; beides ist weg.
  * mit einem Ton als Rückmeldung – für den ersten Durchgang durch ein volles
  * Regal, wenn die Zuordnung später in einem Rutsch passieren soll.
  *
@@ -57,9 +57,6 @@ type Online = {
 /** Stand der Live-Abfrage: läuft, Ergebnis, oder nicht verfügbar. */
 type OnlineStand = { art: 'laeuft' } | { art: 'da'; o: Online } | { art: 'aus'; grund: string }
 
-/** Ein im Sammelmodus weggeschriebener Code, neueste zuerst. */
-type Gesammelt = { ean: string; titel: string | null; plattform: Plattform | null }
-
 /**
  * Kurze Rückmeldung im Kamerabild (Rückmeldung des Nutzers vom 18.09.2026:
  * die Liste steht zu weit unten, um sie beim Scannen zu sehen).
@@ -81,10 +78,7 @@ export function Scannen() {
   const [online, setOnline] = useState<OnlineStand | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [sitzung, setSitzung] = useState(0)
-  const [sammeln, setSammeln] = useState(false)
-  const [gesammelt, setGesammelt] = useState<Gesammelt[]>([])
   /** Codes dieser Sitzung – dieselbe Hülle ein zweites Mal ist keine zweite Disc. */
-  const gesammelteCodes = useRef(new Set<string>())
 
   const [blitz, setBlitz] = useState<Blitz | null>(null)
   const blitzZeit = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -101,8 +95,6 @@ export function Scannen() {
   const [letzterCode, setLetzterCode] = useState<string | null>(null)
   // Die Erkennungsschleife ruft `aufloesen` aus einem Effekt heraus auf und
   // sieht den Zustand vom Beginn des Laufs; der Modus kommt deshalb aus einem Ref.
-  const sammelnRef = useRef(sammeln)
-  sammelnRef.current = sammeln
 
   /**
    * Titelvorschlag von eBay nachladen. Fehler sind hier kein Drama: Der Code
@@ -125,25 +117,6 @@ export function Scannen() {
     try {
       const t = await anfrage<Treffer>('/api/scan', { methode: 'POST', koerper: { ean: roh, zaehlen } })
       setLetzterCode(t.ean)
-      if (sammelnRef.current) {
-        // Nur sammeln: der Code steht als offener Scan bzw. ist längst bekannt –
-        // beides ohne Rückfrage, die Erkennung läuft sofort weiter (Rückgabe false).
-        const schonDa = gesammelteCodes.current.has(t.ean)
-        if (schonDa || t.treffer === 'mapping') tonBekannt()
-        else tonNeu()
-        zeigeBlitz(
-          schonDa
-            ? { art: 'bekannt', zeichen: '↻', text: `${t.ean} – schon gescannt` }
-            : t.treffer === 'mapping'
-              ? { art: 'bekannt', zeichen: '✓', text: `${t.release?.titel} (${t.release?.plattform})` }
-              : { art: 'neu', zeichen: '✓', text: t.ean },
-        )
-        if (!schonDa) {
-          gesammelteCodes.current.add(t.ean)
-          setGesammelt((g) => [{ ean: t.ean, titel: t.release?.titel ?? null, plattform: t.release?.plattform ?? null }, ...g])
-        }
-        return false
-      }
       zeigeBlitz({ art: 'neu', zeichen: '✓', text: t.ean })
       setZustand(t.treffer === 'mapping' ? { art: 'treffer', t } : { art: 'auswahl', t })
       // Lokal nichts gefunden: jetzt erst eBay fragen (Kette 9.2). Bewusst
@@ -153,7 +126,7 @@ export function Scannen() {
       if (t.treffer === 'keiner') void onlineHolen(t.ean)
       return true
     } catch (f) {
-      if (sammelnRef.current) tonFehler()
+      tonFehler()
       zeigeBlitz({ art: 'fehler', zeichen: '✗', text: f instanceof Error ? f.message : 'Fehler' })
       setFehler(f instanceof Error ? f.message : 'Auflösen fehlgeschlagen.')
       return false
@@ -182,34 +155,17 @@ export function Scannen() {
   }, [eanAusUrl, aufloesen, setParams, starten])
 
   /**
-   * Einen eben gesammelten Code wieder wegwerfen (Rückmeldung des Nutzers vom
-   * 18.09.2026: eine Fehllesung soll sofort raus, nicht erst beim Zuordnen).
-   * Betrifft nur offene Scans – ein Code, der schon einem Release gehört,
-   * wird hier nicht angefasst.
+   * Weiterscannen, ohne etwas zu speichern (Stufe 17d).
+   *
+   * "Später" ist weg: Ein Code ohne seine Hülle liess sich später nicht mehr
+   * zuordnen - genau die Erfahrung, die zur Live-Auflösung geführt hat. Die
+   * Disc steht im Regal, ein erneuter Scan holt den Code zurück.
    */
-  /**
-   * Fehllesung wegwerfen und weiterscannen. Mit Rueckfrage wie in "Offene
-   * Scans": Der Code ist danach weg, als waere er nie gescannt worden.
-   */
-  async function verwerfenUndWeiter(ean: string) {
-    if (!confirm(`Code ${ean} wirklich verwerfen? Er ist danach weg, als wäre er nie gescannt worden.`)) return
-    await verwerfen(ean)
+  function ueberspringen() {
+    setHinweis(null)
     weiter()
   }
 
-  async function verwerfen(ean: string) {
-    setFehler(null)
-    try {
-      await anfrage(`/api/scan/unresolved/${ean}`, { methode: 'DELETE' })
-      gesammelteCodes.current.delete(ean)
-      setGesammelt((g) => g.filter((x) => x.ean !== ean))
-      setHinweis(`${ean} verworfen.`)
-    } catch (f) {
-      setFehler(f instanceof Error ? f.message : 'Verwerfen fehlgeschlagen.')
-    }
-  }
-
-  /** Zurück zum Scannen – die Kamera nimmt den nächsten Code. */
   function weiter(neu: Zustand = { art: 'leer' }) {
     setZustand(neu)
     setEingabe('')
@@ -242,9 +198,8 @@ export function Scannen() {
       }
       await anfrage(`/api/physical-copies/${z.id}`, { methode: 'DELETE' })
       await anfrage(`/api/scan/${z.ean}`, { methode: 'DELETE' })
-      // Der Code war vor dem Zuordnen ein offener Scan und muss es wieder
-      // werden – sonst ist er weder zugeordnet noch offen.
-      await scanWiederOeffnen(z.ean)
+      // Seit Stufe 17d gibt es keinen offenen Scan mehr, der wiederherzustellen
+      // wäre: Das Mapping ist gelöst, die Disc entfernt, der Code wieder frei.
       setSitzung((n) => Math.max(0, n - 1))
       weiter()
       setHinweis('Zurückgenommen.')
@@ -266,9 +221,6 @@ export function Scannen() {
     }
   }
 
-  // Für „Letzten verwerfen": der zuletzt gesammelte Code, der noch keinem Spiel gehört.
-  const letzterNeuer = gesammelt.find((g) => g.titel === null)
-
   return (
     <>
       <h1>Scannen</h1>
@@ -289,7 +241,6 @@ export function Scannen() {
               <span className="text">{blitz.text}</span>
             </p>
           )}
-          {sammeln && <p className="zaehler" aria-hidden="true">{gesammelt.length}</p>}
         </div>
         <p className="steuerung kamera-zeile">
           {kameraStatus === 'laeuft' ? (
@@ -308,22 +259,6 @@ export function Scannen() {
           {nativ === false && <span className="pille" title="Kein nativer BarcodeDetector – ZXing im Browser">Fallback</span>}
         </p>
         {kameraFehler && <p role="alert" className="auffaellig">{kameraFehler}</p>}
-
-        <p className="steuerung">
-          <label>
-            <input
-              type="checkbox"
-              checked={sammeln}
-              onChange={(e) => {
-                setSammeln(e.target.checked)
-                setZustand({ art: 'leer' })
-                setPausiert(false)
-              }}
-              aria-label="Nur sammeln"
-            />{' '}
-            Nur sammeln – Codes wegschreiben, Zuordnung später
-          </label>
-        </p>
 
         <form
           className="steuerung"
@@ -347,38 +282,6 @@ export function Scannen() {
       {fehler && <p role="alert" className="auffaellig">{fehler}</p>}
       {hinweis && <p role="status" className="hinweis">{hinweis}</p>}
 
-      {sammeln ? (
-        <section className="scankarte" aria-live="polite">
-          <p className="zeile">
-            Jeder erkannte Code wird weggeschrieben, die Erkennung läuft weiter – ein heller Ton heißt „neu",
-            zwei tiefe „kenne ich schon". Zuordnen kannst du später in einem Rutsch (Einstellungen → Offene Scans).
-          </p>
-          <p className="steuerung">
-            <strong>Gesammelt: {gesammelt.length}</strong>
-            {letzterNeuer && (
-              <>
-                {' '}
-                <button type="button" onClick={() => verwerfen(letzterNeuer.ean)}>
-                  Letzten verwerfen ({letzterNeuer.ean})
-                </button>
-              </>
-            )}
-          </p>
-          <ul className="gesammelt">
-            {gesammelt.slice(0, 12).map((g) => (
-              <li key={g.ean}>
-                <span className="titel">{g.ean}</span>{' '}
-                <span className="wozu">{g.titel ? `schon zugeordnet: ${g.titel} (${g.plattform})` : 'neu'}</span>
-                {!g.titel && (
-                  <button type="button" className="klein" onClick={() => verwerfen(g.ean)}>
-                    verwerfen
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : (
       <section className="scankarte" aria-live="polite">
         {zustand.art === 'leer' && (
           <p className="zeile">
@@ -453,8 +356,8 @@ export function Scannen() {
               vorgabe={online?.art === 'da' ? (online.o.kandidaten[0]?.titel ?? online.o.titel ?? '') : ''}
               laeuft={laeuft}
               onWahl={(koerper) => zuordnen(zustand.t.ean, koerper)}
-              onSpaeter={() => weiter()}
-              onVerwerfen={() => void verwerfenUndWeiter(zustand.t.ean)}
+              onSpaeter={ueberspringen}
+              spaeterText="Überspringen"
             />
           </>
         )}
@@ -483,7 +386,6 @@ export function Scannen() {
           </div>
         )}
       </section>
-      )}
     </>
   )
 }

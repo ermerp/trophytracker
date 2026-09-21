@@ -72,34 +72,22 @@ describe("Grenzen der Sammlungsabfrage", () => {
 	});
 });
 
-describe("Offene Scans mit Abgleich (Stufe 17b)", () => {
+describe("Live-Aufloesung beim Scannen (Stufe 17c/17d)", () => {
 	/**
-	 * Die Ansicht liest alle offenen Scans, einmal die Titelliste der Sammlung
-	 * und die Releases der Treffer. Der Abgleich selbst laeuft im Worker; die
-	 * Sammlung wird dafuer einmal zerlegt, nicht je Code (CPU-Grenze).
+	 * Die Route zerlegt die Sammlung einmal (nicht je Angebot) und holt die
+	 * Releases nur fuer die Treffer. Gemessen wird beides einzeln.
 	 */
-	it("liest Sammlung und Treffer, nicht 430 Unterabfragen", async () => {
-		await env.DB.prepare("DELETE FROM unresolved_scan").run();
-		const vorschlaege = env.DB.prepare(
-			"INSERT INTO unresolved_scan (ean, title_raw, title_source, checked_at) VALUES (?, ?, 'upcitemdb', datetime('now'))",
+	it("liest die Sammlung einmal, nicht 430 Unterabfragen", async () => {
+		const sammlung = await zeilenGelesen("SELECT id AS spielId, title AS titel FROM game");
+		const jeTreffer = await zeilenGelesen(
+			"SELECT r.id, r.platform, g.cover_url, (SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare " +
+				"FROM release r JOIN game g ON g.id = r.game_id WHERE r.game_id = ? ORDER BY r.id",
+			1,
 		);
-		// 56 offene Scans wie im Regal des Nutzers am 18.09.2026, jeder mit Treffer.
-		await env.DB.batch(
-			Array.from({ length: 56 }, (_, i) =>
-				vorschlaege.bind(`400000000${String(i).padStart(4, "0")}`, `Ps3 Game - Spiel ${i + 1} [German Version]`),
-			),
-		);
+		console.info({ sammlung, jeTreffer });
 
-		const antwort = await SELF.fetch(`${B}/api/scan/unresolved`);
-		expect(antwort.status).toBe(200);
-		const daten = (await antwort.json()) as { anzahl: number; eindeutig: number };
-		expect(daten.anzahl).toBe(56);
-		expect(daten.eindeutig).toBeGreaterThan(0);
-
-		// Sammlung (430) + Scans (56) + je Treffer ein Index-Lookup.
-		const gelesen = await zeilenGelesen("SELECT id AS spielId, title AS titel FROM game");
-		expect(gelesen).toBeLessThan(600);
-		await env.DB.prepare("DELETE FROM unresolved_scan").run();
+		expect(sammlung).toBeLessThan(600);
+		expect(jeTreffer).toBeLessThan(50);
 	});
 });
 

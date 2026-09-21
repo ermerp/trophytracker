@@ -53,18 +53,13 @@ describe("POST /api/scan", () => {
 		expect(await offene()).toEqual([]);
 	});
 
-	it("haelt einen unbekannten Code als offenen Scan fest und zaehlt hoch", async () => {
-		expect(await (await scan(EAN)).json()).toEqual({ ean: EAN, treffer: "keiner", scans: 1 });
-		expect(await (await scan(` ${EAN} `)).json()).toEqual({ ean: EAN, treffer: "keiner", scans: 2 });
-		expect(await offene()).toEqual([{ ean: EAN, scan_count: 2 }]);
-	});
-
-	it("zaehlt mit zaehlen: false nicht hoch (Oeffnen aus den Einstellungen)", async () => {
-		expect(await (await sende("POST", "/api/scan", { ean: EAN, zaehlen: false })).json()).toEqual({ ean: EAN, treffer: "keiner", scans: 0 });
+	it("schreibt einen unbekannten Code nicht mehr weg (Stufe 17d)", async () => {
+		// Bis Stufe 17c blieb er als offener Scan stehen. Ein Code ohne seine
+		// Huelle liess sich aber spaeter nicht zuordnen - die Liste erzeugte
+		// Arbeit statt Nutzen (Entscheidung des Nutzers vom 21.09.2026).
+		expect(await (await scan(EAN)).json()).toEqual({ ean: EAN, treffer: "keiner", scans: 0 });
+		expect(await (await scan(` ${EAN} `)).json()).toEqual({ ean: EAN, treffer: "keiner", scans: 0 });
 		expect(await offene()).toEqual([]);
-		await scan(EAN);
-		expect(await (await sende("POST", "/api/scan", { ean: EAN, zaehlen: false })).json()).toEqual({ ean: EAN, treffer: "keiner", scans: 1 });
-		expect(await offene()).toEqual([{ ean: EAN, scan_count: 1 }]);
 	});
 
 	it("trifft ein Mapping mit Titel, Cover und Exemplaren, ohne offenen Scan", async () => {
@@ -84,7 +79,7 @@ describe("POST /api/scan", () => {
 		await env.DB.prepare(
 			"INSERT INTO market_offer (source, source_product_id, ean, title_raw, platform_raw, imported_at) VALUES ('rebuy', 'x1', ?, 'Fallout 4', 'PS4', datetime('now'))",
 		).bind(EAN).run();
-		expect(await (await scan(EAN)).json()).toEqual({ ean: EAN, treffer: "angebot", angebot: { titel: "Fallout 4", plattform: "PS4" }, scans: 1 });
+		expect(await (await scan(EAN)).json()).toEqual({ ean: EAN, treffer: "angebot", angebot: { titel: "Fallout 4", plattform: "PS4" }, scans: 0 });
 	});
 });
 
@@ -158,92 +153,7 @@ describe("POST /api/scan/:ean/assign", () => {
 	});
 });
 
-describe("Titelvorschlag und Abgleich (Stufe 17b)", () => {
-	const vorschlag = (ean: string, koerper: unknown) => sende("POST", `/api/scan/${ean}/vorschlag`, koerper);
-
-	it("haelt einen Vorschlag fest und zeigt den Sammlungstreffer", async () => {
-		await release(1); // "Spiel 1" (PS4)
-		await scan(EAN);
-		expect((await vorschlag(EAN, { titel: "Ps3 Game - Spiel 1 [German Version]", quelle: "upcitemdb" })).status).toBe(200);
-
-		const a = await hole("/api/scan/unresolved");
-		expect(a).toMatchObject({ anzahl: 1, ungeprueft: 0, eindeutig: 1 });
-		expect(a.scans[0]).toMatchObject({
-			ean: EAN,
-			titel: "Ps3 Game - Spiel 1 [German Version]",
-			quelle: "upcitemdb",
-			eindeutig: true,
-			kandidaten: [{ spielId: 1, titel: "Spiel 1", releases: [{ releaseId: 1, plattform: "PS4" }] }],
-		});
-		expect(a.scans[0].geprueftAm).toBeTruthy();
-	});
-
-	it("vermerkt auch, dass die Quelle den Code nicht kennt", async () => {
-		await scan(EAN);
-		expect((await vorschlag(EAN, { titel: null })).status).toBe(200);
-		const a = await hole("/api/scan/unresolved");
-		expect(a.scans[0]).toMatchObject({ titel: null, quelle: null, eindeutig: false, kandidaten: [] });
-		expect(a.scans[0].geprueftAm).toBeTruthy();
-		expect(a.ungeprueft).toBe(0);
-	});
-
-	it("nennt dem Job nur Codes, die noch keine Quelle gesehen hat", async () => {
-		await scan(EAN);
-		await scan(EAN2);
-		expect((await hole("/api/scan/ungeprueft")).eans.sort()).toEqual([EAN, EAN2].sort());
-		await vorschlag(EAN, { titel: null });
-		expect((await hole("/api/scan/ungeprueft")).eans).toEqual([EAN2]);
-	});
-
-	it("verwirft einen falschen Vorschlag, behaelt aber den Code (Zahnpasta-Fall)", async () => {
-		await scan(EAN);
-		await vorschlag(EAN, { titel: "Colgate Max Fresh Knockout Toothpaste", quelle: "upcitemdb" });
-		expect((await sende("DELETE", `/api/scan/${EAN}/vorschlag`)).status).toBe(200);
-		const a = await hole("/api/scan/unresolved");
-		expect(a.scans[0]).toMatchObject({ ean: EAN, titel: null, quelle: null });
-		// Geprueft bleibt geprueft: dieselbe Quelle wuerde dasselbe antworten.
-		expect(a.scans[0].geprueftAm).toBeTruthy();
-		expect((await hole("/api/scan/ungeprueft")).eans).toEqual([]);
-		expect((await sende("DELETE", `/api/scan/${EAN}/vorschlag`)).status).toBe(404);
-		expect((await sende("DELETE", `/api/scan/${EAN2}/vorschlag`)).status).toBe(404);
-	});
-
-	it("prueft die Eingaben und meldet einen unbekannten Code", async () => {
-		await scan(EAN);
-		expect((await vorschlag(EAN, { titel: 42 })).status).toBe(400);
-		expect((await vorschlag(EAN, { titel: "x" })).status).toBe(400); // ohne quelle
-		expect((await vorschlag(EAN2, { titel: null })).status).toBe(404);
-		expect((await vorschlag("12", { titel: null })).status).toBe(400);
-	});
-
-	it("laesst einen mehrdeutigen Treffer nicht als eindeutig durchgehen", async () => {
-		await release(1); // Spiel 1
-		await release(2); // Spiel 2
-		await scan(EAN);
-		await vorschlag(EAN, { titel: "Sammlung: Spiel 1 und Spiel 2", quelle: "upcitemdb" });
-		const a = await hole("/api/scan/unresolved");
-		expect(a.scans[0].eindeutig).toBe(false);
-		expect(a.scans[0].kandidaten).toHaveLength(2);
-		expect(a.eindeutig).toBe(0);
-	});
-});
-
-describe("offene Scans und Mapping loesen", () => {
-	it("listet offene Scans neueste zuerst und verwirft einzelne", async () => {
-		await env.DB.prepare("INSERT INTO unresolved_scan (ean, scan_count, first_seen_at, last_seen_at) VALUES (?, 3, '2026-09-01 10:00:00', '2026-09-02 10:00:00')").bind(EAN).run();
-		await env.DB.prepare("INSERT INTO unresolved_scan (ean, scan_count, first_seen_at, last_seen_at) VALUES (?, 1, '2026-09-03 10:00:00', '2026-09-03 10:00:00')").bind(EAN2).run();
-		const liste = await hole("/api/scan/unresolved");
-		expect(liste).toMatchObject({ anzahl: 2, ungeprueft: 2, eindeutig: 0 });
-		expect(liste.scans.map((s: any) => [s.ean, s.scans, s.zuerstAm, s.zuletztAm])).toEqual([
-			[EAN2, 1, "2026-09-03 10:00:00", "2026-09-03 10:00:00"],
-			[EAN, 3, "2026-09-01 10:00:00", "2026-09-02 10:00:00"],
-		]);
-		expect((await sende("DELETE", `/api/scan/unresolved/${EAN}`)).status).toBe(200);
-		expect((await sende("DELETE", `/api/scan/unresolved/${EAN}`)).status).toBe(404);
-		expect((await sende("DELETE", `/api/scan/unresolved/12`)).status).toBe(400);
-		expect(await hole("/api/scan/unresolved")).toMatchObject({ anzahl: 1 });
-	});
-
+describe("Mapping loesen", () => {
 	it("loest ein Mapping, die Disc bleibt", async () => {
 		const r = await release();
 		await sende("POST", `/api/scan/${EAN}/assign`, { releaseId: r });
@@ -251,6 +161,6 @@ describe("offene Scans und Mapping loesen", () => {
 		expect((await sende("DELETE", `/api/scan/${EAN}`)).status).toBe(404);
 		expect(await mappings()).toEqual([]);
 		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM physical_copy").first()).toEqual({ n: 1 });
-		expect(await (await scan(EAN)).json()).toMatchObject({ treffer: "keiner", scans: 1 });
+		expect(await (await scan(EAN)).json()).toMatchObject({ treffer: "keiner", scans: 0 });
 	});
 });

@@ -56,58 +56,19 @@ export const scanRoutes = new Hono<AppEnv>()
 				scans: 0,
 			});
 		}
-		// zaehlen: false – die Karte wird aus den Einstellungen geoeffnet ("zuordnen"),
-		// das ist kein neuer Scan und darf den Zaehler nicht anheben.
-		const scans = k.zaehlen === false ? await c.var.repos.scan.zaehler(ean) : await c.var.repos.scan.vermerken(ean);
+		// Seit Stufe 17d wird ein unbekannter Code NICHT mehr weggeschrieben:
+		// Ein Code ohne seine Huelle war spaeter nicht mehr zuzuordnen, die
+		// Liste offener Scans erzeugte damit Arbeit statt Nutzen (Entscheidung
+		// des Nutzers vom 21.09.2026). Wer jetzt nicht zuordnen kann, scannt
+		// die Disc spaeter erneut.
 		if (angebot) {
-			return c.json({ ean, treffer: "angebot", angebot: { titel: angebot.title_raw, plattform: angebot.platform_raw }, scans });
+			return c.json({ ean, treffer: "angebot", angebot: { titel: angebot.title_raw, plattform: angebot.platform_raw }, scans: 0 });
 		}
-		return c.json({ ean, treffer: "keiner", scans });
+		return c.json({ ean, treffer: "keiner", scans: 0 });
 	})
 
 	/**
-	 * Offene Scans mit Titelvorschlag und Abgleich (9.3, Stufe 17b).
-	 *
-	 * Der Abgleich entsteht hier, nicht in der Datenbank: Er haengt an den
-	 * Spieltiteln und waere nach einer Umbenennung falsch. Die Sammlung wird
-	 * einmal zerlegt (`vorbereiten`), die Plattformen nur fuer die Treffer
-	 * nachgeholt - sonst waeren es 430 Unterabfragen fuer nichts.
-	 */
-	.get("/unresolved", async (c) => {
-		const offene = await c.var.repos.scan.offene();
-		const mitTitel = offene.filter((s) => s.title_raw !== null);
-		const sammlung = mitTitel.length > 0 ? vorbereiten(await c.var.repos.games.alleTitel()) : [];
-
-		const gebraucht = new Map<number, Array<{ id: number; platform: string }>>();
-		const scans = [];
-		for (const s of offene) {
-			const abgleich = s.title_raw ? sammlungstreffer(s.title_raw, sammlung) : { treffer: [], eindeutig: false };
-			for (const t of abgleich.treffer) {
-				if (!gebraucht.has(t.spielId)) gebraucht.set(t.spielId, await c.var.repos.games.releasesVon(t.spielId));
-			}
-			scans.push({
-				...offenerScan(s),
-				titel: s.title_raw,
-				quelle: s.title_source,
-				geprueftAm: s.checked_at,
-				eindeutig: abgleich.eindeutig,
-				kandidaten: abgleich.treffer.map((t) => ({
-					spielId: t.spielId,
-					titel: t.titel,
-					releases: (gebraucht.get(t.spielId) ?? []).map((r) => ({ releaseId: r.id, plattform: r.platform })),
-				})),
-			});
-		}
-		return c.json({
-			anzahl: scans.length,
-			ungeprueft: offene.filter((s) => s.checked_at === null).length,
-			eindeutig: scans.filter((s) => s.eindeutig).length,
-			scans,
-		});
-	})
-
-	/**
-	 * Einen Code live bei eBay aufloesen (Stufe 17c, Abschnitt 9.2).
+	 * Einen Code live aufloesen (Stufe 17c, Abschnitt 9.2).
 	 *
 	 * Bewusst eine eigene Route und nicht Teil von POST /api/scan: Der lokale
 	 * Treffer soll sofort da sein, und ein langsames oder totes eBay darf das
@@ -119,8 +80,10 @@ export const scanRoutes = new Hono<AppEnv>()
 	 * Angeboten - das eine Ziel. Zugeordnet wird ueber POST /:ean/assign,
 	 * also durch den Nutzer (Abschnitt 7).
 	 *
-	 * Der gefundene Titel wird am offenen Scan vermerkt, damit die Ansicht
-	 * "Offene Scans" ihn kennt und derselbe Code nicht zweimal abgefragt wird.
+	 * Kennt eBay den Code nicht, kommt upcitemdb als Rueckfall - genau einmal
+	 * und ohne je zu werfen (Stufe 17d). Gespeichert wird nichts: Seit die
+	 * offenen Scans weg sind, ist ein Titel ohne Zuordnung kein Datum, das
+	 * aufzubewahren waere.
 	 */
 	.get("/:ean/online", async (c) => {
 		const ean = eanAus(c.req.param("ean"));
@@ -137,11 +100,20 @@ export const scanRoutes = new Hono<AppEnv>()
 			return c.json({ fehler: meldungFuer(fehler) }, status);
 		}
 
-		// Kein Angebot: Das ist ein Ergebnis, kein Fehler. Auch das wird
-		// vermerkt, damit der naechtliche Job den Code nicht erneut anfragt.
+		// Rueckfall, nur wenn eBay den Code nicht kennt: upcitemdb drosselt
+		// hart, wird aber selten gebraucht - und wirft nie.
+		let quelle = "ebay";
+		if (titel.length === 0) {
+			const einer = await c.var.upc.titelZuGtin(ean);
+			if (einer) {
+				titel = [einer];
+				quelle = "upcitemdb";
+			}
+		}
+
+		// Kein Angebot ist ein Ergebnis, kein Fehler.
 		const sammlung = titel.length > 0 ? vorbereiten(await c.var.repos.games.alleTitel()) : [];
 		const gewaehlt = bestertitel(titel, sammlung);
-		await c.var.repos.scan.vorschlagSetzen(ean, gewaehlt, "ebay");
 
 		const { spiel } = mehrheitstreffer(titel, sammlung);
 		const alle = gewaehlt ? sammlungstreffer(gewaehlt, sammlung).treffer : [];
@@ -165,59 +137,13 @@ export const scanRoutes = new Hono<AppEnv>()
 
 		return c.json({
 			ean,
-			quelle: "ebay",
+			quelle,
 			angebote: titel.length,
 			titel: gewaehlt,
 			eindeutig: spiel !== null,
 			zielSpielId: spiel?.spielId ?? null,
 			kandidaten,
 		});
-	})
-
-	/**
-	 * Titelvorschlag einer EAN-Quelle eintragen - der Job ausserhalb des
-	 * Workers (9.3). Wie Export und Backup laeuft er ueber das Access Service
-	 * Token und traegt deshalb keine eigene Token-Pruefung (15.3).
-	 * `titel: null` heisst "Quelle kennt den Code nicht" und wird ebenso
-	 * vermerkt, damit der naechste Lauf ihn nicht erneut fragt.
-	 */
-	.post("/:ean/vorschlag", async (c) => {
-		const ean = eanAus(c.req.param("ean"));
-		if (!ean) return c.json({ fehler: "Ungültige EAN." }, 400);
-		const k = await liesJson(c);
-		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
-		if (k.titel !== null && typeof k.titel !== "string") {
-			return c.json({ fehler: "Feld 'titel' muss Text oder null sein." }, 400);
-		}
-		const titel = typeof k.titel === "string" && k.titel.trim() !== "" ? k.titel.trim() : null;
-		if (titel !== null && (typeof k.quelle !== "string" || k.quelle.trim() === "")) {
-			return c.json({ fehler: "Feld 'quelle' fehlt." }, 400);
-		}
-		if (!(await c.var.repos.scan.vorschlagSetzen(ean, titel, String(k.quelle ?? "").trim()))) {
-			return c.json({ fehler: "Kein offener Scan zu dieser EAN." }, 404);
-		}
-		return c.json({ ean, titel, quelle: titel === null ? null : k.quelle });
-	})
-
-	/** „Titel ist falsch": Vorschlag weg, Code bleibt offen (9.3). 404, wenn es keinen Vorschlag gibt. */
-	.delete("/:ean/vorschlag", async (c) => {
-		const ean = eanAus(c.req.param("ean"));
-		if (!ean) return c.json({ fehler: "Ungültige EAN." }, 400);
-		if (!(await c.var.repos.scan.vorschlagVerwerfen(ean))) return c.json({ fehler: "Kein Vorschlag zu dieser EAN." }, 404);
-		return c.json({ ean, vorschlagVerworfen: true });
-	})
-
-	/** Die Arbeitsliste des Jobs: Codes, die noch keine Quelle gesehen hat. */
-	.get("/ungeprueft", async (c) => {
-		const limit = Math.min(100, Math.max(1, Number(c.req.query("limit")) || 100));
-		return c.json({ eans: await c.var.repos.scan.ungeprueft(limit) });
-	})
-
-	.delete("/unresolved/:ean", async (c) => {
-		const ean = eanAus(c.req.param("ean"));
-		if (!ean) return c.json({ fehler: "Ungültige EAN." }, 400);
-		if (!(await c.var.repos.scan.offenenLoeschen(ean))) return c.json({ fehler: "Kein offener Scan zu dieser EAN." }, 404);
-		return c.json({ ean, geloescht: true });
 	})
 
 	.post("/:ean/assign", async (c) => {
