@@ -78,8 +78,8 @@ ist, holt der Scanner den Titel zu einem unbekannten Code **live beim Scannen**
 statt erst nachts – ein Code, den die Sammlung nicht kennt, fällt auf, solange
 die Hülle in der Hand liegt. Der Abgleich bekam dabei zwei gemessene
 Korrekturen (Mehrheit über mehrere Angebote, Ballast vor Ziffern); gemessen
-gegen die echten Codes: 30 von 30 bekannten richtig, 15 von 22 offenen
-eindeutig. Stufe 18 bringt die [Automatik](#automatik) – ein Cron Trigger holt die Trophäen
+gegen die echten Codes: 37 von 37 richtig, kein Fehlgriff, 16 von 22 offenen
+mit Vorschlag. Stufe 18 bringt die [Automatik](#automatik) – ein Cron Trigger holt die Trophäen
 nachts von allein, gibt erschienene Titel frei und frischt IGDB-Metadaten auf,
 je Aufruf ein Schritt (Migration 0021) – und macht das Frontend zur
 [installierbaren App](#als-app-installieren) mit Offline-Lesezugriff. Die
