@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { normalisiereEan, pruefzifferStimmt } from "../domain/ean";
-import { sammlungstreffer, vorbereiten } from "../domain/scan-titel";
+import { bestertitel, mehrheitstreffer, sammlungstreffer, vorbereiten } from "../domain/scan-titel";
 import { istErlaubtePlattform } from "../domain/titel";
+import { EbayKonfigError, EbayRateError, meldungFuer } from "../ebay/client";
 import type { AppEnv } from "../types";
 import { absichtenErledigen } from "./ownership";
 import { liesJson } from "./validierung";
@@ -10,11 +11,11 @@ import { liesJson } from "./validierung";
  * Barcode-Erfassung (Abschnitt 9, Stufe 17).
  *
  * Aufloesungskette 9.2: erst ean_mapping (Stufe 1), dann market_offer
- * (Stufe 2, ab Stufe 20 gefuellt); die Titelsuche in der Sammlung (Stufe 3)
- * macht die Oberflaeche ueber GET /api/games?search=, das Anlegen (Stufe 4)
- * ueber POST /api/games wie in der Sammlung. Keine externe EAN-Quelle
- * (Entscheidung des Nutzers vom 16.09.2026); ein unbekannter Code bleibt
- * als offener Scan stehen, bis er zugeordnet oder verworfen wird.
+ * (Stufe 2, ab Stufe 20 gefuellt), seit Stufe 17c eBay live
+ * (GET /:ean/online, Stufe 3); die Titelsuche in der Sammlung macht die
+ * Oberflaeche ueber GET /api/games?search=, das Anlegen ueber
+ * POST /api/games wie in der Sammlung. Ein unbekannter Code bleibt als
+ * offener Scan stehen, bis er zugeordnet oder verworfen wird.
  *
  * Zuordnen legt die Disc UND das Mapping an: Wer einen Code zuordnet, hat die
  * Disc in der Hand. Die Disc laeuft durch OwnershipRepository.addPhysicalCopy
@@ -102,6 +103,68 @@ export const scanRoutes = new Hono<AppEnv>()
 			ungeprueft: offene.filter((s) => s.checked_at === null).length,
 			eindeutig: scans.filter((s) => s.eindeutig).length,
 			scans,
+		});
+	})
+
+	/**
+	 * Einen Code live bei eBay aufloesen (Stufe 17c, Abschnitt 9.2).
+	 *
+	 * Bewusst eine eigene Route und nicht Teil von POST /api/scan: Der lokale
+	 * Treffer soll sofort da sein, und ein langsames oder totes eBay darf das
+	 * Scannen nicht aufhalten. Die Oberflaeche ruft erst, wenn lokal nichts
+	 * gefunden wurde.
+	 *
+	 * Geantwortet wird mit einem *Vorschlag*, nie mit einer Zuordnung: Titel,
+	 * die passenden Spiele der Sammlung und - bei einer Mehrheit unter den
+	 * Angeboten - das eine Ziel. Zugeordnet wird ueber POST /:ean/assign,
+	 * also durch den Nutzer (Abschnitt 7).
+	 *
+	 * Der gefundene Titel wird am offenen Scan vermerkt, damit die Ansicht
+	 * "Offene Scans" ihn kennt und derselbe Code nicht zweimal abgefragt wird.
+	 */
+	.get("/:ean/online", async (c) => {
+		const ean = eanAus(c.req.param("ean"));
+		if (!ean) return c.json({ fehler: "Ungültige EAN." }, 400);
+		if (!c.var.ebay.konfiguriert()) {
+			return c.json({ fehler: "eBay-Zugangsdaten sind nicht hinterlegt." }, 503);
+		}
+
+		let titel: string[];
+		try {
+			titel = await c.var.ebay.titelZuGtin(ean);
+		} catch (fehler) {
+			const status = fehler instanceof EbayKonfigError ? 503 : fehler instanceof EbayRateError ? 503 : 502;
+			return c.json({ fehler: meldungFuer(fehler) }, status);
+		}
+
+		// Kein Angebot: Das ist ein Ergebnis, kein Fehler. Auch das wird
+		// vermerkt, damit der naechtliche Job den Code nicht erneut anfragt.
+		const sammlung = titel.length > 0 ? vorbereiten(await c.var.repos.games.alleTitel()) : [];
+		const gewaehlt = bestertitel(titel, sammlung);
+		await c.var.repos.scan.vorschlagSetzen(ean, gewaehlt, "ebay");
+
+		const { spiel } = mehrheitstreffer(titel, sammlung);
+		const alle = gewaehlt ? sammlungstreffer(gewaehlt, sammlung).treffer : [];
+		const kandidaten = [];
+		for (const t of spiel && !alle.some((a) => a.spielId === spiel.spielId) ? [spiel, ...alle] : alle) {
+			kandidaten.push({
+				spielId: t.spielId,
+				titel: t.titel,
+				releases: (await c.var.repos.games.releasesVon(t.spielId)).map((r) => ({
+					releaseId: r.id,
+					plattform: r.platform,
+				})),
+			});
+		}
+
+		return c.json({
+			ean,
+			quelle: "ebay",
+			angebote: titel.length,
+			titel: gewaehlt,
+			eindeutig: spiel !== null,
+			zielSpielId: spiel?.spielId ?? null,
+			kandidaten,
 		});
 	})
 

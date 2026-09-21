@@ -1,28 +1,38 @@
 #!/usr/bin/env node
 /**
- * Titel zu offenen Barcodes holen (Abschnitt 9.3, Stufe 17b).
+ * Titel zu offenen Barcodes holen (Abschnitt 9.3, Stufen 17b und 17c).
  *
- * Laeuft in einer GitHub Action, nicht im Worker: Die freie EAN-Quelle
- * drosselt hart (gemessen am 18.09.2026: HTTP 429 nach jeweils sechs
- * Abfragen, danach rund 90 Sekunden Pause; 100 Abfragen am Tag). Im Worker
- * waere das weder mit dem CPU-Budget noch mit der Geduld eines Nutzers
- * vereinbar - hier darf es Minuten dauern.
+ * Seit Stufe 17c loest der Scanner einen unbekannten Code schon beim Scannen
+ * live bei eBay auf (9.2). Dieser Job ist das Netz darunter: fuer Codes, die
+ * im Sammelmodus weggeschrieben wurden oder bei denen die Live-Abfrage
+ * scheiterte.
+ *
+ * Reihenfolge wie in der Kette: erst eBay (gemessen am 21.09.2026 - kennt 33
+ * von 34 bekannten Codes, 5 000 Abfragen am Tag, keine Drosselung), dann
+ * upcitemdb als Rueckfall. upcitemdb drosselt hart (HTTP 429 nach jeweils
+ * sechs Abfragen, danach rund 90 Sekunden Pause, 100 am Tag) - deshalb
+ * laeuft dieser Job ausserhalb des Workers, wo er Minuten brauchen darf.
  *
  * Der Worker bekommt nur das Ergebnis: je Code einen Titel oder null.
  * Ein null-Ergebnis wird ebenso vermerkt, damit der naechste Lauf denselben
  * Code nicht erneut fragt.
  *
  * Aufruf: node scripts/scans-aufloesen.mjs [anzahl]
- * Erwartet APP_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET.
+ * Erwartet APP_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET;
+ * EBAY_CLIENT_ID und EBAY_CLIENT_SECRET sind freiwillig - ohne sie laeuft
+ * der Job wie vor Stufe 17c nur mit upcitemdb.
  */
 
 const APP = process.env.APP_URL;
 const ID = process.env.CF_ACCESS_CLIENT_ID;
 const SECRET = process.env.CF_ACCESS_CLIENT_SECRET;
-const QUELLE = "upcitemdb";
+const EBAY_ID = process.env.EBAY_CLIENT_ID;
+const EBAY_SECRET = process.env.EBAY_CLIENT_SECRET;
 const HOECHSTENS = Number(process.argv[2]) || 100;
 const PAUSE_MS = 8000;
+const EBAY_PAUSE_MS = 200;
 const WARTEN_BEI_LIMIT_MS = 90000;
+const ANGEBOTE_JE_CODE = 10;
 
 if (!APP || !ID || !SECRET) {
 	console.error("APP_URL, CF_ACCESS_CLIENT_ID und CF_ACCESS_CLIENT_SECRET muessen gesetzt sein.");
@@ -41,6 +51,50 @@ async function app(pfad, init = {}) {
 		return JSON.parse(text);
 	} catch {
 		throw new Error(`${pfad}: keine JSON-Antwort (Access-Token abgelaufen?)`);
+	}
+}
+
+/**
+ * Application-Token von eBay, einmal je Lauf. Es wird nirgends abgelegt und
+ * nie ausgegeben - das Repository ist oeffentlich.
+ */
+let ebayToken = null;
+async function ebayTokenBesorgen() {
+	if (ebayToken || !EBAY_ID || !EBAY_SECRET) return ebayToken;
+	const antwort = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
+		method: "POST",
+		headers: {
+			Authorization: `Basic ${Buffer.from(`${EBAY_ID}:${EBAY_SECRET}`).toString("base64")}`,
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+		body: "grant_type=client_credentials&scope=" + encodeURIComponent("https://api.ebay.com/oauth/api_scope"),
+	});
+	if (!antwort.ok) {
+		console.log(`  eBay-Anmeldung fehlgeschlagen (HTTP ${antwort.status}) - weiter nur mit upcitemdb.`);
+		return null;
+	}
+	ebayToken = (await antwort.json()).access_token ?? null;
+	return ebayToken;
+}
+
+/**
+ * Angebotstitel zu einer GTIN. Leere Liste heisst "kennt den Code nicht",
+ * null heisst "eBay steht nicht zur Verfuegung" (dann greift upcitemdb).
+ */
+async function ebayTitelZu(ean) {
+	const tok = await ebayTokenBesorgen();
+	if (!tok) return null;
+	try {
+		const antwort = await fetch(
+			`https://api.ebay.com/buy/browse/v1/item_summary/search?gtin=${ean}&limit=${ANGEBOTE_JE_CODE}`,
+			{ headers: { Authorization: `Bearer ${tok}`, "X-EBAY-C-MARKETPLACE-ID": "EBAY_DE" }, signal: AbortSignal.timeout(25000) },
+		);
+		if (antwort.status === 204) return [];
+		if (!antwort.ok) return null;
+		const daten = await antwort.json();
+		return (daten.itemSummaries ?? []).map((i) => i.title).filter((t) => typeof t === "string" && t.trim() !== "");
+	} catch {
+		return null;
 	}
 }
 
@@ -63,28 +117,44 @@ async function titelZu(ean) {
 const { eans } = await app(`/api/scan/ungeprueft?limit=${HOECHSTENS}`);
 console.log(`${eans.length} Codes ohne Titel.`);
 
-let gefunden = 0;
+let ausEbay = 0;
+let ausUpc = 0;
 let unbekannt = 0;
-for (const [i, ean] of eans.entries()) {
-	let titel = await titelZu(ean);
-	if (titel === "limit") {
-		console.log(`  gedrosselt nach ${i} Abfragen, warte ${WARTEN_BEI_LIMIT_MS / 1000} s`);
-		await schlafen(WARTEN_BEI_LIMIT_MS);
-		titel = await titelZu(ean);
+let upcAbfragen = 0;
+for (const ean of eans) {
+	// 1. eBay: schnell, grosszuegiges Kontingent, mehrere Angebote je Code.
+	const angebote = await ebayTitelZu(ean);
+	let titel = angebote && angebote.length > 0 ? angebote[0] : null;
+	let quelle = "ebay";
+	if (titel) await schlafen(EBAY_PAUSE_MS);
+
+	// 2. upcitemdb nur, wenn eBay den Code nicht kennt oder ausfaellt.
+	if (!titel) {
+		let roh = await titelZu(ean);
+		upcAbfragen += 1;
+		if (roh === "limit") {
+			console.log(`  upcitemdb gedrosselt nach ${upcAbfragen} Abfragen, warte ${WARTEN_BEI_LIMIT_MS / 1000} s`);
+			await schlafen(WARTEN_BEI_LIMIT_MS);
+			roh = await titelZu(ean);
+		}
+		if (roh === "limit") {
+			console.log("  weiterhin gedrosselt - Rest bleibt fuer morgen liegen.");
+			break;
+		}
+		titel = roh;
+		quelle = "upcitemdb";
+		await schlafen(PAUSE_MS);
 	}
-	if (titel === "limit") {
-		console.log("  weiterhin gedrosselt - Rest bleibt fuer morgen liegen.");
-		break;
-	}
+
 	await app(`/api/scan/${ean}/vorschlag`, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
-		body: JSON.stringify({ titel, quelle: QUELLE }),
+		body: JSON.stringify({ titel, quelle }),
 	});
-	if (titel) gefunden += 1;
+	if (titel && quelle === "ebay") ausEbay += 1;
+	else if (titel) ausUpc += 1;
 	else unbekannt += 1;
-	await schlafen(PAUSE_MS);
 }
 
 // Nur Zahlen ins Log - das Repository ist oeffentlich (CLAUDE.md).
-console.log(`Titel gefunden: ${gefunden}, Quelle kennt den Code nicht: ${unbekannt}.`);
+console.log(`Titel von eBay: ${ausEbay}, von upcitemdb: ${ausUpc}, keine Quelle kennt den Code: ${unbekannt}.`);

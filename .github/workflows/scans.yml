@@ -1,11 +1,16 @@
 name: Offene Scans auflösen
 
-# Holt Titel zu gescannten Barcodes (Abschnitt 9.3, Stufe 17b).
+# Holt Titel zu gescannten Barcodes (Abschnitt 9.3, Stufen 17b und 17c).
 #
-# Warum hier und nicht im Worker: Die freie EAN-Quelle drosselt nach jeweils
-# sechs Abfragen um rund 90 Sekunden und erlaubt 100 am Tag. Ein Job darf so
-# lange brauchen, eine Anfrage im Worker nicht (10 ms CPU, und der Nutzer
-# wartet). Dieselbe Trennung wie bei den Händler-Feeds (Abschnitt 2).
+# Seit Stufe 17c löst der Scanner unbekannte Codes schon beim Scannen live
+# bei eBay auf. Dieser Job ist das Netz darunter: für Codes aus dem
+# Sammelmodus und für gescheiterte Live-Abfragen. Reihenfolge wie in der
+# Kette (9.2): erst eBay, dann upcitemdb.
+#
+# Warum upcitemdb hier und nicht im Worker: Die freie Quelle drosselt nach
+# jeweils sechs Abfragen um rund 90 Sekunden und erlaubt 100 am Tag. Ein Job
+# darf so lange brauchen, eine Anfrage im Worker nicht (10 ms CPU, und der
+# Nutzer wartet). Dieselbe Trennung wie bei den Händler-Feeds (Abschnitt 2).
 #
 # Der Job schreibt nur Titelvorschläge. Zugeordnet wird nichts automatisch -
 # das entscheidet der Nutzer in der Ansicht "Offene Scans".
@@ -52,4 +57,7 @@ jobs:
         env:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          # Freiwillig: ohne sie laeuft der Job wie vor Stufe 17c nur mit upcitemdb.
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
         run: node scripts/scans-aufloesen.mjs "${{ inputs.anzahl || '100' }}"
