@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufe 18 gebaut, Abnahme offen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen 18 und 17c gebaut, Abnahme offen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -73,7 +73,13 @@ Stufe 17b holt zu liegen gebliebenen Codes den Titel per täglichem Job und legt
 sie in `/scans` zur Entscheidung vor (Migration 0020). **Beide abgenommen am
 19.09.2026**: PS3-Regal gescannt, 34 Discs per Barcode erfasst; 22 Codes, die
 die Quelle nicht kennt, bleiben offen, bis eBay als zweite Quelle freigegeben ist.
-Stufe 18 bringt die [Automatik](#automatik) – ein Cron Trigger holt die Trophäen
+Stufe 17c löst die offene Frage aus 17b ein: Seit der eBay-Entwicklerzugang da
+ist, holt der Scanner den Titel zu einem unbekannten Code **live beim Scannen**
+statt erst nachts – ein Code, den die Sammlung nicht kennt, fällt auf, solange
+die Hülle in der Hand liegt. Der Abgleich bekam dabei zwei gemessene
+Korrekturen (Mehrheit über mehrere Angebote, Ballast vor Ziffern); gemessen
+gegen die echten Codes: 30 von 30 bekannten richtig, 15 von 22 offenen
+eindeutig. Stufe 18 bringt die [Automatik](#automatik) – ein Cron Trigger holt die Trophäen
 nachts von allein, gibt erschienene Titel frei und frischt IGDB-Metadaten auf,
 je Aufruf ein Schritt (Migration 0021) – und macht das Frontend zur
 [installierbaren App](#als-app-installieren) mit Offline-Lesezugriff. Die
@@ -130,6 +136,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | App | Installierbar (PWA) mit Pokal-Symbol; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
 | Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
 | Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen. Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. Umschalter „Nur sammeln" für den ersten Durchgang durchs Regal: Codes werden bloß weggeschrieben, Ton als Rückmeldung, Zuordnung später. Keine externe EAN-Quelle (Messung von eBay-GTIN gegen die echten Codes nach dem Regal-Erfassen) |
+| EAN-Auflösung | Kette beim Scannen: eigenes `ean_mapping` (rein lokal, kein Netz) → Händlerfeed → **eBay live** (seit Stufe 17c, Titelvorschlag mit Kandidaten der Sammlung) → Suche/Anlegen von Hand. Ein einmal zugeordneter Code wird nie wieder online nachgeschlagen |
 | Offene Scans | Werkzeug in den Einstellungen (`/scans`): Ein täglicher GitHub-Job holt Titel zu gescannten Codes bei upcitemdb (die freie Quelle drosselt nach je sechs Abfragen um 90 Sekunden – deshalb außerhalb des Workers), die Ansicht gleicht sie mit der Sammlung ab und legt sie in Blöcken vor: eindeutig mit „Alle erfassen", ohne eindeutiges Ziel mit Kandidaten und Suche, ohne Titel mit dem Stand des Jobs. Erfassen läuft über dieselbe Route wie der Scanner, Rückgängig stellt den offenen Scan wieder her. Gemessen an 56 PS3-Codes: 35 kannte die Quelle, 22 davon eindeutig (Migration 0020) |
 | Änderungen | Werkzeug in den Einstellungen (`/aenderungen`): wer wann was geschrieben hat, neueste zuerst, nach Quelle filterbar (du, PSN-Sync, IGDB, Import), je Zeile mit Link ins Spiel; „ältere laden". Im Spieldetail derselbe Verlauf als Block. Nur lesend – Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidungen, Vorbelegung und Prüflisten-Einträge werden protokolliert, Cover/Wertung beim Auffrischen und die To-Do-Reihenfolge nicht (Migration 0019) |
 
@@ -137,9 +144,8 @@ Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` au
 den Login unter `trophytracker.cloudflareaccess.com`.
 
 **Als Nächstes: Abnahme von Stufe 18** (erster Nachtlauf, App auf dem Handy
-installieren), dann **Stufe 19 – Oberfläche**. Offen aus 17b: eBay als zweite
-EAN-Quelle, sobald der Entwicklerzugang freigegeben ist – die Messung gegen dieselben
-Codes steht dann an (Abschnitt 9.2). Reihenfolge danach, am
+installieren) und **von Stufe 17c** (PS3-Regal erneut scannen), dann
+**Stufe 19 – Oberfläche**. Reihenfolge danach, am
 16.09.2026 entschieden: 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
 AWIN-Feed, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation). Jeder neue
 Schreiber hängt sich ins Änderungsprotokoll ein (Abschnitt 8.5). Die Messung aus Stufe 17 ist erledigt: upcitemdb
@@ -778,6 +784,38 @@ Ein NPSSO ist 64 alphanumerische Zeichen — im gesamten Dump gibt es keine
 solche Zeichenkette. Die eine 64-Zeichen-Kette, die es gibt, steht in
 `psn_raw_response`, enthält Leerzeichen und Satzzeichen und ist ein Spieltitel
 aus einer Sony-Antwort.
+
+## EAN-Quellen und Zugangsdaten
+
+Titel zu Barcodes kommen aus zwei Quellen, in dieser Reihenfolge:
+
+| Quelle | Wo | Kontingent | Wofür |
+|---|---|---|---|
+| **eBay Browse API** | im Worker, live beim Scannen | 5 000/Tag, keine Drosselung | der Normalfall seit Stufe 17c |
+| **upcitemdb** | nächtlicher GitHub-Job | 100/Tag, 90 s Pause nach je 6 | Rückfall für Codes, die eBay nicht kennt |
+
+Die eBay-Zugangsdaten (App ID und Cert ID aus einem **Production**-Keyset unter
+https://developer.ebay.com/my/keys) liegen an drei voneinander getrennten Orten –
+jeder Ort ist eine eigene Ablage, dieselben zwei Werte:
+
+```bash
+# 1. lokal, für `wrangler dev` – in .dev.vars, niemals ins Repository
+EBAY_CLIENT_ID=…
+EBAY_CLIENT_SECRET=…
+
+# 2. für den laufenden Worker (Produktion)
+npx wrangler secret put EBAY_CLIENT_ID
+npx wrangler secret put EBAY_CLIENT_SECRET
+```
+
+3. Für den nächtlichen Job als **GitHub-Secrets**: Repository → Settings →
+Secrets and variables → Actions → New repository secret, Namen `EBAY_CLIENT_ID`
+und `EBAY_CLIENT_SECRET`.
+
+Fehlen sie, antwortet nur `GET /api/scan/:ean/online` mit `503`; Scanner und
+Anwendung laufen unverändert weiter. Beim Anlegen des Keysets verlangt eBay
+einmalig eine Angabe zu „Marketplace Account Deletion" – da die Anwendung keine
+eBay-Nutzerdaten speichert, ist dort die Ausnahme („Exempt") richtig.
 
 ## Offene Scans auflösen
 

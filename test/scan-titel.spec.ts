@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sammlungstreffer, vorbereiten, worteAus } from "../src/domain/scan-titel";
+import { bestertitel, mehrheitstreffer, sammlungstreffer, vorbereiten, worteAus } from "../src/domain/scan-titel";
 
 /**
  * Abgleich Haendlertitel gegen die eigene Sammlung (9.3). Die Faelle stammen
@@ -75,7 +75,74 @@ describe("sammlungstreffer", () => {
 		expect(beide.eindeutig).toBe(false);
 	});
 
-	it("wirft Ballastworte weg", () => {
-		expect([...worteAus("Ps3 / Sony Playstation 3 Game - Darksiders [standard] En/ger Boxed")]).toEqual(["3", "darksiders"]);
+	it("wirft Ballastworte weg - samt der Plattformziffer", () => {
+		// Bis Stufe 17c blieb die "3" aus "Sony Playstation 3" stehen und liess
+		// Angebote fuer ein Grundspiel auf dessen dritten Teil passen.
+		expect([...worteAus("Ps3 / Sony Playstation 3 Game - Darksiders [standard] En/ger Boxed")]).toEqual(["darksiders"]);
+	});
+});
+
+/**
+ * Stufe 17c: eBay liefert bis zu zehn Angebote je Code. Die Faelle stammen
+ * aus der Messung vom 21.09.2026 gegen dieselben echten Codes.
+ */
+describe("Mehrheit ueber mehrere Angebote (Stufe 17c)", () => {
+	const mehr = [...spiele, { spielId: 13, titel: "LittleBigPlanet" }, { spielId: 14, titel: "LittleBigPlanet2" }];
+	const bestand2 = vorbereiten(mehr);
+	const ziel = (titel: string[]) => mehrheitstreffer(titel, bestand2).spiel?.titel ?? null;
+
+	it("nimmt das Spiel, das die Mehrheit der Angebote nennt", () => {
+		expect(
+			ziel([
+				"Killzone 3 PS3 Sony PlayStation 3",
+				"Killzone 3 - Playstation 3 - PAL - deutsch",
+				"Killzone 3 (Sony PlayStation 3, 2011)",
+			]),
+		).toBe("Killzone 3");
+	});
+
+	it("laesst ein Buendel-Angebot nicht durch", () => {
+		// Ein Angebot nennt zwei Spiele, die uebrigen nur eines. So entstand am
+		// 21.09.2026 der Fehlgriff "Red Dead Redemption -> GTA IV".
+		expect(
+			ziel([
+				"Spec Ops: The Line PS3",
+				"Spec Ops The Line - Playstation 3 - CiB",
+				"Sammlung: Spec Ops The Line + Demon's Souls PS3",
+				"Spec Ops: The Line (Sony PlayStation 3)",
+			]),
+		).toBe("Spec Ops: The Line");
+	});
+
+	it("entscheidet nicht, wenn zwei Spiele gleich oft genannt werden", () => {
+		expect(ziel(["Killzone 3 PS3", "Batman: Arkham Asylum PS3"])).toBeNull();
+	});
+
+	it("verhaelt sich bei einem einzigen Angebot wie der Einzelabgleich", () => {
+		expect(ziel(["Batman Arkham Asylum Game of the Year PS3"])).toBe("Batman: Arkham Asylum");
+		expect(ziel(["Colgate Max Fresh Knockout"])).toBeNull();
+	});
+
+	it("trennt zusammengeschriebene Fortsetzungsnummern", () => {
+		// Die Sammlung fuehrt "LittleBigPlanet2", eBay schreibt "LittleBigPlanet 2".
+		// Ohne Trennung gewann das Grundspiel - der Fehlgriff der ersten Messung.
+		expect(ziel(["LittleBigPlanet 2 Zustand gut CIB OVP Sony PlayStation 3 PS3"])).toBe("LittleBigPlanet2");
+		expect(ziel(["LittleBigPlanet Sony PlayStation 3 PAL"])).toBe("LittleBigPlanet");
+	});
+
+	it("macht aus 'Killzone PS3' nicht 'Killzone 3'", () => {
+		// Die Ziffer aus der Plattform darf nie in den Titelvergleich geraten:
+		// deshalb faellt Ballast VOR der Zifferntrennung weg.
+		expect(worteAus("Killzone PS3")).toEqual(new Set(["killzone"]));
+		expect(ziel(["Killzone PS3 Sony PlayStation 3 PAL"])).toBe("Killzone");
+	});
+
+	it("gibt den Titel zurueck, der die Mehrheit gebracht hat", () => {
+		expect(
+			bestertitel(["Irgendwas anderes", "Killzone 3 PS3 PAL", "Killzone 3 CiB"], bestand2),
+		).toBe("Killzone 3 PS3 PAL");
+		// Ohne Treffer bleibt der erste Titel - er ist die Vorlage zum Anlegen.
+		expect(bestertitel(["Unbekanntes Spiel PS4"], bestand2)).toBe("Unbekanntes Spiel PS4");
+		expect(bestertitel([], bestand2)).toBeNull();
 	});
 });

@@ -37,6 +37,21 @@ type Zuordnung = ErfasstAntwort & {
   spiel: { spielId: number; titel: string; plattform: Plattform } | null
 }
 
+/**
+ * Antwort der Live-Auflösung bei eBay (Stufe 17c). `null` als Titel heißt:
+ * eBay kennt den Code nicht – ein Ergebnis, kein Fehler.
+ */
+type Online = {
+  titel: string | null
+  angebote: number
+  eindeutig: boolean
+  zielSpielId: number | null
+  kandidaten: Array<{ spielId: number; titel: string; releases: Array<{ releaseId: number; plattform: Plattform }> }>
+}
+
+/** Stand der Live-Abfrage: läuft, Ergebnis, oder nicht verfügbar. */
+type OnlineStand = { art: 'laeuft' } | { art: 'da'; o: Online } | { art: 'aus'; grund: string }
+
 /** Ein im Sammelmodus weggeschriebener Code, neueste zuerst. */
 type Gesammelt = { ean: string; titel: string | null; plattform: Plattform | null }
 
@@ -58,6 +73,7 @@ export function Scannen() {
   const [eingabe, setEingabe] = useState('')
   const [fehler, setFehler] = useState<string | null>(null)
   const [hinweis, setHinweis] = useState<string | null>(null)
+  const [online, setOnline] = useState<OnlineStand | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [sitzung, setSitzung] = useState(0)
   const [sammeln, setSammeln] = useState(false)
@@ -82,6 +98,19 @@ export function Scannen() {
   // sieht den Zustand vom Beginn des Laufs; der Modus kommt deshalb aus einem Ref.
   const sammelnRef = useRef(sammeln)
   sammelnRef.current = sammeln
+
+  /**
+   * Titelvorschlag von eBay nachladen. Fehler sind hier kein Drama: Der Code
+   * bleibt ein offener Scan, und der nächtliche Job versucht es erneut.
+   */
+  const onlineHolen = useCallback(async (ean: string) => {
+    setOnline({ art: 'laeuft' })
+    try {
+      setOnline({ art: 'da', o: await anfrage<Online>(`/api/scan/${ean}/online`) })
+    } catch (f) {
+      setOnline({ art: 'aus', grund: f instanceof Error ? f.message : 'Die Abfrage ist fehlgeschlagen.' })
+    }
+  }, [])
 
   /** `zaehlen: false` beim Öffnen aus den Einstellungen – kein neuer Scan. */
   const aufloesen = useCallback(async (roh: string, zaehlen = true) => {
@@ -112,6 +141,11 @@ export function Scannen() {
       }
       zeigeBlitz({ art: 'neu', zeichen: '✓', text: t.ean })
       setZustand(t.treffer === 'mapping' ? { art: 'treffer', t } : { art: 'auswahl', t })
+      // Lokal nichts gefunden: jetzt erst eBay fragen (Kette 9.2). Bewusst
+      // nach dem Anzeigen der Karte – ein langsames eBay darf das Scannen
+      // nicht aufhalten, und ohne Zugangsdaten läuft alles wie bisher weiter.
+      setOnline(null)
+      if (t.treffer === 'keiner') void onlineHolen(t.ean)
       return true
     } catch (f) {
       if (sammelnRef.current) tonFehler()
@@ -349,15 +383,55 @@ export function Scannen() {
         )}
 
         {zustand.art === 'auswahl' && (
-          <ScanAuswahl
-            key={zustand.t.ean}
-            ean={zustand.t.ean}
-            scans={zustand.t.scans}
-            angebot={zustand.t.angebot ?? null}
-            laeuft={laeuft}
-            onWahl={(koerper) => zuordnen(zustand.t.ean, koerper)}
-            onSpaeter={() => weiter()}
-          />
+          <>
+            {online?.art === 'laeuft' && <p className="zeile">Frage eBay nach dem Titel …</p>}
+            {online?.art === 'aus' && <p className="zeile">Kein Titel von eBay: {online.grund}</p>}
+            {online?.art === 'da' && online.o.titel === null && (
+              <p className="zeile">eBay kennt diesen Code nicht – bitte von Hand suchen oder anlegen.</p>
+            )}
+            {online?.art === 'da' && online.o.titel !== null && (
+              <div className="online-vorschlag">
+                <p>
+                  <strong>eBay:</strong> {online.o.titel}
+                </p>
+                {online.o.kandidaten.length === 0 ? (
+                  <p className="zeile">Kein Spiel deiner Sammlung passt dazu – unten anlegen.</p>
+                ) : (
+                  <ul className="online-kandidaten">
+                    {online.o.kandidaten.map((k) => (
+                      <li key={k.spielId}>
+                        {k.titel}
+                        {k.spielId === online.o.zielSpielId && ' '}
+                        {k.spielId === online.o.zielSpielId && <span className="pille">Vorschlag</span>}{' '}
+                        {k.releases.map((r) => (
+                          <button
+                            key={r.releaseId}
+                            type="button"
+                            disabled={laeuft}
+                            onClick={() => zuordnen(zustand.t.ean, { releaseId: r.releaseId })}
+                          >
+                            Erfassen ({r.plattform})
+                          </button>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            <ScanAuswahl
+              // Der Schlüssel enthält den Stand der Live-Abfrage: Trifft der
+              // Titel später ein, baut sich das Suchfeld mit ihm als Vorgabe neu auf.
+              key={`${zustand.t.ean}-${online?.art ?? 'ohne'}`}
+              ean={zustand.t.ean}
+              scans={zustand.t.scans}
+              angebot={zustand.t.angebot ?? null}
+              vorgabe={online?.art === 'da' ? (online.o.kandidaten[0]?.titel ?? online.o.titel ?? '') : ''}
+              laeuft={laeuft}
+              onWahl={(koerper) => zuordnen(zustand.t.ean, koerper)}
+              onSpaeter={() => weiter()}
+            />
+          </>
         )}
 
         {zustand.art === 'erfasst' && (

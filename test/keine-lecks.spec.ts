@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createApp, createScheduled } from "../src/index";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
+import { erstelleEbayClient } from "../src/ebay/client";
 import { erstelleIgdbClient } from "../src/igdb/client";
 import { erstellePsnClient } from "../src/psn/client";
 import { spielRoh } from "./igdb-fake";
@@ -19,6 +20,8 @@ import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophySeite } f
 
 const MARKIERUNGEN = {
 	npsso: "MARKIERUNG-NPSSO-7f3a91",
+	ebaySecret: "MARKIERUNG-EBAYSECRET-3d9f15",
+	ebayToken: "MARKIERUNG-EBAYTOKEN-8a2c76",
 	refresh: "MARKIERUNG-REFRESH-2b8c04",
 	access: "MARKIERUNG-ACCESS-e51d67",
 	igdbSecret: "MARKIERUNG-IGDBSECRET-9c1d22",
@@ -57,6 +60,33 @@ function psnMarkiert() {
 }
 
 const IGDB_ZUGANG = { clientId: "igdb-client-id", clientSecret: new Geheimnis(MARKIERUNGEN.igdbSecret) };
+
+const EBAY_ZUGANG = { clientId: "ebay-client-id", clientSecret: new Geheimnis(MARKIERUNGEN.ebaySecret) };
+
+/** eBay-Client mit markiertem Token, Erfolgspfad. */
+function ebayMarkiert() {
+	return erstelleEbayClient(
+		EBAY_ZUGANG,
+		fakeFetch([
+			[/oauth2\/token/, () => jsonAntwort({ access_token: MARKIERUNGEN.ebayToken, expires_in: 7200 })],
+			[/item_summary\/search/, () => jsonAntwort({ itemSummaries: [{ title: "Killzone 3 PS3" }] })],
+		]).fetch,
+	);
+}
+
+/** eBay-Client, der die Markierungen im Fehlertext zurueckwirft. */
+function ebayKaputt(status: number) {
+	return erstelleEbayClient(
+		EBAY_ZUGANG,
+		fakeFetch([
+			[/oauth2\/token/, () =>
+				status === 401
+					? jsonAntwort({ error: `abgelehnt ${MARKIERUNGEN.ebaySecret}` }, 400)
+					: jsonAntwort({ access_token: MARKIERUNGEN.ebayToken, expires_in: 7200 })],
+			[/item_summary\/search/, () => new Response(`Fehler ${MARKIERUNGEN.ebayToken}`, { status })],
+		]).fetch,
+	);
+}
 
 /** IGDB-Client mit markiertem Token, Erfolgspfad. */
 function igdbMarkiert() {
@@ -189,7 +219,8 @@ describe("Dichtheitsprüfung", () => {
 
 	it("gibt auf keiner Route ein Geheimnis heraus - Erfolgspfad", async () => {
 		const igdb = igdbMarkiert();
-		const app = createApp(psnMarkiert, () => igdb);
+		const ebay = ebayMarkiert();
+		const app = createApp(psnMarkiert, () => igdb, () => ebay);
 
 		const antworten = [
 			await ruf(app, "/api/settings/npsso", {
@@ -257,6 +288,8 @@ describe("Dichtheitsprüfung", () => {
 				body: JSON.stringify({ ean: "4006381333913" }),
 			}),
 			await ruf(app, "/api/scan/unresolved"),
+			// Stufe 17c: die Live-Aufloesung, Erfolg und Fehlerpfade.
+			await ruf(app, "/api/scan/4006381333931/online"),
 			await ruf(app, "/api/scan/4006381333931/assign", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
@@ -311,6 +344,20 @@ describe("Dichtheitsprüfung", () => {
 
 		expect(ausgabe.length).toBeGreaterThan(6);
 		expect(istDicht(ausgabe.join("\n")), ausgabe.join("\n")).toMatchObject({ dicht: true });
+	});
+
+	it("gibt auf keiner eBay-Route ein Geheimnis heraus - Fehlerpfade (Stufe 17c)", async () => {
+		for (const status of [401, 429, 500]) {
+			const app = createApp(psnKaputt, () => igdbMarkiert(), () => ebayKaputt(status));
+			const texte = [
+				await ruf(app, "/api/scan/4006381333931/online"),
+				await ruf(app, "/api/scan/5026555403719/online"),
+			];
+			for (const text of texte) {
+				expect(istDicht(text), `Leck in: ${text.slice(0, 200)}`).toMatchObject({ dicht: true });
+			}
+		}
+		expect(istDicht(ausgabe.join("\n"))).toMatchObject({ dicht: true });
 	});
 
 	it("gibt auf keiner IGDB-Route ein Geheimnis heraus - Fehlerpfade", async () => {
@@ -383,7 +430,8 @@ describe("Dichtheitsprüfung", () => {
 	 */
 	it("legt in KEINER Tabelle der Datenbank Klartext ab", async () => {
 		const igdb = igdbMarkiert();
-		const app = createApp(psnMarkiert, () => igdb);
+		const ebay = ebayMarkiert();
+		const app = createApp(psnMarkiert, () => igdb, () => ebay);
 		await ruf(app, "/api/settings/npsso", {
 			method: "POST",
 			headers: { "content-type": "application/json" },

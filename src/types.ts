@@ -1,4 +1,5 @@
 import type { Repositories } from "./db";
+import type { EbayClient } from "./ebay/client";
 import type { IgdbClient } from "./igdb/client";
 import type { PsnClient } from "./psn/client";
 
@@ -12,5 +13,6 @@ export type AppEnv = {
 		repos: Repositories;
 		psn: PsnClient;
 		igdb: IgdbClient;
+		ebay: EbayClient;
 	};
 };

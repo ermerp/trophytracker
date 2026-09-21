@@ -101,7 +101,7 @@ Ebenso: "nur digital gespielt" und "Lücke" sind Views, keine Spalten.
 Der Free Tier erlaubt 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit zählen nicht mit, eigenes Rechnen schon.
 
 - **Cron Trigger helfen nicht.** Auf dem Free Tier gilt für sie dieselbe 10-ms-Grenze wie für normale Anfragen; die 30 Sekunden gibt es erst im Bezahlplan. Der Schutz kommt aus dem Entwurf, nicht aus dem Auslöser: Arbeit pro Aufruf begrenzen und den Fortschritt in der Datenbank halten, damit der nächste Aufruf weitermacht. So arbeitet `cronSchritt` (`src/sync/cron.ts`, Abschnitt 10.1): genau eine schwere Arbeit je Aufruf, 36 Aufrufe je Nacht. Wer dem Cron etwas hinzufügt, hängt es als weiteren Schritt in diese Reihenfolge – nie zwei Arbeiten in einen Aufruf
-- Schwere Importe (Händler-Feeds) **und gedrosselte Quellen** laufen in einer GitHub Action, nicht im Worker – upcitemdb antwortet nach je sechs Abfragen 90 Sekunden mit `429` und erlaubt 100 am Tag; ein Job darf so lange brauchen, eine Anfrage im Worker nicht (`scans.yml`, Stufe 17b)
+- Schwere Importe (Händler-Feeds) **und gedrosselte Quellen** laufen in einer GitHub Action, nicht im Worker – upcitemdb antwortet nach je sechs Abfragen 90 Sekunden mit `429` und erlaubt 100 am Tag; ein Job darf so lange brauchen, eine Anfrage im Worker nicht (`scans.yml`, Stufe 17b). Maßstab ist die **Blockierdauer der Quelle, nicht das Wort „extern"**: Netzwartezeit zählt nicht gegen die 10 ms, deshalb darf die eBay Browse API seit Stufe 17c live im Worker laufen (0,3 s, 5 000/Tag, `src/ebay/client.ts`)
 - Abgleiche im Worker bereiten den Bestand **einmal** vor, nicht je Eingabe: 430 Spieltitel × 56 offene Scans wären 24 000 Zerlegungen in einem Aufruf (`vorbereiten` in `src/domain/scan-titel.ts`)
 - Große Fremddaten (Händler-Feeds) werden in der GitHub Action geparst und gefiltert; der Worker bekommt nur fertige Batches
 - Rohantworten seitenweise speichern, nicht am Stück parsen
@@ -124,7 +124,7 @@ NPSSO, Refresh- und Access Token wandern ausschliesslich als `Geheimnis` (`src/d
 
 Daraus folgt: Die Antwort des PSN-Token-Endpunkts wird nie in `psn_raw_response` geschrieben. Dort landen ausschliesslich Trophäen-Seiten. `test/keine-lecks.spec.ts` prüft das über alle Routen, auch in den Fehlerpfaden.
 
-IGDB-Client-Secret und Twitch-Token nehmen denselben Weg. Das Token lebt nur im Speicher der Worker-Instanz, nie in D1 (Abschnitt 7.6). Fehlende IGDB-Secrets oder ein Ratenlimit betreffen ausschliesslich die IGDB-Routen (503), nie die übrige Anwendung.
+IGDB-Client-Secret und Twitch-Token nehmen denselben Weg; seit Stufe 17c auch eBay-Cert-ID und Application-Token (`src/ebay/client.ts`). Das Token lebt nur im Speicher der Worker-Instanz, nie in D1 (Abschnitt 7.6). Fehlende IGDB-Secrets oder ein Ratenlimit betreffen ausschliesslich die IGDB-Routen (503), nie die übrige Anwendung.
 
 **Maschinen-Endpunkte tragen keine eigene Token-Prüfung.** `/api/export/*`, `/api/backup/*` und später `/api/imports/feed` laufen über ein Access Service Token; Access steht vor dem ganzen Worker. Kein Bearer-Token im Code — in Stufe 8 entschieden, begründet in Abschnitt 15.3.
 

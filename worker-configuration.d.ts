@@ -8,6 +8,9 @@ interface __BaseEnv_Env {
 	/** IGDB/Twitch-Zugangsdaten, als Cloudflare Secrets (Stufe 9). Optional: ohne sie laeuft die App ohne IGDB. */
 	IGDB_CLIENT_ID?: string;
 	IGDB_CLIENT_SECRET?: string;
+	/** eBay-Zugangsdaten, als Cloudflare Secrets (Stufe 17c). Optional: ohne sie loest der Scanner nur lokal auf. */
+	EBAY_CLIENT_ID?: string;
+	EBAY_CLIENT_SECRET?: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -20,7 +23,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NPSSO_KEY" | "IGDB_CLIENT_ID" | "IGDB_CLIENT_SECRET">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NPSSO_KEY" | "IGDB_CLIENT_ID" | "IGDB_CLIENT_SECRET" | "EBAY_CLIENT_ID" | "EBAY_CLIENT_SECRET">> {}
 }
 
 // Begin runtime types

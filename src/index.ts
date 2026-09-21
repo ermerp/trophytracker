@@ -14,6 +14,7 @@ import { scanRoutes } from "./api/scan";
 import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
+import { erstelleEbayClient, zugangAus as ebayZugangAus, type EbayClient } from "./ebay/client";
 import { erstelleIgdbClient, zugangAus, type IgdbClient } from "./igdb/client";
 import { erstellePsnClient, type PsnClient } from "./psn/client";
 import { cronLogzeile, cronSchritt } from "./sync/cron";
@@ -31,6 +32,7 @@ import type { AppEnv } from "./types";
 export function createApp(
 	psnFactory: () => PsnClient = () => erstellePsnClient(),
 	igdbFactory: (env: Env) => IgdbClient = igdbJeInstanz(),
+	ebayFactory: (env: Env) => EbayClient = ebayJeInstanz(),
 ) {
 	const app = new Hono<AppEnv>();
 
@@ -43,6 +45,7 @@ export function createApp(
 		c.set("repos", createRepositories(c.env.DB, c.env.NPSSO_KEY));
 		c.set("psn", psnFactory());
 		c.set("igdb", igdbFactory(c.env));
+		c.set("ebay", ebayFactory(c.env));
 		await next();
 	});
 
@@ -89,6 +92,19 @@ function igdbJeInstanz(): (env: Env) => IgdbClient {
 	let client: IgdbClient | null = null;
 	return (env) => {
 		if (!client) client = erstelleIgdbClient(zugangAus(env));
+		return client;
+	};
+}
+
+/**
+ * Ein eBay-Client je Worker-Instanz - er haelt das Application-Token im
+ * Speicher (9.2). Ohne Zugangsdaten entsteht ein Client ohne Zugang; nur
+ * die Scan-Aufloesung antwortet dann mit 503, alles andere laeuft weiter.
+ */
+function ebayJeInstanz(): (env: Env) => EbayClient {
+	let client: EbayClient | null = null;
+	return (env) => {
+		if (!client) client = erstelleEbayClient(ebayZugangAus(env));
 		return client;
 	};
 }

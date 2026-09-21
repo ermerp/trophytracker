@@ -26,7 +26,22 @@ const BALLAST = new Set([
 	"usk", "pegi", "limited", "special", "complete", "en", "ger",
 ]);
 
-/** Kleinschreibung, nur Buchstaben und Ziffern, Ballast raus. */
+/** Worte, hinter denen eine blanke Zahl die Plattform meint, nicht den Titel. */
+const PLATTFORMWORT = new Set(["playstation", "ps", "sony", "vita", "psvita"]);
+
+/**
+ * Kleinschreibung, nur Buchstaben und Ziffern, Ballast raus - und danach
+ * Buchstaben-Ziffern-Grenzen getrennt: "LittleBigPlanet2" wird zu
+ * "littlebigplanet" + "2".
+ *
+ * Die Reihenfolge ist entscheidend und gemessen (21.09.2026): Wird zuerst
+ * getrennt, zerfaellt auch "ps3" zu "ps" + "3" - die Ziffer 3 staende dann
+ * in jedem Haendlertitel, und ein Angebot "Killzone PS3" wuerde zu
+ * "Killzone 3". Ballast zuerst zu entfernen schliesst das aus, behebt aber
+ * den echten Fall: Die Sammlung fuehrt "LittleBigPlanet2" zusammen, eBay
+ * schreibt "LittleBigPlanet 2", und ohne Trennung gewann das Grundspiel -
+ * der einzige Fehlgriff in der Messung gegen 34 bekannte Codes.
+ */
 export function worteAus(text: string): Set<string> {
 	const roh = text
 		.toLowerCase()
@@ -34,7 +49,20 @@ export function worteAus(text: string): Set<string> {
 		.replace(/[^\p{Letter}\p{Number}]+/gu, " ")
 		.trim()
 		.split(/\s+/);
-	return new Set(roh.filter((w) => w !== "" && !BALLAST.has(w)));
+
+	const worte = new Set<string>();
+	for (const [i, wort] of roh.entries()) {
+		if (wort === "" || BALLAST.has(wort)) continue;
+		// "Sony PlayStation 3" laesst sonst eine blanke 3 stehen, und die
+		// passt auf "Killzone 3" - ein Angebot fuer Killzone 1 waere damit
+		// der falsche Treffer. Eine Zahl direkt hinter einem Plattformwort
+		// gehoert zur Plattform, nicht zum Titel.
+		if (PLATTFORMWORT.has(roh[i - 1] ?? "") && /^\p{Number}+$/u.test(wort)) continue;
+		for (const teil of wort.replace(/(\p{Letter})(\p{Number})/gu, "$1 $2").replace(/(\p{Number})(\p{Letter})/gu, "$1 $2").split(" ")) {
+			if (teil !== "" && !BALLAST.has(teil)) worte.add(teil);
+		}
+	}
+	return worte;
 }
 
 /** Ein Spiel der Sammlung, so viel wie der Abgleich braucht. */
@@ -80,4 +108,64 @@ export function sammlungstreffer<T extends SammlungsSpiel>(
 	// Echte Mehrdeutigkeit nur, wenn ein weiterer Treffer nicht im besten aufgeht.
 	const eindeutig = passend.slice(1).every(({ worte }) => [...worte].every((w) => bester.has(w)) && worte.size < bester.size);
 	return { treffer: passend.map((p) => p.spiel), eindeutig };
+}
+
+/**
+ * Mehrere Angebote zu EINEM Code auf ein Ziel bringen (Stufe 17c).
+ *
+ * eBay liefert je Barcode bis zu zehn Verkaeuferangebote. Einzeln betrachtet
+ * genuegt eines, um danebenzugreifen: Ein Buendel ("Red Dead Redemption +
+ * GTA IV") oder ein Cross-Sell nennt ein Spiel, das mit dem Code nichts zu
+ * tun hat. Gemessen am 21.09.2026 brachte das drei Fehlgriffe.
+ *
+ * Deshalb zaehlt hier die Mehrheit: Ein Spiel gilt nur, wenn es in mehr als
+ * der Haelfte der eindeutigen Angebotstreffer steckt und oefter als jedes
+ * andere. Ein Buendel steht in einem von zehn Angeboten und faellt heraus.
+ * Mit nur einem Angebot (upcitemdb liefert genau einen Titel) verhaelt sich
+ * die Funktion wie `sammlungstreffer`.
+ */
+export function mehrheitstreffer<T extends SammlungsSpiel>(
+	haendlertitel: readonly string[],
+	sammlung: readonly VorbereitetesSpiel<T>[],
+): { spiel: T | null; angebote: number } {
+	const jeSpiel = new Map<number, { spiel: T; anzahl: number }>();
+	for (const titel of haendlertitel) {
+		const { treffer, eindeutig } = sammlungstreffer(titel, sammlung);
+		if (!eindeutig || treffer.length === 0) continue;
+		const bisher = jeSpiel.get(treffer[0].spielId);
+		if (bisher) bisher.anzahl++;
+		else jeSpiel.set(treffer[0].spielId, { spiel: treffer[0], anzahl: 1 });
+	}
+
+	const sortiert = [...jeSpiel.values()].sort((a, b) => b.anzahl - a.anzahl);
+	if (sortiert.length === 0) return { spiel: null, angebote: 0 };
+	if (sortiert.length === 1) return { spiel: sortiert[0].spiel, angebote: sortiert[0].anzahl };
+
+	const gesamt = sortiert.reduce((summe, e) => summe + e.anzahl, 0);
+	const [erster, zweiter] = sortiert;
+	if (erster.anzahl > gesamt / 2 && erster.anzahl > zweiter.anzahl) {
+		return { spiel: erster.spiel, angebote: erster.anzahl };
+	}
+	return { spiel: null, angebote: erster.anzahl };
+}
+
+/**
+ * Der Titel, der die Mehrheit gebracht hat - er wird als `title_raw`
+ * gespeichert, damit die Ansicht "Offene Scans" denselben Abgleich beim
+ * Lesen wiederholen kann (9.3). Ohne Mehrheit der erste Titel: Auch ein
+ * Titel ohne Treffer in der Sammlung ist die Vorlage zum Anlegen.
+ */
+export function bestertitel<T extends SammlungsSpiel>(
+	haendlertitel: readonly string[],
+	sammlung: readonly VorbereitetesSpiel<T>[],
+): string | null {
+	const { spiel } = mehrheitstreffer(haendlertitel, sammlung);
+	if (spiel) {
+		const passend = haendlertitel.find((t) => {
+			const { treffer, eindeutig } = sammlungstreffer(t, sammlung);
+			return eindeutig && treffer[0]?.spielId === spiel.spielId;
+		});
+		if (passend) return passend;
+	}
+	return haendlertitel[0] ?? null;
 }
