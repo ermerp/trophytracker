@@ -74,9 +74,10 @@ export const psnRoutes = new Hono<AppEnv>()
 	 * daraus einen fehlgeschlagenen Nachtlauf, den niemand am Bildschirm sah.
 	 */
 	.get("/sync/status", async (c) => {
-		const [lauf, cronLauf, zugang, trophaeen] = await Promise.all([
+		const [lauf, cronLauf, cronAusgang, zugang, trophaeen] = await Promise.all([
 			c.var.repos.sync.letzterLauf(),
 			c.var.repos.sync.letzterLauf("cron"),
+			c.var.repos.sync.cronAusgang(),
 			c.var.repos.credentials.anzeige(),
 			c.var.repos.trophies.anzahl(),
 		]);
@@ -86,6 +87,9 @@ export const psnRoutes = new Hono<AppEnv>()
 			trophaeen,
 			letzterLauf: laufAntwort(lauf),
 			letzterAutomatischerLauf: laufAntwort(cronLauf),
+			// Was der letzte Cron-Aufruf tat - auch wenn er gar keinen Lauf
+			// anfasste (Stufe 18b).
+			cronAusgang,
 		});
 	});
 

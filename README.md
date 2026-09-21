@@ -388,10 +388,14 @@ Ein voller Sync braucht bei 431 Titeln rund elf Aufrufe. Ist der Zugang
 `abgelaufen`, legt der Cron gar keinen Lauf an; ein neues NPSSO in den
 Einstellungen genügt, dann geht es in der nächsten Nacht von allein weiter.
 
-Was der Cron tut, steht an drei Stellen: in den Einstellungen unter
-**Automatik** (letzter automatischer Abruf mit Ergebnis), im Hinweisblock der
-Sammlung, wenn der Nachtlauf fehlgeschlagen ist, und als Zeile `cron: …` in den
+Was der Cron tut, steht an vier Stellen: in den Einstellungen unter **Automatik**
+(letzter automatischer Abruf **und** der Ausgang des letzten Cron-Aufrufs), im
+Hinweisblock der Sammlung, wenn der Nachtlauf fehlgeschlagen ist, in
+`GET /api/sync/status` als `cronAusgang` und als Zeile `cron: …` in den
 Worker-Logs (Cloudflare-Dashboard → Worker → Logs) – nur Zahlen und feste Texte.
+Der Eintrag in der Datenbank ist seit Stufe 18b dabei, weil Worker-Logs nur live
+einsehbar sind: Ohne ihn lässt sich am Morgen nicht sagen, ob ein Schritt
+scheiterte oder schlicht nichts zu tun fand.
 `GET /api/sync/status` nennt `letzterAutomatischerLauf`, jeder Lauf trägt
 `ausloeser` (`nutzer` oder `cron`).
 

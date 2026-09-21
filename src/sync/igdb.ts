@@ -180,6 +180,8 @@ export type AuffrischErgebnis = {
 	status: "erfolg" | "fehler";
 	angefragt: number;
 	aktualisiert: number;
+	/** Angefragt, aber von IGDB nicht geliefert - trotzdem gestempelt. */
+	ohneAntwort?: number;
 	meldung?: string;
 };
 
@@ -203,12 +205,22 @@ export async function igdbAuffrischSchritt(
 		const nachId = new Map<number, IgdbKandidat>(treffer.map((k) => [k.igdbId, k]));
 		const heute = heuteIso();
 		let aktualisiert = 0;
+		const ohneAntwort: number[] = [];
 		for (const spiel of spiele) {
 			const k = nachId.get(spiel.igdb_id);
-			if (!k) continue;
+			// Was IGDB nicht zurueckgibt, wird trotzdem gestempelt - sonst waehlt
+			// der naechste Aufruf dieselben Spiele wieder und kommt nie voran.
+			if (!k) {
+				ohneAntwort.push(spiel.id);
+				continue;
+			}
 			if (await repos.igdb.auffrischen(spiel.id, metadatenAus(k, heute))) aktualisiert++;
 		}
-		return { status: "erfolg", angefragt: spiele.length, aktualisiert };
+		// In Stuecken: D1 erlaubt 100 gebundene Werte je Statement.
+		for (let i = 0; i < ohneAntwort.length; i += 50) {
+			await repos.igdb.auffrischStempeln(ohneAntwort.slice(i, i + 50));
+		}
+		return { status: "erfolg", angefragt: spiele.length, aktualisiert, ohneAntwort: ohneAntwort.length };
 	} catch (fehler) {
 		return { status: "fehler", angefragt: spiele.length, aktualisiert: 0, meldung: meldungFuer(fehler) };
 	}

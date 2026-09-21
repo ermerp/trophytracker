@@ -294,7 +294,7 @@ describe("IgdbRepository: Entscheidungen des Nutzers", () => {
 		expect(await zeile(1)).toMatchObject({ igdb_id: 1001, critic_score: 77, critic_source: "manuell", cover_url: expect.any(String) });
 
 		const e = await igdbAuffrischSchritt(r, fakeIgdb([[spielRoh({ aggregated_rating: 50 })]]).client);
-		expect(e).toEqual({ status: "erfolg", angefragt: 1, aktualisiert: 1 });
+		expect(e).toEqual({ status: "erfolg", angefragt: 1, aktualisiert: 1, ohneAntwort: 0 });
 		expect(await zeile(1)).toMatchObject({ critic_score: 77, critic_source: "manuell" });
 
 		// Nach dem Loesen bleibt die manuelle Wertung ebenfalls.
@@ -313,7 +313,7 @@ describe("IgdbRepository: Entscheidungen des Nutzers", () => {
 		expect(await r.igdb.zumAuffrischen(1)).toEqual([{ id: 2, igdb_id: 12 }]);
 
 		const { client, aufrufe } = fakeIgdb([[spielRoh({ id: 11, aggregated_rating: 60.4, aggregated_rating_count: 3 }), spielRoh({ id: 12, cover: { image_id: "neu" } })]]);
-		expect(await igdbAuffrischSchritt(r, client)).toEqual({ status: "erfolg", angefragt: 2, aktualisiert: 2 });
+		expect(await igdbAuffrischSchritt(r, client)).toEqual({ status: "erfolg", angefragt: 2, aktualisiert: 2, ohneAntwort: 0 });
 		expect(String(aufrufe.at(-1)?.init?.body)).toContain("where id = (12,11)");
 		expect(await zeile(1)).toMatchObject({ critic_score: 60, critic_score_count: 3 });
 		expect((await zeile(2))?.cover_url).toContain("/neu.jpg");

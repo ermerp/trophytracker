@@ -17,6 +17,17 @@ export type SyncLauf = {
 	started_by: SyncAusloeser;
 };
 
+/**
+ * Schluessel in app_setting, unter dem der Cron seinen letzten Ausgang
+ * hinterlaesst (Stufe 18b). Begruendung: Der Cron ist der einzige Schreiber
+ * ohne Zuschauer, und die Worker-Logs sind nur live zu sehen - als am
+ * 21.09.2026 der IGDB-Schritt zwei Naechte lang nichts tat, war von aussen
+ * nicht zu erkennen, ob er scheiterte, gar nicht lief oder nichts zu tun
+ * fand. Eine Zeile Zustand schliesst diese Luecke; berechnet ist daran
+ * nichts.
+ */
+const SCHLUESSEL_CRON = "cron_letzter_ausgang";
+
 /** Fester Text fuer einen abgebrochenen Haenger - nur eine Zahl, kein Fremdtext (Abschnitt 10.1). */
 export const haengerMeldung = (stunden: number) =>
 	`Abgebrochen: seit über ${stunden} Stunden kein Fortschritt.`;
@@ -177,6 +188,26 @@ export class SyncRepository {
 			)
 			.bind(laufId)
 			.run();
+	}
+
+	/** Den Ausgang eines Cron-Aufrufs festhalten (nur Zahlen und feste Texte). */
+	async cronAusgangVermerken(zeile: string): Promise<void> {
+		await this.db
+			.prepare(
+				"INSERT INTO app_setting (key, value) VALUES (?, ?) " +
+					"ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+			)
+			.bind(SCHLUESSEL_CRON, zeile)
+			.run();
+	}
+
+	/** Der zuletzt vermerkte Cron-Ausgang, fuer die Einstellungen. */
+	async cronAusgang(): Promise<string | null> {
+		const z = await this.db
+			.prepare("SELECT value FROM app_setting WHERE key = ?")
+			.bind(SCHLUESSEL_CRON)
+			.first<{ value: string }>();
+		return z?.value ?? null;
 	}
 
 	async letzterErfolgreicherLauf(): Promise<SyncLauf | null> {
