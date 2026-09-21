@@ -143,7 +143,15 @@ Was steht und in Betrieb nachgewiesen ist:
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Rest-Abnahme von Stufe 18.** Die PWA ist abgenommen (installiert,
+**Als Nächstes: Rest-Abnahme von Stufe 18**, dann zwei neu geplante Stufen aus
+einer Messung gegen das echte PSN-Konto (21.09.2026, Abschnitt 7.7 der
+Spezifikation): **18c** bringt Spielzeit (`playDuration`, `playCount`) und den
+digitalen Besitz inklusive der Unterscheidung gekauft/PS+, **18d** die
+Einzeltrophäen je Spiel mit Zeitpunkt und weltweiter Seltenheit. Beide ergänzen
+nur, was die Sammlung schon kennt, und importieren nichts. Danach erst die
+Oberfläche.
+
+**Rest-Abnahme Stufe 18 im Detail:** Die PWA ist abgenommen (installiert,
 offline geprüft), der nächtliche Sync belegt (Läufe am 20. und 21.09., je 431
 Titel); der IGDB-Schritt tat zwei Nächte nichts und wird seit Stufe 18b
 nachprüfbar protokolliert – am Morgen nach dem Deploy zu kontrollieren. Danach
