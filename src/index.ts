@@ -128,8 +128,24 @@ export function createScheduled(
 			return;
 		}
 		const repos = createRepositories(env.DB, env.NPSSO_KEY);
-		const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env));
-		console.log(cronLogzeile(ergebnis));
+		try {
+			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env));
+			const zeile = cronLogzeile(ergebnis);
+			console.log(zeile);
+			// Der Cron ist der einzige Schreiber ohne Zuschauer, und Worker-Logs
+			// sind nur live zu sehen. Deshalb bleibt sein Ausgang auch in der
+			// Datenbank stehen (Stufe 18b) - sonst laesst sich am Morgen nicht
+			// unterscheiden, ob er scheiterte oder nichts zu tun fand.
+			await repos.sync.cronAusgangVermerken(`${new Date().toISOString().slice(0, 16).replace("T", " ")} ${zeile}`);
+		} catch (fehler) {
+			// Ein Absturz darf nicht spurlos bleiben. Nur eigene Texte, kein
+			// Fremdtext - der koennte ein Geheimnis zitieren.
+			console.log("cron: abgebrochen");
+			await repos.sync
+				.cronAusgangVermerken(`${new Date().toISOString().slice(0, 16).replace("T", " ")} cron: abgebrochen`)
+				.catch(() => {});
+			throw fehler;
+		}
 	};
 }
 

@@ -207,6 +207,24 @@ export class IgdbRepository {
 	}
 
 	/**
+	 * Spiele als "geprueft" stempeln, ohne ihre Metadaten anzufassen.
+	 *
+	 * Fuer die, die IGDB auf Anfrage nicht zurueckgibt: Ohne Stempel waehlt
+	 * der naechste Aufruf dieselben Spiele erneut, und der naechtliche
+	 * Auffrisch-Schritt dreht sich im Kreis (Verdacht vom 21.09.2026).
+	 * Dieselbe Regel wie bei der Disc-Pruefung: Eine leere Antwort ist ein
+	 * Ergebnis, kein Grund zur Wiederholung. Kein Ereignis - nichts geaendert.
+	 */
+	async auffrischStempeln(ids: readonly number[]): Promise<number> {
+		if (ids.length === 0) return 0;
+		const ergebnis = await this.db
+			.prepare(`UPDATE game SET igdb_synced_at = datetime('now') WHERE id IN (${ids.map(() => "?").join(",")})`)
+			.bind(...ids)
+			.run();
+		return ergebnis.meta.changes ?? 0;
+	}
+
+	/**
 	 * Verknuepfte Spiele, die am laengsten nicht aufgefrischt wurden.
 	 *
 	 * Mit `mindestAlterTage > 0` nur solche, deren Stand aelter ist (oder

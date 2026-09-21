@@ -27,7 +27,14 @@ type Lauf = {
 } | null
 
 /** Seit Stufe 18 auch der juengste Lauf des Cron (Abschnitt 10.1). */
-export type StatusAntwort = { zugang: Zugang; letzterLauf: Lauf; letzterAutomatischerLauf: Lauf; trophaeen: number }
+export type StatusAntwort = {
+  zugang: Zugang
+  letzterLauf: Lauf
+  letzterAutomatischerLauf: Lauf
+  /** Was der letzte Cron-Aufruf tat – auch ohne Sync-Lauf (Stufe 18b). */
+  cronAusgang: string | null
+  trophaeen: number
+}
 
 type SyncAntwort = {
   status: 'erfolg' | 'laufend' | 'fehler'
@@ -250,6 +257,9 @@ export function Einstellungen() {
       <p>
         Letzter automatischer Abruf:{' '}
         {status?.letzterAutomatischerLauf ? laufText(status.letzterAutomatischerLauf) : 'noch keiner'}
+      </p>
+      <p className="zeile">
+        Letzter Cron-Aufruf: {status?.cronAusgang ?? 'noch keiner vermerkt'}
       </p>
 
       {meldung && <p role="status">{meldung}</p>}

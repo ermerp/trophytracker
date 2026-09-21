@@ -5,6 +5,7 @@ import type { PsnClient } from "../psn/client";
 import {
 	igdbAuffrischSchritt,
 	igdbPhysischSchritt,
+	meldungFuer,
 	type AuffrischErgebnis,
 	type PhysischErgebnis,
 } from "./igdb";
@@ -40,6 +41,8 @@ export type CronErgebnis = {
 	erschienen: number;
 	/** Laeufe, die als haengengeblieben auf 'fehler' gesetzt wurden. */
 	abgebrochen: number;
+	/** Gescheiterter Schritt ausserhalb des Syncs - fester Text, nie Fremdtext. */
+	meldung?: string;
 	sync?: SyncErgebnis;
 	auffrischen?: AuffrischErgebnis;
 	physisch?: PhysischErgebnis;
@@ -78,12 +81,20 @@ export async function cronSchritt(
 	}
 
 	// 4./5. IGDB nur mit Zugang; ohne bleibt die Nacht ruhig.
+	//
+	// In try/catch, weil eine Ausnahme hier bisher den ganzen Aufruf riss:
+	// Der Sync lief dann zwar, aber alles danach fiel still aus, und von
+	// aussen war das nicht zu sehen (Stufe 18b).
 	if (igdb.konfiguriert()) {
-		const auffrischen = await igdbAuffrischSchritt(repos, igdb, undefined, AUFFRISCH_FRIST_TAGE);
-		if (auffrischen.angefragt > 0) return { ...basis, getan: "igdb_auffrischen", auffrischen };
+		try {
+			const auffrischen = await igdbAuffrischSchritt(repos, igdb, undefined, AUFFRISCH_FRIST_TAGE);
+			if (auffrischen.angefragt > 0) return { ...basis, getan: "igdb_auffrischen", auffrischen };
 
-		const physisch = await igdbPhysischSchritt(repos, igdb);
-		if (physisch.angefragt > 0) return { ...basis, getan: "igdb_physisch", physisch };
+			const physisch = await igdbPhysischSchritt(repos, igdb);
+			if (physisch.angefragt > 0) return { ...basis, getan: "igdb_physisch", physisch };
+		} catch (fehler) {
+			return { ...basis, getan: "nichts", meldung: meldungFuer(fehler) };
+		}
 	}
 
 	return { ...basis, getan: "nichts" };
@@ -114,9 +125,15 @@ export function cronLogzeile(e: CronErgebnis): string {
 		if (e.sync.meldung) teile.push(`meldung="${e.sync.meldung}"`);
 	}
 	if (e.auffrischen) {
-		teile.push(`auffrischen=${e.auffrischen.status}`, `angefragt=${e.auffrischen.angefragt}`, `aktualisiert=${e.auffrischen.aktualisiert}`);
+		teile.push(
+			`auffrischen=${e.auffrischen.status}`,
+			`angefragt=${e.auffrischen.angefragt}`,
+			`aktualisiert=${e.auffrischen.aktualisiert}`,
+			`ohneAntwort=${e.auffrischen.ohneAntwort ?? 0}`,
+		);
 		if (e.auffrischen.meldung) teile.push(`meldung="${e.auffrischen.meldung}"`);
 	}
+	if (e.meldung) teile.push(`meldung="${e.meldung}"`);
 	if (e.physisch) {
 		teile.push(`physisch=${e.physisch.status}`, `angefragt=${e.physisch.angefragt}`, `gesetzt=${e.physisch.gesetzt}`);
 		if (e.physisch.meldung) teile.push(`meldung="${e.physisch.meldung}"`);

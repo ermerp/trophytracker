@@ -242,6 +242,36 @@ describe("cronSchritt", () => {
 		expect(AUFFRISCH_FRIST_TAGE).toBe(7);
 	});
 
+	it("stempelt Spiele, die IGDB nicht zurueckgibt - sonst dreht sich der Schritt im Kreis", async () => {
+		// Gesehen am 21.09.2026: Der naechtliche Auffrisch-Schritt waehlte
+		// zwei Naechte lang dieselben Spiele und kam nie voran.
+		await spielMitIgdb(1, 11, "2020-01-01 00:00:00");
+		await spielMitIgdb(2, 12, "2020-01-01 00:00:00");
+
+		// IGDB liefert nur eines der beiden zurueck.
+		const e = await cronSchritt(repos(), psnStumm(), fakeIgdb([[spielRoh({ id: 11 })]]).client);
+		expect(e.auffrischen).toMatchObject({ angefragt: 2, aktualisiert: 1, ohneAntwort: 1 });
+
+		// Beide trage jetzt einen frischen Stempel - der naechste Aufruf hat nichts mehr zu tun.
+		const offen = await env.DB.prepare(
+			"SELECT COUNT(*) AS n FROM game WHERE igdb_id IS NOT NULL AND (igdb_synced_at IS NULL OR igdb_synced_at < datetime('now','-7 days'))",
+		).first<{ n: number }>();
+		expect(offen?.n).toBe(0);
+	});
+
+	it("meldet einen IGDB-Ausfall, statt den Aufruf zu reissen", async () => {
+		await spielMitIgdb(1, 11, null);
+		const kaputt = fakeIgdb([new Response("weg", { status: 500 })]).client;
+
+		const e = await cronSchritt(repos(), psnStumm(), kaputt);
+
+		// Der Schritt faengt den Fehler selbst; der Aufruf laeuft zu Ende und
+		// sagt in der Logzeile, was los war.
+		expect(e.getan).toBe("igdb_auffrischen");
+		expect(e.auffrischen).toMatchObject({ status: "fehler", aktualisiert: 0 });
+		expect(cronLogzeile(e)).toContain('meldung="Der IGDB-Abruf ist fehlgeschlagen."');
+	});
+
 	it("die Logzeile nennt nur Zahlen und feste Texte", () => {
 		const zeile = cronLogzeile({
 			getan: "sync",
