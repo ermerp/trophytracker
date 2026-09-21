@@ -27,6 +27,7 @@ export function ScanAuswahl({
   laeuft,
   onWahl,
   onSpaeter,
+  onVerwerfen,
   spaeterText = 'Später',
 }: {
   ean: string
@@ -39,6 +40,14 @@ export function ScanAuswahl({
   laeuft: boolean
   onWahl: (wahl: Wahl) => void
   onSpaeter?: () => void
+  /**
+   * Den Code wegwerfen, statt ihn liegen zu lassen. Fuer Fehllesungen: Der
+   * Scanner las am 17.09. und erneut am 21.09.2026 eine Disc mit zwei
+   * vertauschten Ziffern, deren Pruefziffer gueltig blieb. Wer die Huelle in
+   * der Hand haelt, erkennt das sofort - und soll es sofort loswerden
+   * koennen, statt den Code ueber "Offene Scans" nachzuraeumen.
+   */
+  onVerwerfen?: () => void
   spaeterText?: string
 }) {
   const [suchtext, setSuchtext] = useState(angebot?.titel ?? vorgabe)
@@ -87,6 +96,11 @@ export function ScanAuswahl({
         {onSpaeter && (
           <button type="button" disabled={laeuft} onClick={onSpaeter}>
             {spaeterText}
+          </button>
+        )}{' '}
+        {onVerwerfen && (
+          <button type="button" disabled={laeuft} onClick={onVerwerfen}>
+            Verwerfen
           </button>
         )}
       </p>
