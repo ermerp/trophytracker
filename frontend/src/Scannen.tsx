@@ -182,6 +182,16 @@ export function Scannen() {
    * Betrifft nur offene Scans – ein Code, der schon einem Release gehört,
    * wird hier nicht angefasst.
    */
+  /**
+   * Fehllesung wegwerfen und weiterscannen. Mit Rueckfrage wie in "Offene
+   * Scans": Der Code ist danach weg, als waere er nie gescannt worden.
+   */
+  async function verwerfenUndWeiter(ean: string) {
+    if (!confirm(`Code ${ean} wirklich verwerfen? Er ist danach weg, als wäre er nie gescannt worden.`)) return
+    await verwerfen(ean)
+    weiter()
+  }
+
   async function verwerfen(ean: string) {
     setFehler(null)
     try {
@@ -430,6 +440,7 @@ export function Scannen() {
               laeuft={laeuft}
               onWahl={(koerper) => zuordnen(zustand.t.ean, koerper)}
               onSpaeter={() => weiter()}
+              onVerwerfen={() => void verwerfenUndWeiter(zustand.t.ean)}
             />
           </>
         )}
