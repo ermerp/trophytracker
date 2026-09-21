@@ -137,6 +137,33 @@ describe("Mehrheit ueber mehrere Angebote (Stufe 17c)", () => {
 		expect(ziel(["Killzone PS3 Sony PlayStation 3 PAL"])).toBe("Killzone");
 	});
 
+	it("nimmt keinen Alleinkandidaten, den nur ein Angebot von vielen stuetzt", () => {
+		// So entstand am 21.09.2026 aus einem Buendel ein Vorschlag fuer ein
+		// fremdes Spiel: neun Angebote nannten ein Spiel, das die Sammlung in
+		// zwei Fassungen fuehrt (also mehrdeutig), und das zehnte ein GTA.
+		const titel = [
+			"Irgendein Spiel das hier nicht steht PS3",
+			"Noch eines ohne Treffer PS3",
+			"Bundle: Killzone 3 + zwei weitere PS3",
+		];
+		expect(ziel(titel)).toBeNull();
+		// Mit zwei Nennungen ist der Rueckhalt da.
+		expect(ziel([...titel, "Killzone 3 PS3 PAL"])).toBe("Killzone 3");
+	});
+
+	it("bleibt bei einem einzigen Angebot entscheidungsfaehig", () => {
+		// upcitemdb liefert genau einen Titel - der Rueckhalt darf dort nicht greifen.
+		expect(ziel(["Killzone 3 PS3 PAL"])).toBe("Killzone 3");
+		expect(ziel(["Killzone 3 PS3 PAL", "Irgendwas anderes"])).toBe("Killzone 3");
+	});
+
+	it("bringt roemische Fortsetzungsnummern mit arabischen zusammen", () => {
+		// Die Sammlung schreibt "II", die Verkaeufer schreiben "2".
+		expect(worteAus("Kingdom Come: Deliverance II")).toEqual(worteAus("Kingdom Come Deliverance 2"));
+		// v und x bleiben Buchstaben: "Mega Man X" ist nicht "Mega Man 10".
+		expect([...worteAus("Mega Man X")]).toEqual(["mega", "man", "x"]);
+	});
+
 	it("gibt den Titel zurueck, der die Mehrheit gebracht hat", () => {
 		expect(
 			bestertitel(["Irgendwas anderes", "Killzone 3 PS3 PAL", "Killzone 3 CiB"], bestand2),

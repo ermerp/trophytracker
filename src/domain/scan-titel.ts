@@ -30,6 +30,28 @@ const BALLAST = new Set([
 const PLATTFORMWORT = new Set(["playstation", "ps", "sony", "vita", "psvita"]);
 
 /**
+ * Roemische Zahlen in Fortsetzungsnummern, auf Ziffern gebracht.
+ *
+ * Die Sammlung fuehrt "Kingdom Come: Deliverance II", die Verkaeufer
+ * schreiben "Kingdom Come Deliverance 2" - ohne diese Tabelle passt der
+ * Nachfolger auf keines seiner eigenen Angebote, und das Grundspiel gewinnt
+ * (Fehlgriff beim Regal-Durchgang am 21.09.2026).
+ *
+ * `v` und `x` fehlen mit Absicht: Sie sind auch gewoehnliche Buchstaben
+ * ("Mega Man X" meint kein "Mega Man 10"), und die Messung zeigte keinen
+ * Gewinn durch sie.
+ */
+const ROEMISCH: Record<string, string> = {
+	ii: "2",
+	iii: "3",
+	iv: "4",
+	vi: "6",
+	vii: "7",
+	viii: "8",
+	ix: "9",
+};
+
+/**
  * Kleinschreibung, nur Buchstaben und Ziffern, Ballast raus - und danach
  * Buchstaben-Ziffern-Grenzen getrennt: "LittleBigPlanet2" wird zu
  * "littlebigplanet" + "2".
@@ -59,7 +81,7 @@ export function worteAus(text: string): Set<string> {
 		// gehoert zur Plattform, nicht zum Titel.
 		if (PLATTFORMWORT.has(roh[i - 1] ?? "") && /^\p{Number}+$/u.test(wort)) continue;
 		for (const teil of wort.replace(/(\p{Letter})(\p{Number})/gu, "$1 $2").replace(/(\p{Number})(\p{Letter})/gu, "$1 $2").split(" ")) {
-			if (teil !== "" && !BALLAST.has(teil)) worte.add(teil);
+			if (teil !== "" && !BALLAST.has(teil)) worte.add(ROEMISCH[teil] ?? teil);
 		}
 	}
 	return worte;
@@ -123,7 +145,23 @@ export function sammlungstreffer<T extends SammlungsSpiel>(
  * andere. Ein Buendel steht in einem von zehn Angeboten und faellt heraus.
  * Mit nur einem Angebot (upcitemdb liefert genau einen Titel) verhaelt sich
  * die Funktion wie `sammlungstreffer`.
+ *
+ * Dazu braucht der Sieger **Rueckhalt**: Ab drei Angeboten muessen ihn
+ * mindestens zwei nennen. Sonst gewinnt ein Alleinkandidat auch dann, wenn
+ * ihn nur ein einziges von zehn Angeboten stuetzt - genau so wurde am
+ * 21.09.2026 aus einem Buendel ("GTA 4 + 5 Red Dead Redemption") ein
+ * Vorschlag fuer GTA, waehrend das eigentliche Spiel in zwei Fassungen mit
+ * Jahreszahl in der Sammlung steht und deshalb auf keines seiner Angebote
+ * passte. Lieber kein Vorschlag als ein falscher: Ohne Ziel zeigt die
+ * Oberflaeche die Suche, und der Nutzer entscheidet.
  */
+/**
+ * Ab so vielen Angeboten braucht der Sieger mindestens zwei Nennungen.
+ * Bei einem oder zwei Angeboten waere das die falsche Haerte - upcitemdb
+ * liefert genau einen Titel, und viele Codes haben nur ein Angebot.
+ */
+export const MINDESTENS_ZWEI_AB = 2;
+
 export function mehrheitstreffer<T extends SammlungsSpiel>(
 	haendlertitel: readonly string[],
 	sammlung: readonly VorbereitetesSpiel<T>[],
@@ -139,6 +177,9 @@ export function mehrheitstreffer<T extends SammlungsSpiel>(
 
 	const sortiert = [...jeSpiel.values()].sort((a, b) => b.anzahl - a.anzahl);
 	if (sortiert.length === 0) return { spiel: null, angebote: 0 };
+	if (haendlertitel.length > MINDESTENS_ZWEI_AB && sortiert[0].anzahl < 2) {
+		return { spiel: null, angebote: sortiert[0].anzahl };
+	}
 	if (sortiert.length === 1) return { spiel: sortiert[0].spiel, angebote: sortiert[0].anzahl };
 
 	const gesamt = sortiert.reduce((summe, e) => summe + e.anzahl, 0);
