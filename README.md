@@ -143,8 +143,10 @@ Was steht und in Betrieb nachgewiesen ist:
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Abnahme von Stufe 18** (erster Nachtlauf, App auf dem Handy
-installieren) und **von Stufe 17c** (PS3-Regal erneut scannen), dann
+**Als Nächstes: Rest-Abnahme von Stufe 18.** Die PWA ist abgenommen (installiert,
+offline geprüft), der nächtliche Sync belegt (Läufe am 20. und 21.09., je 431
+Titel); der IGDB-Schritt tat zwei Nächte nichts und wird seit Stufe 18b
+nachprüfbar protokolliert – am Morgen nach dem Deploy zu kontrollieren. Danach
 **Stufe 19 – Oberfläche**. Reihenfolge danach, am
 16.09.2026 entschieden: 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
 AWIN-Feed, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation). Jeder neue
