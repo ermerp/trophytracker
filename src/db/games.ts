@@ -725,6 +725,28 @@ aeenliste haengt
 	}
 
 	/**
+	 * Releases eines Spiels mit Cover und Zahl der Exemplare - fuer den
+	 * Titelvorschlag beim Scannen (9.2). Die Karte soll aussehen wie die
+	 * eines bekannten Codes: Wer scannt, muss auf einen Blick sehen, dass das
+	 * Spiel schon in der Sammlung steht und ob eine Disc davon im Regal ist
+	 * (Rueckmeldung des Nutzers vom 21.09.2026). Beide Unterabfragen laufen
+	 * ueber Indizes, und es geht nur um die wenigen Kandidaten eines Codes.
+	 */
+	async releasesFuerScan(
+		gameId: number,
+	): Promise<Array<{ id: number; platform: string; cover_url: string | null; exemplare: number }>> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT r.id, r.platform, g.cover_url, " +
+					"(SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare " +
+					"FROM release r JOIN game g ON g.id = r.game_id WHERE r.game_id = ? ORDER BY r.id",
+			)
+			.bind(gameId)
+			.all<{ id: number; platform: string; cover_url: string | null; exemplare: number }>();
+		return results;
+	}
+
+	/**
 	 * Angekuendigte Spiele, deren Datum verstrichen ist, gelten als erschienen
 	 * (8.4). Ein Scan ueber game (rund 470 Zeilen), nur bei Handausloesung
 	 * ("Metadaten auffrischen"); der taegliche Lauf kommt mit dem Cron in

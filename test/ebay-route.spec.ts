@@ -57,11 +57,31 @@ describe("GET /api/scan/:ean/online", () => {
 		// Das Ziel steht vorn, die schwaechere Alternative bleibt sichtbar:
 		// Eine Zuordnung muss korrigierbar sein (Abschnitt 9.3).
 		expect(daten.kandidaten).toMatchObject([
-			{ spielId: 2, titel: "Killzone 3", releases: [{ plattform: "PS3" }] },
+			{ spielId: 2, titel: "Killzone 3", releases: [{ plattform: "PS3", exemplare: 0 }] },
 			{ spielId: 1, titel: "Killzone" },
 		]);
 		// Die GTIN steht in der Abfrage, das Limit auch.
 		expect(aufrufe.at(-1)?.url).toContain(`gtin=${EAN}`);
+	});
+
+	it("nennt Cover und vorhandene Exemplare, damit 'hast du schon' sichtbar ist", async () => {
+		// Rueckmeldung des Nutzers vom 21.09.2026: Die Karte sagte nur, dass der
+		// CODE unbekannt ist - dass das SPIEL laengst in der Sammlung steht, war
+		// nicht zu erkennen.
+		await spiel(1, "Killzone 3", ["PS3"]);
+		await env.DB.batch([
+			env.DB.prepare("UPDATE game SET cover_url = 'https://bild.invalid/k3.jpg' WHERE id = 1"),
+			env.DB.prepare("INSERT INTO physical_copy (release_id, condition) VALUES (1, 'gut')"),
+		]);
+
+		const antwort = await app(fakeEbay([["Killzone 3 PS3 PAL"]]).client).request(`/api/scan/${EAN}/online`, undefined, env);
+		const daten = (await antwort.json()) as { kandidaten: Array<Record<string, unknown>> };
+
+		expect(daten.kandidaten[0]).toMatchObject({
+			titel: "Killzone 3",
+			bild: "https://bild.invalid/k3.jpg",
+			releases: [{ plattform: "PS3", exemplare: 1 }],
+		});
 	});
 
 	it("vermerkt den Titel am offenen Scan, damit er nicht zweimal geholt wird", async () => {

@@ -46,7 +46,12 @@ type Online = {
   angebote: number
   eindeutig: boolean
   zielSpielId: number | null
-  kandidaten: Array<{ spielId: number; titel: string; releases: Array<{ releaseId: number; plattform: Plattform }> }>
+  kandidaten: Array<{
+    spielId: number
+    titel: string
+    bild: string | null
+    releases: Array<{ releaseId: number; plattform: Plattform; exemplare: number }>
+  }>
 }
 
 /** Stand der Live-Abfrage: läuft, Ergebnis, oder nicht verfügbar. */
@@ -399,36 +404,45 @@ export function Scannen() {
             {online?.art === 'da' && online.o.titel === null && (
               <p className="zeile">eBay kennt diesen Code nicht – bitte von Hand suchen oder anlegen.</p>
             )}
-            {online?.art === 'da' && online.o.titel !== null && (
-              <div className="online-vorschlag">
-                <p>
-                  <strong>eBay:</strong> {online.o.titel}
-                </p>
-                {online.o.kandidaten.length === 0 ? (
-                  <p className="zeile">Kein Spiel deiner Sammlung passt dazu – unten anlegen.</p>
-                ) : (
-                  <ul className="online-kandidaten">
-                    {online.o.kandidaten.map((k) => (
-                      <li key={k.spielId}>
-                        {k.titel}
-                        {k.spielId === online.o.zielSpielId && ' '}
-                        {k.spielId === online.o.zielSpielId && <span className="pille">Vorschlag</span>}{' '}
-                        {k.releases.map((r) => (
-                          <button
-                            key={r.releaseId}
-                            type="button"
-                            disabled={laeuft}
-                            onClick={() => zuordnen(zustand.t.ean, { releaseId: r.releaseId })}
-                          >
-                            Erfassen ({r.plattform})
-                          </button>
-                        ))}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+            {online?.art === 'da' && online.o.titel !== null && online.o.kandidaten.length === 0 && (
+              <p className="zeile">
+                <strong>Noch nicht in deiner Sammlung.</strong> eBay nennt „{online.o.titel}" – unten anlegen.
+              </p>
             )}
+            {online?.art === 'da' &&
+              online.o.kandidaten.map((k) => (
+                // Dieselbe Karte wie bei einem bekannten Code: Wer scannt, soll
+                // auf einen Blick sehen, dass das Spiel schon in der Sammlung
+                // steht (Rückmeldung vom 21.09.2026 – vorher stand dort nur
+                // „EAN … ist noch nicht zugeordnet", eine Aussage über den Code).
+                <div className="pruefkarte" key={k.spielId}>
+                  <div className="bild">{k.bild ? <img src={k.bild} alt="" /> : <span aria-hidden="true">▦</span>}</div>
+                  <div>
+                    <h2>
+                      <Link to={`/spiel/${k.spielId}`}>{k.titel}</Link>{' '}
+                      {k.spielId === online.o.zielSpielId && <span className="pille">in deiner Sammlung</span>}
+                    </h2>
+                    <p>
+                      {k.releases
+                        .map((r) => `${r.plattform}: ${r.exemplare === 0 ? 'noch kein Exemplar' : `im Regal ×${r.exemplare}`}`)
+                        .join(' · ')}
+                    </p>
+                    <p className="aktionen">
+                      {k.releases.map((r) => (
+                        <button
+                          key={r.releaseId}
+                          type="button"
+                          disabled={laeuft}
+                          onClick={() => zuordnen(zustand.t.ean, { releaseId: r.releaseId })}
+                        >
+                          {r.exemplare === 0 ? `Disc erfassen (${r.plattform})` : `Weiteres Exemplar (${r.plattform})`}
+                        </button>
+                      ))}
+                    </p>
+                    <p className="zeile">Angebot: {online.o.titel}</p>
+                  </div>
+                </div>
+              ))}
             <ScanAuswahl
               // Der Schlüssel enthält den Stand der Live-Abfrage: Trifft der
               // Titel später ein, baut sich das Suchfeld mit ihm als Vorgabe neu auf.

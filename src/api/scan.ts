@@ -147,12 +147,18 @@ export const scanRoutes = new Hono<AppEnv>()
 		const alle = gewaehlt ? sammlungstreffer(gewaehlt, sammlung).treffer : [];
 		const kandidaten = [];
 		for (const t of spiel && !alle.some((a) => a.spielId === spiel.spielId) ? [spiel, ...alle] : alle) {
+			const releases = await c.var.repos.games.releasesFuerScan(t.spielId);
 			kandidaten.push({
 				spielId: t.spielId,
 				titel: t.titel,
-				releases: (await c.var.repos.games.releasesVon(t.spielId)).map((r) => ({
+				// Cover und Exemplarzahl, damit die Oberflaeche den Treffer wie
+				// einen bekannten Code zeigen kann - "das hast du schon" muss
+				// auf einen Blick erkennbar sein (9.2).
+				bild: releases[0]?.cover_url ?? null,
+				releases: releases.map((r) => ({
 					releaseId: r.id,
 					plattform: r.platform,
+					exemplare: r.exemplare,
 				})),
 			});
 		}
