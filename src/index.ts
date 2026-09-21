@@ -15,6 +15,7 @@ import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
 import { erstelleEbayClient, zugangAus as ebayZugangAus, type EbayClient } from "./ebay/client";
+import { erstelleUpcitemdbClient, type UpcitemdbClient } from "./ean/upcitemdb";
 import { erstelleIgdbClient, zugangAus, type IgdbClient } from "./igdb/client";
 import { erstellePsnClient, type PsnClient } from "./psn/client";
 import { cronLogzeile, cronSchritt } from "./sync/cron";
@@ -33,6 +34,7 @@ export function createApp(
 	psnFactory: () => PsnClient = () => erstellePsnClient(),
 	igdbFactory: (env: Env) => IgdbClient = igdbJeInstanz(),
 	ebayFactory: (env: Env) => EbayClient = ebayJeInstanz(),
+	upcFactory: () => UpcitemdbClient = () => erstelleUpcitemdbClient(),
 ) {
 	const app = new Hono<AppEnv>();
 
@@ -46,6 +48,7 @@ export function createApp(
 		c.set("psn", psnFactory());
 		c.set("igdb", igdbFactory(c.env));
 		c.set("ebay", ebayFactory(c.env));
+		c.set("upc", upcFactory());
 		await next();
 	});
 
