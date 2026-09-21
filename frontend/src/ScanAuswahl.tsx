@@ -80,7 +80,7 @@ export function ScanAuswahl({
   return (
     <div className="auswahl">
       <p>
-        <strong>EAN {ean}</strong> ist noch nicht zugeordnet
+        <strong>EAN {ean}</strong> ist noch keinem Spiel zugeordnet
         {scans > 1 && ` (zum ${scans}. Mal gescannt)`}.
         {angebot && ` Ein Händler nennt „${angebot.titel}"${angebot.plattform ? ` (${angebot.plattform})` : ''}.`}
       </p>
