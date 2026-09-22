@@ -31,8 +31,8 @@ export type StatusAntwort = {
   zugang: Zugang
   letzterLauf: Lauf
   letzterAutomatischerLauf: Lauf
-  /** Was der letzte Cron-Aufruf tat – auch ohne Sync-Lauf (Stufe 18b). */
-  cronAusgang: string | null
+  /** Was die letzten Cron-Aufrufe taten, neueste zuerst (Stufe 18b). */
+  cronVerlauf: string[]
   trophaeen: number
 }
 
@@ -258,8 +258,19 @@ export function Einstellungen() {
         Letzter automatischer Abruf:{' '}
         {status?.letzterAutomatischerLauf ? laufText(status.letzterAutomatischerLauf) : 'noch keiner'}
       </p>
+      <h3>Letzte Cron-Aufrufe</h3>
+      {status && status.cronVerlauf.length === 0 ? (
+        <p className="zeile">Noch keiner vermerkt.</p>
+      ) : (
+        <ul className="cron-verlauf">
+          {status?.cronVerlauf.map((zeile) => (
+            <li key={zeile}>{zeile}</li>
+          ))}
+        </ul>
+      )}
       <p className="zeile">
-        Letzter Cron-Aufruf: {status?.cronAusgang ?? 'noch keiner vermerkt'}
+        Der letzte Aufruf einer Nacht lautet fast immer „nichts" – dann ist die Arbeit schon getan.
+        Deshalb stehen hier mehrere.
       </p>
 
       {meldung && <p role="status">{meldung}</p>}
