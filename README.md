@@ -143,19 +143,18 @@ Was steht und in Betrieb nachgewiesen ist:
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Rest-Abnahme von Stufe 18**, dann zwei neu geplante Stufen aus
-einer Messung gegen das echte PSN-Konto (21.09.2026, Abschnitt 7.7 der
-Spezifikation): **18c** bringt Spielzeit (`playDuration`, `playCount`) und den
-digitalen Besitz inklusive der Unterscheidung gekauft/PS+, **18d** die
-Einzeltrophäen je Spiel mit Zeitpunkt und weltweiter Seltenheit. Beide ergänzen
-nur, was die Sammlung schon kennt, und importieren nichts. Danach erst die
-Oberfläche.
+**Als Nächstes: Stufe 18c** – Spielzeit (`playDuration`, `playCount`) und
+digitaler Besitz inklusive der Unterscheidung gekauft/PS+, aus einer Messung
+gegen das echte PSN-Konto (Abschnitt 7.7 der Spezifikation). Danach die
+Oberfläche (19), dahinter die Einzeltrophäen je Spiel (19b). Beide
+PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
 
-**Rest-Abnahme Stufe 18 im Detail:** Die PWA ist abgenommen (installiert,
-offline geprüft), der nächtliche Sync belegt (Läufe am 20. und 21.09., je 431
-Titel); der IGDB-Schritt tat zwei Nächte nichts und wird seit Stufe 18b
-nachprüfbar protokolliert – am Morgen nach dem Deploy zu kontrollieren. Danach
-**Stufe 19 – Oberfläche**. Reihenfolge danach, am
+**Stufe 18 ist seit dem 22.09.2026 abgenommen:** PWA installiert und offline
+geprüft, nächtliche Läufe am 20., 21. und 22.09. mit je 431 Titeln, in der Nacht
+zum 22.09. zusätzlich 368 aufgefrischte Spiele. Der IGDB-Schritt hatte zwei
+Nächte geschwiegen – Stufe 18b hat ihn repariert (gebundener Parameter in
+`datetime('now', ?)` durch Text ersetzt) und zugleich nachprüfbar gemacht.
+Reihenfolge danach, am
 16.09.2026 entschieden: 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
 AWIN-Feed, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation). Jeder neue
 Schreiber hängt sich ins Änderungsprotokoll ein (Abschnitt 8.5). Die Messung aus Stufe 17 ist erledigt: upcitemdb
