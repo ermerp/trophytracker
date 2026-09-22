@@ -18,15 +18,26 @@ export type SyncLauf = {
 };
 
 /**
- * Schluessel in app_setting, unter dem der Cron seinen letzten Ausgang
- * hinterlaesst (Stufe 18b). Begruendung: Der Cron ist der einzige Schreiber
+ * Schluessel in app_setting, unter dem der Cron seine letzten Ausgaenge
+ * hinterlaesst (Stufe 18b, seit 22.09.2026 mehrere statt einem). Begruendung: Der Cron ist der einzige Schreiber
  * ohne Zuschauer, und die Worker-Logs sind nur live zu sehen - als am
  * 21.09.2026 der IGDB-Schritt zwei Naechte lang nichts tat, war von aussen
  * nicht zu erkennen, ob er scheiterte, gar nicht lief oder nichts zu tun
  * fand. Eine Zeile Zustand schliesst diese Luecke; berechnet ist daran
  * nichts.
  */
-const SCHLUESSEL_CRON = "cron_letzter_ausgang";
+const SCHLUESSEL_CRON = "cron_verlauf";
+
+/**
+ * Wie viele Cron-Ausgaenge aufgehoben werden.
+ *
+ * Fuenf, weil der letzte Aufruf einer Nacht fast immer "nichts" lautet - die
+ * Arbeit ist dann laengst getan. Genau das war am 22.09.2026 zu sehen: Der
+ * Cron hatte 368 Spiele aufgefrischt, und die einzige gespeicherte Zeile sagte
+ * "nichts". Mit fuenf Eintraegen sieht man das Ende der Nacht und das, was
+ * davor geschah; mehr waere Protokoll, und dafuer gibt es die Worker-Logs.
+ */
+const CRON_VERLAUF_LAENGE = 5;
 
 /** Fester Text fuer einen abgebrochenen Haenger - nur eine Zahl, kein Fremdtext (Abschnitt 10.1). */
 export const haengerMeldung = (stunden: number) =>
@@ -192,22 +203,24 @@ export class SyncRepository {
 
 	/** Den Ausgang eines Cron-Aufrufs festhalten (nur Zahlen und feste Texte). */
 	async cronAusgangVermerken(zeile: string): Promise<void> {
+		const bisher = await this.cronVerlauf();
+		const wert = [zeile, ...bisher].slice(0, CRON_VERLAUF_LAENGE).join("\n");
 		await this.db
 			.prepare(
 				"INSERT INTO app_setting (key, value) VALUES (?, ?) " +
 					"ON CONFLICT(key) DO UPDATE SET value = excluded.value",
 			)
-			.bind(SCHLUESSEL_CRON, zeile)
+			.bind(SCHLUESSEL_CRON, wert)
 			.run();
 	}
 
-	/** Der zuletzt vermerkte Cron-Ausgang, fuer die Einstellungen. */
-	async cronAusgang(): Promise<string | null> {
+	/** Die letzten Cron-Ausgaenge, neueste zuerst - fuer die Einstellungen. */
+	async cronVerlauf(): Promise<string[]> {
 		const z = await this.db
 			.prepare("SELECT value FROM app_setting WHERE key = ?")
 			.bind(SCHLUESSEL_CRON)
 			.first<{ value: string }>();
-		return z?.value ?? null;
+		return z?.value ? z.value.split("\n").filter((l) => l !== "") : [];
 	}
 
 	async letzterErfolgreicherLauf(): Promise<SyncLauf | null> {

@@ -145,7 +145,10 @@ den Login unter `trophytracker.cloudflareaccess.com`.
 
 **Als Nächstes: Stufe 18c** – Spielzeit (`playDuration`, `playCount`) und
 digitaler Besitz inklusive der Unterscheidung gekauft/PS+, aus einer Messung
-gegen das echte PSN-Konto (Abschnitt 7.7 der Spezifikation). Danach die
+gegen das echte PSN-Konto (Abschnitt 7.7 der Spezifikation). Entschieden ist
+bereits: Titel ohne Spielzeit stehen bei dieser Sortierung ganz unten, ein Kauf
+schlägt PS+, und die PS+-Seite ist eine Momentaufnahme, die ein vollständiger
+Lauf als Ganzes ersetzt. Danach die
 Oberfläche (19), dahinter die Einzeltrophäen je Spiel (19b). Beide
 PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
 

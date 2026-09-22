@@ -272,6 +272,15 @@ describe("cronSchritt", () => {
 		expect(cronLogzeile(e)).toContain('meldung="Der IGDB-Abruf ist fehlgeschlagen."');
 	});
 
+	it("hebt die letzten fuenf Ausgaenge auf, neueste zuerst", async () => {
+		// Der letzte Aufruf einer Nacht lautet fast immer "nichts"; ohne Verlauf
+		// waere die geleistete Arbeit nicht zu sehen (22.09.2026).
+		const r = repos();
+		for (const zeile of ["A", "B", "C", "D", "E", "F"]) await r.sync.cronAusgangVermerken(zeile);
+
+		expect(await r.sync.cronVerlauf()).toEqual(["F", "E", "D", "C", "B"]);
+	});
+
 	it("die Logzeile nennt nur Zahlen und feste Texte", () => {
 		const zeile = cronLogzeile({
 			getan: "sync",
