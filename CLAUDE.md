@@ -88,7 +88,7 @@ Was halb- oder vollautomatisch entsteht, muss sich in der Oberfläche zurückneh
 
 Das gilt auch für seine Zwischenentscheidungen: Ein "überspringen" ist eine Entscheidung und darf ein Neuladen überstehen, nicht nur den Moment.
 
-Ein „Rückgängig" stellt den Stand **vor** der Aktion vollständig her – auch das, was der Schreibpfad nebenbei entfernt hat. Das Zuordnen eines Scans löscht den offenen Scan; das Zurücknehmen muss ihn samt Vorschlag zurückbringen, sonst ist der Code spurlos weg (in Stufe 17b zuerst vergessen).
+Ein „Rückgängig" stellt den Stand **vor** der Aktion vollständig her – auch das, was der Schreibpfad nebenbei entfernt hat – in Stufe 17b zuerst vergessen, als das Zurücknehmen eines Scans den Code spurlos verschwinden ließ.
 
 ### Berechnetes nicht speichern
 
@@ -115,6 +115,7 @@ D1 zählt **gelesene Zeilen** (Scans, nicht Ergebniszeilen), und der Free Tier e
 - **Korrelierte Unterabfragen nur über indizierte Spalten.** Ein Unterselect je Ergebniszeile ist in Ordnung, wenn er ein Index-Lookup ist; als Tabellenscan multipliziert er sich mit der Zeilenzahl
 - **Kein `OR` über zwei Spalten in einer Unterabfrage**, auch wenn beide indiziert sind: SQLite weicht dann auf `idx_plan_offen` aus und liest alle Einträge der Art je Zeile (gemessen in Stufe 15: 12 000 statt 3 200 Zeilen). Stattdessen zwei Unterabfragen (`NOT EXISTS … AND NOT EXISTS …`, `COALESCE((…), (…))`) oder eine `UNION` zweier Index-Lookups mit den Filtern **innerhalb** der Teilabfragen (`PlanRepository.offeneAmZiel`)
 - **Keyset statt `(? IS NULL OR id < ?)`:** Eine optionale Bedingung gehört als eigener Text ins Statement, nicht als Bind mit `IS NULL OR` – damit las die zweite Seite des Änderungsprotokolls 2 052 statt 51 Zeilen (Stufe 16)
+- **Kein Bind in `datetime('now', ?)`.** Ein Datums-Modifier gehört als Text ins Statement (`datetime('now', '-7 days')`). Mit Bind lieferte dieselbe Abfrage in der Produktion **null Zeilen statt 50** – ohne Fehler, ohne Log: Der nächtliche IGDB-Schritt schwieg zwei Nächte (Stufe 18b). Lokal in Miniflare lief er
 - `test/lesekosten.spec.ts` misst die heißen Abfragen gegen einen Bestand in Produktionsgröße über `meta.rows_read` der lokalen D1. Neue Listenabfragen kommen dort dazu, bevor sie deployt werden
 - `npx wrangler d1 info trophytracker` zeigt `rows_read_24h`; bei mehr als einer Million ohne Import stimmt etwas nicht
 
@@ -183,7 +184,7 @@ Das Repository ist öffentlich, das Backup-Repository ist privat. Ein Datenbank-
 
   Offene Entscheidungen bleiben ausdrücklich als offen markiert ("in Stufe N zu
   entscheiden"), statt stillschweigend geschlossen zu werden.
-- **Nutzerdaten ändert nur der Nutzer, in der Anwendung.** Ergebnisse einer Messung oder eines Skripts werden nie über die API oder `d1 execute --remote` eingetragen – auch nicht nach Freigabe im Chat (Entscheidung des Nutzers vom 18.09.2026: die 22 eindeutigen Scans kamen erst über die Ansicht `/scans`). Fehlt der Weg in der Oberfläche, wird er gebaut. Erlaubt bleibt der Prüfaufruf nach dem Deploy, der seine Testzeile selbst wieder löscht.
+- **Nutzerdaten ändert nur der Nutzer, in der Anwendung.** Ergebnisse einer Messung oder eines Skripts werden nie über die API oder `d1 execute --remote` eingetragen – auch nicht nach Freigabe im Chat (Entscheidung des Nutzers vom 18.09.2026: die 22 eindeutigen Scans kamen erst über die Ansicht `/scans`). Fehlt der Weg in der Oberfläche, wird er gebaut. Erlaubt bleibt der Prüfaufruf nach dem Deploy, der seine Testzeile selbst wieder löscht. **Auch ein GET kann schreiben** – `/api/scan/:ean/online` vermerkte den gefundenen Titel und veränderte so beim Prüfen echte Daten (22.09.2026). Vor dem Prüfen in den Code sehen und mit Wegwerf-Daten arbeiten, nie mit echten.
 - **Vor größeren Aufgaben einen Plan vorlegen**, insbesondere bei allem, was Migrationen oder externe Schnittstellen berührt.
 - **Migrationen abwärtskompatibel halten.** Sie laufen vor dem Deployment, der alte Worker läuft in dem Moment noch. Spalten hinzufügen ist unkritisch, Umbenennen braucht zwei Deployments. Eine neue Tabelle gehört zugleich in `EXPORT_TABELLEN` oder `NICHT_EXPORTIERT` (`src/db/export.ts`), sonst fährt sie ungesichert mit.
 - **Datenmigrationen weisen ihre Wirkung nach.** Schreibt oder löscht eine Migration Zeilen, prüft der Deploy-Job vorher die Sicherung (INSERT-Zeilen im Dump gegen `COUNT(*)` der Datenbank, Abbruch vor der Migration bei Abweichung) und protokolliert danach die betroffene Zeilenzahl neben der Erwartung. Nur Zahlen ins Log, nie Inhalt — das Repository ist öffentlich. Die Zahlen gehören auch in den Bericht an den Nutzer.
