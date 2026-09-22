@@ -101,6 +101,7 @@ jobs:
       #   Kopplung     (0015): To-Do = am_spielen, Backlog = pausiert; Abweichungen erwartet 0
       #   reviewed_progress_pct (0016): jede gestempelte Liste hat einen Prozentwert, erwartet = gestempelt
       #   Besitz       (0018): offene Wuensche/Kaeufe an Releases mit Besitz (oder am Spiel davon) erledigt, erwartet 0
+      #   Cron-Verlauf (0022): alter Einzeleintrag 'cron_letzter_ausgang' geloescht, erwartet 0
       - name: Datenmigrationen protokollieren
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -131,7 +132,8 @@ jobs:
                     (SELECT COUNT(*) FROM plan_entry WHERE kind IN ('wunsch','kauf') AND status = 'offen'
                        AND (release_id IN (SELECT release_id FROM physical_copy UNION SELECT release_id FROM digital_entitlement)
                          OR game_id IN (SELECT r.game_id FROM release r WHERE r.id IN (SELECT release_id FROM physical_copy UNION SELECT release_id FROM digital_entitlement)))) AS offen_trotz_besitz,
-                    (SELECT COUNT(*) FROM plan_entry WHERE kind IN ('wunsch','kauf') AND status = 'erledigt') AS erledigte_absichten" \
+                    (SELECT COUNT(*) FROM plan_entry WHERE kind IN ('wunsch','kauf') AND status = 'erledigt') AS erledigte_absichten,
+                    (SELECT COUNT(*) FROM app_setting WHERE key = 'cron_letzter_ausgang') AS cron_alt" \
             | jq -r '.[0].results[0] |
                 "zugeordnete Listen: \(.zugeordnet)",
                 "play_status: \(.play_status) Zeilen, erwartet mindestens \(.ps_erwartet) (zugeordnete Listen mit Fortschritt)",
@@ -141,7 +143,8 @@ jobs:
                 "plan_entry: \(.todo_offen) offene To-Do-Eintraege, davon \(.todo_ohne_position) ohne Position, erwartet 0 (Migration 0014)",
                 "Kopplung: \(.todo_nicht_am_spielen) To-Do-Eintraege nicht am_spielen, \(.status_ohne_eintrag) am_spielen/pausiert ohne Eintrag, \(.offen_trotz_erledigt) offen trotz erledigter Bewertung, erwartet je 0 (Migration 0015)",
                 "reviewed_progress_pct: \(.mit_prozent) Listen mit Prozentwert, erwartet \(.gestempelt) (gestempelte Listen, Migration 0016)",
-                "Besitz: \(.offen_trotz_besitz) offene Wuensche/Kaeufe an Releases mit Besitz, erwartet 0; \(.erledigte_absichten) erledigte Wuensche/Kaeufe insgesamt (Migration 0018)"'
+                "Besitz: \(.offen_trotz_besitz) offene Wuensche/Kaeufe an Releases mit Besitz, erwartet 0; \(.erledigte_absichten) erledigte Wuensche/Kaeufe insgesamt (Migration 0018)",
+                "Cron-Verlauf: \(.cron_alt) alte Einzeleintraege, erwartet 0 (Migration 0022)"'
 
       - name: Worker und Assets deployen
         uses: cloudflare/wrangler-action@v4
