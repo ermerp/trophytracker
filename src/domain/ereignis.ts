@@ -135,6 +135,7 @@ const ANLASS: Record<string, string> = {
 	kopplung: "über die Bewertung",
 	besitz: "durch Erfassen",
 	scan: "per Barcode",
+	psn: "von PSN erkannt",
 	kauf: "durch erledigten Kauf",
 };
 
@@ -231,9 +232,12 @@ export function beschreibeEreignis(e: Ereignis): string {
 		case "exemplar_geloescht":
 			return mitDetail("Disc entfernt", e.detail);
 		case "berechtigung_angelegt":
-			return mitDetail(`Digitale Berechtigung erfasst: ${wert(e.new_value, DIGITALE_QUELLE)}`, e.detail);
+			return mitAnlass(`Digitale Berechtigung erfasst: ${wert(e.new_value, DIGITALE_QUELLE)}`, e.detail);
 		case "berechtigung_geloescht":
-			return `Digitale Berechtigung entfernt: ${wert(e.old_value, DIGITALE_QUELLE)}`;
+			// Der Anlass steht hier, seit PSN Berechtigungen selbst entfernt:
+			// Ein PS+-Titel, der aus dem Katalog faellt, ist kein Handgriff
+			// des Nutzers (7.7, Stufe 18c).
+			return mitAnlass(`Digitale Berechtigung entfernt: ${wert(e.old_value, DIGITALE_QUELLE)}`, e.detail);
 		case "igdb_verknuepft":
 			return mitDetail("Mit IGDB verknüpft", e.detail);
 		case "igdb_geloest":

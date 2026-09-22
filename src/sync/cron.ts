@@ -9,7 +9,8 @@ import {
 	type AuffrischErgebnis,
 	type PhysischErgebnis,
 } from "./igdb";
-import { syncSchritt, type SyncErgebnis } from "./run";
+import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis } from "./besitz";
+import { sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
 
 /**
  * Die naechtliche Automatik (Stufe 18, Abschnitt 10.1).
@@ -35,8 +36,23 @@ export const HAENGT_NACH_STUNDEN = 3;
 /** Frist fuer das automatische Auffrischen der IGDB-Metadaten. */
 export const AUFFRISCH_FRIST_TAGE = 7;
 
+/**
+ * Wie oft die beiden PSN-Zusatzabrufe laufen (7.7, Stufe 18c).
+ *
+ * Spielzeit taeglich: Sie aendert sich, sobald gespielt wird, und kostet nur
+ * zwei Aufrufe. Besitz woechentlich: Der PS+-Katalog wechselt monatlich, und
+ * die ganze Kaufliste sind rund 15 Aufrufe - ein eigener Monatsplan waere
+ * mehr Verwaltung als Gewinn und traefe den Wechsel trotzdem nur zufaellig
+ * (Entscheidung des Nutzers vom 22.09.2026).
+ */
+export const BESITZ_FRIST_TAGE = 7;
+
+/** Schluessel des Blaetterungs-Fortschritts in app_setting. */
+const SCHLUESSEL_SPIELZEIT = "psn_spielzeit_stand";
+const SCHLUESSEL_BESITZ = "psn_besitz_stand";
+
 export type CronErgebnis = {
-	getan: "sync" | "igdb_auffrischen" | "igdb_physisch" | "nichts";
+	getan: "sync" | "spielzeit" | "besitz" | "igdb_auffrischen" | "igdb_physisch" | "nichts";
 	/** angekuendigt -> erschienen (8.4), in jedem Aufruf. */
 	erschienen: number;
 	/** Laeufe, die als haengengeblieben auf 'fehler' gesetzt wurden. */
@@ -44,6 +60,8 @@ export type CronErgebnis = {
 	/** Gescheiterter Schritt ausserhalb des Syncs - fester Text, nie Fremdtext. */
 	meldung?: string;
 	sync?: SyncErgebnis;
+	spielzeit?: SpielzeitErgebnis;
+	besitz?: BesitzErgebnis;
 	auffrischen?: AuffrischErgebnis;
 	physisch?: PhysischErgebnis;
 };
@@ -80,7 +98,26 @@ export async function cronSchritt(
 		return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron" }) };
 	}
 
-	// 4./5. IGDB nur mit Zugang; ohne bleibt die Nacht ruhig.
+	// 4./5. Spielzeit und digitaler Besitz (7.7). Erst nach dem Sync: Die
+	//       Zuordnung laeuft ueber die Titel der Sammlung, und die sind nach
+	//       dem Sync auf dem neuesten Stand. Beide brauchen einen Zugang -
+	//       ohne NPSSO passiert hier nichts.
+	const zugang = await repos.credentials.anzeige();
+	if (zugang.eingerichtet && zugang.status !== "abgelaufen") {
+		try {
+			const spielzeit = await spielzeitLauf(repos, psn, heute);
+			if (spielzeit) return { ...basis, getan: "spielzeit", spielzeit };
+
+			const besitz = await besitzLauf(repos, psn, heute);
+			if (besitz) return { ...basis, getan: "besitz", besitz };
+		} catch (fehler) {
+			// Ein abgelaufener Zugang oder ein PSN-Ausfall darf die Nacht nicht
+			// beenden - die IGDB-Schritte danach laufen weiter.
+			return { ...basis, getan: "nichts", meldung: "Der PSN-Abruf ist fehlgeschlagen." };
+		}
+	}
+
+	// 6./7. IGDB nur mit Zugang; ohne bleibt die Nacht ruhig.
 	//
 	// In try/catch, weil eine Ausnahme hier bisher den ganzen Aufruf riss:
 	// Der Sync lief dann zwar, aber alles danach fiel still aus, und von
@@ -98,6 +135,78 @@ export async function cronSchritt(
 	}
 
 	return { ...basis, getan: "nichts" };
+}
+
+/**
+ * Eine Seite Spielzeit, wenn heute noch nicht alles geholt wurde.
+ *
+ * Der Stand steht als "datum:offset" in app_setting: Ein neuer Tag beginnt
+ * bei 0, ein abgeschlossener Tag traegt offset -1 und laesst den Schritt
+ * ruhen. Damit macht jeder Aufruf genau eine Seite - dieselbe Blaetterung
+ * wie beim Trophaeen-Sync (Abschnitt 2).
+ */
+async function spielzeitLauf(repos: Repositories, psn: PsnClient, heute: string): Promise<SpielzeitErgebnis | null> {
+	const stand = await repos.sync.fortschritt(SCHLUESSEL_SPIELZEIT);
+	const [tag, offsetRoh] = (stand ?? "").split(":");
+	const offset = tag === heute ? Number(offsetRoh) : 0;
+	if (tag === heute && offset < 0) return null;
+
+	const { accessToken } = await sitzungBesorgen(repos, psn);
+	const ergebnis = await spielzeitSchritt(repos, psn, accessToken, offset);
+	if (ergebnis.status === "fehler") {
+		// Der Tag gilt als erledigt, damit ein Ausfall nicht die ganze Nacht
+		// dieselbe Seite anfragt; morgen wird es erneut versucht.
+		await repos.sync.fortschrittSetzenWert(SCHLUESSEL_SPIELZEIT, `${heute}:-1`);
+		return ergebnis;
+	}
+	await repos.sync.fortschrittSetzenWert(
+		SCHLUESSEL_SPIELZEIT,
+		ergebnis.weiter ? `${heute}:${offset + ergebnis.geholt}` : `${heute}:-1`,
+	);
+	return ergebnis;
+}
+
+/**
+ * Eine Seite der Kaufliste, wenn der letzte vollstaendige Durchlauf laenger
+ * als BESITZ_FRIST_TAGE her ist.
+ *
+ * Der Stand haelt Startdatum, Blaetterung und die bisher gesehenen
+ * PS+-Releases: Erst wenn alle Seiten da sind, raeumt `besitzSchritt` auf -
+ * ein abgebrochener Lauf loescht nichts (7.7).
+ */
+async function besitzLauf(repos: Repositories, psn: PsnClient, heute: string): Promise<BesitzErgebnis | null> {
+	const stand = await repos.sync.fortschritt(SCHLUESSEL_BESITZ);
+	const gespeichert = stand ? (JSON.parse(stand) as { fertigAm?: string; start?: number; gesehen?: number[] }) : {};
+
+	const laeuft = typeof gespeichert.start === "number";
+	if (!laeuft && gespeichert.fertigAm && tageSeit(gespeichert.fertigAm, heute) < BESITZ_FRIST_TAGE) return null;
+
+	const { accessToken } = await sitzungBesorgen(repos, psn);
+	const gesehen = laeuft ? (gespeichert.gesehen ?? []) : [];
+	const start = laeuft ? (gespeichert.start ?? 0) : 0;
+	const ergebnis = await besitzSchritt(repos, psn, accessToken, start, gesehen);
+
+	if (ergebnis.status === "fehler") {
+		// Abgebrochen: Der halbe Stand wird verworfen, damit der naechste
+		// Durchlauf sauber von vorn beginnt - und nichts geloescht wird.
+		await repos.sync.fortschrittSetzenWert(SCHLUESSEL_BESITZ, JSON.stringify({ fertigAm: heute }));
+		return ergebnis;
+	}
+	await repos.sync.fortschrittSetzenWert(
+		SCHLUESSEL_BESITZ,
+		ergebnis.weiter
+			? JSON.stringify({ start: start + ergebnis.geholt, gesehen })
+			: JSON.stringify({ fertigAm: heute }),
+	);
+	return ergebnis;
+}
+
+/** Ganze Tage zwischen zwei ISO-Datumsangaben (YYYY-MM-DD). */
+function tageSeit(vorher: string, heute: string): number {
+	const a = Date.parse(`${vorher}T00:00:00Z`);
+	const b = Date.parse(`${heute}T00:00:00Z`);
+	if (Number.isNaN(a) || Number.isNaN(b)) return Number.POSITIVE_INFINITY;
+	return Math.floor((b - a) / 86_400_000);
 }
 
 async function syncFaellig(repos: Repositories, heute: string): Promise<boolean> {
@@ -123,6 +232,25 @@ export function cronLogzeile(e: CronErgebnis): string {
 		teile.push(`sync=${e.sync.status}/${e.sync.phase}`, `offset=${e.sync.offset}`);
 		if (e.sync.status === "erfolg") teile.push(`titel=${e.sync.titlesSeen ?? 0}`, `eingereiht=${e.sync.eingereiht ?? 0}`);
 		if (e.sync.meldung) teile.push(`meldung="${e.sync.meldung}"`);
+	}
+	if (e.spielzeit) {
+		teile.push(
+			`spielzeit=${e.spielzeit.status}`,
+			`geholt=${e.spielzeit.geholt}`,
+			`zugeordnet=${e.spielzeit.zugeordnet}`,
+		);
+		if (e.spielzeit.meldung) teile.push(`meldung="${e.spielzeit.meldung}"`);
+	}
+	if (e.besitz) {
+		teile.push(
+			`besitz=${e.besitz.status}`,
+			`geholt=${e.besitz.geholt}`,
+			`kauf=${e.besitz.kauf}`,
+			`plus=${e.besitz.plus}`,
+			`entfallen=${e.besitz.entfallen}`,
+		);
+		if (e.besitz.erledigt) teile.push(`erledigt=${e.besitz.erledigt}`);
+		if (e.besitz.meldung) teile.push(`meldung="${e.besitz.meldung}"`);
 	}
 	if (e.auffrischen) {
 		teile.push(

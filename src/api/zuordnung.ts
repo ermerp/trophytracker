@@ -147,7 +147,14 @@ function releaseAntwort(r: ReleaseZeile) {
 		zuletztGespielt: r.last_played_at,
 		status: r.play_status,
 		exemplare: r.exemplare,
-		digital: r.digital ? r.digital.split(",") : [],
+		// "kauf:psn,plus:nutzer" - die Herkunft entscheidet, ob die Oberflaeche
+		// ein Loeschkreuz anbietet (7.7, Stufe 18c).
+		digital: r.digital
+			? r.digital.split(",").map((eintrag) => {
+					const [quelle, herkunft] = eintrag.split(":");
+					return { quelle, herkunft: herkunft === "psn" ? "psn" : "nutzer" };
+				})
+			: [],
 	};
 }
 
@@ -199,6 +206,7 @@ export const gameRoutes = new Hono<AppEnv>()
 				cover: z.cover_url !== null,
 				kritik: z.critic_score,
 				zuletztGespielt: z.zuletzt_gespielt,
+				spielzeitSekunden: z.spielzeit_s,
 				releases: (releasesJeSpiel.get(z.id) ?? []).map(releaseAntwort),
 			})),
 		});
@@ -401,6 +409,19 @@ export const gameRoutes = new Hono<AppEnv>()
 		const detail = await c.var.repos.games.spielDetail(id);
 		if (!detail) return c.json({ fehler: "Spiel nicht gefunden." }, 404);
 		const besitz = await c.var.repos.ownership.copiesForGame(id);
+		// Spielzeit je Release (7.7, Stufe 18c) - ein Index-Lookup ueber
+		// psn_played_title.release_id.
+		const spielzeiten = new Map(
+			(await c.var.repos.besitz.spielzeitenVonSpiel(id)).map((z) => [
+				z.release_id,
+				{
+					sekunden: z.play_duration_s,
+					anzahl: z.play_count,
+					erstesSpielAm: z.first_played_at,
+					letztesSpielAm: z.last_played_at,
+				},
+			]),
+		);
 		const bewertungen = new Map(
 			(await c.var.repos.playStatus.fuerSpiel(id)).map((b) => [b.release_id, b] as const),
 		);
@@ -458,7 +479,10 @@ export const gameRoutes = new Hono<AppEnv>()
 				exemplare: besitz.exemplare.filter((e) => e.release_id === r.id).map(exemplarAntwort),
 				digital: besitz.digital
 					.filter((d) => d.release_id === r.id)
-					.map((d) => ({ id: d.id, quelle: d.source, erworbenAm: d.acquired_at })),
+					.map((d) => ({ id: d.id, quelle: d.source, erworbenAm: d.acquired_at, herkunft: d.herkunft })),
+				// Spielzeit aus PSN (7.7, Stufe 18c). null heisst "unbekannt" -
+				// PS3 und Vita liefern grundsaetzlich keine.
+				spielzeit: spielzeiten.get(r.id) ?? null,
 			})),
 		});
 	})

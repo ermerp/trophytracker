@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen 18 und 17c gebaut, Abnahme offen** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen bis 18 abgenommen** (22.09.2026), **18c gebaut** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -143,12 +143,13 @@ Was steht und in Betrieb nachgewiesen ist:
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Als Nächstes: Stufe 18c** – Spielzeit (`playDuration`, `playCount`) und
-digitaler Besitz inklusive der Unterscheidung gekauft/PS+, aus einer Messung
-gegen das echte PSN-Konto (Abschnitt 7.7 der Spezifikation). Entschieden ist
-bereits: Titel ohne Spielzeit stehen bei dieser Sortierung ganz unten, ein Kauf
-schlägt PS+, und die PS+-Seite ist eine Momentaufnahme, die ein vollständiger
-Lauf als Ganzes ersetzt. Danach die
+**Stufe 18c ist gebaut** (22.09.2026): Der Cron holt nachts Spielzeit
+(`playDuration`, `playCount`) und den digitalen Besitz samt der Unterscheidung
+gekauft/PS+ – ohne dass etwas von Hand einzutragen wäre. Die Spielzeit steht im
+Spieldetail und ist Sortierkriterium der Sammlung; digitale Berechtigungen
+erscheinen als Pillen an der Kachel wie bisher, nur eben von allein. Gemessen:
+236 Releases bekommen Spielzeit, 56 Kauf- und 160 PS+-Einträge entstehen.
+**Als Nächstes: Stufe 19 – Oberfläche**, dahinter 19b (Einzeltrophäen). Danach die
 Oberfläche (19), dahinter die Einzeltrophäen je Spiel (19b). Beide
 PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
 
@@ -390,6 +391,8 @@ Aufruf genau **eine** Sache und merkt sich den Stand in der Datenbank
 1. erschienene Titel freigeben (`angekuendigt → erschienen`, nur SQL)
 2. einen seit über drei Stunden hängenden Sync-Lauf auf `fehler` setzen
 3. läuft ein Sync, einen Schritt davon (eine Seite holen oder auswerten)
+3b. Spielzeit (täglich, zwei Aufrufe) und die Kaufliste (wöchentlich, rund 15
+   Aufrufe) – beide seitenweise, beide ergänzen nur und importieren nichts
 4. sonst, wenn heute noch kein Cron-Lauf war und kein Handabruf erfolgreich: einen
    Sync starten – **ein Versuch je Nacht**, ein Fehler wird erst in der nächsten
    Nacht wiederholt

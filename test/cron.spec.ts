@@ -23,6 +23,13 @@ function psnMit(total: number) {
 	const { fetch, aufrufe } = fakeFetch([
 		[/oauth\/authorize/, () => redirectAntwort("v3.abc")],
 		[/oauth\/token/, () => jsonAntwort(TOKEN_ANTWORT)],
+		// Die PSN-Zusatzabrufe aus Stufe 18c antworten leer: Dieser Fake
+		// dreht sich um den Sync, nicht um Spielzeit und Besitz.
+		[/gamelist\/v2/, () => jsonAntwort({ totalItemCount: 0, titles: [] })],
+		[
+			/graphql/,
+			() => jsonAntwort({ data: { purchasedTitlesRetrieve: { games: [], pageInfo: { totalCount: 0 } } } }),
+		],
 		[
 			/trophyTitles/,
 			() => {
@@ -96,11 +103,14 @@ describe("cronSchritt", () => {
 		for (let i = 0; i < 20; i++) {
 			const e = await cronSchritt(repos(), psn, igdbOhne());
 			schritte.push(e);
-			if (e.getan !== "sync") break;
+			if (e.getan === "nichts") break;
 		}
 
-		// 2 Seiten holen, 2 auswerten, 1 Abschluss, dann ist nichts mehr zu tun.
-		expect(schritte.map((s) => s.getan)).toEqual(["sync", "sync", "sync", "sync", "sync", "nichts"]);
+		// 2 Seiten holen, 2 auswerten, 1 Abschluss - danach die beiden
+		// PSN-Zusatzabrufe (Stufe 18c, hier leer), dann ist nichts mehr zu tun.
+		expect(schritte.map((s) => s.getan)).toEqual([
+			"sync", "sync", "sync", "sync", "sync", "spielzeit", "besitz", "nichts",
+		]);
 		expect(schritte[4].sync).toMatchObject({ status: "erfolg", titlesSeen: 150 });
 		expect(await laeufe()).toEqual([expect.objectContaining({ status: "erfolg", started_by: "cron" })]);
 		expect(await repos().trophies.anzahl()).toBe(150);

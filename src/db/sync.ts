@@ -201,6 +201,33 @@ export class SyncRepository {
 			.run();
 	}
 
+	/**
+	 * Fortschritt der PSN-Zusatzabrufe (Stufe 18c): Wo steht die Blaetterung,
+	 * wann lief der letzte vollstaendige Durchlauf, welche Releases hat PSN
+	 * in diesem Durchlauf als PS+ genannt.
+	 *
+	 * In app_setting statt in einer eigenen Tabelle: Es ist Arbeitszustand
+	 * weniger Zeilen, kein Fachdatum - dieselbe Ablage wie der Cron-Verlauf
+	 * und der Sicherungsstand.
+	 */
+	async fortschritt(schluessel: string): Promise<string | null> {
+		const z = await this.db
+			.prepare("SELECT value FROM app_setting WHERE key = ?")
+			.bind(schluessel)
+			.first<{ value: string }>();
+		return z?.value ?? null;
+	}
+
+	async fortschrittSetzenWert(schluessel: string, wert: string): Promise<void> {
+		await this.db
+			.prepare(
+				"INSERT INTO app_setting (key, value) VALUES (?, ?) " +
+					"ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+			)
+			.bind(schluessel, wert)
+			.run();
+	}
+
 	/** Den Ausgang eines Cron-Aufrufs festhalten (nur Zahlen und feste Texte). */
 	async cronAusgangVermerken(zeile: string): Promise<void> {
 		const bisher = await this.cronVerlauf();

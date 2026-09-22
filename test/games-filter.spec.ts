@@ -190,7 +190,14 @@ describe("GET /api/games – Filter", () => {
 		expect(gta.zuletztGespielt).toBe("2025-12-24T00:00:00Z");
 		expect(gta.releases).toEqual([
 			expect.objectContaining({ plattform: "PS4", exemplare: 1, digital: [], fortschritt: 20, platin: "offen" }),
-			expect.objectContaining({ plattform: "PS5", exemplare: 0, digital: ["kauf"], fortschritt: 60 }),
+			expect.objectContaining({
+				plattform: "PS5",
+				exemplare: 0,
+				// Seit Stufe 18c nennt die Antwort auch die Herkunft: Nur eigene
+				// Eintraege bekommen in der Oberflaeche ein Loeschkreuz.
+				digital: [{ quelle: "kauf", herkunft: "nutzer" }],
+				fortschritt: 60,
+			}),
 		]);
 
 		const ico = (await hole("/api/games?search=Ico")).spiele[0];
@@ -198,6 +205,10 @@ describe("GET /api/games – Filter", () => {
 		expect(ico.releases[0]).toMatchObject({ exemplare: 2, fortschritt: null, platin: null });
 
 		const journey = (await hole("/api/games?search=Journey&platform=PS3")).spiele[0];
-		expect(journey.releases[0]).toMatchObject({ plattform: "PS3", platin: "nicht_verfuegbar", digital: ["plus"] });
+		expect(journey.releases[0]).toMatchObject({
+			plattform: "PS3",
+			platin: "nicht_verfuegbar",
+			digital: [{ quelle: "plus", herkunft: "nutzer" }],
+		});
 	});
 });

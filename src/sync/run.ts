@@ -41,7 +41,7 @@ export class KeinNpssoError extends Error {}
  * Rueckfall. Ein normaler Sync fasst das NPSSO damit gar nicht an - schonend
  * gegenueber einer inoffiziellen Schnittstelle.
  */
-async function sitzungBesorgen(repos: Repositories, psn: PsnClient): Promise<Sitzung> {
+export async function sitzungBesorgen(repos: Repositories, psn: PsnClient): Promise<Sitzung> {
 	const refresh = await repos.credentials.gueltigerRefreshToken();
 	if (refresh) {
 		try {

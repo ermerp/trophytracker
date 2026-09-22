@@ -199,7 +199,9 @@ export const digitalEntitlementRoutes = new Hono<AppEnv>()
 		const id = idAus(c.req.param("id"));
 		if (id === null) return c.json({ fehler: "Ungültige Id." }, 400);
 		if (!(await c.var.repos.ownership.deleteDigitalEntitlement(id))) {
-			return c.json({ fehler: "Berechtigung nicht gefunden." }, 404);
+			// Auch der Fall "von PSN erkannt" landet hier: Solche Zeilen sind
+			// nicht von Hand loeschbar (7.7).
+			return c.json({ fehler: "Berechtigung nicht gefunden oder von PSN erkannt." }, 404);
 		}
 		return c.json({ id, geloescht: true });
 	});

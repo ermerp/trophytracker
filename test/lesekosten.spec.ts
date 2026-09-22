@@ -97,6 +97,32 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(antwort.status).toBe(200);
 	});
 
+	it("misst die Sortierung nach Spielzeit (Stufe 18c)", async () => {
+		// Spielzeit fuer jedes zweite Release, wie bei einem Bestand mit PS3
+		// und Vita ohne Spielzeit.
+		const einfuegen = env.DB.prepare(
+			"INSERT INTO psn_played_title (title_id, name, platform, play_duration_s, release_id, synced_at) " +
+				"VALUES (?, ?, 'PS4', ?, ?, datetime('now'))",
+		);
+		const anweisungen: D1PreparedStatement[] = [];
+		for (let i = 1; i <= ANZAHL; i += 2) anweisungen.push(einfuegen.bind(`CUSA${i}`, `Spiel ${i}`, i * 60, i));
+		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
+
+		const spielzeit =
+			"(SELECT SUM(p2.play_duration_s) FROM psn_played_title p2 JOIN release r4 ON r4.id = p2.release_id WHERE r4.game_id = g.id)";
+		const gelesen = await zeilenGelesen(
+			`SELECT g.id, g.title, ${spielzeit} AS spielzeit_s FROM game g
+			 ORDER BY ${spielzeit} IS NULL, ${spielzeit} DESC, g.sort_title LIMIT 20 OFFSET 0`,
+		);
+		console.info({ sortierungSpielzeit: gelesen });
+
+		// Zwei Index-Lookups je Ergebniszeile (idx_played_release), keine
+		// Tabellenscans - dieselbe Groessenordnung wie "zuletzt gespielt".
+		expect(gelesen).toBeLessThan(6_000);
+
+		await env.DB.prepare("DELETE FROM psn_played_title").run();
+	});
+
 	it("misst die Abfragen der Sammlung einzeln", async () => {
 		const zuletzt =
 			"(SELECT MAX(t2.last_played_at) FROM trophy_progress t2 JOIN release r2 ON r2.id = t2.release_id WHERE r2.game_id = g.id)";

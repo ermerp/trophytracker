@@ -32,6 +32,7 @@ export type DigitalEntitlementZeile = {
 	release_id: number;
 	source: DigitaleQuelle;
 	acquired_at: string | null;
+	herkunft: "nutzer" | "psn";
 };
 
 /** Spaltenname je Feld - die einzige Stelle, an der Feldnamen zu SQL werden. */
@@ -84,7 +85,7 @@ export class OwnershipRepository {
 				.bind(gameId),
 			this.db
 				.prepare(
-					"SELECT id, release_id, source, acquired_at FROM digital_entitlement " +
+					"SELECT id, release_id, source, acquired_at, herkunft FROM digital_entitlement " +
 						"WHERE release_id IN (SELECT id FROM release WHERE game_id = ?) ORDER BY id",
 				)
 				.bind(gameId),
@@ -255,9 +256,18 @@ export class OwnershipRepository {
 		return r ?? null;
 	}
 
+	/**
+	 * Eine digitale Berechtigung loeschen - aber nur eine eigene.
+	 *
+	 * Von PSN erkannte Zeilen bleiben: Der naechste Lauf legte sie ohnehin
+	 * wieder an, und das Loeschen saehe aus, als haette es nicht funktioniert
+	 * (7.7, Stufe 18c). Die Oberflaeche bietet es deshalb gar nicht erst an;
+	 * hier steht dieselbe Regel noch einmal, damit sie nicht nur im Frontend
+	 * haengt. Rueckgabe: `false` auch dann - die Zeile bleibt, wie sie ist.
+	 */
 	async deleteDigitalEntitlement(id: number): Promise<boolean> {
 		const vorher = await this.db
-			.prepare("SELECT release_id, source FROM digital_entitlement WHERE id = ?")
+			.prepare("SELECT release_id, source FROM digital_entitlement WHERE id = ? AND herkunft = 'nutzer'")
 			.bind(id)
 			.first<{ release_id: number; source: string }>();
 		if (!vorher) return false;

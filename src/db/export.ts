@@ -22,6 +22,11 @@
  *   abrufbar. Der SQL-Dump aus `d1 export` hat sie ohnehin.
  * - `d1_migrations` - Wranglers eigene Buchfuehrung, kommt beim
  *   Wiedereinspielen aus dem Dump.
+ * `psn_played_title` wird dagegen exportiert: Die Spielzeit ist zwar
+ * Fremddatum, aber die Zuordnung zum Release ist eine Entscheidung (von Hand
+ * korrigierbar), und PSN liefert alte Werte nicht nach - was einmal weg ist,
+ * kommt nicht zurueck.
+ *
  * - `igdb_candidate` - Suchergebnisse von IGDB fuer die Pruefansicht,
  *   abgeleitet und jederzeit neu abrufbar. Die Entscheidungen des Nutzers
  *   (Verknuepfung, Ablehnung) stehen in `game` und werden gesichert.
@@ -45,6 +50,7 @@ export const EXPORT_TABELLEN = [
 	"app_setting",
 	"psn_sync_run",
 	"game_event",
+	"psn_played_title",
 ] as const;
 
 /** Tabellen, die es gibt und die absichtlich nicht exportiert werden. */

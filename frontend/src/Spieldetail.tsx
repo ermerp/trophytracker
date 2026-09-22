@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { spielzeitText } from './spielzeit'
 import {
   DISCQUELLE,
   DISC_FASSUNGEN,
@@ -66,7 +67,15 @@ type Exemplar = {
   angelegtAm: string
 }
 
-type Digital = { id: number; quelle: Quelle; erworbenAm: string | null }
+type Digital = { id: number; quelle: Quelle; erworbenAm: string | null; herkunft: 'nutzer' | 'psn' }
+
+/** Spielzeit aus PSN (7.7); alle Felder können fehlen – PS3 und Vita liefern keine. */
+type Spielzeit = {
+  sekunden: number | null
+  anzahl: number | null
+  erstesSpielAm: string | null
+  letztesSpielAm: string | null
+}
 
 type Release = {
   id: number
@@ -80,6 +89,7 @@ type Release = {
   bewertung: Bewertung | null
   exemplare: Exemplar[]
   digital: Digital[]
+  spielzeit: Spielzeit | null
 }
 
 type IgdbZustand = {
@@ -552,6 +562,17 @@ export function Spieldetail() {
               ) : (
                 <p className="zeile">keine Trophäenliste</p>
               )}
+              {/* Spielzeit aus PSN (7.7). Ohne Daten steht hier „unbekannt" –
+                  bei PS3 und Vita dauerhaft, denn Sony erfasst sie erst seit
+                  der PS4. Niemals „0 h" (Abschnitt 3). */}
+              <p className="zeile">
+                Spielzeit: <strong>{spielzeitText(r.spielzeit?.sekunden ?? null)}</strong>
+                {r.spielzeit?.anzahl ? ` · ${r.spielzeit.anzahl}-mal gestartet` : ''}
+                {r.spielzeit?.letztesSpielAm ? ` · zuletzt ${datum(r.spielzeit.letztesSpielAm)}` : ''}
+                {r.spielzeit === null && (r.plattform === 'PS3' || r.plattform === 'PSVITA')
+                  ? ' (PSN liefert für PS3 und Vita keine)'
+                  : ''}
+              </p>
             </div>
             <div>
               <h3>Eigene Bewertung</h3>
@@ -601,20 +622,30 @@ export function Spieldetail() {
               {r.digital.map((d) => (
                 <li key={d.id}>
                   {QUELLENTEXT[d.quelle]}
-                  {d.erworbenAm && <span className="zeile"> · erworben {datum(d.erworbenAm)}</span>}{' '}
-                  <button
-                    type="button"
-                    className="klein"
-                    disabled={laeuft}
-                    aria-label={`${QUELLENTEXT[d.quelle]} entfernen`}
-                    onClick={() => {
-                      if (confirm(`„${QUELLENTEXT[d.quelle]}" entfernen?`)) {
-                        void tue(() => anfrage(`/api/digital-entitlements/${d.id}`, { methode: 'DELETE' }), 'Entfernt.')
-                      }
-                    }}
-                  >
-                    ×
-                  </button>
+                  {d.erworbenAm && <span className="zeile"> · erworben {datum(d.erworbenAm)}</span>}
+                  {d.herkunft === 'psn' ? (
+                    // Von PSN erkannt: kein Löschkreuz. Der nächste Lauf legte
+                    // die Zeile ohnehin wieder an – was Sony sagt, korrigiert
+                    // man bei Sony (7.7).
+                    <span className="zeile"> · von PSN erkannt</span>
+                  ) : (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        className="klein"
+                        disabled={laeuft}
+                        aria-label={`${QUELLENTEXT[d.quelle]} entfernen`}
+                        onClick={() => {
+                          if (confirm(`„${QUELLENTEXT[d.quelle]}" entfernen?`)) {
+                            void tue(() => anfrage(`/api/digital-entitlements/${d.id}`, { methode: 'DELETE' }), 'Entfernt.')
+                          }
+                        }}
+                      >
+                        ×
+                      </button>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>

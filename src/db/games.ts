@@ -62,7 +62,7 @@ export const JA_NEIN = ["ja", "nein"] as const;
 export const PLATIN_FILTER = ["ja", "nein", "nichtverfuegbar"] as const;
 export const DISC_FILTER = ["ja", "nein", "unbekannt"] as const;
 export type DiscFassung = (typeof DISC_FILTER)[number];
-export const SORTIERUNGEN = ["titel", "zuletzt"] as const;
+export const SORTIERUNGEN = ["titel", "zuletzt", "spielzeit"] as const;
 
 /**
  * Filter auf GET /api/games (Abschnitt 12).
@@ -94,6 +94,8 @@ export type SpielZeile = {
 	icon_url: string | null;
 	critic_score: number | null;
 	zuletzt_gespielt: string | null;
+	/** Spielzeit ueber alle Releases in Sekunden; null heisst "unbekannt" (7.7). */
+	spielzeit_s: number | null;
 };
 
 export type ReleaseZeile = {
@@ -585,10 +587,21 @@ aeenliste haengt
 		const zuletzt =
 			"(SELECT MAX(t2.last_played_at) FROM trophy_progress t2 JOIN release r2 " +
 			"ON r2.id = t2.release_id WHERE r2.game_id = g.id)";
+		// Spielzeit ueber alle Releases eines Spiels (7.7, Stufe 18c). Der
+		// Unterselect laeuft ueber idx_played_release, ist also ein
+		// Index-Lookup je Ergebniszeile und kein Tabellenscan.
+		const spielzeit =
+			"(SELECT SUM(p2.play_duration_s) FROM psn_played_title p2 JOIN release r4 " +
+			"ON r4.id = p2.release_id WHERE r4.game_id = g.id)";
 		const sortierung =
 			filter.sort === "zuletzt"
 				? `${zuletzt} IS NULL, ${zuletzt} DESC, g.sort_title`
-				: "g.sort_title";
+				: filter.sort === "spielzeit"
+					// Ohne Spielzeit ans Ende: PS3 und Vita liefern grundsaetzlich
+					// keine, und "unbekannt" ist keine Null (Entscheidung des
+					// Nutzers vom 22.09.2026, Abschnitt 5.2).
+					? `${spielzeit} IS NULL, ${spielzeit} DESC, g.sort_title`
+					: "g.sort_title";
 
 		const [zaehlung, seite] = await this.db.batch([
 			this.db.prepare(`SELECT COUNT(*) AS n ${woher}${sucheBedingung}`).bind(...werte),
@@ -597,7 +610,8 @@ aeenliste haengt
 					`SELECT g.id, g.title, g.sort_title, g.cover_url, g.critic_score,
 					        (SELECT t3.icon_url FROM trophy_progress t3 JOIN release r3 ON r3.id = t3.release_id
 					          WHERE r3.game_id = g.id AND t3.icon_url IS NOT NULL ORDER BY r3.platform DESC LIMIT 1) AS icon_url,
-					        ${zuletzt} AS zuletzt_gespielt
+					        ${zuletzt} AS zuletzt_gespielt,
+					        ${spielzeit} AS spielzeit_s
 					 ${woher}${sucheBedingung}
 					 ORDER BY ${sortierung} LIMIT ? OFFSET ?`,
 				)
@@ -615,7 +629,7 @@ aeenliste haengt
 				        t.progress_pct, t.defined_platinum, t.earned_platinum, t.last_played_at,
 				        ps.status AS play_status,
 				        (SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare,
-				        (SELECT GROUP_CONCAT(d.source) FROM digital_entitlement d WHERE d.release_id = r.id) AS digital
+				        (SELECT GROUP_CONCAT(d.source || ':' || d.herkunft) FROM digital_entitlement d WHERE d.release_id = r.id) AS digital
 				 FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id
 				 LEFT JOIN play_status ps ON ps.release_id = r.id
 				 WHERE r.game_id IN (${ids.map(() => "?").join(",")}) AND NOT ${GamesRepository.NUR_WUNSCH}
