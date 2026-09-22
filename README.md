@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 18 abgenommen** (22.09.2026), **18c gebaut** ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen bis 18c abgenommen** (22.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -143,7 +143,7 @@ Was steht und in Betrieb nachgewiesen ist:
 Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
 den Login unter `trophytracker.cloudflareaccess.com`.
 
-**Stufe 18c ist gebaut** (22.09.2026): Der Cron holt nachts Spielzeit
+**Stufe 18c ist abgenommen** (22.09.2026): Der Cron holt nachts Spielzeit
 (`playDuration`, `playCount`) und den digitalen Besitz samt der Unterscheidung
 gekauft/PS+ – ohne dass etwas von Hand einzutragen wäre. Die Spielzeit steht im
 Spieldetail und ist Sortierkriterium der Sammlung; digitale Berechtigungen
