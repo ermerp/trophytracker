@@ -44,7 +44,7 @@ type Release = {
   zuletztGespielt: string | null
   status: PlayStatus | null
   exemplare: number
-  digital: Quelle[]
+  digital: Array<{ quelle: Quelle; herkunft: 'nutzer' | 'psn' }>
 }
 
 type Spiel = {
@@ -97,7 +97,7 @@ const FILTER = {
 
 type FilterName = keyof typeof FILTER
 
-const SORTIERTEXT = { titel: 'Titel', zuletzt: 'zuletzt gespielt' } as const
+const SORTIERTEXT = { titel: 'Titel', zuletzt: 'zuletzt gespielt', spielzeit: 'Spielzeit' } as const
 
 export function Sammlung() {
   const [params, setParams] = useSearchParams()
@@ -184,7 +184,7 @@ export function Sammlung() {
         methode: 'POST',
         koerper: { releaseId: r.id, quelle },
       })
-      aktualisiereRelease(r.id, (x) => ({ ...x, digital: [...x.digital, quelle] }))
+      aktualisiereRelease(r.id, (x) => ({ ...x, digital: [...x.digital, { quelle, herkunft: 'nutzer' as const }] }))
       setEben({ art: 'digital', id: a.id, releaseId: r.id, quelle, absichtenErledigt: a.absichtenErledigt, aufListe: a.aufListe })
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Anlegen fehlgeschlagen.')
@@ -225,7 +225,7 @@ export function Sammlung() {
         await anfrage(`/api/digital-entitlements/${e.id}`, { methode: 'DELETE' })
         aktualisiereRelease(e.releaseId, (x) => ({
           ...x,
-          digital: x.digital.filter((q) => q !== e.quelle),
+          digital: x.digital.filter((d) => d.quelle !== e.quelle),
         }))
       }
     } catch (f) {
@@ -265,7 +265,7 @@ export function Sammlung() {
       const d = detail.releases.find((x) => x.id === r.id)?.digital.find((x) => x.quelle === quelle)
       if (!d) return
       await anfrage(`/api/digital-entitlements/${d.id}`, { methode: 'DELETE' })
-      aktualisiereRelease(r.id, (x) => ({ ...x, digital: x.digital.filter((q) => q !== quelle) }))
+      aktualisiereRelease(r.id, (x) => ({ ...x, digital: x.digital.filter((d) => d.quelle !== quelle) }))
       if (eben?.art === 'digital' && eben.id === d.id) setEben(null)
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Löschen fehlgeschlagen.')
@@ -379,10 +379,14 @@ export function Sammlung() {
                           )}
                         </span>
                       )}
-                      {r.digital.map((q) => (
-                        <span key={q} className="pille">
-                          {QUELLENTEXT[q]}
-                          <button type="button" aria-label={`${QUELLENTEXT[q]} entfernen`} onClick={() => digitalLoeschen(s, r, q)}>×</button>
+                      {r.digital.map((d) => (
+                        <span key={d.quelle} className="pille" title={d.herkunft === 'psn' ? 'von PSN erkannt' : undefined}>
+                          {QUELLENTEXT[d.quelle]}
+                          {/* Kein Löschkreuz an von PSN erkannten Einträgen: Der
+                              nächste Lauf legte sie ohnehin wieder an (7.7). */}
+                          {d.herkunft === 'nutzer' && (
+                            <button type="button" aria-label={`${QUELLENTEXT[d.quelle]} entfernen`} onClick={() => digitalLoeschen(s, r, d.quelle)}>×</button>
+                          )}
                         </span>
                       ))}
                       <button type="button" className="klein" onClick={() => discAnlegen(r)}>+ Disc</button>
@@ -395,7 +399,7 @@ export function Sammlung() {
                           onChange={(e) => e.target.value && digitalAnlegen(r, e.target.value as Quelle)}
                         >
                           <option value="">Quelle …</option>
-                          {QUELLEN.filter((q) => !r.digital.includes(q)).map((q) => (
+                          {QUELLEN.filter((q) => !r.digital.some((d) => d.quelle === q)).map((q) => (
                             <option key={q} value={q}>{QUELLENTEXT[q]}</option>
                           ))}
                         </select>
@@ -404,7 +408,7 @@ export function Sammlung() {
                           type="button"
                           className="klein"
                           disabled={r.digital.length === QUELLEN.length}
-                          onClick={() => (r.digital.includes('kauf') ? setOffen(r.id) : digitalAnlegen(r, 'kauf'))}
+                          onClick={() => (r.digital.some((d) => d.quelle === 'kauf') ? setOffen(r.id) : digitalAnlegen(r, 'kauf'))}
                         >
                           + digital
                         </button>

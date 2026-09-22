@@ -280,3 +280,19 @@ describe("DELETE /api/releases/:id und /api/games/:id", () => {
 		expect((await sende("DELETE", "/api/releases/999")).status).toBe(404);
 	});
 });
+
+describe("Von PSN erkannte Berechtigungen (Stufe 18c)", () => {
+	it("laesst sich nicht von Hand loeschen - der naechste Lauf legte sie wieder an", async () => {
+		const r = await release();
+		await env.DB.prepare(
+			"INSERT INTO digital_entitlement (id, release_id, source, herkunft) VALUES (999, ?, 'kauf', 'psn')",
+		)
+			.bind(r)
+			.run();
+
+		const antwort = await sende("DELETE", "/api/digital-entitlements/999");
+
+		expect(antwort.status).toBe(404);
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM digital_entitlement WHERE id = 999").first()).toEqual({ n: 1 });
+	});
+});

@@ -134,7 +134,7 @@ PSN-Antworten werden zuerst unverändert in `psn_raw_response` geschrieben, dana
 
 Der Sync hat deshalb zwei Phasen (`psn_sync_run.phase`): erst `abruf`, dann `normalisierung`, beide mit begrenzter Arbeit je Aufruf. `POST /api/sync/normalize` setzt `normalized_at` zurück und lässt die Normalisierung erneut laufen — ohne PSN.
 
-Das gilt für PSN. IGDB-Antworten werden **nicht** roh abgelegt — offizielle Schnittstelle, klein, jederzeit neu abrufbar; `igdb_candidate` hält nur die normalisierten Kandidaten und ist deshalb `NICHT_EXPORTIERT`.
+Das gilt für die **Trophäenseiten**: teurer Abruf, komplexe Normalisierung, einzige Aufzeichnung. Die beiden Zusatzabrufe aus Stufe 18c (Spielzeit, Kaufliste) sind ausdrücklich ausgenommen (Entscheidung des Nutzers vom 22.09.2026, Abschnitt 7.7) – zusammen rund 17 Anfragen, jederzeit neu abrufbar, Normalisierung ist Feldkopieren plus Titelabgleich. IGDB-Antworten werden **nicht** roh abgelegt — offizielle Schnittstelle, klein, jederzeit neu abrufbar; `igdb_candidate` hält nur die normalisierten Kandidaten und ist deshalb `NICHT_EXPORTIERT`.
 
 ### Titelnormalisierung ist geteilte Logik
 
