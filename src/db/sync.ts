@@ -31,13 +31,46 @@ const SCHLUESSEL_CRON = "cron_verlauf";
 /**
  * Wie viele Cron-Ausgaenge aufgehoben werden.
  *
- * Fuenf, weil der letzte Aufruf einer Nacht fast immer "nichts" lautet - die
- * Arbeit ist dann laengst getan. Genau das war am 22.09.2026 zu sehen: Der
- * Cron hatte 368 Spiele aufgefrischt, und die einzige gespeicherte Zeile sagte
- * "nichts". Mit fuenf Eintraegen sieht man das Ende der Nacht und das, was
- * davor geschah; mehr waere Protokoll, und dafuer gibt es die Worker-Logs.
+ * Zwanzig, und wirkungslose Aufrufe werden verdichtet - beides zusammen
+ * ergibt "eine Nacht". Fuenf Eintraege waren es bis Stufe 18d, und sie
+ * zeigten systematisch die falschen: Das Cron-Fenster hat 36 Aufrufe, die
+ * Arbeit ist gegen 04:10 getan, danach folgen gut zwanzig leere. Am
+ * 23.09.2026 standen deshalb fuenf Zeilen "nichts" von 05:36 bis 05:56 im
+ * Verlauf, waehrend Sync, Spielzeit, Besitz und 49 aufgefrischte Spiele
+ * unsichtbar blieben - dieselbe Blindheit, gegen die Migration 0022
+ * angetreten war, nur eine Stufe spaeter.
+ *
+ * Eine volle Nacht sind elf Sync-Aufrufe, je einer fuer Spielzeit und
+ * Besitz, ein bis zwei fuer IGDB, einer fuers Aufraeumen und eine
+ * verdichtete Leerlaufzeile - siebzehn. Zwanzig deckt das ab.
  */
-const CRON_VERLAUF_LAENGE = 5;
+const CRON_VERLAUF_LAENGE = 20;
+
+/**
+ * Eine gespeicherte Leerlaufzeile, einzeln oder bereits verdichtet:
+ * "2026-09-23 04:16 cron: nichts erschienen=0" oder
+ * "2026-09-23 04:16-05:56 cron: nichts x21".
+ */
+const LEERLAUF =
+	/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?:–\d{2}:\d{2})? cron: nichts(?: erschienen=0)?(?: ×(\d+))?$/;
+
+/**
+ * Zwei aufeinanderfolgende Leerlaufaufrufe zu einer Zeile zusammenziehen.
+ *
+ * Gibt `null` zurueck, wenn die vorherige Zeile keine Leerlaufzeile ist -
+ * dann wird normal vorangestellt. Das Verdichten passiert ausschliesslich
+ * beim Schreiben; gerechnet oder gespeichert wird daran nichts, was sich
+ * nicht aus den Zeilen selbst ergibt.
+ */
+export function verdichteLeerlauf(vorherige: string, zeit: string): string | null {
+	const t = LEERLAUF.exec(vorherige);
+	if (!t) return null;
+	// Zwei Aufrufe in derselben Minute gibt es nur von Hand; "15:28-15:28"
+	// waere dann Rauschen statt Zeitraum.
+	const bis = zeit.slice(11);
+	const spanne = bis === t[1].slice(11) ? t[1] : `${t[1]}–${bis}`;
+	return `${spanne} cron: nichts ×${t[2] ? Number(t[2]) + 1 : 2}`;
+}
 
 /** Fester Text fuer einen abgebrochenen Haenger - nur eine Zahl, kein Fremdtext (Abschnitt 10.1). */
 export const haengerMeldung = (stunden: number) =>
@@ -116,13 +149,46 @@ export class SyncRepository {
 	 * wird fortgesetzt. Rueckgabe: Anzahl abgebrochener Laeufe.
 	 */
 	async haengendeAbbrechen(stunden: number): Promise<number> {
+		// Der Modifier steht als Text im Statement, nicht als Bind: Zahl aus
+		// einer Konstanten, nie aus einer Eingabe (CLAUDE.md, Stufe 18d).
+		const frist = `datetime('now', '-${Math.trunc(stunden)} hours')`;
 		const ergebnis = await this.db
 			.prepare(
 				"UPDATE psn_sync_run SET status = 'fehler', finished_at = datetime('now'), error_message = ? " +
 					"WHERE status = 'laufend' AND MAX(started_at, COALESCE((SELECT MAX(MAX(r.fetched_at, COALESCE(r.normalized_at, ''))) " +
-					"FROM psn_raw_response r WHERE r.sync_run_id = psn_sync_run.id), '')) < datetime('now', ?)",
+					`FROM psn_raw_response r WHERE r.sync_run_id = psn_sync_run.id), '')) < ${frist}`,
 			)
-			.bind(haengerMeldung(stunden), `-${stunden} hours`)
+			.bind(haengerMeldung(stunden))
+			.run();
+		return ergebnis.meta.changes ?? 0;
+	}
+
+	/**
+	 * Rohantworten alter Laeufe loeschen (Stufe 18d).
+	 *
+	 * Der Grund fuer `psn_raw_response` ist die wiederholbare Normalisierung
+	 * ohne PSN-Zugriff (Abschnitt 7.1) - dafuer braucht es die letzten Laeufe,
+	 * nicht jede Nacht seit dem ersten Tag. Am 23.09.2026 waren 2,31 von 3,26
+	 * MB der Datenbank Rohantworten: fuenf Seiten je Nacht, immer dieselben
+	 * 431 Titel, 263 KiB taeglich. Sie wandern ueber `d1 export` auch in jede
+	 * woechentliche Sicherung und damit dauerhaft in die Historie des privaten
+	 * Backup-Repositorys.
+	 *
+	 * Behalten wird, was noch nicht normalisiert ist - immer, unabhaengig vom
+	 * Alter: Das ist unerledigte Arbeit, kein Archiv. Dazu die Seiten der
+	 * juengsten `laeufe` Laeufe, die ueberhaupt Seiten haben; ein
+	 * fehlgeschlagener Lauf ohne Seiten verdraengt so keinen guten.
+	 *
+	 * Kein `game_event`: Es aendert sich kein Spiel, keine Bewertung, keine
+	 * Zuordnung - nur Fremddaten, die jederzeit neu abrufbar sind (8.5).
+	 */
+	async rohantwortenAufraeumen(laeufe: number): Promise<number> {
+		const ergebnis = await this.db
+			.prepare(
+				"DELETE FROM psn_raw_response WHERE normalized_at IS NOT NULL AND sync_run_id NOT IN " +
+					"(SELECT sync_run_id FROM psn_raw_response GROUP BY sync_run_id ORDER BY sync_run_id DESC LIMIT ?)",
+			)
+			.bind(laeufe)
 			.run();
 		return ergebnis.meta.changes ?? 0;
 	}
@@ -228,10 +294,20 @@ export class SyncRepository {
 			.run();
 	}
 
-	/** Den Ausgang eines Cron-Aufrufs festhalten (nur Zahlen und feste Texte). */
-	async cronAusgangVermerken(zeile: string): Promise<void> {
+	/**
+	 * Den Ausgang eines Cron-Aufrufs festhalten (nur Zahlen und feste Texte).
+	 *
+	 * `wirkungslos` sagt, dass der Aufruf nichts getan hat. Folgt er auf einen
+	 * ebensolchen, werden beide zu einer Zeile verdichtet, statt die Nacht aus
+	 * dem Verlauf zu draengen (Stufe 18d). Ein Lebenszeichen bleibt so oder so
+	 * stehen: Die verdichtete Zeile traegt die Zeit des juengsten Aufrufs.
+	 */
+	async cronAusgangVermerken(zeitstempel: string, zeile: string, wirkungslos = false): Promise<void> {
 		const bisher = await this.cronVerlauf();
-		const wert = [zeile, ...bisher].slice(0, CRON_VERLAUF_LAENGE).join("\n");
+		const neue = `${zeitstempel} ${zeile}`;
+		const verdichtet = wirkungslos && bisher[0] ? verdichteLeerlauf(bisher[0], zeitstempel) : null;
+		const alle = verdichtet ? [verdichtet, ...bisher.slice(1)] : [neue, ...bisher];
+		const wert = alle.slice(0, CRON_VERLAUF_LAENGE).join("\n");
 		await this.db
 			.prepare(
 				"INSERT INTO app_setting (key, value) VALUES (?, ?) " +

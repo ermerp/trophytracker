@@ -18,7 +18,7 @@ import { erstelleEbayClient, zugangAus as ebayZugangAus, type EbayClient } from 
 import { erstelleUpcitemdbClient, type UpcitemdbClient } from "./ean/upcitemdb";
 import { erstelleIgdbClient, zugangAus, type IgdbClient } from "./igdb/client";
 import { erstellePsnClient, type PsnClient } from "./psn/client";
-import { cronLogzeile, cronSchritt } from "./sync/cron";
+import { cronLogzeile, cronSchritt, cronWirkungslos } from "./sync/cron";
 import type { AppEnv } from "./types";
 
 /**
@@ -135,15 +135,15 @@ export function createScheduled(
 			// Der Cron ist der einzige Schreiber ohne Zuschauer, und Worker-Logs
 			// sind nur live zu sehen. Deshalb bleibt sein Ausgang auch in der
 			// Datenbank stehen (Stufe 18b) - sonst laesst sich am Morgen nicht
-			// unterscheiden, ob er scheiterte oder nichts zu tun fand.
-			await repos.sync.cronAusgangVermerken(`${new Date().toISOString().slice(0, 16).replace("T", " ")} ${zeile}`);
+			// unterscheiden, ob er scheiterte oder nichts zu tun fand. Aufrufe
+			// ohne Wirkung werden dabei verdichtet, damit die zwanzig leeren am
+			// Ende der Nacht nicht die Arbeit davor verdraengen (Stufe 18d).
+			await repos.sync.cronAusgangVermerken(zeitstempel(), zeile, cronWirkungslos(ergebnis));
 		} catch (fehler) {
 			// Ein Absturz darf nicht spurlos bleiben. Nur eigene Texte, kein
 			// Fremdtext - der koennte ein Geheimnis zitieren.
 			console.log("cron: abgebrochen");
-			await repos.sync
-				.cronAusgangVermerken(`${new Date().toISOString().slice(0, 16).replace("T", " ")} cron: abgebrochen`)
-				.catch(() => {});
+			await repos.sync.cronAusgangVermerken(zeitstempel(), "cron: abgebrochen").catch(() => {});
 			throw fehler;
 		}
 	};
@@ -157,3 +157,6 @@ export default {
 	fetch: app.fetch,
 	scheduled: createScheduled(undefined, igdbFactory),
 } satisfies ExportedHandler<Env>;
+
+/** "2026-09-23 04:16" - UTC, wie alle Zeitstempel der Datenbank. */
+const zeitstempel = () => new Date().toISOString().slice(0, 16).replace("T", " ");

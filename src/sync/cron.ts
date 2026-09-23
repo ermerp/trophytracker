@@ -47,16 +47,27 @@ export const AUFFRISCH_FRIST_TAGE = 7;
  */
 export const BESITZ_FRIST_TAGE = 7;
 
+/**
+ * Wie viele Sync-Laeufe ihre Rohantworten behalten (Stufe 18d).
+ *
+ * Drei: Der Zweck der Rohablage ist eine Normalisierung, die sich ohne
+ * PSN-Zugriff wiederholen laesst (Abschnitt 7.1) - dafuer reicht der letzte
+ * Lauf, drei geben Luft, falls die letzte Nacht selbst der Fehler war.
+ */
+export const ROHANTWORTEN_LAEUFE = 3;
+
 /** Schluessel des Blaetterungs-Fortschritts in app_setting. */
 const SCHLUESSEL_SPIELZEIT = "psn_spielzeit_stand";
 const SCHLUESSEL_BESITZ = "psn_besitz_stand";
 
 export type CronErgebnis = {
-	getan: "sync" | "spielzeit" | "besitz" | "igdb_auffrischen" | "igdb_physisch" | "nichts";
+	getan: "sync" | "spielzeit" | "besitz" | "igdb_auffrischen" | "igdb_physisch" | "aufraeumen" | "nichts";
 	/** angekuendigt -> erschienen (8.4), in jedem Aufruf. */
 	erschienen: number;
 	/** Laeufe, die als haengengeblieben auf 'fehler' gesetzt wurden. */
 	abgebrochen: number;
+	/** Geloeschte Rohantworten alter Laeufe (Stufe 18d). */
+	geloescht?: number;
 	/** Gescheiterter Schritt ausserhalb des Syncs - fester Text, nie Fremdtext. */
 	meldung?: string;
 	sync?: SyncErgebnis;
@@ -134,7 +145,26 @@ export async function cronSchritt(
 		}
 	}
 
+	// 8. Aufraeumen: Rohantworten, die niemand mehr braucht. Ein einzelnes
+	//    DELETE ueber einen Index - die leichteste Arbeit der Reihenfolge und
+	//    deshalb ganz hinten. Sie belegt einen Aufruf, der sonst "nichts" tut,
+	//    und niemals denselben wie eine schwere Arbeit: Jeder Schritt davor
+	//    kehrt bei Erfolg sofort zurueck (CPU-Grenze, Abschnitt 10.1).
+	const geloescht = await repos.sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE);
+	if (geloescht > 0) return { ...basis, getan: "aufraeumen", geloescht };
+
 	return { ...basis, getan: "nichts" };
+}
+
+/**
+ * Hat dieser Aufruf gar nichts bewirkt?
+ *
+ * Nur solche Ausgaenge werden im Verlauf verdichtet (Stufe 18d). Ein Fehler
+ * ist kein Leerlauf - er soll stehen bleiben, auch wenn danach zwanzig leere
+ * Aufrufe folgen.
+ */
+export function cronWirkungslos(e: CronErgebnis): boolean {
+	return e.getan === "nichts" && e.erschienen === 0 && e.abgebrochen === 0 && e.meldung === undefined;
 }
 
 /**
@@ -228,6 +258,7 @@ async function syncFaellig(repos: Repositories, heute: string): Promise<boolean>
 export function cronLogzeile(e: CronErgebnis): string {
 	const teile = [`cron: ${e.getan}`, `erschienen=${e.erschienen}`];
 	if (e.abgebrochen) teile.push(`abgebrochen=${e.abgebrochen}`);
+	if (e.geloescht) teile.push(`geloescht=${e.geloescht}`);
 	if (e.sync) {
 		teile.push(`sync=${e.sync.status}/${e.sync.phase}`, `offset=${e.sync.offset}`);
 		if (e.sync.status === "erfolg") teile.push(`titel=${e.sync.titlesSeen ?? 0}`, `eingereiht=${e.sync.eingereiht ?? 0}`);
