@@ -4,7 +4,14 @@ import { createRepositories } from "../src/db";
 import { haengerMeldung } from "../src/db/sync";
 import { Geheimnis } from "../src/domain/secret";
 import { erstellePsnClient } from "../src/psn/client";
-import { AUFFRISCH_FRIST_TAGE, cronLogzeile, cronSchritt, HAENGT_NACH_STUNDEN } from "../src/sync/cron";
+import {
+	AUFFRISCH_FRIST_TAGE,
+	cronLogzeile,
+	cronSchritt,
+	cronWirkungslos,
+	HAENGT_NACH_STUNDEN,
+	ROHANTWORTEN_LAEUFE,
+} from "../src/sync/cron";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
 import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophySeite } from "./psn-fake";
 
@@ -73,6 +80,8 @@ async function spielMitIgdb(id: number, igdbId: number, syncedAt: string | null)
 beforeEach(async () => {
 	await env.DB.batch([
 		env.DB.prepare("DELETE FROM game_event"),
+		// Der Verlauf lebt in app_setting und ueberdauert sonst den Test.
+		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'psn_spielzeit_stand', 'psn_besitz_stand')"),
 		env.DB.prepare("DELETE FROM psn_raw_response"),
 		env.DB.prepare("DELETE FROM psn_sync_run"),
 		env.DB.prepare("DELETE FROM psn_credentials"),
@@ -138,7 +147,9 @@ describe("cronSchritt", () => {
 		// Sperre kommt hier allein aus der Regel "ein Cron-Versuch je Nacht".
 		expect((await repos().credentials.anzeige()).status).toBe("fehler");
 
-		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).toBe("nichts");
+		// Kein zweiter Lauf: Der naechste Aufruf geht weiter in der Reihenfolge
+		// (hier Spielzeit), statt den Sync zu wiederholen.
+		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).not.toBe("sync");
 		expect(await laeufe()).toHaveLength(1);
 	});
 
@@ -159,7 +170,7 @@ describe("cronSchritt", () => {
 		await env.DB.prepare(
 			"INSERT INTO psn_sync_run (started_at, finished_at, status, next_offset, started_by) VALUES (datetime('now'), datetime('now'), 'erfolg', 0, 'nutzer')",
 		).run();
-		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).toBe("nichts");
+		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).not.toBe("sync");
 
 		await env.DB.prepare("UPDATE psn_sync_run SET status = 'fehler'").run();
 		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).toBe("sync");
@@ -282,13 +293,132 @@ describe("cronSchritt", () => {
 		expect(cronLogzeile(e)).toContain('meldung="Der IGDB-Abruf ist fehlgeschlagen."');
 	});
 
-	it("hebt die letzten fuenf Ausgaenge auf, neueste zuerst", async () => {
+	it("hebt die Ausgaenge mit Zeitstempel auf, neueste zuerst", async () => {
 		// Der letzte Aufruf einer Nacht lautet fast immer "nichts"; ohne Verlauf
 		// waere die geleistete Arbeit nicht zu sehen (22.09.2026).
 		const r = repos();
-		for (const zeile of ["A", "B", "C", "D", "E", "F"]) await r.sync.cronAusgangVermerken(zeile);
+		for (const [i, zeile] of ["A", "B", "C"].entries()) {
+			await r.sync.cronAusgangVermerken(`2026-09-23 03:0${i}`, zeile);
+		}
 
-		expect(await r.sync.cronVerlauf()).toEqual(["F", "E", "D", "C", "B"]);
+		expect(await r.sync.cronVerlauf()).toEqual([
+			"2026-09-23 03:02 C",
+			"2026-09-23 03:01 B",
+			"2026-09-23 03:00 A",
+		]);
+	});
+
+	it("verdichtet aufeinanderfolgende Leerlaufaufrufe zu einer Zeile", async () => {
+		// Das Cron-Fenster hat 36 Aufrufe, die Arbeit ist gegen 04:10 getan.
+		// Ohne Verdichtung stuenden am Morgen nur leere Zeilen im Verlauf und
+		// die Nacht waere unsichtbar - der Befund vom 23.09.2026.
+		const r = repos();
+		await r.sync.cronAusgangVermerken("2026-09-23 04:11", "cron: igdb_auffrischen angefragt=50 aktualisiert=49");
+		for (const minute of ["16", "21", "26"]) {
+			await r.sync.cronAusgangVermerken(`2026-09-23 04:${minute}`, "cron: nichts erschienen=0", true);
+		}
+
+		expect(await r.sync.cronVerlauf()).toEqual([
+			"2026-09-23 04:16–04:26 cron: nichts ×3",
+			"2026-09-23 04:11 cron: igdb_auffrischen angefragt=50 aktualisiert=49",
+		]);
+	});
+
+	it("nennt keinen Zeitraum, wenn beide Aufrufe in dieselbe Minute fallen", async () => {
+		const r = repos();
+		await r.sync.cronAusgangVermerken("2026-09-23 15:28", "cron: nichts erschienen=0", true);
+		await r.sync.cronAusgangVermerken("2026-09-23 15:28", "cron: nichts erschienen=0", true);
+
+		expect(await r.sync.cronVerlauf()).toEqual(["2026-09-23 15:28 cron: nichts ×2"]);
+
+		// Und die verdichtete Zeile laesst sich weiter verdichten.
+		await r.sync.cronAusgangVermerken("2026-09-23 15:33", "cron: nichts erschienen=0", true);
+		expect(await r.sync.cronVerlauf()).toEqual(["2026-09-23 15:28–15:33 cron: nichts ×3"]);
+	});
+
+	it("verdichtet nicht ueber eine wirksame Zeile hinweg", async () => {
+		const r = repos();
+		await r.sync.cronAusgangVermerken("2026-09-23 04:06", "cron: nichts erschienen=0", true);
+		await r.sync.cronAusgangVermerken("2026-09-23 04:11", "cron: aufraeumen erschienen=0 geloescht=30");
+		await r.sync.cronAusgangVermerken("2026-09-23 04:16", "cron: nichts erschienen=0", true);
+
+		const verlauf = await r.sync.cronVerlauf();
+		expect(verlauf).toHaveLength(3);
+		expect(verlauf[2]).toBe("2026-09-23 04:06 cron: nichts erschienen=0");
+	});
+
+	it("ein Fehler ist kein Leerlauf und bleibt stehen", async () => {
+		expect(cronWirkungslos({ getan: "nichts", erschienen: 0, abgebrochen: 0 })).toBe(true);
+		expect(cronWirkungslos({ getan: "nichts", erschienen: 0, abgebrochen: 0, meldung: "Der PSN-Abruf ist fehlgeschlagen." })).toBe(false);
+		expect(cronWirkungslos({ getan: "nichts", erschienen: 1, abgebrochen: 0 })).toBe(false);
+		expect(cronWirkungslos({ getan: "aufraeumen", erschienen: 0, abgebrochen: 0, geloescht: 5 })).toBe(false);
+	});
+
+	/**
+	 * Rohantworten alter Laeufe (Stufe 18d). Am 23.09.2026 waren 2,31 von 3,26
+	 * MB der Datenbank Rohantworten - fuenf Seiten je Nacht, immer dieselben
+	 * Titel, und nichts loeschte sie je.
+	 */
+	async function lauf(status: string, seiten: number, normalisiert: boolean): Promise<number> {
+		const { results } = await env.DB.prepare(
+			"INSERT INTO psn_sync_run (started_at, status, next_offset) VALUES (datetime('now'), ?, 0) RETURNING id",
+		)
+			.bind(status)
+			.all<{ id: number }>();
+		const id = results[0].id;
+		for (let i = 0; i < seiten; i++) {
+			await env.DB.prepare(
+				"INSERT INTO psn_raw_response (sync_run_id, endpoint, payload, fetched_at, normalized_at) " +
+					"VALUES (?, ?, '[]', datetime('now'), ?)",
+			)
+				.bind(id, `/trophyTitles?offset=${i * 100}`, normalisiert ? "2026-09-23 03:30:00" : null)
+				.run();
+		}
+		return id;
+	}
+
+	const seitenJeLauf = async () =>
+		(
+			await env.DB.prepare(
+				"SELECT sync_run_id, COUNT(*) AS n FROM psn_raw_response GROUP BY sync_run_id ORDER BY sync_run_id",
+			).all<{ sync_run_id: number; n: number }>()
+		).results;
+
+	it("raeumt Rohantworten alter Laeufe ab und behaelt die juengsten", async () => {
+		const alt1 = await lauf("erfolg", 5, true);
+		const alt2 = await lauf("erfolg", 5, true);
+		const behalten: number[] = [];
+		for (let i = 0; i < ROHANTWORTEN_LAEUFE; i++) behalten.push(await lauf("erfolg", 5, true));
+
+		expect(await repos().sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE)).toBe(10);
+		const uebrig = (await seitenJeLauf()).map((z) => z.sync_run_id);
+		expect(uebrig).toEqual(behalten);
+		expect(uebrig).not.toContain(alt1);
+		expect(uebrig).not.toContain(alt2);
+		// Die Laeufe selbst bleiben stehen - nur ihre Rohantworten gehen.
+		expect(await laeufe()).toHaveLength(ROHANTWORTEN_LAEUFE + 2);
+	});
+
+	it("behaelt Nichtnormalisiertes unabhaengig vom Alter", async () => {
+		// Unerledigte Arbeit, kein Archiv: Die Normalisierung laeuft ohne PSN
+		// erneut - aber nur, solange ihre Vorlage noch da ist (Abschnitt 7.1).
+		const offen = await lauf("fehler", 3, false);
+		for (let i = 0; i < ROHANTWORTEN_LAEUFE; i++) await lauf("erfolg", 5, true);
+
+		expect(await repos().sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE)).toBe(0);
+		expect((await seitenJeLauf()).map((z) => z.sync_run_id)).toContain(offen);
+	});
+
+	it("der Cron raeumt auf, wenn sonst nichts zu tun ist - und nur dann", async () => {
+		for (let i = 0; i < ROHANTWORTEN_LAEUFE + 1; i++) await lauf("erfolg", 5, true);
+
+		const e = await cronSchritt(repos(), psnStumm(), igdbOhne());
+		expect(e.getan).toBe("aufraeumen");
+		expect(e.geloescht).toBe(5);
+		expect(cronLogzeile(e)).toContain("geloescht=5");
+
+		// Nichts mehr zu loeschen: Der naechste Aufruf faellt auf "nichts".
+		expect((await cronSchritt(repos(), psnStumm(), igdbOhne())).getan).toBe("nichts");
 	});
 
 	it("die Logzeile nennt nur Zahlen und feste Texte", () => {

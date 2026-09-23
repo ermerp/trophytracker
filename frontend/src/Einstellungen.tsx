@@ -250,9 +250,9 @@ export function Einstellungen() {
       <h2>Automatik</h2>
       <p>
         Nachts zwischen 5 und 8 Uhr (03:00–06:00 UTC) holt der Worker die Trophäen einmal von allein ab,
-        gibt erschienene Titel frei und frischt danach IGDB-Metadaten und Disc-Fassungen auf – in kleinen
-        Schritten alle fünf Minuten. Ein fehlgeschlagener Abruf wird erst in der nächsten Nacht wiederholt;
-        bei abgelaufenem NPSSO ruht der Abruf, bis ein neues eingetragen ist.
+        gibt erschienene Titel frei, frischt IGDB-Metadaten und Disc-Fassungen auf und räumt zuletzt alte
+        PSN-Rohantworten weg – in kleinen Schritten alle fünf Minuten. Ein fehlgeschlagener Abruf wird erst
+        in der nächsten Nacht wiederholt; bei abgelaufenem NPSSO ruht der Abruf, bis ein neues eingetragen ist.
       </p>
       <p>
         Letzter automatischer Abruf:{' '}
@@ -269,8 +269,9 @@ export function Einstellungen() {
         </ul>
       )}
       <p className="zeile">
-        Der letzte Aufruf einer Nacht lautet fast immer „nichts" – dann ist die Arbeit schon getan.
-        Deshalb stehen hier mehrere.
+        Die Arbeit einer Nacht ist meist gegen 04:10 getan; danach folgen gut zwanzig Aufrufe, die nichts
+        mehr finden. Sie stehen zu einer Zeile zusammengefasst da („nichts ×21"), damit sie die Nacht nicht
+        aus dem Verlauf drängen.
       </p>
 
       {meldung && <p role="status">{meldung}</p>}

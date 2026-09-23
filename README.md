@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 18c abgenommen** (22.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen bis 18c abgenommen** (22.09.2026), Stufe 18d gebaut (23.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -132,7 +132,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
 | Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 20 (Migration 0018). **Stufe 15 abgenommen am 16.09.2026** |
 | Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt der nächtliche Cron nach, außerdem „Metadaten auffrischen" (Stufe 18) |
-| Automatik | Cron Trigger, nachts alle fünf Minuten zwischen 03:00 und 05:59 UTC, je Aufruf ein Schritt: Erschienene freigeben, hängende Läufe abbrechen, Trophäen-Sync (ein Versuch je Nacht), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen. Block „Automatik" in den Einstellungen, Hinweisblock bei Fehler oder abgelaufenem Zugang (Migration 0021) |
+| Automatik | Cron Trigger, nachts alle fünf Minuten zwischen 03:00 und 05:59 UTC, je Aufruf ein Schritt: Erschienene freigeben, hängende Läufe abbrechen, Trophäen-Sync (ein Versuch je Nacht), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, zuletzt Aufräumen alter Rohantworten (Stufe 18d). Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen, Leerläufe verdichtet; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migration 0021) |
 | App | Installierbar (PWA) mit Pokal-Symbol; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
 | Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
 | Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen, „Verwerfen" wirft eine Fehllesung sofort weg (mit Rückfrage). Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. „Überspringen" geht weiter, ohne etwas zu speichern (seit Stufe 17d – davor „Später" und ein Sammelmodus, beides mit offenen Scans entfallen). Unbekannte Codes löst seit Stufe 17c eBay live auf; ein Treffer aus der Sammlung erscheint als dieselbe Karte wie ein bekannter Code – mit Cover, „im Regal ×n" und „Disc erfassen" (9.2) |
@@ -149,6 +149,14 @@ gekauft/PS+ – ohne dass etwas von Hand einzutragen wäre. Die Spielzeit steht 
 Spieldetail und ist Sortierkriterium der Sammlung; digitale Berechtigungen
 erscheinen als Pillen an der Kachel wie bisher, nur eben von allein. Gemessen:
 236 Releases bekommen Spielzeit, 56 Kauf- und 160 PS+-Einträge entstehen.
+**Stufe 18d** (23.09.2026) kam aus einer Analyse der Nachtläufe: Die Nächte liefen
+sauber, nur sah man es nicht. Der Verlauf zeigte fünfmal „nichts" aus dem Leerlauf
+nach 05:36, während Sync, Spielzeit, Besitz und 49 aufgefrischte Spiele darunter
+verschwanden – seitdem zwanzig Einträge mit verdichteten Leerläufen. Dazu wuchs
+die Rohablage ungebremst: 2,31 von 3,26 MB der Datenbank und 263 KiB je Nacht,
+mit jedem `d1 export` erneut in die Sicherung. Ein neunter Cron-Schritt räumt sie
+jetzt weg.
+
 **Als Nächstes: Stufe 19 – Oberfläche**, dahinter 19b (Einzeltrophäen). Danach die
 Oberfläche (19), dahinter die Einzeltrophäen je Spiel (19b). Beide
 PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
@@ -398,6 +406,8 @@ Aufruf genau **eine** Sache und merkt sich den Stand in der Datenbank
    Nacht wiederholt
 5. sonst IGDB-Metadaten auffrischen – 50 Spiele, deren Stand älter als sieben Tage ist
 6. sonst Disc-Fassungen aus IGDB prüfen (30-Tage-Frist)
+7. sonst alte PSN-Rohantworten löschen (seit Stufe 18d) – die Seiten der jüngsten
+   drei Läufe und alles noch nicht Normalisierte bleiben
 
 Ein voller Sync braucht bei 431 Titeln rund elf Aufrufe. Ist der Zugang
 `abgelaufen`, legt der Cron gar keinen Lauf an; ein neues NPSSO in den
@@ -410,7 +420,11 @@ Hinweisblock der Sammlung, wenn der Nachtlauf fehlgeschlagen ist, in
 Worker-Logs (Cloudflare-Dashboard → Worker → Logs) – nur Zahlen und feste Texte.
 Der Eintrag in der Datenbank ist seit Stufe 18b dabei, weil Worker-Logs nur live
 einsehbar sind: Ohne ihn lässt sich am Morgen nicht sagen, ob ein Schritt
-scheiterte oder schlicht nichts zu tun fand.
+scheiterte oder schlicht nichts zu tun fand. Aufgehoben werden **die letzten
+zwanzig** Aufrufe, und aufeinanderfolgende Aufrufe ohne Wirkung stehen als eine
+Zeile da (`cron: nichts ×21`). Mit fünf Einträgen ohne Verdichtung sah man
+ausschließlich das leere Ende der Nacht – die Arbeit ist gegen 04:10 getan,
+danach folgen gut zwanzig Leerläufe (Befund vom 23.09.2026, Stufe 18d).
 `GET /api/sync/status` nennt `letzterAutomatischerLauf`, jeder Lauf trägt
 `ausloeser` (`nutzer` oder `cron`).
 

@@ -234,18 +234,24 @@ export class IgdbRepository {
 	 * Binds (Zeilenlese-Regel).
 	 */
 	async zumAuffrischen(n: number, mindestAlterTage = 0): Promise<Array<{ id: number; igdb_id: number }>> {
+		// Der Modifier steht als Text im Statement, nicht als Bind - Zahl aus
+		// einer Konstanten, nie aus einer Eingabe (CLAUDE.md). Stufe 18b hatte
+		// das angekuendigt, aber nur in der Zaehlabfrage der Statusanzeige
+		// umgesetzt; die auswaehlende Abfrage band weiter (Befund vom
+		// 23.09.2026). Sie tat es nachweislich richtig - die Regel gilt
+		// trotzdem, und Code und Regel sollen uebereinstimmen.
 		const frist =
 			mindestAlterTage > 0
-				? "AND (igdb_synced_at IS NULL OR igdb_synced_at < datetime('now', ?)) "
+				? `AND (igdb_synced_at IS NULL OR igdb_synced_at < datetime('now', '-${Math.trunc(mindestAlterTage)} days')) `
 				: "";
-		const anweisung = this.db.prepare(
-			"SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL " +
-				frist +
-				"ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT ?",
-		);
-		const { results } = await (
-			mindestAlterTage > 0 ? anweisung.bind(`-${mindestAlterTage} days`, n) : anweisung.bind(n)
-		).all<{ id: number; igdb_id: number }>();
+		const { results } = await this.db
+			.prepare(
+				"SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL " +
+					frist +
+					"ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT ?",
+			)
+			.bind(n)
+			.all<{ id: number; igdb_id: number }>();
 		return results;
 	}
 

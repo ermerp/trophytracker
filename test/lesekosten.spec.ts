@@ -601,6 +601,17 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				).bind(`-${i} days`, `-${i} days`),
 			),
 		]);
+		// Fuenf Seiten je Lauf, alle normalisiert - der Stand einer echten Nacht.
+		await env.DB.batch(
+			(await env.DB.prepare("SELECT id FROM psn_sync_run").all<{ id: number }>()).results.flatMap((l) =>
+				Array.from({ length: 5 }, (_, i) =>
+					env.DB.prepare(
+						"INSERT INTO psn_raw_response (sync_run_id, endpoint, payload, fetched_at, normalized_at) " +
+							"VALUES (?, ?, '[]', datetime('now'), datetime('now'))",
+					).bind(l.id, `/trophyTitles?offset=${i * 100}`),
+				),
+			),
+		);
 
 		const erschienen = await zeilenGelesen(
 			"SELECT id FROM game WHERE release_status = 'angekuendigt' AND release_date <= date('now')",
@@ -620,17 +631,27 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			 AND r.physical_release_status = 'unbekannt'
 			 AND (r.physical_checked_at IS NULL OR r.physical_checked_at < datetime('now', '-30 days'))) ORDER BY g.id LIMIT 50`,
 		);
-		const leerlauf = erschienen + haenger + laufend + heutige + auffrischen + disc;
-		console.info({ erschienen, haenger, laufend, heutige, auffrischen, disc, leerlauf });
+		// Der Aufraeumschritt (Stufe 18d) laeuft in jedem Leerlauf mit. Als
+		// SELECT gemessen, weil zeilenGelesen kein DELETE ausfuehren soll -
+		// dieselbe Bedingung, derselbe Plan.
+		const aufraeumen = await zeilenGelesen(
+			`SELECT id FROM psn_raw_response WHERE normalized_at IS NOT NULL AND sync_run_id NOT IN
+			 (SELECT sync_run_id FROM psn_raw_response GROUP BY sync_run_id ORDER BY sync_run_id DESC LIMIT 3)`,
+		);
+		const leerlauf = erschienen + haenger + laufend + heutige + auffrischen + disc + aufraeumen;
+		console.info({ erschienen, haenger, laufend, heutige, auffrischen, disc, aufraeumen, leerlauf });
 
-		// Gemessen 2 165: game zweimal (erschienen, auffrischen), game mit
+		// Gemessen 2 241: game zweimal (erschienen, auffrischen), game mit
 		// release je Spiel fuer die Disc-Auswahl (1 289), psn_sync_run dreimal
-		// (5 Zeilen). Mal 36 Aufrufe sind das rund 80 000 Zeilen je Nacht.
+		// (5 Zeilen) und seit Stufe 18d der Aufraeumschritt mit 76 Zeilen ueber
+		// die 25 Rohantworten der fuenf Laeufe. Mal 36 Aufrufe sind das rund
+		// 80 000 Zeilen je Nacht.
 		expect(leerlauf).toBeLessThan(2_500);
 
 		await env.DB.batch([
 			env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_synced_at = NULL"),
 			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL"),
+			env.DB.prepare("DELETE FROM psn_raw_response"),
 			env.DB.prepare("DELETE FROM psn_sync_run"),
 		]);
 	});
