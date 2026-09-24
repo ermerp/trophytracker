@@ -168,7 +168,8 @@ Desktop stehen die Reiter als Unterpunkte in der Seitenleiste. Die Suche
 klappt erst auf Tippen auf die Lupe auf, Filter sind Chips, und Kacheln oder
 Zeilen lassen sich je Liste getrennt umschalten (die Wahl liegt im Gerät, nicht
 am Konto). Die Filter stehen in zwei Ebenen: sichtbar ist nur, was gesetzt ist,
-alles Weitere hinter einem Knopf „Filter“. Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen –
+alles Weitere hinter einem Knopf „Filter“.
+Farben, Abstände und Schriften stehen an einer Stelle: `frontend/src/tokens.css`. Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen –
 daraus wird in Stufe 19a das Dashboard.
 
 **Als Nächstes: Stufe 19a – Dashboard**, dahinter 19b (Einzeltrophäen). Danach die
