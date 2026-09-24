@@ -3,10 +3,19 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 /**
- * Hintergrund der App-Symbole; zugleich theme_color und background_color des
- * Manifests, damit Startbildschirm und Statusleiste zum Symbol passen.
+ * Hintergrund der App-Symbole und des Startbildschirms, damit beide zum
+ * Symbol passen.
  */
 const SYMBOLFARBE = '#1f2633'
+
+/**
+ * Farbe der Statusleiste. Bis Stufe 19 war das dieselbe wie der
+ * Symbolhintergrund - gemessen am Bildschirmfoto des Nutzers vom 24.09.2026
+ * ergab das eine sichtbare Kante: Statusleiste rgb(31,38,51), Seite
+ * darunter rgb(18,21,28). Jetzt traegt die Statusleiste die Grundfarbe der
+ * Anwendung und die Seite beginnt ohne Naht.
+ */
+const GRUNDFARBE = '#12151c'
 
 /**
  * Nur Antworten der eigenen Origin, die nicht aus einer Weiterleitung stammen,
@@ -50,7 +59,7 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        theme_color: SYMBOLFARBE,
+        theme_color: GRUNDFARBE,
         background_color: SYMBOLFARBE,
         icons: [
           { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },

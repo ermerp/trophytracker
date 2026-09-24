@@ -1555,7 +1555,13 @@ textarea {
   align-items: center;
   height: calc(var(--leiste-hoehe) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: var(--flaeche);
+  /*
+   * Die Grundfarbe, nicht die hellere Flaeche: Darunter malt Android ein
+   * schwarzes Systemband, und der Sprung von #1a1f2a auf Schwarz war eine
+   * Stufe (Freigabe des Nutzers vom 24.09.2026). Die Leiste trennt sich
+   * jetzt nur noch durch ihre Oberkante vom Inhalt.
+   */
+  background: var(--grund);
   border-top: 1px solid var(--linie);
 }
 
