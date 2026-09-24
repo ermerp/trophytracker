@@ -5,7 +5,13 @@
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      `viewport-fit=cover` laesst die Seite bis unter die Systemleisten
+      reichen. Ohne das sind alle `env(safe-area-inset-*)` null, und das
+      Betriebssystem malt den Streifen unter der Leiste selbst - auf dem
+      Handy des Nutzers als heller Strich (Rueckmeldung vom 24.09.2026).
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!--
       Saira traegt Titel, Plattform-Kennzeichen und Zahlen (Stufe 19). Faellt
       der Abruf aus - offline, geblockt -, uebernimmt die System-Schrift; die

@@ -41,8 +41,8 @@ type Luecke = {
 
 /** Die beiden Umschalter der Ansicht, als Chips wie überall sonst (Stufe 19). */
 const LUECKEN_CHIPS: readonly ChipGruppe[] = [
-  { param: 'verworfene', werte: [['1', 'auch verworfene']] },
-  { param: 'unbekannte', werte: [['1', 'Disc-Fassung unbekannt']] },
+  { param: 'verworfene', titel: 'Verworfene', werte: [['1', 'auch verworfene']] },
+  { param: 'unbekannte', titel: 'Zweiter Block', werte: [['1', 'Disc-Fassung unbekannt']] },
 ]
 
 type Antwort = { anzahl: number; verworfen: number; unbekannt: number; luecken: Luecke[]; moeglich: Luecke[] }

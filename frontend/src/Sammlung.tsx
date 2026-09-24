@@ -59,9 +59,10 @@ type Spiel = {
 type Antwort = { gesamt: number; limit: number; offset: number; spiele: Spiel[] }
 
 const GRUPPEN: readonly ChipGruppe[] = [
-	{ param: 'platform', mehrfach: true, werte: PLATTFORMEN.map((p) => [p, p === 'PSVITA' ? 'Vita' : p] as const) },
+	{ param: 'platform', titel: 'Plattform', mehrfach: true, werte: PLATTFORMEN.map((p) => [p, p === 'PSVITA' ? 'Vita' : p] as const) },
 	{
 		param: 'owned',
+		titel: 'Besitz',
 		werte: [
 			['physisch', 'im Regal'],
 			['digital', 'digital'],
@@ -69,9 +70,10 @@ const GRUPPEN: readonly ChipGruppe[] = [
 			['keins', 'nicht im Besitz'],
 		],
 	},
-	{ param: 'playStatus', werte: PLAY_STATUS.map((w) => [w, STATUSTEXT[w]] as const) },
+	{ param: 'playStatus', titel: 'Status', werte: PLAY_STATUS.map((w) => [w, STATUSTEXT[w]] as const) },
 	{
 		param: 'platinum',
+		titel: 'Platin',
 		werte: [
 			['ja', 'Platin'],
 			['nein', 'Platin offen'],
@@ -81,6 +83,7 @@ const GRUPPEN: readonly ChipGruppe[] = [
 	{
 		// Ob es die Disc ueberhaupt gibt - dreiwertig, nie zu ja/nein verkuerzt.
 		param: 'physicalAvailable',
+		titel: 'Disc-Fassung',
 		werte: [
 			['ja', 'Disc gibt es'],
 			['nein', 'Disc gibt es nicht'],

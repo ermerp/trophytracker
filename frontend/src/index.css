@@ -11,8 +11,14 @@
   line-height: 1.5;
 }
 
+/* Auch das Wurzelelement, damit unter der Seite nichts Helles durchkommt. */
+html,
+body {
+  background: var(--grund);
+}
+
 body {
   margin: 0;
-  background: var(--grund);
+  min-height: 100dvh;
   color: var(--text);
 }
