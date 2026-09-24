@@ -1,0 +1,97 @@
+/*
+ * Gestaltungslinie „Vitrine" (Stufe 19).
+ *
+ * Ein dunkler Schaukasten, in dem die Cover die einzigen bunten Flächen sind.
+ * Die Oberfläche bleibt still; Farbe ist ausschliesslich Information –
+ * Plattform, Zustand, Auszeichnung. Gold ist der einzige Akzent und wird
+ * sparsam vergeben: aktiver Leisteneintrag, Favoritenstern, 100 % und
+ * erspieltes Platin.
+ *
+ * Nur dunkel, keine helle Fassung (Entscheidung des Nutzers vom 23.09.2026) –
+ * deshalb ein einziger Tokensatz und `color-scheme: dark`.
+ */
+
+:root {
+	color-scheme: dark;
+
+	/* Flaechen, von hinten nach vorn. */
+	--grund: #12151c;
+	--flaeche: #1a1f2a;
+	--flaeche-hoch: #222836;
+	--linie: #2b3242;
+
+	--text: #e8eaf0;
+	--text-leise: #9aa3b5;
+	--text-still: #7b8599;
+
+	--gold: #e8b923;
+	--gold-flaeche: rgba(232, 185, 35, 0.13);
+	--gold-rand: rgba(232, 185, 35, 0.55);
+
+	/* Meldungen: eine Warnung, ein Fehler. Beide nur als Text und Rand. */
+	--warnung: #e8a33d;
+	--gefahr: #e0685a;
+
+	/*
+	 * Ein Ton fuer alles, was FEHLT: keine Disc, kein Download, offenes Platin
+	 * (Wunsch des Nutzers vom 23.09.2026). Vorhanden ist hell, nicht vorhanden
+	 * ist dunkel - eine Regel statt drei Sonderfaellen. Bewusst leise, aber
+	 * noch erkennbar.
+	 */
+	--aus: #3b4356;
+
+	/*
+	 * Plattformen: eigene Zuordnung des Nutzers, keine Marke. Sie erscheinen
+	 * nie als Flaeche, sondern als Textfarbe und Rand eines Kennzeichens.
+	 */
+	--ps3: #d4563f;
+	--ps4: #4aa8e8;
+	--ps5: #6b7bf0;
+	--psvita: #3fb27f;
+
+	/*
+	 * Zustaende. Die Namen sind die Werte aus `play_status`, damit sich der
+	 * Token im Code bilden laesst: var(--st-am_spielen).
+	 *
+	 * Komplettiert ist gold, am Spielen gruen (Entscheidung des Nutzers vom
+	 * 23.09.2026). Dadurch tragen Prozentzahl, Pokal, Zustandspunkt und
+	 * Fortschrittsbalken eines komplettierten Spiels dieselbe Farbe - die
+	 * Auszeichnung wird eine Aussage statt vier verstreuter Zeichen.
+	 */
+	--st-am_spielen: #3fb27f;
+	--st-komplettiert: #e8b923;
+	--st-durchgespielt: #4aa8e8;
+	--st-pausiert: #8a94ab;
+	--st-abgebrochen: #c4564a;
+	--st-nicht_gespielt: #5a6377;
+	--st-unentschieden: #b48ae8;
+
+	/* Abstaende, Radien, Schatten. */
+	--a1: 0.25rem;
+	--a2: 0.5rem;
+	--a3: 0.75rem;
+	--a4: 1rem;
+	--a5: 1.5rem;
+	--a6: 2rem;
+	--r1: 4px;
+	--r2: 8px;
+	--r3: 14px;
+	--r-rund: 999px;
+	--schatten-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+	--schatten-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+	/*
+	 * Saira traegt Titel, Plattform-Kennzeichen und Zahlen (aus zehn
+	 * verglichenen gewaehlt, 23.09.2026); der Fliesstext bleibt die
+	 * System-Schrift des Geraets. Faellt der Webfont aus - offline, geblockt -,
+	 * uebernimmt sie auch die Titel, ohne dass etwas bricht.
+	 */
+	--schrift-display: 'Saira', system-ui, sans-serif;
+	--schrift: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+	--kopf-hoehe: 56px;
+	--leiste-hoehe: 64px;
+
+	/* Cover sind Hochformat (264 x 374, `t_cover_big`, Abschnitt 7.6). */
+	--cover: 264 / 374;
+}

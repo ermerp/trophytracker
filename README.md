@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 18c abgenommen** (22.09.2026), Stufe 18d gebaut (23.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen bis 18c abgenommen** (22.09.2026), Stufen 18d und 19 gebaut (23./24.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -106,7 +106,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
 | Ansicht | Trophäenliste mit Sortierung, Platin-Filter und Blätterung |
 | Zuordnung | Gruppenvorschläge nach Titel, ein Spiel mit mehreren Releases |
-| Sammlung | Kachelraster mit Filtern (Plattform, Besitz, gespielt, Platin, Disc-Fassung), Suche, Schnellerfassung mit Rückgängig |
+| Sammlung | Kacheln oder Zeilen (umschaltbar, je Liste gemerkt), Filter als Chips (Plattform mehrfach, Besitz, Status, Platin, Disc-Fassung), Suche hinter der Lupe. Besitz ist Anzeige – erfasst wird über Scanner und Spieldetail |
 | Spieldetail | Exemplare mit Zustand, Kaufdatum, Preis, EAN; digitale Quellen (Kauf, PS Plus, Testversion); Releases anlegen und löschen |
 | Besitz | Spiele ohne Trophäenliste von Hand anlegen, Dublettenwarnung über den Titelschlüssel |
 | Navigation | `react-router-dom`, Leiste unten (Handy) bzw. seitlich (Desktop), Filter in der URL |
@@ -133,7 +133,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 20 (Migration 0018). **Stufe 15 abgenommen am 16.09.2026** |
 | Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt der nächtliche Cron nach, außerdem „Metadaten auffrischen" (Stufe 18) |
 | Automatik | Cron Trigger, nachts alle fünf Minuten zwischen 03:00 und 05:59 UTC, je Aufruf ein Schritt: Erschienene freigeben, hängende Läufe abbrechen, Trophäen-Sync (ein Versuch je Nacht), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, zuletzt Aufräumen alter Rohantworten (Stufe 18d). Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen, Leerläufe verdichtet; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migration 0021) |
-| App | Installierbar (PWA) mit Pokal-Symbol; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
+| App | Installierbar (PWA) mit eigenem Symbol – ein Pokal im Fortschrittsring; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
 | Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
 | Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen, „Verwerfen" wirft eine Fehllesung sofort weg (mit Rückfrage). Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. „Überspringen" geht weiter, ohne etwas zu speichern (seit Stufe 17d – davor „Später" und ein Sammelmodus, beides mit offenen Scans entfallen). Unbekannte Codes löst seit Stufe 17c eBay live auf; ein Treffer aus der Sammlung erscheint als dieselbe Karte wie ein bekannter Code – mit Cover, „im Regal ×n" und „Disc erfassen" (9.2) |
 | EAN-Auflösung | Kette beim Scannen: eigenes `ean_mapping` (rein lokal, kein Netz) → Händlerfeed → **eBay live** (seit Stufe 17c, Titelvorschlag mit Kandidaten der Sammlung) → Suche/Anlegen von Hand. Ein einmal zugeordneter Code wird nie wieder online nachgeschlagen |
@@ -157,7 +157,20 @@ die Rohablage ungebremst: 2,31 von 3,26 MB der Datenbank und 263 KiB je Nacht,
 mit jedem `d1 export` erneut in die Sicherung. Ein neunter Cron-Schritt räumt sie
 jetzt weg.
 
-**Als Nächstes: Stufe 19 – Oberfläche**, dahinter 19b (Einzeltrophäen). Danach die
+**Stufe 19** (24.09.2026) hat die Oberfläche aufgeräumt. Die Linie heißt
+**„Vitrine"**: ein dunkler Schaukasten, in dem die Cover die einzigen bunten
+Flächen sind – Farbe ist sonst ausschließlich Information. Alle Werte stehen
+als Tokens in `frontend/src/tokens.css`, die Anwendung ist nur noch dunkel.
+Die untere Leiste trägt **vier Symbole ohne Text** statt sieben Einträge bei
+0,6 rem: Kaufliste und Lücken sind Reiter der Wunschliste, Scannen ist eine
+Aktion in der Kopfzeile der Sammlung, die Einstellungen sind das Zahnrad; am
+Desktop stehen die Reiter als Unterpunkte in der Seitenleiste. Die Suche
+klappt erst auf Tippen auf die Lupe auf, Filter sind Chips, und Kacheln oder
+Zeilen lassen sich je Liste getrennt umschalten (die Wahl liegt im Gerät, nicht
+am Konto). Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen –
+daraus wird in Stufe 19a das Dashboard.
+
+**Als Nächstes: Stufe 19a – Dashboard**, dahinter 19b (Einzeltrophäen). Danach die
 Oberfläche (19), dahinter die Einzeltrophäen je Spiel (19b). Beide
 PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
 
@@ -692,8 +705,9 @@ entsprechen. Die Ausgabe von `wrangler deploy` nennt außerdem den Cron
 ## Als App installieren
 
 Das Frontend ist seit Stufe 18 eine PWA (`vite-plugin-pwa`): Manifest, eigenes
-Symbol (ein Pokal – bewusst ohne PlayStation-Marken, das Repository ist
-öffentlich) und ein Service Worker.
+Symbol (ein Pokal in einem Fortschrittsring – bewusst ohne PlayStation-Marken,
+das Repository ist öffentlich) und ein Service Worker. Der Ring ist zu 87 %
+geschlossen: Eine Sammlung ist nie ganz fertig.
 
 - **Android, Chrome:** Menü → „App installieren" beziehungsweise „Zum
   Startbildschirm hinzufügen".

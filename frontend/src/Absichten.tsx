@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router-dom'
-import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, STATUSTEXT, anfrage, datum, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
+import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
+import type { Ansichtsart } from './Ansicht'
+import type { ChipGruppe } from './Chips'
+import { Cover, PlattformChip, ZustandsZeile } from './SpielTeile'
+import { Zeichen, type ZeichenName } from './Symbole'
 
 /**
  * Geteilte Bausteine der Listen (Abschnitt 5): Wunschliste (Stufe 10), To-Do
@@ -236,47 +240,23 @@ export function ErscheintBaldLink() {
 
 export type PlanListe = ReturnType<typeof usePlanListe>
 
-/** Sortierung, Favoriten, erledigte, Plattformen. Ohne `sortierbar` fehlt das Sortier-Dropdown (To-Do). */
-export function Filterleiste({ liste, sortierbar = true }: { liste: PlanListe; sortierbar?: boolean }) {
-  const { sortierung, nurFavoriten, alle, plattformen, suche, setzeParam, plattformFilterUmschalten } = liste
-  const standard = liste.art === 'todo' ? 'position' : 'favorit'
-  return (
-    <div className="filterleiste">
-      <input
-        type="search"
-        value={suche}
-        placeholder="Titel suchen"
-        aria-label="Titel suchen"
-        onChange={(e) => setzeParam('suche', e.target.value)}
-      />
-      {sortierbar && (
-        <label>
-          Sortierung{' '}
-          <select value={sortierung} onChange={(e) => setzeParam('sort', e.target.value === standard ? '' : e.target.value)}>
-            {Object.entries(SORTIERTEXT)
-              .filter(([wert]) => wert !== 'position' || liste.art === 'todo')
-              .map(([wert, text]) => (
-                <option key={wert} value={wert}>{text}</option>
-              ))}
-          </select>
-        </label>
-      )}
-      <label>
-        <input type="checkbox" checked={nurFavoriten} onChange={(e) => setzeParam('favorit', e.target.checked ? '1' : '')} /> nur Favoriten
-      </label>
-      <label>
-        <input type="checkbox" checked={alle} onChange={(e) => setzeParam('status', e.target.checked ? 'alle' : '')} /> auch erledigte und verworfene
-      </label>
-      <span className="plattformfilter" role="group" aria-label="Plattformen">
-        {PLATTFORM_FILTER.map((p) => (
-          <label key={p}>
-            <input type="checkbox" checked={plattformen.has(p)} onChange={() => plattformFilterUmschalten(p)} /> {p === 'ohne' ? 'ohne Plattform' : p}
-          </label>
-        ))}
-      </span>
-    </div>
-  )
-}
+/**
+ * Die Filter der Absichtslisten als Chips (Stufe 19) – dieselbe Gestalt wie
+ * in der Sammlung. Vorher war es hier eine Kästchenreihe und dort ein Band
+ * aus Dropdowns; das war dieselbe Aufgabe in zwei Formen.
+ */
+export const PLAN_CHIPS: readonly ChipGruppe[] = [
+	{
+		param: 'plattform',
+		mehrfach: true,
+		werte: [
+			...PLATTFORMEN.map((p) => [p, p === 'PSVITA' ? 'Vita' : p] as const),
+			['ohne', 'ohne Plattform'] as const,
+		],
+	},
+	{ param: 'favorit', werte: [['1', 'Favoriten']] },
+	{ param: 'status', werte: [['alle', 'auch erledigte']] },
+]
 
 /** Fehlermeldung und die Rückgängig-Zeile nach dem Anlegen. */
 export function Meldungen({ liste }: { liste: PlanListe }) {
@@ -295,12 +275,19 @@ export function Meldungen({ liste }: { liste: PlanListe }) {
   )
 }
 
-/** To-Do und Backlog sind eine Seite mit zwei Reitern (Abschnitt 13). */
-export function Reiter() {
+/**
+ * Reiter einer Seite (Abschnitt 13). To-Do und Backlog waren von Anfang an
+ * zwei Reiter; seit Stufe 19 sind Kaufliste und Lücken die Reiter der
+ * Wunschliste, damit die untere Leiste vier Symbole trägt statt sieben.
+ */
+export function Reiter({ eintraege }: { eintraege: ReadonlyArray<readonly [ziel: string, text: string]> }) {
   return (
     <nav className="reiter" aria-label="Listen">
-      <NavLink to="/todo">To-Do</NavLink>
-      <NavLink to="/backlog">Backlog</NavLink>
+      {eintraege.map(([ziel, text]) => (
+        <NavLink key={ziel} to={ziel}>
+          {text}
+        </NavLink>
+      ))}
     </nav>
   )
 }
@@ -308,127 +295,196 @@ export function Reiter() {
 type KarteProps = {
   e: PlanEintrag
   liste: PlanListe
-  /** Drag-Griff vor dem Kopf (To-Do). */
-  griff?: ReactNode
-  /** Artspezifische Knöpfe in der Knopfzeile, etwa „auf To-Do". */
+  art: Ansichtsart
+  /** Artspezifische Knöpfe, etwa „auf die Kaufliste". */
   knoepfe?: ReactNode
   liRef?: (el: HTMLLIElement | null) => void
   style?: CSSProperties
   className?: string
+  /**
+   * Die Eigenschaften von `useSortable` (To-Do). Sie sitzen auf der **ganzen
+   * Karte**, nicht auf einem Griff – seit Stufe 19 gibt es keinen mehr.
+   */
+  zieher?: Record<string, unknown>
+}
+
+/** Ein Symbolknopf der Karte. Was er tut, steht im `aria-label`, nicht daneben. */
+function IKnopf({
+  name,
+  text,
+  onClick,
+  gefahr,
+}: {
+  name: ZeichenName
+  text: string
+  onClick: () => void
+  gefahr?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      className={gefahr ? 'ikone gefahr' : 'ikone'}
+      aria-label={text}
+      title={text}
+      onClick={onClick}
+      // Die ganze Karte ist in der To-Do-Liste der Ziehgriff (Stufe 19);
+      // ohne das hier startete jeder Knopfdruck eine Verschiebung.
+      onPointerDown={(ev) => ev.stopPropagation()}
+    >
+      <Zeichen name={name} groesse={19} />
+    </button>
+  )
 }
 
 /**
- * Eine Kachel: Cover, Titel, Kritik und Jahr, Stern, Plattform-Dropdown
- * (hängt den Eintrag um), erledigt/verworfen/wieder öffnen, entfernen,
- * Notiz. Bei To-Do und Backlog am Release stehen statt „erledigt" die
+ * Eine Karte der Absichtslisten – als Kachel oder als Zeile (Stufe 19).
+ *
+ * Cover, Titel, Plattform, Kritik und Jahr, Favoritenstern und die Knöpfe als
+ * Symbole. Bei To-Do und Backlog am Release stehen statt „erledigt" die
  * Bewertungen „durchgespielt" und „abgebrochen" (Kopplung, 5.5); nie
- * gestartete kennen stattdessen nur „nicht vorgesehen" (verworfen).
+ * gestartete kennen stattdessen nur „nicht vorgesehen".
+ *
+ * Zwei Dinge sind seit Stufe 19 anders (Rückmeldung des Nutzers vom
+ * 22.09.2026):
+ *
+ * - **Die Notiz wird nicht mehr angezeigt.** Sie bleibt in Datenmodell, API
+ *   und Spieldetail – „es reicht, wenn sie nicht angezeigt wird".
+ * - **Die Plattform ist nur in der Kachel änderbar.** In der Zeile steht sie
+ *   als Kennzeichen; das Dropdown hätte dort die Knopfreihe verdrängt. Das
+ *   Umhängen ist seltene Nachpflege, für die es den Filter „ohne Plattform"
+ *   gibt (Abschnitt 5).
  */
-export function PlanKarte({ e, liste, griff, knoepfe, liRef, style, className }: KarteProps) {
+export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zieher }: KarteProps) {
   const { aendern, entfernen, bewerten } = liste
   const gekoppelt = (e.art === 'todo' || e.art === 'backlog') && e.releaseId !== null
   const nieGestartet = e.eigenerStatus === null || e.eigenerStatus === 'nicht_gespielt'
-  const [notizOffen, setNotizOffen] = useState(false)
-  const klassen = ['kachel', e.status === 'offen' ? '' : 'erledigt', className ?? ''].filter(Boolean).join(' ')
+  const klassen = [
+    art === 'kacheln' ? 'kachel' : 'eintrag',
+    e.status === 'offen' ? '' : 'erledigt',
+    zieher ? 'ziehbar' : '',
+    className ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
-  return (
-    <li ref={liRef} style={style} className={klassen}>
-      <div className="wunsch-kopf">
-        {griff}
-        {e.spielId !== null ? (
-          <Link to={`/spiel/${e.spielId}`} className={e.bild ? 'bild cover' : 'bild'}>
-            {e.bild ? <img src={e.bild} alt="" loading="lazy" /> : <span aria-hidden="true">{e.titel.slice(0, 1)}</span>}
-          </Link>
-        ) : (
-          <span className="bild" aria-hidden="true">?</span>
-        )}
-        <div>
-          {e.spielId !== null ? (
-            <Link to={`/spiel/${e.spielId}`} className="titel">{e.titel}</Link>
-          ) : (
-            <span className="titel">{e.titel}</span>
-          )}
-          <div className="zeile">
-            {e.spielId === null ? 'ohne IGDB-Eintrag' : `Kritik ${e.kritik ?? 'unbekannt'}`}
-            {e.releaseStatus === 'angekuendigt' && ` · erscheint ${e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'}`}
-            {e.releaseStatus !== 'angekuendigt' && e.erscheinungsdatum && ` · ${e.erscheinungsdatum.slice(0, 4)}`}
-            {e.art !== 'wunsch' && e.eigenerStatus && ` · ${STATUSTEXT[e.eigenerStatus]}`}
-            {e.art === 'kauf' && e.herkunft && ` · ${HERKUNFTTEXT[e.herkunft] ?? e.herkunft}`}
-            {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.imBesitz && ' · im Besitz'}
-            {e.status !== 'offen' && ` · ${PLAN_STATUSTEXT[e.status]}`}
-          </div>
-        </div>
-      </div>
-
-      <div className="besitz">
-        <button
-          type="button"
-          className={e.favorit ? 'stern aktiv' : 'stern'}
-          aria-pressed={e.favorit}
-          title={e.favorit ? 'Favorit – klicken zum Entfernen' : 'Als Favorit markieren'}
-          onClick={() => aendern(e.id, { favorit: !e.favorit })}
+  const meta = (
+    <div className="release-daten umbrechend">
+      {e.spielId !== null && e.plattform && art === 'zeilen' ? (
+        <PlattformChip plattform={e.plattform} />
+      ) : e.spielId !== null && art === 'kacheln' ? (
+        <select
+          value={e.plattform ?? ''}
+          aria-label="Plattform"
+          title="Plattform des Eintrags – ein Release entsteht bei Bedarf"
+          onChange={(ev) => aendern(e.id, { plattform: ev.target.value })}
         >
-          {e.favorit ? '★' : '☆'}
-        </button>
-        {e.spielId !== null ? (
-          <select
-            value={e.plattform ?? ''}
-            aria-label="Plattform"
-            title="Plattform des Eintrags – ein Release entsteht bei Bedarf"
-            onChange={(ev) => aendern(e.id, { plattform: ev.target.value })}
-          >
-            <option value="">ohne Plattform</option>
-            {PLATTFORMEN.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        ) : (
-          <span className="zeile">ohne Plattform</span>
-        )}
-        {e.status === 'offen' ? (
-          <>
-            {knoepfe}
-            {gekoppelt ? (
-              nieGestartet ? (
-                <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'verworfen' })}>nicht vorgesehen</button>
-              ) : (
-                <>
-                  <button type="button" className="klein" onClick={() => bewerten(e, 'durchgespielt')}>durchgespielt</button>
-                  <button type="button" className="klein" onClick={() => bewerten(e, 'abgebrochen')}>abgebrochen</button>
-                </>
-              )
+          <option value="">ohne Plattform</option>
+          {PLATTFORMEN.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="plattform leer">ohne Plattform</span>
+      )}
+      {e.art !== 'wunsch' && e.eigenerStatus && <ZustandsZeile status={e.eigenerStatus} klein />}
+      <span className="ruhig klein">
+        {e.spielId === null ? 'ohne IGDB-Eintrag' : `Kritik ${e.kritik ?? 'unbekannt'}`}
+        {e.releaseStatus === 'angekuendigt' && ` · erscheint ${e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'}`}
+        {e.releaseStatus !== 'angekuendigt' && e.erscheinungsdatum && ` · ${e.erscheinungsdatum.slice(0, 4)}`}
+        {e.art === 'kauf' && e.herkunft && ` · ${HERKUNFTTEXT[e.herkunft] ?? e.herkunft}`}
+        {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.imBesitz && ' · im Besitz'}
+        {e.status !== 'offen' && ` · ${PLAN_STATUSTEXT[e.status]}`}
+      </span>
+    </div>
+  )
+
+  const stern = (
+    <button
+      type="button"
+      className={e.favorit ? 'ikone stern aktiv' : 'ikone stern'}
+      aria-pressed={e.favorit}
+      aria-label={e.favorit ? 'Favorit – klicken zum Entfernen' : 'Als Favorit markieren'}
+      title={e.favorit ? 'Favorit – klicken zum Entfernen' : 'Als Favorit markieren'}
+      onClick={() => aendern(e.id, { favorit: !e.favorit })}
+      onPointerDown={(ev) => ev.stopPropagation()}
+    >
+      <Zeichen name="stern" groesse={19} gefuellt={e.favorit} />
+    </button>
+  )
+
+  const knopfzeile = (
+    <div className="knoepfe">
+      {art === 'zeilen' && stern}
+      {e.status === 'offen' ? (
+        <>
+          {knoepfe}
+          {gekoppelt ? (
+            nieGestartet ? (
+              <IKnopf name="kreuz" text="nicht vorgesehen" onClick={() => aendern(e.id, { status: 'verworfen' })} />
             ) : (
               <>
-                <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'erledigt' })}>erledigt</button>
-                <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'verworfen' })}>verworfen</button>
+                <IKnopf name="durchgespielt" text="durchgespielt" onClick={() => bewerten(e, 'durchgespielt')} />
+                <IKnopf name="abgebrochen" text="abgebrochen" onClick={() => bewerten(e, 'abgebrochen')} />
               </>
-            )}
-          </>
-        ) : (
-          <button type="button" className="klein" onClick={() => aendern(e.id, { status: 'offen' })}>wieder öffnen</button>
-        )}
-        <button type="button" className="klein gefaehrlich" onClick={() => entfernen(e)}>entfernen</button>
-      </div>
-
-      {notizOffen ? (
-        <form
-          className="notizfeld"
-          onSubmit={(ev) => {
-            ev.preventDefault()
-            const notiz = new FormData(ev.currentTarget).get('notiz')
-            setNotizOffen(false)
-            void aendern(e.id, { notiz: typeof notiz === 'string' ? notiz : '' })
-          }}
-        >
-          <input name="notiz" defaultValue={e.notiz ?? ''} aria-label="Notiz" autoFocus />
-          <button type="submit" className="klein">Speichern</button>
-          <button type="button" className="klein" onClick={() => setNotizOffen(false)}>Abbrechen</button>
-        </form>
+            )
+          ) : (
+            <>
+              <IKnopf name="haken" text="erledigt" onClick={() => aendern(e.id, { status: 'erledigt' })} />
+              <IKnopf name="kreuz" text="verworfen" onClick={() => aendern(e.id, { status: 'verworfen' })} />
+            </>
+          )}
+        </>
       ) : (
-        <button type="button" className="notiz" onClick={() => setNotizOffen(true)} title="Notiz bearbeiten">
-          {e.notiz ?? 'Notiz …'}
-        </button>
+        <IKnopf name="oeffnen" text="wieder öffnen" onClick={() => aendern(e.id, { status: 'offen' })} />
       )}
+      <IKnopf name="muell" text="entfernen" gefahr onClick={() => entfernen(e)} />
+    </div>
+  )
+
+  const titel =
+    e.spielId !== null ? (
+      <Link to={`/spiel/${e.spielId}`} className="titel">
+        {e.titel}
+      </Link>
+    ) : (
+      <span className="titel">{e.titel}</span>
+    )
+
+  if (art === 'kacheln') {
+    return (
+      <li ref={liRef} style={style} className={klassen} {...zieher}>
+        <div className="kachel-bild">
+          <Cover
+            bild={e.bild}
+            cover={e.bild !== null}
+            titel={e.titel}
+            ziel={e.spielId !== null ? `/spiel/${e.spielId}` : undefined}
+          />
+          <span className="ecke">{stern}</span>
+        </div>
+        {titel}
+        {meta}
+        {knopfzeile}
+      </li>
+    )
+  }
+
+  return (
+    <li ref={liRef} style={style} className={`${klassen} hoch`} {...zieher}>
+      <Cover
+        bild={e.bild}
+        cover={e.bild !== null}
+        titel={e.titel}
+        ziel={e.spielId !== null ? `/spiel/${e.spielId}` : undefined}
+        breite={52}
+      />
+      <div className="eintrag-text">
+        {titel}
+        {meta}
+        {knopfzeile}
+      </div>
     </li>
   )
 }

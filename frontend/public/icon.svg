@@ -1,12 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <!--
-    App-Symbol: ein schlichter Pokal (Stufe 18). Eigene Zeichnung, eine Farbe,
-    kein Text. Keine PlayStation-Symbole oder -Schriftzuege, auch nicht
-    angedeutet - geschuetzte Marken, das Repository ist oeffentlich
-    (Entscheidung des Nutzers vom 19.09.2026, Spezifikation Abschnitt 13).
+    App-Symbol: ein Pokal in einem Fortschrittsring (Stufe 19; aus zehn
+    Entwuerfen vom Nutzer am 24.09.2026 gewaehlt). Der Ring ist zu 87 Prozent
+    geschlossen - eine Sammlung ist nie ganz fertig. Eigene Zeichnung, zwei
+    Farben, kein Text. Keine PlayStation-Logos, -Symbole oder -Schriftzuege,
+    auch nicht angedeutet (Spezifikation Abschnitt 13).
+
+    Der Pokal sitzt auf 0.68 der Originalgroesse: gemessen gegen 64 px, bei
+    der kleineren Fassung verlor er im Ring an Kraft. Der Ringaussenrand
+    liegt bei Radius 189 und damit innerhalb der maskierbaren Schutzzone
+    (204.8 bei 512 px), sodass Android beim Rundschnitt nichts abschneidet.
   -->
   <rect width="512" height="512" rx="96" fill="#1f2633"/>
-  <g fill="#e8b923">
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#2e3648" stroke-width="26"/>
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#e8b923" stroke-width="26"
+          stroke-linecap="round" stroke-dasharray="962 1106" transform="rotate(-90 256 256)"/>
+  <g fill="#e8b923" transform="translate(256 256) scale(0.68) translate(-256 -256)">
     <!-- Kelch -->
     <path d="M152 112h208v96c0 62-46 112-104 112s-104-50-104-112z"/>
     <!-- Henkel -->

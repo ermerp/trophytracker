@@ -6,6 +6,18 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Saira traegt Titel, Plattform-Kennzeichen und Zahlen (Stufe 19). Faellt
+      der Abruf aus - offline, geblockt -, uebernimmt die System-Schrift; die
+      Seite bleibt vollstaendig benutzbar. Der Service Worker legt die beiden
+      Antworten dauerhaft ab, damit das offline nicht jedes Mal passiert.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <meta name="theme-color" content="#1f2633" />
     <title>Trophytracker</title>
   </head>

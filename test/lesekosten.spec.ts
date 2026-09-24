@@ -97,6 +97,30 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(antwort.status).toBe(200);
 	});
 
+	/**
+	 * Der Chip-Filter der Sammlung erlaubt seit Stufe 19 mehrere Plattformen.
+	 * Aus `r.platform = ?` wird `r.platform IN (?,?,?,?)` - hoechstens vier
+	 * Werte, derselbe Plan, kein zusaetzlicher Scan. Gemessen, weil ein `IN`
+	 * ueber eine indizierte Spalte in SQLite leicht auf einen Tabellenscan
+	 * umkippt, wenn die Liste waechst.
+	 */
+	it("misst den Plattformfilter mit mehreren Werten (Stufe 19)", async () => {
+		const einer = await zeilenGelesen(
+			"SELECT COUNT(*) AS n FROM game g WHERE EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id AND (r.platform = ?))",
+			"PS4",
+		);
+		const vier = await zeilenGelesen(
+			"SELECT COUNT(*) AS n FROM game g WHERE EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id " +
+				"AND (r.platform IN ('PS3','PS4','PS5','PSVITA')))",
+		);
+		console.info({ einePlattform: einer, vierPlattformen: vier });
+
+		// Vier Werte duerfen nicht teurer sein als ein Vielfaches der Treffer:
+		// Der Filter laeuft ueber idx_release_game, nicht ueber die Tabelle.
+		expect(vier).toBeLessThan(einer * 4 + 500);
+		expect(await SELF.fetch(`${B}/api/games?platform=PS4,PS5&limit=50`)).toHaveProperty("status", 200);
+	});
+
 	it("misst die Sortierung nach Spielzeit (Stufe 18c)", async () => {
 		// Spielzeit fuer jedes zweite Release, wie bei einem Bestand mit PS3
 		// und Vita ohne Spielzeit.

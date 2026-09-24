@@ -1,87 +1,131 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { type IgdbKandidat } from './api'
-import { ErscheintBaldLink, Filterleiste, Meldungen, PlanKarte, usePlanListe } from './Absichten'
+import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERTEXT, usePlanListe } from './Absichten'
+import { useAnsicht } from './Ansicht'
+import { Chips } from './Chips'
 import { IgdbSuche } from './IgdbSuche'
+import { Kopfzeile } from './Kopfzeile'
+import { Zeichen } from './Symbole'
 
 /**
  * Wunschliste (Use Case 4, ab Stufe 10; Use Case 11 für das Datum).
  *
  * Favoriten zuerst, dann nach Kritikerwertung (5.2); alternativ Wertung,
- * Titel, Erscheinungsdatum, zuletzt angelegt. Filter: nur Favoriten,
- * Plattformen, „ohne Plattform" – der Filter, mit dem sich Wünsche ohne
- * Plattform nachpflegen lassen (Entscheidung des Nutzers vom 15.09.2026).
- * Neue Wünsche kommen aus der IGDB-Suche; jeder Treffer trägt sein eigenes
- * Plattform-Dropdown, vorbelegt mit seiner neuesten; „ohne Plattform" bleibt
- * wählbar. Ein Eintrag ohne IGDB-Zuordnung entsteht nur über den
- * ausdrücklichen Knopf (8.2). Bei angekündigten Titeln steht das
- * Erscheinungsdatum dort, wo später der Preis steht (8.4). Ein Release nur
- * aus Wunsch zählt nicht zur Sammlung (Abschnitt 3).
+ * Titel, Erscheinungsdatum, zuletzt angelegt. Neue Wünsche kommen aus der
+ * IGDB-Suche; jeder Treffer trägt sein eigenes Plattform-Dropdown, vorbelegt
+ * mit seiner neuesten. Ein Eintrag ohne IGDB-Zuordnung entsteht nur über den
+ * ausdrücklichen Knopf (8.2).
  *
- * Kachel, Filter und Schreibzugriffe teilt sie sich seit Stufe 12 mit
- * To-Do und Backlog (Absichten.tsx). „auf die Kaufliste" (Stufe 15) legt
- * eine Kopie an – der Wunsch bleibt, bis der Kauf erledigt ist.
+ * Seit Stufe 19 ist sie die erste von **drei Reitern** – Kaufliste und Lücken
+ * sitzen daneben, wie das Backlog neben To-Do. Damit trägt die untere Leiste
+ * vier Symbole statt sieben.
  */
+
+/** Die drei Reiter dieser Seite (Stufe 19). */
+export const WUNSCH_REITER = [
+	['/wunschliste', 'Wunschliste'],
+	['/kaufliste', 'Kaufliste'],
+	['/luecken', 'Lücken'],
+] as const
+
 export function Wunschliste() {
-  const liste = usePlanListe('wunsch')
-  const { daten, laeuft, nurFavoriten, plattformen, suche } = liste
-  const [hinzufuegen, setHinzufuegen] = useState(false)
+	const liste = usePlanListe('wunsch')
+	const { daten, laeuft, sortierung, setzeParam } = liste
+	const ansicht = useAnsicht('wunsch')
+	const [hinzufuegen, setHinzufuegen] = useState(false)
 
-  async function anlegen(koerper: Record<string, unknown>) {
-    if (await liste.anlegen(koerper)) setHinzufuegen(false)
-  }
-  const igdbWaehlen = (k: IgdbKandidat, plattform: string) => anlegen({ igdbId: k.igdbId, plattform })
-  // Freitext hat kein Spiel und damit kein Release - die Plattform bleibt weg.
-  const ohneTreffer = (begriff: string) => anlegen({ titel: begriff })
+	async function anlegen(koerper: Record<string, unknown>) {
+		if (await liste.anlegen(koerper)) setHinzufuegen(false)
+	}
+	const igdbWaehlen = (k: IgdbKandidat, plattform: string) => anlegen({ igdbId: k.igdbId, plattform })
+	// Freitext hat kein Spiel und damit kein Release - die Plattform bleibt weg.
+	const ohneTreffer = (begriff: string) => anlegen({ titel: begriff })
 
-  return (
-    <>
-      <h1>Wunschliste</h1>
+	return (
+		<>
+			<Kopfzeile
+				titel="Wunschliste"
+				sucheParam="suche"
+				ansicht={ansicht}
+				aktion={{ name: 'plus', text: 'Wunsch hinzufügen', onClick: () => setHinzufuegen(!hinzufuegen) }}
+			/>
+			<Reiter eintraege={WUNSCH_REITER} />
+			<Chips gruppen={PLAN_CHIPS} />
 
-      <section className="anlegen">
-        <button type="button" onClick={() => setHinzufuegen(!hinzufuegen)} disabled={laeuft}>
-          {hinzufuegen ? 'Schließen' : 'Wunsch hinzufügen'}
-        </button>{' '}
-        <Link to="/import" className="zeile">Liste importieren</Link>{' '}
-        <ErscheintBaldLink />
-        {hinzufuegen && (
-          <>
-            <p className="zeile">
-              Bei IGDB suchen und übernehmen. Die Plattform steht an jedem Treffer, vorbelegt mit seiner neuesten; Freitext bleibt immer ohne Plattform.
-            </p>
-            <IgdbSuche vorgabe="" onWahl={igdbWaehlen} onOhneTreffer={ohneTreffer} laeuft={laeuft} mitPlattform />
-          </>
-        )}
-      </section>
+			<div className="seite">
+				{hinzufuegen && (
+					<section className="anlegen">
+						<p className="ruhig klein">
+							Bei IGDB suchen und übernehmen. Die Plattform steht an jedem Treffer, vorbelegt mit seiner neuesten;
+							Freitext bleibt immer ohne Plattform.
+						</p>
+						<IgdbSuche vorgabe="" onWahl={igdbWaehlen} onOhneTreffer={ohneTreffer} laeuft={laeuft} mitPlattform />
+					</section>
+				)}
 
-      <Filterleiste liste={liste} />
-      <Meldungen liste={liste} />
+				<Meldungen liste={liste} />
 
-      {!daten ? (
-        <p>wird geladen …</p>
-      ) : daten.eintraege.length === 0 ? (
-        <p>{nurFavoriten || plattformen.size > 0 || suche ? 'Nichts passt zum Filter.' : 'Die Wunschliste ist leer.'}</p>
-      ) : (
-        <>
-          <p>{daten.eintraege.length} Einträge</p>
-          <ul className="kacheln">
-            {daten.eintraege.map((e) => (
-              <PlanKarte
-                key={e.id}
-                e={e}
-                liste={liste}
-                knoepfe={
-                  e.aufKaufliste !== null ? (
-                    <Link to="/kaufliste" className="zeile">auf der Kaufliste</Link>
-                  ) : (
-                    <button type="button" className="klein" disabled={laeuft} onClick={() => liste.aufKaufliste(e)}>auf die Kaufliste</button>
-                  )
-                }
-              />
-            ))}
-          </ul>
-        </>
-      )}
-    </>
-  )
+				{!daten ? (
+					<p className="ruhig">wird geladen …</p>
+				) : daten.eintraege.length === 0 ? (
+					<p className="ruhig">Nichts passt zum Filter.</p>
+				) : (
+					<>
+						<div className="listenkopf">
+							<span>{daten.eintraege.length} Einträge</span>
+							<ErscheintBaldLink />
+							<Link to="/import" className="ruhig klein">
+								Liste importieren
+							</Link>
+							<label>
+								<span className="nur-vorlesen">Sortierung</span>
+								<select
+									value={sortierung}
+									onChange={(e) => setzeParam('sort', e.target.value === 'favorit' ? '' : e.target.value)}
+								>
+									{Object.entries(SORTIERTEXT)
+										.filter(([wert]) => wert !== 'position')
+										.map(([wert, text]) => (
+											<option key={wert} value={wert}>
+												{text}
+											</option>
+										))}
+								</select>
+							</label>
+						</div>
+
+						<ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>
+							{daten.eintraege.map((e) => (
+								<PlanKarte
+									key={e.id}
+									e={e}
+									liste={liste}
+									art={ansicht.art}
+									knoepfe={
+										e.aufKaufliste !== null ? (
+											<Link to="/kaufliste" className="ikone" aria-label="steht auf der Kaufliste" title="steht auf der Kaufliste">
+												<Zeichen name="umhaengen" groesse={19} gefuellt />
+											</Link>
+										) : (
+											<button
+												type="button"
+												className="ikone"
+												aria-label="Auf die Kaufliste"
+												title="Auf die Kaufliste"
+												disabled={laeuft}
+												onClick={() => liste.aufKaufliste(e)}
+											>
+												<Zeichen name="umhaengen" groesse={19} />
+											</button>
+										)
+									}
+								/>
+							))}
+						</ul>
+					</>
+				)}
+			</div>
+		</>
+	)
 }

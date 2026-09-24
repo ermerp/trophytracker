@@ -1,9 +1,18 @@
+/*
+ * Nur die Grundlagen. Alles Gestaltete steht in tokens.css und App.css.
+ * Die Anwendung ist seit Stufe 19 ausschliesslich dunkel (Entscheidung des
+ * Nutzers vom 23.09.2026) - `color-scheme` sagt das dem Browser, damit auch
+ * Bildlaufleisten und Formularelemente dazu passen.
+ */
+@import './tokens.css';
+
 :root {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--schrift);
   line-height: 1.5;
-  color-scheme: light dark;
 }
 
 body {
   margin: 0;
+  background: var(--grund);
+  color: var(--text);
 }

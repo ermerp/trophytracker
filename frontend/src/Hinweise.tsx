@@ -10,8 +10,13 @@ import type { Sicherungsstand } from './Sicherung'
  *
  * Die Unentschieden-Zeile steht bewusst auch dann, wenn die Prüfliste leer
  * ist: Sonst verschwindet die zweite Runde aus dem Blick.
+ *
+ * Seit Stufe 19 steht der Block auf der Startseite statt oben in der
+ * Sammlung. Als **Seite** schweigt er nicht, wenn nichts offen ist – eine
+ * leere Startseite sähe nach einem Fehler aus, wo „nichts zu tun" die gute
+ * Nachricht ist.
  */
-export function Hinweise() {
+export function Hinweise({ alsSeite = false }: { alsSeite?: boolean } = {}) {
   const [params] = useSearchParams()
   const [review, setReview] = useState<ReviewFortschritt | null>(null)
   const [listenOffen, setListenOffen] = useState(0)
@@ -163,7 +168,14 @@ export function Hinweise() {
     )
   }
 
-  if (zeilen.length === 0) return null
+  if (zeilen.length === 0) {
+    if (!alsSeite) return null
+    return (
+      <p className="ruhig">
+        Nichts offen. Der nächtliche Abruf läuft, die Prüfliste ist leer, die Sicherung ist frisch.
+      </p>
+    )
+  }
   return <ul className="hinweise">{zeilen}</ul>
 }
 

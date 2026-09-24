@@ -55,7 +55,7 @@ ul.trophaeen li {
   display: flex;
   gap: 0.8rem;
   padding: 0.5rem 0;
-  border-top: 1px solid rgba(128, 128, 128, 0.3);
+  border-top: 1px solid var(--linie);
 }
 
 ul.trophaeen img {
@@ -83,7 +83,7 @@ ul.gruppen {
 }
 
 ul.gruppen li {
-  border-top: 1px solid rgba(128, 128, 128, 0.3);
+  border-top: 1px solid var(--linie);
   padding: 0.8rem 0;
 }
 
@@ -103,7 +103,7 @@ ul.gruppen td {
 
 .hinweis {
   font-size: 0.85rem;
-  border-left: 3px solid rgba(200, 140, 0, 0.7);
+  border-left: 3px solid var(--warnung);
   padding-left: 0.6rem;
   margin: 0.3rem 0;
 }
@@ -120,13 +120,13 @@ ul.gruppen td {
 .tabelle th {
   text-align: left;
   padding: 0.2rem 0.6rem 0.2rem 0;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.4);
+  border-bottom: 1px solid var(--linie);
 }
 
 .tabelle td {
   padding: 0.2rem 0.6rem 0.2rem 0;
   vertical-align: top;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+  border-bottom: 1px solid var(--linie);
 }
 
 .tabelle input[type='text'] {
@@ -137,13 +137,13 @@ ul.gruppen td {
 }
 
 .auffaellig {
-  color: #b35c00;
+  color: var(--gefahr);
   font-weight: 600;
 }
 
 input.auffaellig {
   color: inherit;
-  border-color: #b35c00;
+  border-color: var(--gefahr);
 }
 
 input[type='search'] {
@@ -159,147 +159,19 @@ main {
   padding-bottom: 5rem; /* Platz für die Leiste unten */
 }
 
-.nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-around;
-  padding: 0.5rem 0 max(0.5rem, env(safe-area-inset-bottom));
-  background: Canvas;
-  border-top: 1px solid rgba(128, 128, 128, 0.4);
-  z-index: 10;
-}
 
-.nav a {
-  color: inherit;
-  text-decoration: none;
-  opacity: 0.7;
-  /* Fuenf Eintraege seit Stufe 14, sechs seit Stufe 15 (Kaufliste), sieben
-     seit Stufe 17 (Scannen): auf dem Handy Symbol ueber Text, sonst bricht
-     "To-Do" um oder die Leiste laeuft ueber; mit sieben Eintraegen braucht
-     320 px 0.6rem und enge Buchstaben ("Einstellungen" ist der breiteste).
-     Stufe 19 raeumt das Layout auf. */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 0.6rem;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-}
 
-.nav a.active {
-  opacity: 1;
-  font-weight: 600;
-}
 
-@media (min-width: 48rem) {
-  .app {
-    display: grid;
-    grid-template-columns: 11rem 1fr;
-  }
 
-  .nav {
-    position: sticky;
-    top: 0;
-    bottom: auto;
-    align-self: start;
-    height: 100vh;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 0.6rem;
-    padding: 2rem 1rem;
-    border-top: none;
-    border-right: 1px solid rgba(128, 128, 128, 0.3);
-  }
 
-  .nav a {
-    flex-direction: row;
-    gap: 0.4rem;
-    font-size: 0.9rem;
-    letter-spacing: normal;
-  }
 
-  /* Als Grid-Item wuerde main mit margin:auto auf Inhaltsbreite schrumpfen. */
-  main {
-    width: 100%;
-    box-sizing: border-box;
-    padding-bottom: 2rem;
-  }
-}
 
-.filterleiste {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  align-items: center;
-  margin: 1rem 0;
-}
 
-.filterleiste label {
-  display: inline;
-  margin: 0;
-  font-size: 0.9rem;
-}
 
-.filterleiste input[type='search'] {
-  font: inherit;
-  padding: 0.25rem 0.4rem;
-  min-width: 10rem;
-}
 
-.filterleiste select {
-  font: inherit;
-}
 
-.kacheln {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: 1rem;
-}
 
-.kachel {
-  border: 1px solid rgba(128, 128, 128, 0.3);
-  border-radius: 6px;
-  padding: 0.7rem;
-}
 
-.kachel .bild {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  aspect-ratio: 1;
-  max-height: 10rem;
-  margin-bottom: 0.5rem;
-  background: rgba(128, 128, 128, 0.12);
-  border-radius: 4px;
-  overflow: hidden;
-  font-size: 3rem;
-  color: rgba(128, 128, 128, 0.7);
-  text-decoration: none;
-}
-
-.kachel .bild img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.kachel .titel {
-  display: block;
-  font-weight: 600;
-  color: inherit;
-  margin-bottom: 0.3rem;
-}
-
-.kachel .release {
-  border-top: 1px solid rgba(128, 128, 128, 0.2);
-  padding: 0.4rem 0;
-}
 
 .besitz {
   display: flex;
@@ -316,7 +188,7 @@ main {
   font-size: 0.8rem;
   padding: 0.1rem 0.5rem;
   border-radius: 1rem;
-  background: rgba(60, 140, 90, 0.18);
+  background: var(--flaeche-hoch);
 }
 
 .pille button,
@@ -342,8 +214,8 @@ button.klein {
 }
 
 button.gefaehrlich {
-  color: #b32000;
-  border-color: #b32000;
+  color: var(--gefahr);
+  border-color: var(--gefahr);
 }
 
 .anlegen .hinweis ul {
@@ -383,7 +255,7 @@ button.gefaehrlich {
 }
 
 .release-block {
-  border-top: 1px solid rgba(128, 128, 128, 0.3);
+  border-top: 1px solid var(--linie);
   padding-top: 0.5rem;
 }
 
@@ -473,7 +345,7 @@ ul.digital {
 
 .cron-verlauf li {
   padding: 0.15rem 0;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  border-bottom: 1px solid var(--linie);
   overflow-wrap: anywhere;
 }
 
@@ -482,9 +354,9 @@ ul.digital {
 .offline {
   margin: 0 0 1rem;
   padding: 0.5rem 0.8rem;
-  border: 1px solid rgba(128, 128, 128, 0.5);
+  border: 1px solid var(--aus);
   border-radius: 6px;
-  background: rgba(128, 128, 128, 0.12);
+  background: var(--flaeche-hoch);
 }
 
 /* --- Stufe 7: Pruefliste und Hinweise --- */
@@ -493,9 +365,9 @@ ul.digital {
   list-style: none;
   padding: 0.6rem 0.8rem;
   margin: 0 0 1rem;
-  border: 1px solid rgba(200, 140, 0, 0.5);
+  border: 1px solid var(--warnung);
   border-radius: 6px;
-  background: rgba(200, 140, 0, 0.08);
+  background: rgba(232, 163, 61, 0.09);
 }
 
 .hinweise li + li {
@@ -512,7 +384,7 @@ ul.digital {
 
 .fortschrittsbalken {
   height: 0.4rem;
-  background: rgba(128, 128, 128, 0.2);
+  background: var(--linie);
   border-radius: 0.2rem;
   overflow: hidden;
   margin-bottom: 1.5rem;
@@ -520,7 +392,7 @@ ul.digital {
 
 .fortschrittsbalken div {
   height: 100%;
-  background: rgba(60, 140, 90, 0.8);
+  background: var(--st-am_spielen);
 }
 
 /*
@@ -544,11 +416,11 @@ ul.digital {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(128, 128, 128, 0.12);
+  background: var(--flaeche-hoch);
   border-radius: 6px;
   overflow: hidden;
   font-size: 3rem;
-  color: rgba(128, 128, 128, 0.7);
+  color: var(--text-still);
 }
 
 .pruefkarte .bild img {
@@ -565,7 +437,7 @@ ul.digital {
 .pruefkarte .vergleich {
   font-size: 1.05rem;
   font-weight: 600;
-  border-left: 3px solid rgba(60, 140, 220, 0.8);
+  border-left: 3px solid var(--st-durchgespielt);
   padding-left: 0.6rem;
   margin: 0.3rem 0 0.6rem;
 }
@@ -588,7 +460,7 @@ ul.digital {
   min-width: 1.2rem;
   margin-right: 0.3rem;
   padding: 0 0.3rem;
-  border: 1px solid rgba(128, 128, 128, 0.5);
+  border: 1px solid var(--aus);
   border-radius: 3px;
   font-size: 0.75rem;
   text-align: center;
@@ -668,15 +540,7 @@ ul.digital {
  * IGDB (Stufe 9): Cover in der Kachel, Kandidatenlisten, Pruefansicht
  * ------------------------------------------------------------------------- */
 
-/* IGDB-Cover sind Hochformat (264 x 374); das Trophaeensymbol bleibt quadratisch. */
-.kachel .bild.cover {
-  aspect-ratio: 264 / 374;
-  max-height: none;
-}
 
-.kachel .bild.cover img {
-  object-fit: cover;
-}
 
 .detailkopf img.cover {
   width: 96px;
@@ -720,7 +584,7 @@ ul.digital {
   grid-template-columns: 3rem 1fr auto;
   gap: 0.6rem;
   align-items: center;
-  border: 1px solid rgba(128, 128, 128, 0.3);
+  border: 1px solid var(--linie);
   border-radius: 6px;
   padding: 0.4rem 0.6rem;
 }
@@ -731,10 +595,10 @@ ul.digital {
   justify-content: center;
   width: 3rem;
   height: 4.25rem;
-  background: rgba(128, 128, 128, 0.12);
+  background: var(--flaeche-hoch);
   border-radius: 4px;
   overflow: hidden;
-  color: rgba(128, 128, 128, 0.7);
+  color: var(--text-still);
 }
 
 .kandidat-bild img {
@@ -757,7 +621,7 @@ ul.digital {
 }
 
 .offen-block {
-  border: 1px solid rgba(128, 128, 128, 0.3);
+  border: 1px solid var(--linie);
   border-radius: 6px;
   padding: 0.7rem;
   margin-bottom: 1rem;
@@ -786,65 +650,13 @@ ul.digital {
   }
 }
 
-/* Wunschliste (Stufe 10) */
-.wunsch-kopf {
-  display: flex;
-  gap: 0.7rem;
-  align-items: flex-start;
-}
 
-.wunsch-kopf .bild {
-  width: 4.5rem;
-  min-width: 4.5rem;
-  aspect-ratio: 264 / 374;
-  max-height: none;
-  font-size: 1.5rem;
-  margin-bottom: 0;
-}
 
-.kachel.erledigt {
-  opacity: 0.6;
-}
 
-button.stern {
-  font-size: 1.3rem;
-  line-height: 1;
-  padding: 0 0.3rem;
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: rgba(128, 128, 128, 0.8);
-}
 
-button.stern.aktiv {
-  color: #d99a00;
-}
 
-button.notiz {
-  display: block;
-  width: 100%;
-  margin-top: 0.4rem;
-  padding: 0.2rem 0.4rem;
-  border: 1px dashed rgba(128, 128, 128, 0.4);
-  background: none;
-  font-size: 0.85rem;
-  text-align: left;
-  cursor: text;
-  white-space: pre-wrap;
-}
 
-.notizfeld {
-  display: flex;
-  gap: 0.3rem;
-  margin-top: 0.4rem;
-  flex-wrap: wrap;
-}
 
-.notizfeld input {
-  flex: 1;
-  min-width: 8rem;
-  font: inherit;
-}
 
 .gewichte {
   display: flex;
@@ -941,7 +753,7 @@ button.notiz {
   display: flex;
   gap: 0.2rem;
   margin: -0.5rem 0 0.8rem;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.3);
+  border-bottom: 1px solid var(--linie);
 }
 
 .reiter a {
@@ -959,33 +771,9 @@ button.notiz {
   border-bottom-color: currentColor;
 }
 
-/* Eine Spalte statt Raster: Die Reihenfolge ist der Inhalt. */
-.kacheln.sortierbar {
-  grid-template-columns: 1fr;
-  max-width: 44rem;
-}
 
-.kachel.zieht {
-  opacity: 0.5;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-}
 
-button.griff {
-  align-self: center;
-  padding: 0.6rem 0.3rem;
-  border: none;
-  background: none;
-  font-size: 1.1rem;
-  line-height: 1;
-  letter-spacing: -0.2em;
-  color: rgba(128, 128, 128, 0.9);
-  cursor: grab;
-  touch-action: none;
-}
 
-button.griff:active {
-  cursor: grabbing;
-}
 
 .kandidaten {
   margin-top: 2rem;
@@ -1007,7 +795,7 @@ button.griff:active {
   gap: 0.7rem;
   align-items: center;
   flex-wrap: wrap;
-  border: 1px solid rgba(128, 128, 128, 0.3);
+  border: 1px solid var(--linie);
   border-radius: 6px;
   padding: 0.5rem 0.7rem;
 }
@@ -1021,7 +809,7 @@ button.griff:active {
   justify-content: center;
   border-radius: 4px;
   overflow: hidden;
-  background: rgba(128, 128, 128, 0.15);
+  background: var(--linie);
 }
 
 .kandidatenliste .bild img {
@@ -1048,7 +836,7 @@ button.griff:active {
 
 .verlauf li {
   padding: 0.25rem 0;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  border-bottom: 1px solid var(--linie);
 }
 
 .verlauf .titel {
@@ -1096,7 +884,7 @@ button.griff:active {
   min-height: 12rem;
   margin-top: 0.8rem;
   padding: 0.8rem;
-  border: 1px solid rgba(128, 128, 128, 0.35);
+  border: 1px solid var(--aus);
   border-radius: 6px;
 }
 
@@ -1125,7 +913,7 @@ button.griff:active {
   align-items: center;
   gap: 0.4rem;
   padding: 0.35rem 0;
-  border-top: 1px solid rgba(128, 128, 128, 0.25);
+  border-top: 1px solid var(--linie);
 }
 
 .scankarte ul.treffer .titel {
@@ -1159,7 +947,7 @@ button.griff:active {
 
 .gesammelt li {
   padding: 0.25rem 0;
-  border-top: 1px solid rgba(128, 128, 128, 0.25);
+  border-top: 1px solid var(--linie);
 }
 
 .gesammelt .titel {
@@ -1270,7 +1058,7 @@ button.griff:active {
 
 .scanliste > li {
   padding: 0.5rem 0;
-  border-top: 1px solid rgba(128, 128, 128, 0.3);
+  border-top: 1px solid var(--linie);
 }
 
 .scanliste .titel {
@@ -1283,4 +1071,743 @@ button.griff:active {
 
 .scanliste .auswahl {
   margin-top: 0.4rem;
+}
+
+/* ===========================================================================
+ * Stufe 19: Gestaltungslinie „Vitrine"
+ *
+ * Alles darüber ist in vierzehn Stufen gewachsen und benutzt seit dieser
+ * Stufe die Tokens aus tokens.css. Was hier steht, ist neu: Kopfzeile,
+ * Chip-Filter, Kachel und Zeile, die Navigation aus vier Symbolen.
+ * ======================================================================== */
+
+/* --- Rahmen ------------------------------------------------------------ */
+
+main {
+  max-width: 64rem;
+  margin: 0 auto;
+  /* Waagerecht gepolstert, senkrecht nicht: Kopfzeile und Chipleiste laufen
+     bis an den Rand und holen sich die Polsterung mit negativem Rand zurueck. */
+  padding: 0 var(--a4) calc(var(--leiste-hoehe) + var(--a5));
+}
+
+/* Ansichten ohne eigene Kopfzeile (Einstellungen, Scannen, Import …). */
+main > h1 {
+  margin-top: 1.25rem;
+}
+
+.seite {
+  padding-top: var(--a4);
+}
+
+button,
+input,
+select,
+textarea {
+  color: var(--text);
+}
+
+button {
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+input,
+select,
+textarea {
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+}
+
+/* Nur fuer Vorleseprogramme: sichtbar ist das Symbol, gesagt wird der Name. */
+.nur-vorlesen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ruhig {
+  color: var(--text-leise);
+}
+
+.klein {
+  font-size: 0.8125rem;
+}
+
+/* --- Kopfzeile --------------------------------------------------------- */
+
+.kopfzeile {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--kopf-hoehe);
+  margin: 0 calc(-1 * var(--a4));
+  padding: 0 var(--a2) 0 var(--a4);
+  background: var(--grund);
+  border-bottom: 1px solid var(--linie);
+}
+
+.kopfzeile h1 {
+  flex-grow: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--schrift-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ein Symbolknopf: 44 px, damit er auf dem Handy sicher zu treffen ist. */
+.ikone {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--r2);
+  color: var(--text-leise);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ikone:hover {
+  color: var(--text);
+  background: var(--flaeche-hoch);
+}
+
+.ikone.gefahr:hover {
+  color: var(--gefahr);
+}
+
+.ikone.stern.aktiv {
+  color: var(--gold);
+}
+
+.suchfeld {
+  flex-grow: 1;
+  min-width: 0;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  padding: 0 var(--a3);
+  border-radius: var(--r-rund);
+  background: var(--flaeche-hoch);
+  color: var(--text-still);
+}
+
+.suchfeld input {
+  flex-grow: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  outline: none;
+}
+
+/* --- Chip-Filter ------------------------------------------------------- */
+
+.chips {
+  display: flex;
+  gap: 6px;
+  margin: 0 calc(-1 * var(--a4));
+  padding: var(--a2) var(--a4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--linie);
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: none;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 1px solid var(--linie);
+  border-radius: var(--r-rund);
+  background: none;
+  color: var(--text-leise);
+  font: inherit;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.chip.aktiv {
+  border-color: var(--gold-rand);
+  background: var(--gold-flaeche);
+  color: var(--gold);
+  font-weight: 600;
+  padding-right: 9px;
+}
+
+.chip.ab {
+  color: var(--text-still);
+  border-style: dashed;
+}
+
+/* --- Reiter ------------------------------------------------------------ */
+
+.reiter {
+  margin: 0 calc(-1 * var(--a4));
+  padding: 0 var(--a2);
+  border-bottom: 1px solid var(--linie);
+}
+
+.reiter a.active {
+  border-bottom-color: var(--gold);
+  color: var(--text);
+}
+
+/* --- Listenkopf -------------------------------------------------------- */
+
+.listenkopf {
+  display: flex;
+  align-items: center;
+  gap: var(--a3);
+  flex-wrap: wrap;
+  margin-bottom: var(--a3);
+  font-size: 0.8125rem;
+  color: var(--text-still);
+}
+
+.listenkopf label {
+  display: inline;
+  margin: 0 0 0 auto;
+}
+
+.listenkopf select {
+  background: none;
+  border-color: transparent;
+  color: var(--text-leise);
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 2px 4px;
+}
+
+.blaettern {
+  margin-top: var(--a5);
+}
+
+/* --- Die Zeichen der Karten -------------------------------------------- */
+
+.deckel {
+  display: flex;
+  flex: none;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: var(--cover);
+  background: var(--flaeche-hoch);
+  border-radius: var(--r1);
+  overflow: hidden;
+  color: var(--text-still);
+  font-family: var(--schrift-display);
+  font-size: 1.6rem;
+  text-decoration: none;
+}
+
+.deckel img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Das IGDB-Cover hat genau das Seitenverhaeltnis der Flaeche und fuellt sie;
+   das Trophaeensymbol ist quadratisch und bleibt vollstaendig sichtbar. */
+.deckel img.fuellend {
+  object-fit: cover;
+}
+
+.plattform {
+  flex: none;
+  font-family: var(--schrift-display);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 3px;
+}
+
+.plattform.leer {
+  color: var(--text-still);
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.balken {
+  height: 3px;
+  background: var(--linie);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.balken.duenn {
+  height: 2px;
+}
+
+.balken > div {
+  height: 100%;
+}
+
+.prozent {
+  font-family: var(--schrift-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-leise);
+}
+
+.prozent.voll {
+  color: var(--gold);
+}
+
+.prozent.leer {
+  font-family: var(--schrift);
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-still);
+}
+
+.zeichen {
+  display: inline-flex;
+  align-items: center;
+}
+
+.zustand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-still);
+}
+
+.zustand .punkt {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* --- Kachel und Zeile -------------------------------------------------- */
+
+.titel {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.kacheln {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 1.15rem 0.9rem;
+}
+
+.kachel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.kachel-bild {
+  position: relative;
+}
+
+/* Der Fortschritt sitzt an der Unterkante des Covers - ein Element traegt
+   Fortschritt und Zustandsfarbe, statt die Kachel zusaetzlich einzufaerben. */
+.kachel-bild .balken {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 0;
+}
+
+.zeilen {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.eintrag {
+  display: flex;
+  align-items: center;
+  gap: var(--a3);
+  padding: var(--a2) 0;
+  border-bottom: 1px solid var(--linie);
+}
+
+.eintrag-text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eintrag-text .titel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.release {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.release-daten {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.release-daten select {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 1px 4px;
+}
+
+.fueller {
+  flex-grow: 1;
+}
+
+.knoepfe {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kachel.erledigt,
+.eintrag.erledigt {
+  opacity: 0.55;
+}
+
+/* Verschieben ohne Griff (To-Do): die ganze Karte ist der Anfasser. */
+.ziehbar {
+  touch-action: none;
+  cursor: grab;
+}
+
+.ziehbar:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.kachel.zieht,
+.eintrag.zieht {
+  opacity: 0.6;
+  background: var(--flaeche-hoch);
+  border-radius: var(--r2);
+  box-shadow: var(--schatten-2);
+}
+
+/* --- Navigation -------------------------------------------------------- */
+
+.nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  height: calc(var(--leiste-hoehe) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--flaeche);
+  border-top: 1px solid var(--linie);
+}
+
+.nav-gruppe {
+  flex: 1 1 0;
+  display: flex;
+}
+
+.nav-haupt {
+  flex: 1 1 0;
+  height: var(--leiste-hoehe);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--text-still);
+  text-decoration: none;
+}
+
+.nav-haupt.active {
+  color: var(--gold);
+}
+
+.nav-punkt {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.nav-haupt.active .nav-punkt {
+  background: var(--gold);
+}
+
+/* Auf dem Handy traegt die Leiste nur Symbole; Text und Unterpunkte
+   erscheinen erst am Desktop, wo der Platz dafuer da ist. */
+.nav-text,
+.nav-unter,
+.nav-unten {
+  display: none;
+}
+
+.nach-oben {
+  position: fixed;
+  right: var(--a4);
+  bottom: calc(var(--leiste-hoehe) + env(safe-area-inset-bottom) + var(--a4));
+  z-index: 9;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--linie);
+  border-radius: 50%;
+  background: var(--flaeche-hoch);
+  color: var(--text-leise);
+  box-shadow: var(--schatten-1);
+}
+
+/* --- Desktop ----------------------------------------------------------- */
+
+@media (min-width: 48rem) {
+  .app {
+    display: grid;
+    grid-template-columns: 14rem 1fr;
+  }
+
+  .nav {
+    position: sticky;
+    top: 0;
+    bottom: auto;
+    align-self: start;
+    height: 100vh;
+    /* Ohne das addiert sich die Polsterung auf die 100vh und der letzte
+       Eintrag (Einstellungen) rutscht unter den Bildrand. */
+    box-sizing: border-box;
+    overflow-y: auto;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 2px;
+    padding: var(--a5) var(--a3);
+    border-top: none;
+    border-right: 1px solid var(--linie);
+  }
+
+  .nav-gruppe {
+    flex: none;
+    flex-direction: column;
+  }
+
+  .nav-haupt {
+    flex: none;
+    height: 42px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.7rem;
+    padding: 0 0.85rem;
+    border-radius: var(--r2);
+    font-size: 0.92rem;
+  }
+
+  .nav-haupt.active {
+    background: var(--flaeche-hoch);
+    font-weight: 600;
+  }
+
+  .nav-text {
+    display: inline;
+  }
+
+  .nav-punkt {
+    display: none;
+  }
+
+  .nav-unter {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 0.85rem 0 3rem;
+    border-radius: var(--r2);
+    color: var(--text-still);
+    text-decoration: none;
+    font-size: 0.84rem;
+  }
+
+  .nav-unter.active {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .nav-unten {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-top: auto;
+    height: 42px;
+    padding: 0 0.85rem;
+    border-radius: var(--r2);
+    color: var(--text-still);
+    text-decoration: none;
+    font-size: 0.92rem;
+  }
+
+  /* Am Desktop steht es in der Seitenleiste. */
+  .nur-handy {
+    display: none;
+  }
+
+  main {
+    width: 100%;
+    box-sizing: border-box;
+    padding-bottom: var(--a6);
+  }
+
+  .nach-oben {
+    bottom: var(--a5);
+  }
+}
+
+/*
+ * Die Absichtslisten tragen fuenf Symbolknoepfe je Eintrag. Neben dem Titel
+ * blieben davon auf 390 px 66 Pixel Text uebrig - deshalb steht die
+ * Knopfreihe dort unter dem Text. Die Zeile wird damit knapp so hoch wie ihr
+ * Cover (52 x 74), statt den Titel auf sechs Zeichen zu kuerzen.
+ */
+.eintrag.hoch {
+  align-items: flex-start;
+}
+
+.eintrag.hoch .eintrag-text {
+  gap: 2px;
+}
+
+.eintrag.hoch .knoepfe {
+  margin-left: -8px;
+}
+
+.eintrag.hoch .ikone {
+  width: 40px;
+  height: 40px;
+}
+
+.release-daten.umbrechend {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+/*
+ * Der Favoritenstern sitzt in der Kachel auf dem Cover. Fuenf Symbolknoepfe
+ * nebeneinander brauchen 220 px, eine Kachel ist auf dem Handy 171 px breit -
+ * ohne das brach die Knopfreihe um und die Kacheln wurden ungleich hoch.
+ */
+.kachel-bild .ecke {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+
+.kachel-bild .ecke .ikone {
+  width: 36px;
+  height: 36px;
+  background: rgba(18, 21, 28, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.kachel .knoepfe {
+  gap: 0;
+}
+
+.kachel .knoepfe .ikone {
+  width: 40px;
+}
+
+/* Verweise sind gold, aber nur, wo sie wirklich Verweise sind. */
+a {
+  color: var(--gold);
+}
+
+a:hover {
+  color: var(--text);
+}
+
+.ruhig a,
+a.ruhig {
+  color: var(--text-leise);
+}
+
+/*
+ * Ueberschriften. Die Ansichten ohne eigene Kopfzeile (Einstellungen,
+ * Scannen, Import, Zuordnung) trugen bis hierher die Browser-Groessen und
+ * wirkten neben den neuen Listen riesig.
+ */
+h1,
+h2,
+h3 {
+  font-family: var(--schrift-display);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+main > h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: var(--a5) 0 var(--a2);
+}
+
+h3 {
+  font-size: 1rem;
 }

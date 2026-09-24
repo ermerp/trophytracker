@@ -58,7 +58,7 @@ Die Quelle (`nutzer` / `sync` / `igdb` / `import`, `feed` und `migration` reserv
 
 ### Keine PlayStation-Marken in der Gestaltung
 
-Keine PlayStation-Logos, -Symbole (Dreieck/Kreis/Kreuz/Quadrat, PS-Monogramm) oder -Schriftzüge in Icons, Grafiken oder Gestaltungselementen – auch nicht angedeutet oder abstrahiert (Entscheidung des Nutzers vom 19.09.2026, Abschnitt 13). Geschützte Marken, das Repository ist öffentlich. Plattformnamen als Text („PS4") sind Daten, kein Logo. Das App-Symbol ist ein eigener Pokal (`frontend/public/icon.svg`).
+Keine PlayStation-Logos, -Symbole (Dreieck/Kreis/Kreuz/Quadrat, PS-Monogramm) oder -Schriftzüge in Icons, Grafiken oder Gestaltungselementen – auch nicht angedeutet oder abstrahiert (Entscheidung des Nutzers vom 19.09.2026, Abschnitt 13). Geschützte Marken, das Repository ist öffentlich. Plattformnamen als Text („PS4") sind Daten, kein Logo. Das App-Symbol ist ein eigener Pokal in einem Fortschrittsring (`frontend/public/icon.svg`, seit 24.09.2026).
 
 ### Nur PS3, PS4, PS5 und PS Vita
 

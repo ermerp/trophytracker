@@ -168,9 +168,12 @@ function releaseAntwort(r: ReleaseZeile) {
 export const gameRoutes = new Hono<AppEnv>()
 	.get("/", async (c) => {
 		const q = c.req.query();
-		const plattform = q.platform !== undefined && istErlaubtePlattform(q.platform) ? q.platform : undefined;
+		// Kommagetrennt, wie der Plattformfilter der Listen (`/api/plans`).
+		// Unbekannte Werte fallen einzeln heraus; bleibt nichts uebrig, gilt
+		// der Filter als nicht gesetzt.
+		const plattformen = (q.platform ?? "").split(",").filter(istErlaubtePlattform);
 		const filter: SpieleFilter = {
-			platform: plattform,
+			platform: plattformen.length > 0 ? plattformen : undefined,
 			owned: ausWahl(q.owned, BESITZ_FILTER),
 			played: ausWahl(q.played, JA_NEIN),
 			platinum: ausWahl(q.platinum, PLATIN_FILTER),

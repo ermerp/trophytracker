@@ -93,6 +93,20 @@ export default defineConfig({
             options: { cacheName: 'wasm', expiration: { maxEntries: 4 } },
           },
           {
+            // Saira (Stufe 19): Stylesheet und Schriftschnitt aendern sich
+            // nicht mehr, sobald sie einmal da sind. Ohne diese Regel faellt
+            // die Anwendung offline auf die System-Schrift zurueck - das
+            // braeche nichts, saehe aber bei jedem Start anders aus.
+            urlPattern: ({ url }) =>
+              url.origin === 'https://fonts.googleapis.com' || url.origin === 'https://fonts.gstatic.com',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'schriften',
+              expiration: { maxEntries: 12, maxAgeSeconds: 365 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Cover von IGDB: gehashte Bild-Ids, aendern sich nie. Als
             // <img> geladen sind die Antworten opaque (Status 0).
             urlPattern: ({ url }) => url.origin === 'https://images.igdb.com',

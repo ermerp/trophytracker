@@ -72,7 +72,12 @@ export const SORTIERUNGEN = ["titel", "zuletzt", "spielzeit"] as const;
  * "hat eine PS4-Disc", nicht "hat irgendeine Disc und irgendein PS4-Release".
  */
 export type SpieleFilter = {
-	platform?: Plattform;
+	/**
+	 * Mehrere Plattformen sind eine ODER-Auswahl (Stufe 19, Chip-Filter);
+	 * die Liste hat hoechstens vier Werte und bleibt damit weit unter der
+	 * 100-Bindungen-Grenze von D1.
+	 */
+	platform?: readonly Plattform[];
 	owned?: (typeof BESITZ_FILTER)[number];
 	played?: (typeof JA_NEIN)[number];
 	platinum?: (typeof PLATIN_FILTER)[number];
@@ -544,9 +549,9 @@ aeenliste haengt
 		const bedingungen: string[] = [`NOT ${GamesRepository.NUR_WUNSCH}`];
 		const werte: unknown[] = [];
 
-		if (filter.platform) {
-			bedingungen.push("r.platform = ?");
-			werte.push(filter.platform);
+		if (filter.platform && filter.platform.length > 0) {
+			bedingungen.push(`r.platform IN (${filter.platform.map(() => "?").join(",")})`);
+			werte.push(...filter.platform);
 		}
 		const physisch = "EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)";
 		const digital = "EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id)";
