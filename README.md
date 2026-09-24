@@ -133,7 +133,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 20 (Migration 0018). **Stufe 15 abgenommen am 16.09.2026** |
 | Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt der nächtliche Cron nach, außerdem „Metadaten auffrischen" (Stufe 18) |
 | Automatik | Cron Trigger, nachts alle fünf Minuten zwischen 03:00 und 05:59 UTC, je Aufruf ein Schritt: Erschienene freigeben, hängende Läufe abbrechen, Trophäen-Sync (ein Versuch je Nacht), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, zuletzt Aufräumen alter Rohantworten (Stufe 18d). Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen, Leerläufe verdichtet; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migration 0021) |
-| App | Installierbar (PWA) mit Pokal-Symbol; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
+| App | Installierbar (PWA) mit eigenem Symbol – ein Pokal im Fortschrittsring; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
 | Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
 | Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen, „Verwerfen" wirft eine Fehllesung sofort weg (mit Rückfrage). Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. „Überspringen" geht weiter, ohne etwas zu speichern (seit Stufe 17d – davor „Später" und ein Sammelmodus, beides mit offenen Scans entfallen). Unbekannte Codes löst seit Stufe 17c eBay live auf; ein Treffer aus der Sammlung erscheint als dieselbe Karte wie ein bekannter Code – mit Cover, „im Regal ×n" und „Disc erfassen" (9.2) |
 | EAN-Auflösung | Kette beim Scannen: eigenes `ean_mapping` (rein lokal, kein Netz) → Händlerfeed → **eBay live** (seit Stufe 17c, Titelvorschlag mit Kandidaten der Sammlung) → Suche/Anlegen von Hand. Ein einmal zugeordneter Code wird nie wieder online nachgeschlagen |
@@ -692,8 +692,9 @@ entsprechen. Die Ausgabe von `wrangler deploy` nennt außerdem den Cron
 ## Als App installieren
 
 Das Frontend ist seit Stufe 18 eine PWA (`vite-plugin-pwa`): Manifest, eigenes
-Symbol (ein Pokal – bewusst ohne PlayStation-Marken, das Repository ist
-öffentlich) und ein Service Worker.
+Symbol (ein Pokal in einem Fortschrittsring – bewusst ohne PlayStation-Marken,
+das Repository ist öffentlich) und ein Service Worker. Der Ring ist zu 87 %
+geschlossen: Eine Sammlung ist nie ganz fertig.
 
 - **Android, Chrome:** Menü → „App installieren" beziehungsweise „Zum
   Startbildschirm hinzufügen".
