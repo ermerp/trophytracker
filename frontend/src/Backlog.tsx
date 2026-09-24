@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { anfrage, type BacklogKandidat } from './api'
-import { Filterleiste, Meldungen, PlanKarte, Reiter, usePlanListe } from './Absichten'
+import { Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERTEXT, usePlanListe } from './Absichten'
+import { useAnsicht } from './Ansicht'
+import { Chips } from './Chips'
+import { Kopfzeile } from './Kopfzeile'
+import { Zeichen } from './Symbole'
+import { TODO_REITER } from './Todo'
 
 /**
  * Backlog (Use Case 5b, Stufe 12): der große Haufen, sortiert wie die
@@ -16,7 +21,8 @@ import { Filterleiste, Meldungen, PlanKarte, Reiter, usePlanListe } from './Absi
  */
 export function Backlog() {
   const liste = usePlanListe('backlog')
-  const { daten, laeuft, nurFavoriten, plattformen, suche, aendern, alle, setzeParam } = liste
+  const { daten, laeuft, nurFavoriten, plattformen, suche, aendern, alle, setzeParam, sortierung } = liste
+  const ansicht = useAnsicht('backlog')
   const [kandidaten, setKandidaten] = useState<{ kandidaten: BacklogKandidat[]; abgelehnt: number } | null>(null)
 
   const kandidatenLaden = useCallback(async () => {
@@ -44,27 +50,46 @@ export function Backlog() {
 
   return (
     <>
-      <h1>Backlog</h1>
-      <Reiter />
-      <p className="zeile">Pausiert oder nie gestartet. „auf To-Do" zieht einen Eintrag ans Ende der To-Do-Liste und setzt „am Spielen".</p>
+      <Kopfzeile titel="Backlog" sucheParam="suche" ansicht={ansicht} />
+      <Reiter eintraege={TODO_REITER} />
+      <Chips gruppen={PLAN_CHIPS} />
 
-      <Filterleiste liste={liste} />
+      <div className="seite">
+      <p className="ruhig klein">Pausiert oder nie gestartet. „auf To-Do" zieht einen Eintrag ans Ende der To-Do-Liste und setzt „am Spielen".</p>
+
       <Meldungen liste={{ ...liste, rueckgaengig }} />
 
       {!daten ? (
-        <p>wird geladen …</p>
+        <p className="ruhig">wird geladen …</p>
       ) : daten.eintraege.length === 0 ? (
-        <p>{nurFavoriten || plattformen.size > 0 || suche ? 'Nichts passt zum Filter.' : 'Das Backlog ist leer.'}</p>
+        <p className="ruhig">{nurFavoriten || plattformen.size > 0 || suche ? 'Nichts passt zum Filter.' : 'Das Backlog ist leer.'}</p>
       ) : (
         <>
-          <p>{daten.eintraege.length} Einträge</p>
-          <ul className="kacheln">
+          <div className="listenkopf">
+            <span>{daten.eintraege.length} Einträge</span>
+            <label>
+              <span className="nur-vorlesen">Sortierung</span>
+              <select value={sortierung} onChange={(e) => setzeParam('sort', e.target.value === 'favorit' ? '' : e.target.value)}>
+                {Object.entries(SORTIERTEXT)
+                  .filter(([wert]) => wert !== 'position')
+                  .map(([wert, text]) => (
+                    <option key={wert} value={wert}>{text}</option>
+                  ))}
+              </select>
+            </label>
+          </div>
+          <ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>
             {daten.eintraege.map((e) => (
               <PlanKarte
                 key={e.id}
                 e={e}
                 liste={liste}
-                knoepfe={<button type="button" className="klein" onClick={() => aendern(e.id, { art: 'todo' })}>auf To-Do</button>}
+                art={ansicht.art}
+                knoepfe={
+                  <button type="button" className="ikone" aria-label="Auf To-Do" title="Auf To-Do" onClick={() => aendern(e.id, { art: 'todo' })}>
+                    <Zeichen name="haken" groesse={19} />
+                  </button>
+                }
               />
             ))}
           </ul>
@@ -73,7 +98,7 @@ export function Backlog() {
 
       <section className="kandidaten">
         <h2>Kandidaten</h2>
-        <p className="zeile">
+        <p className="ruhig klein">
           Im Besitz, nie angefasst, auf keiner Liste. „nicht vorgesehen" merkt sich die Ablehnung als verworfenen Eintrag; „entfernen" dort macht den Titel wieder zum Kandidaten.
           {kandidaten && kandidaten.abgelehnt > 0 && (
             <>
@@ -104,7 +129,7 @@ export function Backlog() {
                 </Link>
                 <div>
                   <Link to={`/spiel/${k.spielId}`} className="titel">{k.titel}</Link>
-                  <div className="zeile">{k.plattform} · Kritik {k.kritik ?? 'unbekannt'}</div>
+                  <div className="ruhig klein">{k.plattform} · Kritik {k.kritik ?? 'unbekannt'}</div>
                 </div>
                 <div className="knopfzeile">
                   <button type="button" className="klein" disabled={laeuft} onClick={() => uebernehmen(k, { art: 'backlog' })}>ins Backlog</button>
@@ -116,6 +141,7 @@ export function Backlog() {
           </ul>
         )}
       </section>
+      </div>
     </>
   )
 }

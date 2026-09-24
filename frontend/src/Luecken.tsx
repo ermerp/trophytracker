@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { STATUSTEXT, anfrage, euro, type DiscFassung, type PlayStatus } from './api'
+import { Reiter } from './Absichten'
+import { Chips, type ChipGruppe } from './Chips'
+import { Kopfzeile } from './Kopfzeile'
+import { PlattformChip } from './SpielTeile'
+import { WUNSCH_REITER } from './Wunschliste'
 
 /**
  * Lücken (Use Case 3, Stufe 14): digital gespielt, Disc-Fassung belegt,
@@ -34,6 +39,12 @@ type Luecke = {
   planId: number | null
 }
 
+/** Die beiden Umschalter der Ansicht, als Chips wie überall sonst (Stufe 19). */
+const LUECKEN_CHIPS: readonly ChipGruppe[] = [
+  { param: 'verworfene', werte: [['1', 'auch verworfene']] },
+  { param: 'unbekannte', werte: [['1', 'Disc-Fassung unbekannt']] },
+]
+
 type Antwort = { anzahl: number; verworfen: number; unbekannt: number; luecken: Luecke[]; moeglich: Luecke[] }
 
 type Eben =
@@ -41,7 +52,8 @@ type Eben =
   | { art: 'disc'; titel: string; releaseId: number; gesetzt: DiscFassung }
 
 export function Luecken() {
-  const [params, setParams] = useSearchParams()
+  // Die beiden Umschalter schreibt jetzt die Chip-Leiste in die URL.
+  const [params] = useSearchParams()
   const mitVerworfenen = params.get('verworfene') === '1'
   const moeglichOffen = params.get('unbekannte') === '1'
   const [daten, setDaten] = useState<Antwort | null>(null)
@@ -61,12 +73,6 @@ export function Luecken() {
     void laden()
   }, [laden])
 
-  function setzeParam(name: string, wert: string) {
-    const p = new URLSearchParams(params)
-    if (wert) p.set(name, wert)
-    else p.delete(name)
-    setParams(p, { replace: true })
-  }
 
   async function tue(aktion: () => Promise<unknown>, danach?: Eben | null) {
     setLaeuft(true)
@@ -111,18 +117,15 @@ export function Luecken() {
 
   return (
     <>
-      <h1>Lücken</h1>
-      <p className="zeile">
+      <Kopfzeile titel="Lücken" />
+      <Reiter eintraege={WUNSCH_REITER} />
+      <Chips gruppen={LUECKEN_CHIPS} />
+
+      <div className="seite">
+      <p className="ruhig klein">
         Digital gespielt, Disc-Fassung belegt, nicht im Regal. Die Disc-Fassung kommt aus IGDB (Einstellungen → IGDB → „Disc-Fassungen prüfen") oder von
         Hand im Spieldetail. Preise folgen mit dem Händler-Feed.
       </p>
-
-      <div className="filterleiste">
-        <label>
-          <input type="checkbox" checked={mitVerworfenen} onChange={(e) => setzeParam('verworfene', e.target.checked ? '1' : '')} /> auch verworfene zeigen
-          {daten && daten.verworfen > 0 && ` (${daten.verworfen})`}
-        </label>
-      </div>
 
       {meldung && <p role="alert" className="auffaellig">{meldung}</p>}
       {eben && (
@@ -134,9 +137,9 @@ export function Luecken() {
       )}
 
       {!daten ? (
-        <p>wird geladen …</p>
+        <p className="ruhig">wird geladen …</p>
       ) : daten.luecken.length === 0 ? (
-        <p>
+        <p className="ruhig">
           {daten.anzahl === 0 && daten.verworfen === 0
             ? 'Keine Lücken. Lücke ist ein digital gespieltes Release, dessen Disc-Fassung belegt ist und das nicht im Regal steht.'
             : 'Alle Lücken sind verworfen – „auch verworfene zeigen" holt sie zurück.'}
@@ -162,13 +165,8 @@ export function Luecken() {
       )}
 
       <section className="kandidaten">
-        <h2>
-          <button type="button" className="klein" aria-expanded={moeglichOffen} onClick={() => setzeParam('unbekannte', moeglichOffen ? '' : '1')}>
-            {moeglichOffen ? '▾' : '▸'}
-          </button>{' '}
-          Disc-Fassung unbekannt{daten && ` (${daten.unbekannt})`}
-        </h2>
-        <p className="zeile">
+        <h2>Disc-Fassung unbekannt{daten && ` (${daten.unbekannt})`}</h2>
+        <p className="ruhig klein">
           Digital gespielt und nicht im Regal, aber ohne Beleg, dass es eine Disc gibt. „Disc gibt es" macht daraus eine Lücke, „gibt es nicht" nimmt das
           Release dauerhaft heraus – beides gilt als deine Entscheidung und wird von IGDB nicht mehr überschrieben. „physisch nicht gewünscht" lässt die
           Frage offen und blendet das Release trotzdem aus: ob es die Disc gibt, ist dir dann egal.
@@ -196,6 +194,7 @@ export function Luecken() {
             </ul>
           ))}
       </section>
+      </div>
     </>
   )
 }
@@ -208,8 +207,8 @@ function LueckeZeile({ l, children }: { l: Luecke; children: ReactNode }) {
       </Link>
       <div>
         <Link to={`/spiel/${l.spielId}`} className="titel">{l.titel}</Link>
-        <div className="zeile">
-          {l.plattform} · {l.fortschritt} %{l.platin && ' · Platin'}
+        <div className="ruhig klein">
+          <PlattformChip plattform={l.plattform} /> {l.fortschritt} %{l.platin && ' · Platin'}
           {l.eigenerStatus && ` · ${STATUSTEXT[l.eigenerStatus]}`}
           {' · '}Gebrauchtpreis: {euro(l.besterGebrauchtpreisCents)}
           {l.verworfen && ' · verworfen'}

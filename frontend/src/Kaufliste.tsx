@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { anfrage, euro, type KaufKandidat } from './api'
-import { ErscheintBaldLink, Filterleiste, Meldungen, PlanKarte, usePlanListe } from './Absichten'
+import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERTEXT, usePlanListe } from './Absichten'
+import { useAnsicht } from './Ansicht'
+import { Chips } from './Chips'
+import { Kopfzeile } from './Kopfzeile'
+import { WUNSCH_REITER } from './Wunschliste'
 
 /**
  * Kaufliste (Use Cases 6 und 10, Stufe 15): sortiert und gefiltert wie die
@@ -22,7 +26,8 @@ type Kandidaten = { anzahl: number; luecken: number; wuensche: number; kandidate
 
 export function Kaufliste() {
   const liste = usePlanListe('kauf')
-  const { daten, laeuft, nurFavoriten, plattformen, suche } = liste
+  const { daten, laeuft, nurFavoriten, plattformen, suche, sortierung, setzeParam } = liste
+  const ansicht = useAnsicht('kauf')
   const [kandidaten, setKandidaten] = useState<Kandidaten | null>(null)
 
   const kandidatenLaden = useCallback(async () => {
@@ -96,7 +101,7 @@ export function Kaufliste() {
         )}
         <div>
           {ziel ? <Link to={ziel} className="titel">{k.titel}</Link> : <span className="titel">{k.titel}</span>}
-          <div className="zeile">
+          <div className="ruhig klein">
             {k.plattform ?? 'ohne Plattform'} · Kritik {k.kritik ?? 'unbekannt'}
             {k.quelle === 'luecke' && ` · Gebraucht ${k.besterGebrauchtpreisCents === null ? 'unbekannt' : euro(k.besterGebrauchtpreisCents)}`}
             {k.favorit && ' · ★'}
@@ -114,13 +119,16 @@ export function Kaufliste() {
 
   return (
     <>
-      <h1>Kaufliste</h1>
-      <p className="zeile">
+      <Kopfzeile titel="Kaufliste" sucheParam="suche" ansicht={ansicht} />
+      <Reiter eintraege={WUNSCH_REITER} />
+      <Chips gruppen={PLAN_CHIPS} />
+
+      <div className="seite">
+      <p className="ruhig klein">
         Gespeist aus Lücken und Wunschliste. Eine Disc oder Berechtigung zu erfassen erledigt den Eintrag – und den Wunsch dazu.{' '}
         <ErscheintBaldLink />
       </p>
 
-      <Filterleiste liste={liste} />
       <Meldungen liste={{ ...liste, rueckgaengig }} />
       {verworfen && (
         <p role="status" className="hinweis">
@@ -130,15 +138,27 @@ export function Kaufliste() {
       )}
 
       {!daten ? (
-        <p>wird geladen …</p>
+        <p className="ruhig">wird geladen …</p>
       ) : daten.eintraege.length === 0 ? (
-        <p>{nurFavoriten || plattformen.size > 0 || suche ? 'Nichts passt zum Filter.' : 'Die Kaufliste ist leer.'}</p>
+        <p className="ruhig">{nurFavoriten || plattformen.size > 0 || suche ? 'Nichts passt zum Filter.' : 'Die Kaufliste ist leer.'}</p>
       ) : (
         <>
-          <p>{daten.eintraege.length} Einträge</p>
-          <ul className="kacheln">
+          <div className="listenkopf">
+            <span>{daten.eintraege.length} Einträge</span>
+            <label>
+              <span className="nur-vorlesen">Sortierung</span>
+              <select value={sortierung} onChange={(e) => setzeParam('sort', e.target.value === 'favorit' ? '' : e.target.value)}>
+                {Object.entries(SORTIERTEXT)
+                  .filter(([wert]) => wert !== 'position')
+                  .map(([wert, text]) => (
+                    <option key={wert} value={wert}>{text}</option>
+                  ))}
+              </select>
+            </label>
+          </div>
+          <ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>
             {daten.eintraege.map((e) => (
-              <PlanKarte key={e.id} e={e} liste={liste} />
+              <PlanKarte key={e.id} e={e} liste={liste} art={ansicht.art} />
             ))}
           </ul>
         </>
@@ -157,7 +177,7 @@ export function Kaufliste() {
           <>
             <details open={kandidaten.luecken > 0 && kandidaten.luecken <= 20}>
               <summary>aus Lücken ({kandidaten.luecken})</summary>
-              <p className="zeile">
+              <p className="ruhig klein">
                 Digital gespielt, Disc-Fassung belegt, nicht im Regal. „physisch nicht gewünscht" merkt sich die Ablehnung als verworfenen Eintrag – wie in der{' '}
                 <Link to="/luecken">Lückenansicht</Link>.
               </p>
@@ -165,12 +185,13 @@ export function Kaufliste() {
             </details>
             <details open={kandidaten.wuensche > 0 && kandidaten.wuensche <= 20}>
               <summary>aus Wünschen ({kandidaten.wuensche})</summary>
-              <p className="zeile">Offene Wünsche, die noch nicht auf der Kaufliste stehen. Die Kopie nimmt den Favorit-Stern mit; der Wunsch bleibt, bis der Kauf erledigt ist.</p>
+              <p className="ruhig klein">Offene Wünsche, die noch nicht auf der Kaufliste stehen. Die Kopie nimmt den Favorit-Stern mit; der Wunsch bleibt, bis der Kauf erledigt ist.</p>
               {kandidaten.wuensche > 0 && <ul className="kandidatenliste">{block('wunsch').map(zeile)}</ul>}
             </details>
           </>
         )}
       </section>
+      </div>
     </>
   )
 }

@@ -8,8 +8,10 @@ import { ErscheintBald } from './ErscheintBald'
 import { Kaufliste } from './Kaufliste'
 import { Igdb } from './Igdb'
 import { IgdbZuordnung } from './IgdbZuordnung'
+import { NachOben } from './NachOben'
 import { Navigation } from './Navigation'
 import { Offline } from './Offline'
+import { Start } from './Start'
 import { OhneZuordnung } from './OhneZuordnung'
 import { Pruefliste } from './Pruefliste'
 import { Sammlung } from './Sammlung'
@@ -58,7 +60,10 @@ function App() {
       <main>
         <Offline />
         <Routes>
-          <Route path="/" element={<Navigate to="/sammlung" replace />} />
+          {/* Die Startseite ist seit Stufe 19 ein eigener Ort; bis zum
+              Dashboard (19a) traegt sie den Hinweisblock. */}
+          <Route path="/" element={<Navigate to="/start" replace />} />
+          <Route path="/start" element={<Start />} />
           <Route path="/sammlung" element={<Sammlung />} />
           <Route path="/spiel/:id" element={<Spieldetail />} />
           <Route path="/wunschliste" element={<Wunschliste />} />
@@ -90,9 +95,10 @@ function App() {
           <Route path="/pruefen" element={<SammlungPruefen />} />
           <Route path="/aenderungen" element={<Aenderungen />} />
           <Route path="/trophaeen" element={<Trophaeen />} />
-          <Route path="*" element={<Navigate to="/sammlung" replace />} />
+          <Route path="*" element={<Navigate to="/start" replace />} />
         </Routes>
       </main>
+      <NachOben />
     </div>
   )
 }

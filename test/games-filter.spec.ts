@@ -117,6 +117,20 @@ describe("GET /api/games – Filter", () => {
 		expect(await titel("platform=PS3")).toEqual(["Ico", "Journey"]);
 	});
 
+	it("platform nimmt mehrere Werte (Chip-Filter, Stufe 19)", async () => {
+		// ODER-Auswahl: ein Spiel erscheint, wenn eines seiner Releases passt.
+		expect(await titel("platform=PS3,PS5")).toEqual(["Grand Theft Auto V", "Ico", "Journey"]);
+		// Zusammen mit einem zweiten Filter gilt weiter: dasselbe Release muss
+		// beide Bedingungen erfuellen.
+		expect(await titel("platform=PS4,PS5&owned=physisch")).toEqual(["Bloodborne", "Grand Theft Auto V"]);
+		// Unbekannte Werte fallen einzeln heraus, der Rest greift.
+		expect(await titel("platform=XBOX,PS5")).toEqual(["Grand Theft Auto V"]);
+		// Bleibt nichts uebrig, gilt der Filter als nicht gesetzt.
+		expect(await titel("platform=XBOX,SWITCH")).toEqual(
+			["Bloodborne", "Grand Theft Auto V", "Ico", "Journey", "Journey Collector"],
+		);
+	});
+
 	it("owned", async () => {
 		expect(await titel("owned=physisch")).toEqual(["Bloodborne", "Grand Theft Auto V", "Ico"]);
 		expect(await titel("owned=digital")).toEqual(["Grand Theft Auto V", "Journey", "Journey Collector"]);

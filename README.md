@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 18c abgenommen** (22.09.2026), Stufe 18d gebaut (23.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen bis 18c abgenommen** (22.09.2026), Stufen 18d und 19 gebaut (23./24.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -106,7 +106,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
 | Ansicht | Trophäenliste mit Sortierung, Platin-Filter und Blätterung |
 | Zuordnung | Gruppenvorschläge nach Titel, ein Spiel mit mehreren Releases |
-| Sammlung | Kachelraster mit Filtern (Plattform, Besitz, gespielt, Platin, Disc-Fassung), Suche, Schnellerfassung mit Rückgängig |
+| Sammlung | Kacheln oder Zeilen (umschaltbar, je Liste gemerkt), Filter als Chips (Plattform mehrfach, Besitz, Status, Platin, Disc-Fassung), Suche hinter der Lupe. Besitz ist Anzeige – erfasst wird über Scanner und Spieldetail |
 | Spieldetail | Exemplare mit Zustand, Kaufdatum, Preis, EAN; digitale Quellen (Kauf, PS Plus, Testversion); Releases anlegen und löschen |
 | Besitz | Spiele ohne Trophäenliste von Hand anlegen, Dublettenwarnung über den Titelschlüssel |
 | Navigation | `react-router-dom`, Leiste unten (Handy) bzw. seitlich (Desktop), Filter in der URL |
@@ -157,7 +157,20 @@ die Rohablage ungebremst: 2,31 von 3,26 MB der Datenbank und 263 KiB je Nacht,
 mit jedem `d1 export` erneut in die Sicherung. Ein neunter Cron-Schritt räumt sie
 jetzt weg.
 
-**Als Nächstes: Stufe 19 – Oberfläche**, dahinter 19b (Einzeltrophäen). Danach die
+**Stufe 19** (24.09.2026) hat die Oberfläche aufgeräumt. Die Linie heißt
+**„Vitrine"**: ein dunkler Schaukasten, in dem die Cover die einzigen bunten
+Flächen sind – Farbe ist sonst ausschließlich Information. Alle Werte stehen
+als Tokens in `frontend/src/tokens.css`, die Anwendung ist nur noch dunkel.
+Die untere Leiste trägt **vier Symbole ohne Text** statt sieben Einträge bei
+0,6 rem: Kaufliste und Lücken sind Reiter der Wunschliste, Scannen ist eine
+Aktion in der Kopfzeile der Sammlung, die Einstellungen sind das Zahnrad; am
+Desktop stehen die Reiter als Unterpunkte in der Seitenleiste. Die Suche
+klappt erst auf Tippen auf die Lupe auf, Filter sind Chips, und Kacheln oder
+Zeilen lassen sich je Liste getrennt umschalten (die Wahl liegt im Gerät, nicht
+am Konto). Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen –
+daraus wird in Stufe 19a das Dashboard.
+
+**Als Nächstes: Stufe 19a – Dashboard**, dahinter 19b (Einzeltrophäen). Danach die
 Oberfläche (19), dahinter die Einzeltrophäen je Spiel (19b). Beide
 PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
 
