@@ -1811,3 +1811,114 @@ h2 {
 h3 {
   font-size: 1rem;
 }
+
+/*
+ * Sichere Bereiche (seit `viewport-fit=cover`, Stufe 19).
+ *
+ * Die Seite reicht jetzt unter Status- und Systemleiste. Die Kopfzeile holt
+ * sich den oberen Rand mit negativem Aussenabstand zurueck und fuellt ihn mit
+ * ihrer eigenen Flaeche - auch wenn sie beim Scrollen oben klebt. Auf Geraeten
+ * ohne Aussparung sind alle Werte null und es aendert sich nichts.
+ */
+main {
+  padding-top: env(safe-area-inset-top);
+}
+
+.kopfzeile {
+  box-sizing: border-box;
+  margin-top: calc(-1 * env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  height: calc(var(--kopf-hoehe) + env(safe-area-inset-top));
+}
+
+@media (min-width: 48rem) {
+  .nav {
+    padding-top: calc(var(--a5) + env(safe-area-inset-top));
+  }
+}
+
+/*
+ * Filter in zwei Ebenen (24.09.2026). Sichtbar sind nur gesetzte Filter und
+ * ein Knopf, der die Tafel aufklappt - 23 Chips nebeneinander waren "zu lang"
+ * (Rueckmeldung des Nutzers).
+ */
+.filter {
+  margin: 0 calc(-1 * var(--a4));
+  border-bottom: 1px solid var(--linie);
+}
+
+.filter .chips {
+  margin: 0;
+  border-bottom: none;
+}
+
+.chip.griff {
+  gap: 7px;
+  padding-left: 10px;
+  color: var(--text-leise);
+}
+
+.chip.griff.offen {
+  background: var(--flaeche-hoch);
+  color: var(--text);
+}
+
+.chip .zahl {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-rund);
+  background: var(--gold);
+  color: var(--grund);
+  font-family: var(--schrift-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.filtertafel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--a3);
+  padding: var(--a2) var(--a4) var(--a4);
+  background: var(--flaeche);
+  border-top: 1px solid var(--linie);
+}
+
+.filtergruppe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filtername {
+  font-family: var(--schrift-display);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+/* In der Tafel duerfen die Chips umbrechen statt zu scrollen. */
+.chips.lose {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+/* Die Plattform ist eine Box, die auf Tippen zum Auswahlfeld wird. */
+.plattform-knopf {
+  padding: 0;
+  border: none;
+  background: none;
+  line-height: 0;
+}
+
+.anlegen {
+  margin-bottom: var(--a5);
+}

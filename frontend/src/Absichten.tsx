@@ -248,14 +248,15 @@ export type PlanListe = ReturnType<typeof usePlanListe>
 export const PLAN_CHIPS: readonly ChipGruppe[] = [
 	{
 		param: 'plattform',
+		titel: 'Plattform',
 		mehrfach: true,
 		werte: [
 			...PLATTFORMEN.map((p) => [p, p === 'PSVITA' ? 'Vita' : p] as const),
 			['ohne', 'ohne Plattform'] as const,
 		],
 	},
-	{ param: 'favorit', werte: [['1', 'Favoriten']] },
-	{ param: 'status', werte: [['alle', 'auch erledigte']] },
+	{ param: 'favorit', titel: 'Auswahl', werte: [['1', 'Favoriten']] },
+	{ param: 'status', titel: 'Erledigte', werte: [['alle', 'auch erledigte und verworfene']] },
 ]
 
 /** Fehlermeldung und die Rückgängig-Zeile nach dem Anlegen. */
@@ -356,6 +357,14 @@ function IKnopf({
  */
 export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zieher }: KarteProps) {
   const { aendern, entfernen, bewerten } = liste
+  /*
+   * Die Plattform steht als Kennzeichen da, nicht als Dropdown (Wunsch des
+   * Nutzers vom 24.09.2026: „Plattformauswahl soll weg und Plattformboxen
+   * sollen stattdessen dorthin"). Ein Tipp darauf macht sie wieder zum
+   * Dropdown - das Umhängen eines Eintrags auf eine andere Plattform bleibt
+   * damit möglich, ohne dass ein Auswahlfeld die Zeile beherrscht.
+   */
+  const [plattformOffen, setPlattformOffen] = useState(false)
   const gekoppelt = (e.art === 'todo' || e.art === 'backlog') && e.releaseId !== null
   const nieGestartet = e.eigenerStatus === null || e.eigenerStatus === 'nicht_gespielt'
   const klassen = [
@@ -369,14 +378,18 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
 
   const meta = (
     <div className="release-daten umbrechend">
-      {e.spielId !== null && e.plattform && art === 'zeilen' ? (
-        <PlattformChip plattform={e.plattform} />
-      ) : e.spielId !== null && art === 'kacheln' ? (
+      {e.spielId === null ? (
+        <span className="plattform leer">ohne Plattform</span>
+      ) : plattformOffen ? (
         <select
           value={e.plattform ?? ''}
           aria-label="Plattform"
-          title="Plattform des Eintrags – ein Release entsteht bei Bedarf"
-          onChange={(ev) => aendern(e.id, { plattform: ev.target.value })}
+          autoFocus
+          onBlur={() => setPlattformOffen(false)}
+          onChange={(ev) => {
+            setPlattformOffen(false)
+            void aendern(e.id, { plattform: ev.target.value })
+          }}
         >
           <option value="">ohne Plattform</option>
           {PLATTFORMEN.map((p) => (
@@ -386,7 +399,15 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
           ))}
         </select>
       ) : (
-        <span className="plattform leer">ohne Plattform</span>
+        <button
+          type="button"
+          className="plattform-knopf"
+          title="Plattform ändern – ein Release entsteht bei Bedarf"
+          onClick={() => setPlattformOffen(true)}
+          onPointerDown={(ev) => ev.stopPropagation()}
+        >
+          {e.plattform ? <PlattformChip plattform={e.plattform} /> : <span className="plattform leer">ohne Plattform</span>}
+        </button>
       )}
       {e.art !== 'wunsch' && e.eigenerStatus && <ZustandsZeile status={e.eigenerStatus} klein />}
       <span className="ruhig klein">

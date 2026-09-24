@@ -167,7 +167,8 @@ Aktion in der Kopfzeile der Sammlung, die Einstellungen sind das Zahnrad; am
 Desktop stehen die Reiter als Unterpunkte in der Seitenleiste. Die Suche
 klappt erst auf Tippen auf die Lupe auf, Filter sind Chips, und Kacheln oder
 Zeilen lassen sich je Liste getrennt umschalten (die Wahl liegt im Gerät, nicht
-am Konto). Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen –
+am Konto). Die Filter stehen in zwei Ebenen: sichtbar ist nur, was gesetzt ist,
+alles Weitere hinter einem Knopf „Filter“. Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen –
 daraus wird in Stufe 19a das Dashboard.
 
 **Als Nächstes: Stufe 19a – Dashboard**, dahinter 19b (Einzeltrophäen). Danach die

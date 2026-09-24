@@ -61,6 +61,11 @@ export function Wunschliste() {
 							Freitext bleibt immer ohne Plattform.
 						</p>
 						<IgdbSuche vorgabe="" onWahl={igdbWaehlen} onOhneTreffer={ohneTreffer} laeuft={laeuft} mitPlattform />
+						{/* Der zweite Weg, Wünsche anzulegen – er gehört hinter dasselbe
+						    Pluszeichen (Wunsch des Nutzers vom 24.09.2026). */}
+						<p className="klein">
+							Oder mehrere auf einmal: <Link to="/import">Liste importieren</Link>
+						</p>
 					</section>
 				)}
 
@@ -75,9 +80,6 @@ export function Wunschliste() {
 						<div className="listenkopf">
 							<span>{daten.eintraege.length} Einträge</span>
 							<ErscheintBaldLink />
-							<Link to="/import" className="ruhig klein">
-								Liste importieren
-							</Link>
 							<label>
 								<span className="nur-vorlesen">Sortierung</span>
 								<select
