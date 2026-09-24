@@ -440,7 +440,11 @@ Der Eintrag in der Datenbank ist seit Stufe 18b dabei, weil Worker-Logs nur live
 einsehbar sind: Ohne ihn lässt sich am Morgen nicht sagen, ob ein Schritt
 scheiterte oder schlicht nichts zu tun fand. Aufgehoben werden **die letzten
 zwanzig** Aufrufe, und aufeinanderfolgende Aufrufe ohne Wirkung stehen als eine
-Zeile da (`cron: nichts ×21`). Mit fünf Einträgen ohne Verdichtung sah man
+Zeile da (`cron: nichts ×21`). **Einmal in der Woche reichen zwanzig Einträge
+nicht:** In der Nacht, in der auch die Kaufliste läuft, sind es rund einunddreißig
+Aufrufe, und die ältesten – die des Syncs – fallen aus dem Verlauf. Dass der Sync
+lief, steht dann weiter oben im Block („letzter automatischer Abruf"); nur seine
+Zwischenschritte fehlen. Nächste solche Nacht: 30.09.2026. Mit fünf Einträgen ohne Verdichtung sah man
 ausschließlich das leere Ende der Nacht – die Arbeit ist gegen 04:10 getan,
 danach folgen gut zwanzig Leerläufe (Befund vom 23.09.2026, Stufe 18d).
 
