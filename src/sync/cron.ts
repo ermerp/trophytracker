@@ -260,14 +260,28 @@ export function cronLogzeile(e: CronErgebnis): string {
 	if (e.abgebrochen) teile.push(`abgebrochen=${e.abgebrochen}`);
 	if (e.geloescht) teile.push(`geloescht=${e.geloescht}`);
 	if (e.sync) {
-		teile.push(`sync=${e.sync.status}/${e.sync.phase}`, `offset=${e.sync.offset}`);
+		teile.push(`sync=${e.sync.status}/${e.sync.phase}`);
+		// In der Normalisierung bewegt sich der Offset nicht - er ist dort fest
+		// 0, der Fortschritt sind die noch offenen Rohantworten. Fuenf Aufrufe
+		// schrieben deshalb fuenfmal `offset=0`: Eine Seite, die immer wieder
+		// scheitert, sah im Verlauf aus wie ein gesunder Lauf (Befund vom
+		// 24.09.2026). `offeneSeiten` fuellt nur der Normalisierungsschritt -
+		// fehlt es, ist der Offset die Zahl, die sich bewegt.
+		if (e.sync.offeneSeiten === undefined) teile.push(`offset=${e.sync.offset}`);
+		else teile.push(`offen=${e.sync.offeneSeiten}`);
 		if (e.sync.status === "erfolg") teile.push(`titel=${e.sync.titlesSeen ?? 0}`, `eingereiht=${e.sync.eingereiht ?? 0}`);
 		if (e.sync.meldung) teile.push(`meldung="${e.sync.meldung}"`);
 	}
 	if (e.spielzeit) {
 		teile.push(
 			`spielzeit=${e.spielzeit.status}`,
+			// Die drei Zahlen sind ein Trichter: `geholt` ist die Seite von
+			// Sony, `geschrieben` was den Plattformfilter ueberlebt hat,
+			// `zugeordnet` was davon an einem Release haengt. Ohne die
+			// mittlere las sich `geholt=200 zugeordnet=117` als 83 nicht
+			// zugeordnete Spiele - es waren die Streaming-Apps (24.09.2026).
 			`geholt=${e.spielzeit.geholt}`,
+			`geschrieben=${e.spielzeit.geschrieben}`,
 			`zugeordnet=${e.spielzeit.zugeordnet}`,
 		);
 		if (e.spielzeit.meldung) teile.push(`meldung="${e.spielzeit.meldung}"`);

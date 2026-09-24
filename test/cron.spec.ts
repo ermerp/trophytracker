@@ -123,6 +123,22 @@ describe("cronSchritt", () => {
 		expect(schritte[4].sync).toMatchObject({ status: "erfolg", titlesSeen: 150 });
 		expect(await laeufe()).toEqual([expect.objectContaining({ status: "erfolg", started_by: "cron" })]);
 		expect(await repos().trophies.anzahl()).toBe(150);
+
+		// Und die Zeilen, die davon im Verlauf stehen: Jeder Aufruf muss sich
+		// vom vorigen unterscheiden, sonst ist am Morgen nicht zu sehen, ob der
+		// Lauf vorankam (Befund vom 24.09.2026). Frueher lauteten die beiden
+		// Normalisierungsaufrufe beide "offset=0".
+		const zeilen = schritte.map(cronLogzeile);
+		expect(zeilen.slice(0, 5)).toEqual([
+			"cron: sync erschienen=0 sync=laufend/abruf offset=100",
+			"cron: sync erschienen=0 sync=laufend/normalisierung offset=100",
+			"cron: sync erschienen=0 sync=laufend/normalisierung offen=1",
+			"cron: sync erschienen=0 sync=laufend/normalisierung offen=0",
+			// eingereiht=0, obwohl 150 Titel neu sind: Ohne zugeordnetes
+			// Release gibt es nichts durchzusehen (8.1).
+			"cron: sync erschienen=0 sync=erfolg/normalisierung offen=0 titel=150 eingereiht=0",
+		]);
+		expect(new Set(zeilen).size).toBe(zeilen.length);
 	});
 
 	it("startet je Nacht nur einen eigenen Lauf - am naechsten Tag wieder einen", async () => {
@@ -429,5 +445,49 @@ describe("cronSchritt", () => {
 			sync: { status: "fehler", phase: "abruf", offset: 100, seitenGeholt: 0, titlesSeen: null, weiter: false, meldung: "Der Abruf ist fehlgeschlagen." },
 		});
 		expect(zeile).toBe('cron: sync erschienen=2 abgebrochen=1 sync=fehler/abruf offset=100 meldung="Der Abruf ist fehlgeschlagen."');
+	});
+
+	it("nennt in der Normalisierung die offenen Seiten statt des stehenden Offsets", () => {
+		// Der Offset ist in dieser Phase fest 0. In der Nacht zum 24.09.2026
+		// standen fuenf gleichlautende Zeilen "laufend/normalisierung offset=0"
+		// im Verlauf - ein Schritt, der immer an derselben Seite scheitert,
+		// haette genau dieselben geschrieben.
+		const zeilen = [4, 3].map((offen) =>
+			cronLogzeile({
+				getan: "sync",
+				erschienen: 0,
+				sync: { status: "laufend", phase: "normalisierung", offset: 0, seitenGeholt: 0, titlesSeen: 431, offeneSeiten: offen, weiter: true },
+			}),
+		);
+
+		expect(zeilen[0]).toBe("cron: sync erschienen=0 sync=laufend/normalisierung offen=4");
+		expect(zeilen[1]).toBe("cron: sync erschienen=0 sync=laufend/normalisierung offen=3");
+		expect(zeilen[0]).not.toEqual(zeilen[1]);
+	});
+
+	it("nennt beim Uebergang in die Normalisierung noch den Offset des Abrufs", () => {
+		// Diesen Aufruf schreibt der Abruf, nicht die Normalisierung: Er hat
+		// die letzte Seite geholt und die Phase umgestellt. `offeneSeiten` ist
+		// hier unbekannt, der Offset dagegen die Zahl, die sich bewegt hat.
+		const zeile = cronLogzeile({
+			getan: "sync",
+			erschienen: 0,
+			sync: { status: "laufend", phase: "normalisierung", offset: 400, seitenGeholt: 1, titlesSeen: 431, weiter: true },
+		});
+
+		expect(zeile).toBe("cron: sync erschienen=0 sync=laufend/normalisierung offset=400");
+	});
+
+	it("nennt bei der Spielzeit den ganzen Trichter, nicht nur Anfang und Ende", () => {
+		// `geholt` ist die Seite von Sony, `zugeordnet` zaehlt erst nach dem
+		// Plattformfilter. Ohne die mittlere Zahl las sich die Zeile als 83
+		// nicht zugeordnete Spiele - es waren die Streaming-Apps (24.09.2026).
+		const zeile = cronLogzeile({
+			getan: "spielzeit",
+			erschienen: 0,
+			spielzeit: { status: "erfolg", geholt: 200, geschrieben: 160, zugeordnet: 117, weiter: true },
+		});
+
+		expect(zeile).toBe("cron: spielzeit erschienen=0 spielzeit=erfolg geholt=200 geschrieben=160 zugeordnet=117");
 	});
 });

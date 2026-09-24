@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 18c abgenommen** (22.09.2026), Stufen 18d und 19 gebaut (23./24.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen bis 18c abgenommen** (22.09.2026), Stufen 18d und 19 gebaut (23./24.09.2026), zwei Zahlen im Cron-Verlauf nachgebessert (24.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -155,7 +155,10 @@ nach 05:36, während Sync, Spielzeit, Besitz und 49 aufgefrischte Spiele darunte
 verschwanden – seitdem zwanzig Einträge mit verdichteten Leerläufen. Dazu wuchs
 die Rohablage ungebremst: 2,31 von 3,26 MB der Datenbank und 263 KiB je Nacht,
 mit jedem `d1 export` erneut in die Sicherung. Ein neunter Cron-Schritt räumt sie
-jetzt weg.
+jetzt weg. Dieselbe Analyse einen Tag später – die erste Nacht, die von Anfang
+bis Ende lesbar war – fand zwei Zahlen, die nichts aussagten: ein `offset=0`,
+das in der Normalisierung fünfmal gleich lautete, und eine Spielzeit-Zeile ohne
+den Stand nach dem Plattformfilter. Beides betrifft nur `cronLogzeile`.
 
 **Stufe 19** (24.09.2026) hat die Oberfläche aufgeräumt. Die Linie heißt
 **„Vitrine"**: ein dunkler Schaukasten, in dem die Cover die einzigen bunten
@@ -431,7 +434,7 @@ Einstellungen genügt, dann geht es in der nächsten Nacht von allein weiter.
 Was der Cron tut, steht an vier Stellen: in den Einstellungen unter **Automatik**
 (letzter automatischer Abruf **und** der Ausgang des letzten Cron-Aufrufs), im
 Hinweisblock der Sammlung, wenn der Nachtlauf fehlgeschlagen ist, in
-`GET /api/sync/status` als `cronAusgang` und als Zeile `cron: …` in den
+`GET /api/sync/status` als `cronVerlauf` und als Zeile `cron: …` in den
 Worker-Logs (Cloudflare-Dashboard → Worker → Logs) – nur Zahlen und feste Texte.
 Der Eintrag in der Datenbank ist seit Stufe 18b dabei, weil Worker-Logs nur live
 einsehbar sind: Ohne ihn lässt sich am Morgen nicht sagen, ob ein Schritt
@@ -440,6 +443,17 @@ zwanzig** Aufrufe, und aufeinanderfolgende Aufrufe ohne Wirkung stehen als eine
 Zeile da (`cron: nichts ×21`). Mit fünf Einträgen ohne Verdichtung sah man
 ausschließlich das leere Ende der Nacht – die Arbeit ist gegen 04:10 getan,
 danach folgen gut zwanzig Leerläufe (Befund vom 23.09.2026, Stufe 18d).
+
+Beim Lesen der Zeile lohnen zwei Zahlen (nachgebessert am 24.09.2026): In der
+**Normalisierung** steht dort `offen=` – die noch unverarbeiteten Rohantworten,
+die von Aufruf zu Aufruf kleiner werden. Der `offset` ist in dieser Phase fest 0
+und taugte nicht als Fortschritt: Fünf gleichlautende Zeilen konnten einen
+gesunden Lauf nicht von einer Seite unterscheiden, die immer wieder scheitert.
+Die **Spielzeit**-Zeile nennt drei Zahlen, und zwar in dieser Reihenfolge:
+`geholt` ist die Seite, wie Sony sie liefert, `geschrieben` was davon PS4 oder
+PS5 ist (Streaming-Apps fallen weg), `zugeordnet` was an einem Release hängt.
+Wer die mittlere überspringt, hält die Streaming-Apps für nicht zugeordnete
+Spiele.
 `GET /api/sync/status` nennt `letzterAutomatischerLauf`, jeder Lauf trägt
 `ausloeser` (`nutzer` oder `cron`).
 

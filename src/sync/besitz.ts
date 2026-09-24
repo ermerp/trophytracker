@@ -23,8 +23,11 @@ export const KAEUFE_JE_SEITE = 50;
 
 export type SpielzeitErgebnis = {
 	status: "erfolg" | "fehler";
+	/** Titel der Seite, wie Sony sie liefert - VOR dem Plattformfilter. */
 	geholt: number;
+	/** Was den Filter ueberlebt hat und gespeichert wurde (PS4/PS5). */
 	geschrieben: number;
+	/** Teilmenge von `geschrieben`, die an genau einem Release haengt. */
 	zugeordnet: number;
 	weiter: boolean;
 	meldung?: string;
