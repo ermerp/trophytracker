@@ -3002,3 +3002,11 @@ details.block > div {
 .kopfzeile .fueller {
   flex: 1;
 }
+
+/* Eine Stufe ohne erspielte Trophaee behaelt ihre Metallfarbe, damit Platin
+   und Gold unterscheidbar bleiben - die Zahl tritt dafuer zurueck, damit die
+   Reihe nicht lauter wird als eine mit Inhalt. */
+.stufe.leer b {
+  color: var(--text-still);
+  font-weight: 500;
+}
