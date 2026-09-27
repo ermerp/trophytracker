@@ -355,8 +355,8 @@ export function Einstellungen() {
         </ul>
       )}
       <p className="zeile">
-        Aufeinanderfolgende Aufrufe derselben Arbeit stehen als eine Zeile da („sync ×11
-        offset=0→400"), damit eine ganze Nacht in den Verlauf passt. Bewegt sich die Zahl dabei nicht,
+        Aufeinanderfolgende Aufrufe derselben Arbeit stehen als eine Zeile da („sync ×5
+        offset=100→400"), damit eine ganze Nacht in den Verlauf passt. Bewegt sich die Zahl dabei nicht,
         ist der Schritt hängengeblieben. Zeilen mit einer Meldung werden nie zusammengefasst.
       </p>
 

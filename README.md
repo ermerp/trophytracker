@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19a abgenommen** (27.09.2026), **Stufe 18e gebaut** (27.09.2026, Abnahme offen)
+**Stufen bis 19a abgenommen** (27.09.2026), **Stufe 18e gebaut und deployt** (27.09.2026, Abnahme offen)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -289,6 +289,16 @@ Der Pfad `/cdn-cgi/` läuft am Asset-Fallback vorbei; das ältere `/__scheduled`
 liefert nur die `index.html`. Das Ergebnis steht als Zeile `cron: …` im
 Terminal des Workers, ohne hinterlegtes NPSSO bleibt es beim IGDB-Teil.
 
+**In der Produktion gibt es diesen Weg nicht.** Cloudflare dokumentiert keine
+Möglichkeit, den `scheduled`-Einstieg eines deployten Workers von aussen zu
+rufen; anstossen lassen sich dort nur die Handrouten, und die schreiben keine
+Verlaufszeile, kennen keinen Bereich und wiederholen nichts. Wer den Cron prüfen
+will, wartet die Nacht ab – oder spielt sie lokal durch.
+
+**Und „Jetzt abrufen" ersetzt den Nachtlauf.** Ein erfolgreicher Handabruf vom
+selben Tag lässt den Cron den Sync überspringen (10.1, Schritt 3). Wer am Abend
+auf den Knopf drückt, hat am nächsten Morgen keine Cron-Sync-Zeilen im Verlauf.
+
 ```bash
 npm test             # Vitest
 ```
@@ -515,10 +525,11 @@ zwanzig** Aufrufe, und seit Stufe 18e stehen aufeinanderfolgende Aufrufe
 
 ```
 2026-09-28 06:00–07:55 cron: nichts ×24 bereich=wartung
-2026-09-28 03:00–03:50 cron: sync ×11 bereich=psn sync=laufend→erfolg/normalisierung offen=4→0
+2026-09-28 03:25–03:45 cron: sync ×5 bereich=psn sync=laufend/normalisierung offen=4→0
 ```
 
-Eine Nacht sind damit rund sechs Zeilen statt einunddreißig – zwanzig Einträge
+Eine Nacht sind damit sieben Zeilen statt einunddreißig (gemessen in `test/cron.spec.ts`,
+das sechzig Aufrufe durchspielt) – zwanzig Einträge
 fassten eine Kaufliste-Nacht vorher nicht, und weg fielen gerade die
 Sync-Zeilen. Verdichtet wird nur bei gleicher Feldfolge, und eine Zeile mit
 `meldung=` nie: Ein Fehler bleibt stehen. Bewegt sich eine Zahl bei `×3` nicht,
