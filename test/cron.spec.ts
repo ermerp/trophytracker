@@ -601,6 +601,42 @@ describe("cronSchritt", () => {
 		});
 	});
 
+	it("eine ganze Nacht passt in den Verlauf - der Zweck der Verdichtung", async () => {
+		// Die Probe auf Stufe 18e: Vorher waren es einunddreissig Zeilen, und
+		// die zwanzig aufgehobenen zeigten die Sync-Aufrufe nicht mehr. Hier
+		// laeuft eine vollstaendige Nacht durch - beide Fenster, jeder Aufruf
+		// mit seiner Zeile wie in src/index.ts.
+		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
+		const { psn } = psnMit(431);
+		const r = repos();
+		let aufrufe = 0;
+
+		const nacht = async (bereich: "psn" | "wartung", stunde: number, anzahl: number) => {
+			for (let i = 0; i < anzahl; i++) {
+				const e = await cronSchritt(r, psn, igdbOhne(), { bereich });
+				const minute = String((i * 5) % 60).padStart(2, "0");
+				const h = String(stunde + Math.floor((i * 5) / 60)).padStart(2, "0");
+				await r.sync.cronAusgangVermerken(`2026-09-28 ${h}:${minute}`, cronLogzeile(e));
+				aufrufe++;
+			}
+		};
+
+		await nacht("psn", 3, 36);
+		await nacht("wartung", 6, 24);
+
+		const verlauf = await r.sync.cronVerlauf();
+		console.info(`${aufrufe} Aufrufe ergeben ${verlauf.length} Zeilen:\n` + verlauf.join("\n"));
+
+		// Sechzig Aufrufe, eine Handvoll Zeilen - und die Sync-Zeilen sind
+		// noch da, statt aus dem Verlauf gedraengt zu sein.
+		expect(aufrufe).toBe(60);
+		expect(verlauf.length).toBeLessThanOrEqual(10);
+		expect(verlauf.join("\n")).toContain("cron: sync ×");
+		// Der erste geloggte Aufruf hat Seite 0 schon geholt und meldet 100.
+		expect(verlauf.join("\n")).toContain("offset=100→400");
+		expect(await repos().trophies.anzahl()).toBe(431);
+	});
+
 	describe("Kaufliste (7.7, Nachbesserung in Stufe 18e)", () => {
 		beforeEach(async () => {
 			await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
