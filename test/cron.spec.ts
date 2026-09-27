@@ -6,12 +6,17 @@ import { Geheimnis } from "../src/domain/secret";
 import { erstellePsnClient } from "../src/psn/client";
 import {
 	AUFFRISCH_FRIST_TAGE,
+	bereichFuerAusdruck,
+	besitzLauf,
+	besitzStand,
+	CRON_PSN,
+	CRON_WARTUNG,
 	cronLogzeile,
 	cronSchritt,
-	cronWirkungslos,
 	HAENGT_NACH_STUNDEN,
 	ROHANTWORTEN_LAEUFE,
 } from "../src/sync/cron";
+import { FEHLVERSUCHE_HOECHSTENS } from "../src/sync/run";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
 import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophySeite } from "./psn-fake";
 
@@ -49,6 +54,55 @@ function psnMit(total: number) {
 	return { psn: erstellePsnClient(fetch), aufrufe };
 }
 
+/**
+ * Wie psnMit, aber die Seiten in `aussetzer` antworten beim ERSTEN Versuch
+ * mit 500 - der Fall aus der Nacht zum 27.09.2026 (Stufe 18e).
+ */
+function psnMitAussetzer(total: number, aussetzer: number[]) {
+	const offen = new Set(aussetzer);
+	const { fetch, aufrufe } = fakeFetch([
+		[/oauth\/authorize/, () => redirectAntwort("v3.abc")],
+		[/oauth\/token/, () => jsonAntwort(TOKEN_ANTWORT)],
+		[/gamelist\/v2/, () => jsonAntwort({ totalItemCount: 0, titles: [] })],
+		[
+			/graphql/,
+			() => jsonAntwort({ data: { purchasedTitlesRetrieve: { games: [], pageInfo: { totalCount: 0 } } } }),
+		],
+		[
+			/trophyTitles/,
+			() => {
+				const letzte = aufrufe[aufrufe.length - 1].url;
+				const offset = Number(new URL(letzte).searchParams.get("offset") ?? 0);
+				return offen.delete(offset) ? new Response("weg", { status: 500 }) : new Response(trophySeite(offset, total));
+			},
+		],
+	]);
+	return { psn: erstellePsnClient(fetch), aufrufe };
+}
+
+/** PSN, das nur die Kaufliste verweigert - fuer den stummen Fehler aus 18c. */
+const psnOhneKaufliste = (status: number) =>
+	erstellePsnClient(
+		fakeFetch([
+			[/oauth\/authorize/, () => redirectAntwort("v3.abc")],
+			[/oauth\/token/, () => jsonAntwort(TOKEN_ANTWORT)],
+			[/graphql/, () => new Response("weg", { status })],
+		]).fetch,
+	);
+
+/** PSN mit leerer Kaufliste - ein vollstaendiger Durchlauf in einem Aufruf. */
+const psnLeereKaufliste = () =>
+	erstellePsnClient(
+		fakeFetch([
+			[/oauth\/authorize/, () => redirectAntwort("v3.abc")],
+			[/oauth\/token/, () => jsonAntwort(TOKEN_ANTWORT)],
+			[
+				/graphql/,
+				() => jsonAntwort({ data: { purchasedTitlesRetrieve: { games: [], pageInfo: { totalCount: 0 } } } }),
+			],
+		]).fetch,
+	);
+
 /** PSN, dessen Anmeldung klappt, aber die Trophaeenliste mit 500 antwortet - ein Abruf scheitert, ohne dass der Zugang 'abgelaufen' wird. */
 const psnKaputt = () =>
 	erstellePsnClient(
@@ -63,6 +117,11 @@ const igdbOhne = () => fakeIgdb([[]], { zugang: null }).client;
 
 const laeufe = async () =>
 	(await env.DB.prepare("SELECT id, status, phase, started_by, error_message FROM psn_sync_run ORDER BY id").all()).results;
+
+/** Fehlversuche des juengsten Laufs (Migration 0024). */
+const fehlversuche = async () =>
+	(await env.DB.prepare("SELECT failed_attempts FROM psn_sync_run ORDER BY id DESC LIMIT 1").first<{ failed_attempts: number }>())
+		?.failed_attempts ?? 0;
 
 async function spielMitIgdb(id: number, igdbId: number, syncedAt: string | null) {
 	await env.DB.batch([
@@ -130,13 +189,13 @@ describe("cronSchritt", () => {
 		// Normalisierungsaufrufe beide "offset=0".
 		const zeilen = schritte.map(cronLogzeile);
 		expect(zeilen.slice(0, 5)).toEqual([
-			"cron: sync erschienen=0 sync=laufend/abruf offset=100",
-			"cron: sync erschienen=0 sync=laufend/normalisierung offset=100",
-			"cron: sync erschienen=0 sync=laufend/normalisierung offen=1",
-			"cron: sync erschienen=0 sync=laufend/normalisierung offen=0",
+			"cron: sync sync=laufend/abruf offset=100",
+			"cron: sync sync=laufend/normalisierung offset=100",
+			"cron: sync sync=laufend/normalisierung offen=1",
+			"cron: sync sync=laufend/normalisierung offen=0",
 			// eingereiht=0, obwohl 150 Titel neu sind: Ohne zugeordnetes
 			// Release gibt es nichts durchzusehen (8.1).
-			"cron: sync erschienen=0 sync=erfolg/normalisierung offen=0 titel=150 eingereiht=0",
+			"cron: sync sync=erfolg/normalisierung offen=0 titel=150 eingereiht=0",
 		]);
 		expect(new Set(zeilen).size).toBe(zeilen.length);
 	});
@@ -147,26 +206,81 @@ describe("cronSchritt", () => {
 		for (let i = 0; i < 5; i++) await cronSchritt(repos(), psn, igdbOhne());
 		expect(await laeufe()).toHaveLength(1);
 
-		expect((await cronSchritt(repos(), psn, igdbOhne(), HEUTE)).getan).toBe("nichts");
+		expect((await cronSchritt(repos(), psn, igdbOhne(), { heute: HEUTE })).getan).toBe("nichts");
 		expect(await laeufe()).toHaveLength(1);
 
-		expect((await cronSchritt(repos(), psn, igdbOhne(), MORGEN)).getan).toBe("sync");
+		expect((await cronSchritt(repos(), psn, igdbOhne(), { heute: MORGEN })).getan).toBe("sync");
 		expect(await laeufe()).toHaveLength(2);
 	});
 
-	it("wiederholt einen fehlgeschlagenen Cron-Lauf in derselben Nacht nicht", async () => {
+	it("holt eine gescheiterte Seite im naechsten Aufruf erneut, statt die Nacht zu verlieren", async () => {
+		// Die Nacht zum 27.09.2026: Die dritte von fuenf Seiten antwortete mit
+		// einem Fehler, der Lauf ging auf 'fehler', und weil schon ein
+		// Cron-Lauf von heute existierte, taten die restlichen 29 Aufrufe des
+		// Fensters nichts - 431 Titel blieben einen Tag alt (Stufe 18e).
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
-		const e = await cronSchritt(repos(), psnKaputt(), igdbOhne());
-		expect(e.sync).toMatchObject({ status: "fehler" });
+		const { psn } = psnMitAussetzer(250, [100]);
+
+		expect((await cronSchritt(repos(), psn, igdbOhne())).sync).toMatchObject({ status: "laufend", offset: 100 });
+
+		const e = await cronSchritt(repos(), psn, igdbOhne());
+		expect(e.sync).toMatchObject({
+			status: "laufend",
+			fehlversuche: 1,
+			// Der Statuscode steht jetzt in der Meldung: Vorher lautete sie
+			// einheitlich "Der Abruf ist fehlgeschlagen.", und am Morgen war
+			// nicht zu unterscheiden, was PSN geantwortet hatte.
+			meldung: "Trophäenabruf antwortete mit 500.",
+		});
+		// Der Lauf lebt - und der Zugang gilt weiter als in Ordnung, solange
+		// es weitergeht.
+		expect(await laeufe()).toEqual([expect.objectContaining({ status: "laufend", started_by: "cron" })]);
+		expect((await repos().credentials.anzeige()).status).toBe("ok");
+		expect(cronLogzeile(e)).toContain(`versuch=1/${FEHLVERSUCHE_HOECHSTENS}`);
+
+		// Weiter bis zum Erfolg: dieselbe Seite, derselbe Lauf.
+		for (let i = 0; i < 7; i++) await cronSchritt(repos(), psn, igdbOhne());
+		expect(await laeufe()).toEqual([expect.objectContaining({ status: "erfolg" })]);
+		expect(await repos().trophies.anzahl()).toBe(250);
+		// Und der Fehlerzaehler ist mit dem Fortschritt verschwunden.
+		expect(await fehlversuche()).toBe(0);
+	});
+
+	it("gibt nach drei Fehlversuchen auf und wiederholt den Lauf in derselben Nacht nicht", async () => {
+		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
+		const psn = psnKaputt();
+
+		for (let versuch = 1; versuch <= FEHLVERSUCHE_HOECHSTENS; versuch++) {
+			const e = await cronSchritt(repos(), psn, igdbOhne());
+			expect(e.sync).toMatchObject({ fehlversuche: versuch });
+			expect(e.sync?.status).toBe(versuch < FEHLVERSUCHE_HOECHSTENS ? "laufend" : "fehler");
+		}
+
 		expect(await laeufe()).toEqual([expect.objectContaining({ status: "fehler", started_by: "cron" })]);
-		// Kein Auth-Fehler: Der Zugang bleibt 'fehler', nicht 'abgelaufen' - die
-		// Sperre kommt hier allein aus der Regel "ein Cron-Versuch je Nacht".
+		// Kein Auth-Fehler: Der Zugang steht auf 'fehler', nicht 'abgelaufen'.
 		expect((await repos().credentials.anzeige()).status).toBe("fehler");
 
 		// Kein zweiter Lauf: Der naechste Aufruf geht weiter in der Reihenfolge
 		// (hier Spielzeit), statt den Sync zu wiederholen.
 		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).not.toBe("sync");
 		expect(await laeufe()).toHaveLength(1);
+	});
+
+	it("gibt bei abgelehntem Token sofort auf - ein Token wird in fuenf Minuten nicht gueltig", async () => {
+		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
+		const psn = erstellePsnClient(
+			fakeFetch([
+				[/oauth\/authorize/, () => redirectAntwort("v3.abc")],
+				[/oauth\/token/, () => jsonAntwort(TOKEN_ANTWORT)],
+				[/trophyTitles/, () => new Response("nein", { status: 401 })],
+			]).fetch,
+		);
+
+		const e = await cronSchritt(repos(), psn, igdbOhne());
+		expect(e.sync).toMatchObject({ status: "fehler" });
+		expect(e.sync?.fehlversuche).toBeUndefined();
+		expect(await laeufe()).toEqual([expect.objectContaining({ status: "fehler" })]);
+		expect((await repos().credentials.anzeige()).status).toBe("abgelaufen");
 	});
 
 	it("legt bei abgelaufenem Zugang gar keinen Lauf an", async () => {
@@ -331,7 +445,7 @@ describe("cronSchritt", () => {
 		const r = repos();
 		await r.sync.cronAusgangVermerken("2026-09-23 04:11", "cron: igdb_auffrischen angefragt=50 aktualisiert=49");
 		for (const minute of ["16", "21", "26"]) {
-			await r.sync.cronAusgangVermerken(`2026-09-23 04:${minute}`, "cron: nichts erschienen=0", true);
+			await r.sync.cronAusgangVermerken(`2026-09-23 04:${minute}`, "cron: nichts");
 		}
 
 		expect(await r.sync.cronVerlauf()).toEqual([
@@ -342,32 +456,180 @@ describe("cronSchritt", () => {
 
 	it("nennt keinen Zeitraum, wenn beide Aufrufe in dieselbe Minute fallen", async () => {
 		const r = repos();
-		await r.sync.cronAusgangVermerken("2026-09-23 15:28", "cron: nichts erschienen=0", true);
-		await r.sync.cronAusgangVermerken("2026-09-23 15:28", "cron: nichts erschienen=0", true);
+		await r.sync.cronAusgangVermerken("2026-09-23 15:28", "cron: nichts");
+		await r.sync.cronAusgangVermerken("2026-09-23 15:28", "cron: nichts");
 
 		expect(await r.sync.cronVerlauf()).toEqual(["2026-09-23 15:28 cron: nichts ×2"]);
 
 		// Und die verdichtete Zeile laesst sich weiter verdichten.
-		await r.sync.cronAusgangVermerken("2026-09-23 15:33", "cron: nichts erschienen=0", true);
+		await r.sync.cronAusgangVermerken("2026-09-23 15:33", "cron: nichts");
 		expect(await r.sync.cronVerlauf()).toEqual(["2026-09-23 15:28–15:33 cron: nichts ×3"]);
 	});
 
 	it("verdichtet nicht ueber eine wirksame Zeile hinweg", async () => {
 		const r = repos();
-		await r.sync.cronAusgangVermerken("2026-09-23 04:06", "cron: nichts erschienen=0", true);
-		await r.sync.cronAusgangVermerken("2026-09-23 04:11", "cron: aufraeumen erschienen=0 geloescht=30");
-		await r.sync.cronAusgangVermerken("2026-09-23 04:16", "cron: nichts erschienen=0", true);
+		await r.sync.cronAusgangVermerken("2026-09-23 04:06", "cron: nichts");
+		await r.sync.cronAusgangVermerken("2026-09-23 04:11", "cron: aufraeumen geloescht=30");
+		await r.sync.cronAusgangVermerken("2026-09-23 04:16", "cron: nichts");
 
 		const verlauf = await r.sync.cronVerlauf();
 		expect(verlauf).toHaveLength(3);
-		expect(verlauf[2]).toBe("2026-09-23 04:06 cron: nichts erschienen=0");
+		expect(verlauf[2]).toBe("2026-09-23 04:06 cron: nichts");
 	});
 
 	it("ein Fehler ist kein Leerlauf und bleibt stehen", async () => {
-		expect(cronWirkungslos({ getan: "nichts", erschienen: 0, abgebrochen: 0 })).toBe(true);
-		expect(cronWirkungslos({ getan: "nichts", erschienen: 0, abgebrochen: 0, meldung: "Der PSN-Abruf ist fehlgeschlagen." })).toBe(false);
-		expect(cronWirkungslos({ getan: "nichts", erschienen: 1, abgebrochen: 0 })).toBe(false);
-		expect(cronWirkungslos({ getan: "aufraeumen", erschienen: 0, abgebrochen: 0, geloescht: 5 })).toBe(false);
+		// Seit Stufe 18e ist die Regel nicht mehr an einem eigenen
+		// "wirkungslos" festgemacht, sondern an der Zeile selbst: Was eine
+		// `meldung=` traegt, wird nie verdichtet.
+		const r = repos();
+		await r.sync.cronAusgangVermerken("2026-09-23 04:06", "cron: nichts");
+		await r.sync.cronAusgangVermerken("2026-09-23 04:11", 'cron: nichts meldung="Der PSN-Abruf ist fehlgeschlagen."');
+		await r.sync.cronAusgangVermerken("2026-09-23 04:16", "cron: nichts");
+
+		expect(await r.sync.cronVerlauf()).toEqual([
+			"2026-09-23 04:16 cron: nichts",
+			'2026-09-23 04:11 cron: nichts meldung="Der PSN-Abruf ist fehlgeschlagen."',
+			"2026-09-23 04:06 cron: nichts",
+		]);
+	});
+
+	it("verdichtet gleichartige Arbeit mit Fortschritt als Spanne", async () => {
+		// Der Kern von Stufe 18e: Zwanzig Eintraege fassten eine Nacht mit
+		// Kaufliste nicht - einunddreissig Aufrufe, und die aeltesten elf (die
+		// Sync-Zeilen) fielen weg (Rechnung vom 24.09.2026).
+		const r = repos();
+		for (const [i, offset] of [0, 100, 200, 300, 400].entries()) {
+			await r.sync.cronAusgangVermerken(`2026-09-27 03:0${i}`, `cron: sync bereich=psn sync=laufend/abruf offset=${offset}`);
+		}
+
+		expect(await r.sync.cronVerlauf()).toEqual([
+			"2026-09-27 03:00–03:04 cron: sync ×5 bereich=psn sync=laufend/abruf offset=0→400",
+		]);
+	});
+
+	it("verdichtet nicht, wenn die Felder wechseln - und nicht ueber die Arbeit hinweg", async () => {
+		const r = repos();
+		await r.sync.cronAusgangVermerken("2026-09-27 03:00", "cron: sync sync=laufend/abruf offset=400");
+		// Andere Feldfolge (offen statt offset): eigene Zeile, genau dort, wo
+		// auch ein Mensch trennen wuerde.
+		await r.sync.cronAusgangVermerken("2026-09-27 03:05", "cron: sync sync=laufend/normalisierung offen=4");
+		await r.sync.cronAusgangVermerken("2026-09-27 03:10", "cron: sync sync=laufend/normalisierung offen=3");
+		await r.sync.cronAusgangVermerken("2026-09-27 03:15", "cron: spielzeit spielzeit=erfolg geholt=200");
+
+		expect(await r.sync.cronVerlauf()).toEqual([
+			"2026-09-27 03:15 cron: spielzeit spielzeit=erfolg geholt=200",
+			"2026-09-27 03:05–03:10 cron: sync ×2 sync=laufend/normalisierung offen=4→3",
+			"2026-09-27 03:00 cron: sync sync=laufend/abruf offset=400",
+		]);
+	});
+
+	it("verdichtet nicht ueber die Fenstergrenze hinweg", async () => {
+		// Sonst stuende am Morgen "nichts ×36 bereich=psn→wartung" da, und von
+		// keinem der beiden Fenster waere zu sehen, ob es gelaufen ist.
+		const r = repos();
+		await r.sync.cronAusgangVermerken("2026-09-28 05:55", "cron: nichts bereich=psn");
+		await r.sync.cronAusgangVermerken("2026-09-28 06:00", "cron: nichts bereich=wartung");
+		await r.sync.cronAusgangVermerken("2026-09-28 06:05", "cron: nichts bereich=wartung");
+
+		expect(await r.sync.cronVerlauf()).toEqual([
+			"2026-09-28 06:00–06:05 cron: nichts ×2 bereich=wartung",
+			"2026-09-28 05:55 cron: nichts bereich=psn",
+		]);
+	});
+
+	it("zeigt eine Seite, die dreimal an derselben Stelle scheitert, als Stillstand", async () => {
+		// Die Lehre aus 18d: Was die Zeile nennt, muss sich bewegen. Ein
+		// unveraenderter Offset bei ×3 ist genau das Signal.
+		const r = repos();
+		for (const minute of ["00", "05", "10"]) {
+			await r.sync.cronAusgangVermerken(`2026-09-27 03:${minute}`, "cron: sync sync=laufend/abruf offset=200");
+		}
+
+		expect(await r.sync.cronVerlauf()).toEqual(["2026-09-27 03:00–03:10 cron: sync ×3 sync=laufend/abruf offset=200"]);
+	});
+
+	describe("zwei Fenster (Stufe 18e)", () => {
+		it("die Ausdruecke im Code und in wrangler.jsonc sagen dasselbe", () => {
+			// wrangler.jsonc laesst sich hier nicht importieren (Kommentare im
+			// JSON), deshalb stehen die Werte woertlich da. Ein Auseinanderlaufen
+			// ist nicht still: Ein unbekannter Ausdruck bekommt 'alles' und tut
+			// zu viel, statt eine Haelfte der Automatik ausfallen zu lassen.
+			expect(CRON_PSN).toBe("*/5 3-5 * * *");
+			expect(CRON_WARTUNG).toBe("*/5 6-7 * * *");
+			expect(bereichFuerAusdruck(CRON_PSN)).toBe("psn");
+			expect(bereichFuerAusdruck(CRON_WARTUNG)).toBe("wartung");
+			expect(bereichFuerAusdruck("*/5 * * * *")).toBe("alles");
+			expect(bereichFuerAusdruck(undefined)).toBe("alles");
+		});
+
+		it("das PSN-Fenster raeumt nicht auf und gibt nichts frei", async () => {
+			await spielMitIgdb(1, 11, null);
+			await env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2020-01-01' WHERE id = 1").run();
+			for (let i = 0; i < ROHANTWORTEN_LAEUFE + 1; i++) await lauf("erfolg", 5, true);
+
+			const e = await cronSchritt(repos(), psnStumm(), fakeIgdb([[spielRoh({ id: 11 })]]).client, { bereich: "psn" });
+			expect(e).toMatchObject({ getan: "nichts", erschienen: 0, bereich: "psn" });
+			expect(cronLogzeile(e)).toBe("cron: nichts bereich=psn");
+			// Nichts geloescht, nichts freigegeben, nichts aufgefrischt.
+			expect(await seitenJeLauf()).toHaveLength(ROHANTWORTEN_LAEUFE + 1);
+			expect(
+				(await env.DB.prepare("SELECT release_status FROM game WHERE id = 1").first<{ release_status: string }>())
+					?.release_status,
+			).toBe("angekuendigt");
+		});
+
+		it("das Wartungsfenster legt keinen Sync-Lauf an", async () => {
+			await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
+			await spielMitIgdb(1, 11, null);
+			await env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2020-01-01' WHERE id = 1").run();
+
+			const e = await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), { bereich: "wartung" });
+			expect(e).toMatchObject({ getan: "nichts", erschienen: 1, bereich: "wartung" });
+			expect(cronLogzeile(e)).toBe("cron: nichts bereich=wartung erschienen=1");
+			// Der Sync ist faellig - aber nicht in diesem Fenster.
+			expect(await laeufe()).toEqual([]);
+		});
+
+		it("ohne Bereich tut ein Aufruf beides - so laeuft es lokal und im Test", async () => {
+			await spielMitIgdb(1, 11, null);
+			await env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2020-01-01' WHERE id = 1").run();
+
+			const e = await cronSchritt(repos(), psnStumm(), igdbOhne());
+			expect(e).toMatchObject({ erschienen: 1, bereich: "alles" });
+			// 'alles' steht nicht in der Zeile: Es ist kein Fenster.
+			expect(cronLogzeile(e)).not.toContain("bereich=");
+		});
+	});
+
+	describe("Kaufliste (7.7, Nachbesserung in Stufe 18e)", () => {
+		beforeEach(async () => {
+			await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
+		});
+
+		it("ein Fehler ist kein 'fertig' und ruht nicht sieben Tage", async () => {
+			// Der Befund vom 27.09.2026: `digital_entitlement` hielt keine
+			// einzige Zeile mit herkunft='psn', obwohl `psn_besitz_stand` auf
+			// {"fertigAm":"2026-09-23"} stand. Beide Ausgaenge schrieben
+			// dieselbe Marke - ein auf der ersten Seite gescheiterter Lauf sah
+			// aus wie ein vollstaendiger und legte den Schritt fuer sieben Tage
+			// still.
+			const e = await besitzLauf(repos(), psnOhneKaufliste(403), "2026-09-27");
+			expect(e).toMatchObject({ status: "fehler", meldung: "Abruf der Kaufliste antwortete mit 403." });
+			expect(await besitzStand(repos())).toEqual({ fehlerAm: "2026-09-27" });
+
+			// Am naechsten Abend wird es erneut versucht, nicht erst in einer Woche.
+			expect(await besitzLauf(repos(), psnOhneKaufliste(403), "2026-09-28")).not.toBeNull();
+		});
+
+		it("ein vollstaendiger Lauf ruht die Frist ab - und weicht dem Knopf", async () => {
+			const psn = psnLeereKaufliste();
+			expect(await besitzLauf(repos(), psn, "2026-09-27")).toMatchObject({ status: "erfolg", weiter: false });
+			expect(await besitzStand(repos())).toEqual({ fertigAm: "2026-09-27" });
+
+			expect(await besitzLauf(repos(), psn, "2026-09-28")).toBeNull();
+			// "Kaufliste jetzt abrufen" wartet nicht bis zum naechsten Termin.
+			expect(await besitzLauf(repos(), psn, "2026-09-28", { erzwingen: true })).not.toBeNull();
+		});
 	});
 
 	/**
@@ -415,14 +677,32 @@ describe("cronSchritt", () => {
 		expect(await laeufe()).toHaveLength(ROHANTWORTEN_LAEUFE + 2);
 	});
 
-	it("behaelt Nichtnormalisiertes unabhaengig vom Alter", async () => {
+	it("behaelt Nichtnormalisiertes eines laufenden Laufs unabhaengig vom Alter", async () => {
 		// Unerledigte Arbeit, kein Archiv: Die Normalisierung laeuft ohne PSN
 		// erneut - aber nur, solange ihre Vorlage noch da ist (Abschnitt 7.1).
-		const offen = await lauf("fehler", 3, false);
+		const offen = await lauf("laufend", 3, false);
 		for (let i = 0; i < ROHANTWORTEN_LAEUFE; i++) await lauf("erfolg", 5, true);
 
 		expect(await repos().sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE)).toBe(0);
 		expect((await seitenJeLauf()).map((z) => z.sync_run_id)).toContain(offen);
+	});
+
+	it("raeumt die Waisen eines gescheiterten Laufs weg - aber erst mit dem Fenster", async () => {
+		// Der Befund vom 24.09.2026, eingetreten in der Nacht zum 27.09.2026:
+		// Lauf 13 scheiterte bei Offset 200, und seine zwei geholten Seiten
+		// (117 KiB) wurden nie normalisiert und nie geloescht - jede Sicherung
+		// trug sie mit. Sie bleiben, solange der Lauf unter den juengsten
+		// dreien ist: Solange sind sie das Beweisstueck zum Fehler.
+		const waise = await lauf("fehler", 2, false);
+		for (let i = 0; i < ROHANTWORTEN_LAEUFE - 1; i++) await lauf("erfolg", 5, true);
+
+		expect(await repos().sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE)).toBe(0);
+		expect((await seitenJeLauf()).map((z) => z.sync_run_id)).toContain(waise);
+
+		// Ein Lauf mehr, und die Waisen fallen aus dem Fenster.
+		await lauf("erfolg", 5, true);
+		expect(await repos().sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE)).toBe(2);
+		expect((await seitenJeLauf()).map((z) => z.sync_run_id)).not.toContain(waise);
 	});
 
 	it("der Cron raeumt auf, wenn sonst nichts zu tun ist - und nur dann", async () => {
@@ -460,8 +740,8 @@ describe("cronSchritt", () => {
 			}),
 		);
 
-		expect(zeilen[0]).toBe("cron: sync erschienen=0 sync=laufend/normalisierung offen=4");
-		expect(zeilen[1]).toBe("cron: sync erschienen=0 sync=laufend/normalisierung offen=3");
+		expect(zeilen[0]).toBe("cron: sync sync=laufend/normalisierung offen=4");
+		expect(zeilen[1]).toBe("cron: sync sync=laufend/normalisierung offen=3");
 		expect(zeilen[0]).not.toEqual(zeilen[1]);
 	});
 
@@ -475,7 +755,7 @@ describe("cronSchritt", () => {
 			sync: { status: "laufend", phase: "normalisierung", offset: 400, seitenGeholt: 1, titlesSeen: 431, weiter: true },
 		});
 
-		expect(zeile).toBe("cron: sync erschienen=0 sync=laufend/normalisierung offset=400");
+		expect(zeile).toBe("cron: sync sync=laufend/normalisierung offset=400");
 	});
 
 	it("nennt bei der Spielzeit den ganzen Trichter, nicht nur Anfang und Ende", () => {
@@ -488,6 +768,6 @@ describe("cronSchritt", () => {
 			spielzeit: { status: "erfolg", geholt: 200, geschrieben: 160, zugeordnet: 117, weiter: true },
 		});
 
-		expect(zeile).toBe("cron: spielzeit erschienen=0 spielzeit=erfolg geholt=200 geschrieben=160 zugeordnet=117");
+		expect(zeile).toBe("cron: spielzeit spielzeit=erfolg geholt=200 geschrieben=160 zugeordnet=117");
 	});
 });

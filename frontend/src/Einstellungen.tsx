@@ -34,6 +34,8 @@ export type StatusAntwort = {
   /** Was die letzten Cron-Aufrufe taten, neueste zuerst (Stufe 18b). */
   cronVerlauf: string[]
   trophaeen: number
+  /** Stand der wöchentlichen Kaufliste (Stufe 18e, 7.7). */
+  besitz?: { fertigAm: string | null; fehlerAm: string | null; laeuft: boolean }
 }
 
 type SyncAntwort = {
@@ -48,6 +50,21 @@ type SyncAntwort = {
   eingereihtNachGrund?: { erstimport: number; neueTrophaeen: number; dlcErweitert: number }
   weiter: boolean
   meldung?: string
+  /** Fehlversuche an derselben Seite, wenn dieser Aufruf einen hatte (Stufe 18e). */
+  fehlversuche?: number
+}
+
+/** Was POST /api/sync/besitz zurückgibt (Stufe 18e). */
+type BesitzAntwort = {
+  status: 'erfolg' | 'fehler'
+  geholt: number
+  kauf: number
+  plus: number
+  entfallen: number
+  erledigt?: number
+  weiter: boolean
+  meldung?: string
+  fehler?: string
 }
 
 /** "3 neu in der Prüfliste (1 zum ersten Mal, 1 weitergespielt, 1 DLC)" - nur, was nicht null ist. */
@@ -63,6 +80,10 @@ function eingereihtText(d: SyncAntwort): string {
   const klammer = teile.length > 1 ? ` (${teile.map(([n, t]) => `${n} ${t}`).join(', ')})` : ''
   return ` ${d.eingereiht} neu in der Prüfliste${klammer}.`
 }
+
+/** Nur der Tag - fuer Marken, die ohnehin nur ein Datum sind (Stufe 18e). */
+const datumNurTag = (wert: string | null) =>
+  wert ? new Date(`${wert}T00:00:00Z`).toLocaleDateString('de-DE') : 'noch keiner'
 
 const datum = (wert: string | null) =>
   wert ? new Date(wert.replace(' ', 'T') + (wert.includes('Z') ? '' : 'Z')).toLocaleString('de-DE') : 'unbekannt'
@@ -156,6 +177,15 @@ export function Einstellungen() {
         setMeldung(daten.meldung ?? 'Der Abruf ist fehlgeschlagen.')
         break
       }
+      // Ein Fehlversuch beendet den Lauf nicht mehr (Stufe 18e): Er bleibt
+      // offen und wird fortgesetzt. Ohne diesen Zweig endete die Schleife
+      // stumm, weil `weiter` dann false ist.
+      if (daten.meldung) {
+        setMeldung(
+          `${daten.meldung} Versuch ${daten.fehlversuche ?? 1} von 3 – der Lauf bleibt offen, „Jetzt abrufen" macht weiter.`,
+        )
+        break
+      }
       setFortschritt(
         daten.phase === 'abruf'
           ? `Abruf: ${daten.offset} von ${daten.titlesSeen ?? '?'} Titeln …`
@@ -168,6 +198,44 @@ export function Einstellungen() {
       if (!daten.weiter) break
     }
     await statusLaden()
+  }
+
+  /**
+   * Die Kaufliste von Hand holen (Stufe 18e, 7.7).
+   *
+   * Der Schritt lief bisher nur wöchentlich im Cron, und als er am
+   * 23.09.2026 stumm scheiterte, war er von hier aus nicht anzustoßen.
+   * Fünfzehn Seiten à 50 Einträge – dieselbe Schleife wie beim Sync.
+   */
+  async function kauflisteHolen() {
+    setMeldung(null)
+    setLaeuft(true)
+    setFortschritt('Kaufliste wird abgerufen …')
+    let kauf = 0
+    let plus = 0
+    try {
+      for (let runde = 0; runde < 40; runde++) {
+        const antwort = await fetch('/api/sync/besitz', { method: 'POST' })
+        const daten = (await antwort.json()) as BesitzAntwort
+        if (daten.status !== 'erfolg') {
+          setMeldung(daten.meldung ?? daten.fehler ?? 'Der Abruf der Kaufliste ist fehlgeschlagen.')
+          setFortschritt(null)
+          break
+        }
+        kauf += daten.kauf
+        plus += daten.plus
+        setFortschritt(
+          daten.weiter
+            ? `Kaufliste: ${kauf} gekauft, ${plus} über PS Plus erkannt …`
+            : `Fertig: ${kauf} gekauft, ${plus} über PS Plus, ${daten.entfallen} nicht mehr im Katalog.` +
+              (daten.erledigt ? ` ${daten.erledigt} Einträge erledigt.` : ''),
+        )
+        if (!daten.weiter) break
+      }
+      await statusLaden()
+    } finally {
+      setLaeuft(false)
+    }
   }
 
   async function synchronisieren() {
@@ -249,14 +317,32 @@ export function Einstellungen() {
 
       <h2>Automatik</h2>
       <p>
-        Nachts zwischen 5 und 8 Uhr (03:00–06:00 UTC) holt der Worker die Trophäen einmal von allein ab,
-        gibt erschienene Titel frei, frischt IGDB-Metadaten und Disc-Fassungen auf und räumt zuletzt alte
-        PSN-Rohantworten weg – in kleinen Schritten alle fünf Minuten. Ein fehlgeschlagener Abruf wird erst
-        in der nächsten Nacht wiederholt; bei abgelaufenem NPSSO ruht der Abruf, bis ein neues eingetragen ist.
+        Der Worker arbeitet in zwei Fenstern, alle fünf Minuten je ein kleiner Schritt. Zwischen 5 und 8 Uhr
+        (03:00–05:59 UTC) alles, was PlayStation anspricht: Trophäen, Spielzeiten und einmal wöchentlich die
+        Kaufliste. Zwischen 8 und 10 Uhr (06:00–07:59 UTC) die Wartung – erschienene Titel freigeben,
+        IGDB-Metadaten und Disc-Fassungen auffrischen, alte PSN-Rohantworten wegräumen.
       </p>
+      <p>
+        Eine gescheiterte Seite wird bis zu dreimal erneut geholt, bevor der Lauf aufgegeben wird; danach ist
+        die nächste Nacht wieder dran. Bei abgelaufenem NPSSO ruht der Abruf, bis ein neues eingetragen ist.
+      </p>
+
       <p>
         Letzter automatischer Abruf:{' '}
         {status?.letzterAutomatischerLauf ? laufText(status.letzterAutomatischerLauf) : 'noch keiner'}
+      </p>
+      <h3>Kaufliste</h3>
+      <p>
+        Letzter vollständiger Durchlauf: {datumNurTag(status?.besitz?.fertigAm ?? null)}
+        {status?.besitz?.fehlerAm ? ` – letzter Fehlversuch: ${datumNurTag(status.besitz.fehlerAm)}` : ''}
+        {status?.besitz?.laeuft ? ' – ein Durchlauf ist gerade offen.' : ''}
+      </p>
+      <button type="button" onClick={kauflisteHolen} disabled={laeuft || !zugang?.eingerichtet}>
+        Kaufliste jetzt abrufen
+      </button>
+      <p className="zeile">
+        Sonys Kaufliste sagt, was gekauft und was über PS Plus im Katalog ist. Sie läuft sonst einmal
+        wöchentlich mit; der Knopf holt sie sofort.
       </p>
       <h3>Letzte Cron-Aufrufe</h3>
       {status && status.cronVerlauf.length === 0 ? (
@@ -269,9 +355,9 @@ export function Einstellungen() {
         </ul>
       )}
       <p className="zeile">
-        Die Arbeit einer Nacht ist meist gegen 04:10 getan; danach folgen gut zwanzig Aufrufe, die nichts
-        mehr finden. Sie stehen zu einer Zeile zusammengefasst da („nichts ×21"), damit sie die Nacht nicht
-        aus dem Verlauf drängen.
+        Aufeinanderfolgende Aufrufe derselben Arbeit stehen als eine Zeile da („sync ×11
+        offset=0→400"), damit eine ganze Nacht in den Verlauf passt. Bewegt sich die Zahl dabei nicht,
+        ist der Schritt hängengeblieben. Zeilen mit einer Meldung werden nie zusammengefasst.
       </p>
 
       {meldung && <p role="status">{meldung}</p>}

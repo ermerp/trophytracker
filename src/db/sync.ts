@@ -15,6 +15,8 @@ export type SyncLauf = {
 	next_offset: number;
 	phase: SyncPhase;
 	started_by: SyncAusloeser;
+	/** Fehlversuche an derselben Stelle (Migration 0024, Stufe 18e). */
+	failed_attempts: number;
 };
 
 /**
@@ -47,29 +49,84 @@ const SCHLUESSEL_CRON = "cron_verlauf";
 const CRON_VERLAUF_LAENGE = 20;
 
 /**
- * Eine gespeicherte Leerlaufzeile, einzeln oder bereits verdichtet:
- * "2026-09-23 04:16 cron: nichts erschienen=0" oder
- * "2026-09-23 04:16-05:56 cron: nichts x21".
+ * Eine gespeicherte Verlaufszeile, einzeln oder bereits verdichtet:
+ * "2026-09-23 04:16 cron: nichts", "2026-09-23 04:16–05:56 cron: nichts ×21"
+ * oder "2026-09-27 03:00–03:10 cron: sync ×3 offset=0→200".
  */
-const LEERLAUF =
-	/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?:–\d{2}:\d{2})? cron: nichts(?: erschienen=0)?(?: ×(\d+))?$/;
+const VERLAUFSZEILE =
+	/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?:–\d{2}:\d{2})? cron: (\S+)(?: ×(\d+))?(.*)$/;
+
+type Verlaufszeile = { von: string; arbeit: string; anzahl: number; felder: Array<[string, string]> };
+
+/** Der Wert eines Feldes, oder undefined. */
+const wert = (z: Verlaufszeile, schluessel: string) => z.felder.find(([k]) => k === schluessel)?.[1];
+
+/** Eine gespeicherte Zeile zerlegen - oder null, wenn sie nicht dem Muster folgt. */
+function zerlege(zeile: string): Verlaufszeile | null {
+	const t = VERLAUFSZEILE.exec(zeile);
+	if (!t) return null;
+	const rest = t[4].trim();
+	const felder: Array<[string, string]> = [];
+	for (const stueck of rest === "" ? [] : rest.split(" ")) {
+		const i = stueck.indexOf("=");
+		// Ein Stueck ohne "=" ist kein Feld - dann lieber nicht verdichten,
+		// als eine Zeile zu erfinden, die so nie geschrieben wurde.
+		if (i <= 0) return null;
+		felder.push([stueck.slice(0, i), stueck.slice(i + 1)]);
+	}
+	return { von: t[1], arbeit: t[2], anzahl: t[3] ? Number(t[3]) : 1, felder };
+}
 
 /**
- * Zwei aufeinanderfolgende Leerlaufaufrufe zu einer Zeile zusammenziehen.
+ * Zwei aufeinanderfolgende Aufrufe DERSELBEN Arbeit zu einer Zeile
+ * zusammenziehen (Stufe 18e).
  *
- * Gibt `null` zurueck, wenn die vorherige Zeile keine Leerlaufzeile ist -
- * dann wird normal vorangestellt. Das Verdichten passiert ausschliesslich
- * beim Schreiben; gerechnet oder gespeichert wird daran nichts, was sich
- * nicht aus den Zeilen selbst ergibt.
+ * Bis 18d galt das nur fuer den Leerlauf, und das reichte nicht: Eine Nacht
+ * mit Kaufliste sind einunddreissig Aufrufe, der Verlauf fasst zwanzig
+ * Eintraege - die aeltesten elf fielen weg, und das waren die Sync-Zeilen
+ * (Befund vom 24.09.2026). Verdichtet wird deshalb jede Arbeit:
+ * "03:00–03:10 cron: sync ×3 offset=0→200".
+ *
+ * Drei Regeln halten die Zeile ehrlich:
+ *
+ * - **Nur bei gleicher Feldfolge.** Wechselt der Sync von `offset` auf
+ *   `offen`, beginnt eine neue Zeile - genau dort, wo auch ein Mensch
+ *   trennen wuerde.
+ * - **Nie mit Meldung.** Ein Fehler ist kein Leerlauf und wird nie
+ *   verdichtet (10.1); er traegt immer eine `meldung=`.
+ * - **Fortschritt als Spanne.** Ein Wert, der sich bewegt, steht als
+ *   `a→b`, ein gleichbleibender einfach so. Eine Seite, die dreimal an
+ *   derselben Stelle scheitert, zeigt damit `×3` bei unveraendertem Offset -
+ *   das war die Lehre aus 18d ("was die Zeile nennt, muss sich bewegen").
+ *
+ * Gibt `null` zurueck, wenn nicht verdichtet werden kann; dann wird die neue
+ * Zeile normal vorangestellt. Gerechnet oder gespeichert wird nichts, was
+ * sich nicht aus den Zeilen selbst ergibt.
  */
-export function verdichteLeerlauf(vorherige: string, zeit: string): string | null {
-	const t = LEERLAUF.exec(vorherige);
-	if (!t) return null;
-	// Zwei Aufrufe in derselben Minute gibt es nur von Hand; "15:28-15:28"
+export function verdichte(vorherige: string, neue: string): string | null {
+	const a = zerlege(vorherige);
+	const b = zerlege(neue);
+	if (!a || !b) return null;
+	if (a.arbeit !== b.arbeit) return null;
+	if (a.felder.length !== b.felder.length) return null;
+	if (a.felder.some(([k], i) => k !== b.felder[i][0])) return null;
+	if (a.felder.some(([k]) => k === "meldung") || b.felder.some(([k]) => k === "meldung")) return null;
+	// Der Bereich ist keine Fortschrittszahl, sondern sagt, WER gerufen hat:
+	// Ueber die Fenstergrenze hinweg wird nicht verdichtet, sonst stuende da
+	// "nichts ×36 bereich=psn→wartung" und man wuesste von keinem der beiden
+	// Fenster, ob es gelaufen ist.
+	if (wert(a, "bereich") !== wert(b, "bereich")) return null;
+
+	// Zwei Aufrufe in derselben Minute gibt es nur von Hand; "15:28–15:28"
 	// waere dann Rauschen statt Zeitraum.
-	const bis = zeit.slice(11);
-	const spanne = bis === t[1].slice(11) ? t[1] : `${t[1]}–${bis}`;
-	return `${spanne} cron: nichts ×${t[2] ? Number(t[2]) + 1 : 2}`;
+	const bis = b.von.slice(11);
+	const spanne = bis === a.von.slice(11) ? a.von : `${a.von}–${bis}`;
+	const felder = a.felder.map(([k, wert], i) => {
+		const anfang = wert.split("→")[0];
+		const ende = b.felder[i][1];
+		return `${k}=${anfang === ende ? anfang : `${anfang}→${ende}`}`;
+	});
+	return [spanne, `cron: ${a.arbeit}`, `×${a.anzahl + 1}`, ...felder].join(" ");
 }
 
 /** Fester Text fuer einen abgebrochenen Haenger - nur eine Zahl, kein Fremdtext (Abschnitt 10.1). */
@@ -174,10 +231,15 @@ export class SyncRepository {
 	 * woechentliche Sicherung und damit dauerhaft in die Historie des privaten
 	 * Backup-Repositorys.
 	 *
-	 * Behalten wird, was noch nicht normalisiert ist - immer, unabhaengig vom
-	 * Alter: Das ist unerledigte Arbeit, kein Archiv. Dazu die Seiten der
-	 * juengsten `laeufe` Laeufe, die ueberhaupt Seiten haben; ein
-	 * fehlgeschlagener Lauf ohne Seiten verdraengt so keinen guten.
+	 * Behalten wird, was noch nicht normalisiert ist - das ist unerledigte
+	 * Arbeit, kein Archiv. Dazu die Seiten der juengsten `laeufe` Laeufe, die
+	 * ueberhaupt Seiten haben; ein fehlgeschlagener Lauf ohne Seiten
+	 * verdraengt so keinen guten.
+	 *
+	 * Die eine Ausnahme kam mit Stufe 18e: Seiten eines endgueltig
+	 * gescheiterten Laufs sind KEINE unerledigte Arbeit. Bis dahin lagen sie
+	 * fuer immer - in der Nacht zum 27.09.2026 zwei Seiten und 117 KiB aus
+	 * Lauf 13, den ein Abrufsfehler bei Offset 200 beendete.
 	 *
 	 * Kein `game_event`: Es aendert sich kein Spiel, keine Bewertung, keine
 	 * Zuordnung - nur Fremddaten, die jederzeit neu abrufbar sind (8.5).
@@ -185,8 +247,19 @@ export class SyncRepository {
 	async rohantwortenAufraeumen(laeufe: number): Promise<number> {
 		const ergebnis = await this.db
 			.prepare(
-				"DELETE FROM psn_raw_response WHERE normalized_at IS NOT NULL AND sync_run_id NOT IN " +
-					"(SELECT sync_run_id FROM psn_raw_response GROUP BY sync_run_id ORDER BY sync_run_id DESC LIMIT ?)",
+				"DELETE FROM psn_raw_response WHERE sync_run_id NOT IN " +
+					"(SELECT sync_run_id FROM psn_raw_response GROUP BY sync_run_id ORDER BY sync_run_id DESC LIMIT ?) " +
+					// Normalisiertes ist erledigt. Unnormalisiertes ist
+					// unerledigte Arbeit - AUSSER der Lauf ist endgueltig
+					// gescheitert (Stufe 18e): naechsteUnverarbeitete filtert
+					// auf die Lauf-Id, und der naechste Lauf beginnt bei
+					// Offset 0, niemand wird diese Seiten je normalisieren.
+					// Vorher blieben sie dauerhaft liegen und wanderten in
+					// jede Sicherung (10.1). Dass sie erst mit dem Lauf aus
+					// dem Fenster der juengsten drei fallen, ist Absicht:
+					// Bis dahin sind sie das Beweisstueck zum Fehler.
+					"AND (normalized_at IS NOT NULL OR sync_run_id IN " +
+					"(SELECT id FROM psn_sync_run WHERE status = 'fehler'))",
 			)
 			.bind(laeufe)
 			.run();
@@ -261,7 +334,7 @@ export class SyncRepository {
 		await this.db
 			.prepare(
 				"UPDATE psn_sync_run SET status = 'laufend', phase = 'normalisierung', " +
-					"finished_at = NULL, error_message = NULL WHERE id = ?",
+					"finished_at = NULL, error_message = NULL, failed_attempts = 0 WHERE id = ?",
 			)
 			.bind(laufId)
 			.run();
@@ -297,15 +370,15 @@ export class SyncRepository {
 	/**
 	 * Den Ausgang eines Cron-Aufrufs festhalten (nur Zahlen und feste Texte).
 	 *
-	 * `wirkungslos` sagt, dass der Aufruf nichts getan hat. Folgt er auf einen
-	 * ebensolchen, werden beide zu einer Zeile verdichtet, statt die Nacht aus
-	 * dem Verlauf zu draengen (Stufe 18d). Ein Lebenszeichen bleibt so oder so
+	 * Folgt er einem Aufruf derselben Arbeit, werden beide zu einer Zeile
+	 * verdichtet, statt die Nacht aus dem Verlauf zu draengen (Stufe 18d fuer
+	 * den Leerlauf, 18e fuer jede Arbeit). Ein Lebenszeichen bleibt so oder so
 	 * stehen: Die verdichtete Zeile traegt die Zeit des juengsten Aufrufs.
 	 */
-	async cronAusgangVermerken(zeitstempel: string, zeile: string, wirkungslos = false): Promise<void> {
+	async cronAusgangVermerken(zeitstempel: string, zeile: string): Promise<void> {
 		const bisher = await this.cronVerlauf();
 		const neue = `${zeitstempel} ${zeile}`;
-		const verdichtet = wirkungslos && bisher[0] ? verdichteLeerlauf(bisher[0], zeitstempel) : null;
+		const verdichtet = bisher[0] ? verdichte(bisher[0], neue) : null;
 		const alle = verdichtet ? [verdichtet, ...bisher.slice(1)] : [neue, ...bisher];
 		const wert = alle.slice(0, CRON_VERLAUF_LAENGE).join("\n");
 		await this.db
@@ -332,11 +405,37 @@ export class SyncRepository {
 			.first<SyncLauf>();
 	}
 
+	/**
+	 * Fortschritt festhalten - und den Fehlerzaehler loeschen (Stufe 18e).
+	 *
+	 * Gezaehlt werden Fehlversuche an DERSELBEN Stelle, nicht ueber die Nacht
+	 * verteilte: Eine Seite, die beim zweiten Anlauf durchgeht, soll die
+	 * naechste nicht belasten.
+	 */
 	async fortschrittSetzen(laufId: number, naechsterOffset: number): Promise<void> {
 		await this.db
-			.prepare("UPDATE psn_sync_run SET next_offset = ? WHERE id = ?")
+			.prepare("UPDATE psn_sync_run SET next_offset = ?, failed_attempts = 0 WHERE id = ?")
 			.bind(naechsterOffset, laufId)
 			.run();
+	}
+
+	/**
+	 * Einen Fehlversuch vermerken, ohne den Lauf zu beenden (Stufe 18e).
+	 *
+	 * Der Lauf bleibt 'laufend', damit der naechste Cron-Aufruf fuenf Minuten
+	 * spaeter dieselbe Seite ab `next_offset` erneut holt; die Meldung steht
+	 * schon jetzt in `error_message`, sonst waere der Versuch unsichtbar.
+	 * Rueckgabe: die Zahl der Fehlversuche nach diesem.
+	 */
+	async fehlversuchVermerken(laufId: number, meldung: string): Promise<number> {
+		const z = await this.db
+			.prepare(
+				"UPDATE psn_sync_run SET failed_attempts = failed_attempts + 1, error_message = ? " +
+					"WHERE id = ? RETURNING failed_attempts",
+			)
+			.bind(meldung, laufId)
+			.first<{ failed_attempts: number }>();
+		return z?.failed_attempts ?? 0;
 	}
 
 	async abschliessen(laufId: number, titlesSeen: number): Promise<void> {

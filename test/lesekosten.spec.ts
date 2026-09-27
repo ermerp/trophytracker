@@ -729,22 +729,34 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			 AND r.physical_release_status = 'unbekannt'
 			 AND (r.physical_checked_at IS NULL OR r.physical_checked_at < datetime('now', '-30 days'))) ORDER BY g.id LIMIT 50`,
 		);
-		// Der Aufraeumschritt (Stufe 18d) laeuft in jedem Leerlauf mit. Als
-		// SELECT gemessen, weil zeilenGelesen kein DELETE ausfuehren soll -
-		// dieselbe Bedingung, derselbe Plan.
+		// Der Aufraeumschritt (Stufe 18d) laeuft in jedem Leerlauf der Wartung
+		// mit. Als SELECT gemessen, weil zeilenGelesen kein DELETE ausfuehren
+		// soll - dieselbe Bedingung, derselbe Plan. Die zweite Haelfte der
+		// Bedingung kam mit Stufe 18e dazu (die Waisen gescheiterter Laeufe).
 		const aufraeumen = await zeilenGelesen(
-			`SELECT id FROM psn_raw_response WHERE normalized_at IS NOT NULL AND sync_run_id NOT IN
-			 (SELECT sync_run_id FROM psn_raw_response GROUP BY sync_run_id ORDER BY sync_run_id DESC LIMIT 3)`,
+			`SELECT id FROM psn_raw_response WHERE sync_run_id NOT IN
+			 (SELECT sync_run_id FROM psn_raw_response GROUP BY sync_run_id ORDER BY sync_run_id DESC LIMIT 3)
+			 AND (normalized_at IS NOT NULL OR sync_run_id IN (SELECT id FROM psn_sync_run WHERE status = 'fehler'))`,
 		);
-		const leerlauf = erschienen + haenger + laufend + heutige + auffrischen + disc + aufraeumen;
-		console.info({ erschienen, haenger, laufend, heutige, auffrischen, disc, aufraeumen, leerlauf });
 
-		// Gemessen 2 241: game zweimal (erschienen, auffrischen), game mit
-		// release je Spiel fuer die Disc-Auswahl (1 289), psn_sync_run dreimal
-		// (5 Zeilen) und seit Stufe 18d der Aufraeumschritt mit 76 Zeilen ueber
-		// die 25 Rohantworten der fuenf Laeufe. Mal 36 Aufrufe sind das rund
-		// 80 000 Zeilen je Nacht.
-		expect(leerlauf).toBeLessThan(2_500);
+		// Seit Stufe 18e sind es zwei Fenster, und jedes liest nur seine
+		// eigenen Abfragen: das PSN-Fenster 36-mal je Nacht, die Wartung
+		// 24-mal.
+		const leerlaufPsn = haenger + laufend + heutige;
+		const leerlaufWartung = erschienen + auffrischen + disc + aufraeumen;
+		const nacht = leerlaufPsn * 36 + leerlaufWartung * 24;
+		console.info({ erschienen, haenger, laufend, heutige, auffrischen, disc, aufraeumen, leerlaufPsn, leerlaufWartung, nacht });
+
+		// Gemessen bis Stufe 18d: 2 241 Zeilen in einem Aufruf, der alles tat -
+		// game zweimal (erschienen, auffrischen), game mit release je Spiel fuer
+		// die Disc-Auswahl (1 289), psn_sync_run dreimal (5 Zeilen) und der
+		// Aufraeumschritt mit 76 Zeilen ueber die 25 Rohantworten. Die
+		// Aufteilung in 18e nimmt dem PSN-Fenster die drei teuren Abfragen: Es
+		// liest nur noch psn_sync_run. Beide Haelften zusammen bleiben weit
+		// unter dem Tagesbudget von fuenf Millionen.
+		expect(leerlaufPsn).toBeLessThan(100);
+		expect(leerlaufWartung).toBeLessThan(2_500);
+		expect(nacht).toBeLessThan(100_000);
 
 		await env.DB.batch([
 			env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_synced_at = NULL"),

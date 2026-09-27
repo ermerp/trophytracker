@@ -10,21 +10,61 @@ import {
 	type PhysischErgebnis,
 } from "./igdb";
 import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis } from "./besitz";
-import { sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
+import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
 
 /**
  * Die naechtliche Automatik (Stufe 18, Abschnitt 10.1).
  *
- * Der Cron Trigger feuert alle fuenf Minuten zwischen 03:00 und 05:59 UTC
- * (wrangler.jsonc). Auf dem Free Tier gilt fuer ihn dieselbe 10-ms-CPU-Grenze
- * wie fuer eine Anfrage - ein Aufruf tut deshalb genau EINE schwere Arbeit,
- * der Fortschritt liegt in der Datenbank, der naechste Aufruf macht weiter.
- * Reihenfolge: erschienene Titel freigeben (nur SQL), Haenger aufraeumen,
- * Sync-Schritt, sonst IGDB-Auffrischen, sonst Disc-Fassungen, sonst nichts.
+ * Auf dem Free Tier gilt fuer einen Cron-Aufruf dieselbe 10-ms-CPU-Grenze wie
+ * fuer eine Anfrage - ein Aufruf tut deshalb genau EINE schwere Arbeit, der
+ * Fortschritt liegt in der Datenbank, der naechste Aufruf macht weiter.
+ *
+ * Seit Stufe 18e sind es ZWEI Cron-Eintraege (wrangler.jsonc), und der
+ * Bereich sagt, welcher gerufen hat:
+ *
+ * - `psn` (alle fuenf Minuten 03:00-05:59 UTC, 36 Aufrufe): Haenger
+ *   aufraeumen, Sync-Schritt, Spielzeit, Kaufliste. Alles, was Sony anfasst,
+ *   und damit alles, was viele Aufrufe braucht.
+ * - `wartung` (alle fuenf Minuten 06:00-07:59 UTC, 24 Aufrufe): erschienene
+ *   Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, alte Rohantworten.
+ *   Nichts davon fasst PSN an.
+ *
+ * Der Grund ist gemessen: Eine Nacht mit Kaufliste braucht elf Aufrufe fuer
+ * den Sync, zwei fuer die Spielzeit, fuenfzehn fuer die Kaufliste und - nach
+ * einem IGDB-Rueckstand - acht fuers Auffrischen; das sind 37 von 36
+ * (Rechnung vom 24.09.2026, 10.1). Die Aufteilung nach "fasst PSN an oder
+ * nicht" ist der Schnitt, an dem beide Haelften bequem passen, und sie trennt
+ * zwei Lastspitzen, die nichts miteinander zu tun haben. Der Free Tier
+ * erlaubt fuenf Eintraege je Konto; wir nutzen zwei.
  *
  * Es sind dieselben Pfade wie auf Knopfdruck. Deshalb protokolliert der Cron
  * ohne eigenes Zutun mit Quelle 'sync' beziehungsweise 'igdb' (8.5).
  */
+
+/** Welcher Cron-Eintrag ruft - `alles` ist der Rueckfall und die Testbarkeit. */
+export type CronBereich = "psn" | "wartung" | "alles";
+
+/**
+ * Die beiden Cron-Ausdruecke, genau wie sie in `wrangler.jsonc` stehen.
+ *
+ * Sie stehen hier, weil der Einstieg den Bereich aus `event.cron` ableitet -
+ * Cloudflare liefert den Ausdruck mit, der gefeuert hat. Wer einen Ausdruck
+ * in wrangler.jsonc aendert, aendert ihn hier mit; `test/cron.spec.ts` haelt
+ * fest, dass beide Seiten dasselbe sagen.
+ */
+export const CRON_PSN = "*/5 3-5 * * *";
+export const CRON_WARTUNG = "*/5 6-7 * * *";
+
+/**
+ * Bereich zu einem Cron-Ausdruck. Ein unbekannter Ausdruck bekommt `alles`:
+ * Lieber ein Aufruf, der zu viel tut, als eine Haelfte der Automatik, die
+ * nach einer Konfigurationsaenderung still ausfaellt.
+ */
+export function bereichFuerAusdruck(ausdruck: string | undefined): CronBereich {
+	if (ausdruck === CRON_PSN) return "psn";
+	if (ausdruck === CRON_WARTUNG) return "wartung";
+	return "alles";
+}
 
 /**
  * Nach so vielen Stunden ohne Fortschritt gilt ein Lauf als haengengeblieben
@@ -70,6 +110,8 @@ export type CronErgebnis = {
 	geloescht?: number;
 	/** Gescheiterter Schritt ausserhalb des Syncs - fester Text, nie Fremdtext. */
 	meldung?: string;
+	/** Welcher Bereich lief (Stufe 18e) - steht in der Verlaufszeile. */
+	bereich?: CronBereich;
 	sync?: SyncErgebnis;
 	spielzeit?: SpielzeitErgebnis;
 	besitz?: BesitzErgebnis;
@@ -79,92 +121,109 @@ export type CronErgebnis = {
 
 /**
  * Ein Aufruf der Automatik. `heute` ist das UTC-Datum (YYYY-MM-DD) und nur
- * fuer Tests ueberschreibbar.
+ * fuer Tests ueberschreibbar; `bereich` sagt, welcher Cron-Eintrag ruft.
  */
 export async function cronSchritt(
 	repos: Repositories,
 	psn: PsnClient,
 	igdb: IgdbClient,
-	heute = heuteIso(),
+	optionen: { heute?: string; bereich?: CronBereich } = {},
 ): Promise<CronErgebnis> {
-	// 1. Unabhaengig von PSN: Der taegliche Statuswechsel aus 8.4 ist ein
-	//    einzelner Batch ohne Rechenarbeit und protokolliert selbst.
-	const erschienen = await repos.games.erschieneneFreigeben();
+	const heute = optionen.heute ?? heuteIso();
+	const bereich = optionen.bereich ?? "alles";
+	const basis: Pick<CronErgebnis, "erschienen" | "abgebrochen" | "bereich"> = {
+		erschienen: 0,
+		abgebrochen: 0,
+		bereich,
+	};
 
-	// 1b. Ein Lauf ohne Fortschritt seit einem ganzen Fenster blockiert sonst
-	//     jede Nacht - laufenderLauf() faende ihn immer wieder.
-	const abgebrochen = await repos.sync.haengendeAbbrechen(HAENGT_NACH_STUNDEN);
-	const basis = { erschienen, abgebrochen };
+	// --- PSN: alles, was Sony anfasst --------------------------------------
+	if (bereich !== "wartung") {
+		// 1. Ein Lauf ohne Fortschritt seit einem ganzen Fenster blockiert
+		//    sonst jede Nacht - laufenderLauf() faende ihn immer wieder.
+		basis.abgebrochen = await repos.sync.haengendeAbbrechen(HAENGT_NACH_STUNDEN);
 
-	// 2. Ein laufender Lauf wird fortgesetzt - auch einer vom Nutzer.
-	if (await repos.sync.laufenderLauf()) {
-		return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn) };
-	}
+		// 2. Ein laufender Lauf wird fortgesetzt - auch einer vom Nutzer, und
+		//    auch einer, dessen letzter Aufruf an einer Seite scheiterte
+		//    (Stufe 18e: ein Abrufsfehler beendet den Lauf nicht mehr).
+		if (await repos.sync.laufenderLauf()) {
+			return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn) };
+		}
 
-	// 3. Ein Cron-Versuch je Nacht (Entscheidung des Nutzers vom 19.09.2026):
-	//    nicht nach einem eigenen Lauf von heute, nicht nach einem
-	//    erfolgreichen Handabruf von heute - wohl aber nach einem
-	//    fehlgeschlagenen oder abgebrochenen Handlauf.
-	if (await syncFaellig(repos, heute)) {
-		return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron" }) };
-	}
+		// 3. Ein Cron-Versuch je Nacht (Entscheidung des Nutzers vom
+		//    19.09.2026): nicht nach einem eigenen Lauf von heute, nicht nach
+		//    einem erfolgreichen Handabruf von heute - wohl aber nach einem
+		//    fehlgeschlagenen oder abgebrochenen Handlauf.
+		if (await syncFaellig(repos, heute)) {
+			return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron" }) };
+		}
 
-	// 4./5. Spielzeit und digitaler Besitz (7.7). Erst nach dem Sync: Die
-	//       Zuordnung laeuft ueber die Titel der Sammlung, und die sind nach
-	//       dem Sync auf dem neuesten Stand. Beide brauchen einen Zugang -
-	//       ohne NPSSO passiert hier nichts.
-	const zugang = await repos.credentials.anzeige();
-	if (zugang.eingerichtet && zugang.status !== "abgelaufen") {
-		try {
-			const spielzeit = await spielzeitLauf(repos, psn, heute);
-			if (spielzeit) return { ...basis, getan: "spielzeit", spielzeit };
+		// 4./5. Spielzeit und digitaler Besitz (7.7). Erst nach dem Sync: Die
+		//       Zuordnung laeuft ueber die Titel der Sammlung, und die sind
+		//       nach dem Sync auf dem neuesten Stand. Beide brauchen einen
+		//       Zugang - ohne NPSSO passiert hier nichts.
+		const zugang = await repos.credentials.anzeige();
+		if (zugang.eingerichtet && zugang.status !== "abgelaufen") {
+			try {
+				const spielzeit = await spielzeitLauf(repos, psn, heute);
+				if (spielzeit) {
+					// Ein geglueckter Abruf raeumt ein altes 'fehler' am Zugang
+					// weg (Stufe 18e). Vorher blieb es bis zum naechsten
+					// erfolgreichen Sync stehen: Am Morgen des 27.09.2026 stand
+					// "Fehler beim letzten Versuch" in den Einstellungen,
+					// obwohl um 03:16 und 03:21 zwei PSN-Abrufe durchgelaufen
+					// waren. `last_success_at` bleibt dem Sync vorbehalten.
+					if (spielzeit.status === "erfolg") await repos.credentials.fehlerStatusLoeschen();
+					return { ...basis, getan: "spielzeit", spielzeit };
+				}
 
-			const besitz = await besitzLauf(repos, psn, heute);
-			if (besitz) return { ...basis, getan: "besitz", besitz };
-		} catch (fehler) {
-			// Ein abgelaufener Zugang oder ein PSN-Ausfall darf die Nacht nicht
-			// beenden - die IGDB-Schritte danach laufen weiter.
-			return { ...basis, getan: "nichts", meldung: "Der PSN-Abruf ist fehlgeschlagen." };
+				const besitz = await besitzLauf(repos, psn, heute);
+				if (besitz) {
+					if (besitz.status === "erfolg") await repos.credentials.fehlerStatusLoeschen();
+					return { ...basis, getan: "besitz", besitz };
+				}
+			} catch (fehler) {
+				// Ein abgelaufener Zugang oder ein PSN-Ausfall darf die Nacht
+				// nicht beenden - die Wartung laeuft in ihrem eigenen Fenster
+				// ohnehin weiter.
+				return { ...basis, getan: "nichts", meldung: "Der PSN-Abruf ist fehlgeschlagen." };
+			}
 		}
 	}
 
-	// 6./7. IGDB nur mit Zugang; ohne bleibt die Nacht ruhig.
-	//
-	// In try/catch, weil eine Ausnahme hier bisher den ganzen Aufruf riss:
-	// Der Sync lief dann zwar, aber alles danach fiel still aus, und von
-	// aussen war das nicht zu sehen (Stufe 18b).
-	if (igdb.konfiguriert()) {
-		try {
-			const auffrischen = await igdbAuffrischSchritt(repos, igdb, undefined, AUFFRISCH_FRIST_TAGE);
-			if (auffrischen.angefragt > 0) return { ...basis, getan: "igdb_auffrischen", auffrischen };
+	// --- Wartung: nichts davon fasst PSN an ---------------------------------
+	if (bereich !== "psn") {
+		// 6. Der taegliche Statuswechsel aus 8.4 ist ein einzelner Batch ohne
+		//    Rechenarbeit und protokolliert selbst.
+		basis.erschienen = await repos.games.erschieneneFreigeben();
 
-			const physisch = await igdbPhysischSchritt(repos, igdb);
-			if (physisch.angefragt > 0) return { ...basis, getan: "igdb_physisch", physisch };
-		} catch (fehler) {
-			return { ...basis, getan: "nichts", meldung: meldungFuer(fehler) };
+		// 7./8. IGDB nur mit Zugang; ohne bleibt es ruhig.
+		//
+		// In try/catch, weil eine Ausnahme hier bisher den ganzen Aufruf riss:
+		// Der Sync lief dann zwar, aber alles danach fiel still aus, und von
+		// aussen war das nicht zu sehen (Stufe 18b).
+		if (igdb.konfiguriert()) {
+			try {
+				const auffrischen = await igdbAuffrischSchritt(repos, igdb, undefined, AUFFRISCH_FRIST_TAGE);
+				if (auffrischen.angefragt > 0) return { ...basis, getan: "igdb_auffrischen", auffrischen };
+
+				const physisch = await igdbPhysischSchritt(repos, igdb);
+				if (physisch.angefragt > 0) return { ...basis, getan: "igdb_physisch", physisch };
+			} catch (fehler) {
+				return { ...basis, getan: "nichts", meldung: meldungFuer(fehler) };
+			}
 		}
-	}
 
-	// 8. Aufraeumen: Rohantworten, die niemand mehr braucht. Ein einzelnes
-	//    DELETE ueber einen Index - die leichteste Arbeit der Reihenfolge und
-	//    deshalb ganz hinten. Sie belegt einen Aufruf, der sonst "nichts" tut,
-	//    und niemals denselben wie eine schwere Arbeit: Jeder Schritt davor
-	//    kehrt bei Erfolg sofort zurueck (CPU-Grenze, Abschnitt 10.1).
-	const geloescht = await repos.sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE);
-	if (geloescht > 0) return { ...basis, getan: "aufraeumen", geloescht };
+		// 9. Aufraeumen: Rohantworten, die niemand mehr braucht. Ein einzelnes
+		//    DELETE ueber einen Index - die leichteste Arbeit der Reihenfolge
+		//    und deshalb ganz hinten. Sie belegt einen Aufruf, der sonst
+		//    "nichts" tut, und niemals denselben wie eine schwere Arbeit: Jeder
+		//    Schritt davor kehrt bei Erfolg sofort zurueck (CPU-Grenze, 10.1).
+		const geloescht = await repos.sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE);
+		if (geloescht > 0) return { ...basis, getan: "aufraeumen", geloescht };
+	}
 
 	return { ...basis, getan: "nichts" };
-}
-
-/**
- * Hat dieser Aufruf gar nichts bewirkt?
- *
- * Nur solche Ausgaenge werden im Verlauf verdichtet (Stufe 18d). Ein Fehler
- * ist kein Leerlauf - er soll stehen bleiben, auch wenn danach zwanzig leere
- * Aufrufe folgen.
- */
-export function cronWirkungslos(e: CronErgebnis): boolean {
-	return e.getan === "nichts" && e.erschienen === 0 && e.abgebrochen === 0 && e.meldung === undefined;
 }
 
 /**
@@ -196,20 +255,60 @@ async function spielzeitLauf(repos: Repositories, psn: PsnClient, heute: string)
 	return ergebnis;
 }
 
+/** Der Stand der Kaufliste in app_setting (Stufe 18c, `fehlerAm` seit 18e). */
+export type BesitzStand = { fertigAm?: string; fehlerAm?: string; start?: number; gesehen?: number[] };
+
+/** Was `GET /api/sync/status` ueber die Kaufliste sagt (Stufe 18e). */
+export async function besitzStand(repos: Repositories): Promise<BesitzStand> {
+	const stand = await repos.sync.fortschritt(SCHLUESSEL_BESITZ);
+	if (!stand) return {};
+	try {
+		return JSON.parse(stand) as BesitzStand;
+	} catch {
+		return {};
+	}
+}
+
 /**
  * Eine Seite der Kaufliste, wenn der letzte vollstaendige Durchlauf laenger
- * als BESITZ_FRIST_TAGE her ist.
+ * als BESITZ_FRIST_TAGE her ist. `null` heisst "nicht faellig".
  *
  * Der Stand haelt Startdatum, Blaetterung und die bisher gesehenen
  * PS+-Releases: Erst wenn alle Seiten da sind, raeumt `besitzSchritt` auf -
  * ein abgebrochener Lauf loescht nichts (7.7).
+ *
+ * **Ein Fehler ist kein "fertig" (Stufe 18e).** Bis dahin schrieben beide
+ * Ausgaenge `{fertigAm}`, und ein gescheiterter Lauf sah aus wie ein
+ * vollstaendiger - er legte den Schritt fuer sieben Tage still. Genau das ist
+ * am 23.09.2026 passiert: Der erste Durchlauf ueberhaupt scheiterte auf
+ * seiner ersten Seite, und weil die Marke dieselbe war, blieb es
+ * unentdeckt, bis am 27.09.2026 auffiel, dass `digital_entitlement` keine
+ * einzige Zeile mit `herkunft='psn'` haelt (7.7). Ein Fehler schreibt
+ * deshalb `{fehlerAm}`: Der halbe Stand ist auch hier verworfen, damit der
+ * naechste Durchlauf sauber von vorn beginnt und nichts loescht - aber die
+ * Frist laeuft nicht, der naechste Abend versucht es erneut.
+ *
+ * `erzwingen` ueberspringt die Frist. Das nutzt der Knopf in den
+ * Einstellungen: Ein Nutzer, der auf "Kaufliste jetzt abrufen" drueckt, will
+ * nicht bis zum naechsten Termin warten.
  */
-async function besitzLauf(repos: Repositories, psn: PsnClient, heute: string): Promise<BesitzErgebnis | null> {
-	const stand = await repos.sync.fortschritt(SCHLUESSEL_BESITZ);
-	const gespeichert = stand ? (JSON.parse(stand) as { fertigAm?: string; start?: number; gesehen?: number[] }) : {};
+export async function besitzLauf(
+	repos: Repositories,
+	psn: PsnClient,
+	heute: string,
+	optionen: { erzwingen?: boolean } = {},
+): Promise<BesitzErgebnis | null> {
+	const gespeichert = await besitzStand(repos);
 
 	const laeuft = typeof gespeichert.start === "number";
-	if (!laeuft && gespeichert.fertigAm && tageSeit(gespeichert.fertigAm, heute) < BESITZ_FRIST_TAGE) return null;
+	if (
+		!laeuft &&
+		!optionen.erzwingen &&
+		gespeichert.fertigAm &&
+		tageSeit(gespeichert.fertigAm, heute) < BESITZ_FRIST_TAGE
+	) {
+		return null;
+	}
 
 	const { accessToken } = await sitzungBesorgen(repos, psn);
 	const gesehen = laeuft ? (gespeichert.gesehen ?? []) : [];
@@ -217,9 +316,7 @@ async function besitzLauf(repos: Repositories, psn: PsnClient, heute: string): P
 	const ergebnis = await besitzSchritt(repos, psn, accessToken, start, gesehen);
 
 	if (ergebnis.status === "fehler") {
-		// Abgebrochen: Der halbe Stand wird verworfen, damit der naechste
-		// Durchlauf sauber von vorn beginnt - und nichts geloescht wird.
-		await repos.sync.fortschrittSetzenWert(SCHLUESSEL_BESITZ, JSON.stringify({ fertigAm: heute }));
+		await repos.sync.fortschrittSetzenWert(SCHLUESSEL_BESITZ, JSON.stringify({ fehlerAm: heute }));
 		return ergebnis;
 	}
 	await repos.sync.fortschrittSetzenWert(
@@ -256,7 +353,13 @@ async function syncFaellig(repos: Repositories, heute: string): Promise<boolean>
  * (meldungFuer), Fremdtext kommt hier nicht vorbei.
  */
 export function cronLogzeile(e: CronErgebnis): string {
-	const teile = [`cron: ${e.getan}`, `erschienen=${e.erschienen}`];
+	const teile = [`cron: ${e.getan}`];
+	// Nur was zu sagen ist: Seit Stufe 18e stehen zwei Cron-Eintraege
+	// dahinter, und "erschienen=0" in jeder Zeile des PSN-Fensters waere eine
+	// Zahl, die es dort gar nicht gibt. Der Zeitstempel ist das
+	// Lebenszeichen, nicht die Null.
+	if (e.bereich && e.bereich !== "alles") teile.push(`bereich=${e.bereich}`);
+	if (e.erschienen) teile.push(`erschienen=${e.erschienen}`);
 	if (e.abgebrochen) teile.push(`abgebrochen=${e.abgebrochen}`);
 	if (e.geloescht) teile.push(`geloescht=${e.geloescht}`);
 	if (e.sync) {
@@ -270,6 +373,9 @@ export function cronLogzeile(e: CronErgebnis): string {
 		if (e.sync.offeneSeiten === undefined) teile.push(`offset=${e.sync.offset}`);
 		else teile.push(`offen=${e.sync.offeneSeiten}`);
 		if (e.sync.status === "erfolg") teile.push(`titel=${e.sync.titlesSeen ?? 0}`, `eingereiht=${e.sync.eingereiht ?? 0}`);
+		// Der Fehlversuch steht als Zahl da, damit "dreimal dieselbe Seite"
+		// nicht wie "drei Seiten geholt" aussieht (Stufe 18e).
+		if (e.sync.fehlversuche) teile.push(`versuch=${e.sync.fehlversuche}/${FEHLVERSUCHE_HOECHSTENS}`);
 		if (e.sync.meldung) teile.push(`meldung="${e.sync.meldung}"`);
 	}
 	if (e.spielzeit) {

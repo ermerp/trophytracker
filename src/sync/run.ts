@@ -9,7 +9,7 @@ import {
 	extractTotalItemCount,
 	naechsterOffset,
 } from "../domain/trophy-pages";
-import { PsnAuthError, type PsnClient, type Sitzung } from "../psn/client";
+import { PsnAbrufError, PsnAuthError, type PsnClient, type Sitzung } from "../psn/client";
 import { ordneAutomatischZu } from "./zuordnung";
 
 export type SyncErgebnis = {
@@ -30,9 +30,25 @@ export type SyncErgebnis = {
 	eingereihtNachGrund?: Pick<Einreihung, "erstimport" | "neueTrophaeen" | "dlcErweitert">;
 	weiter: boolean;
 	meldung?: string;
+	/** Fehlversuche an derselben Stelle, wenn dieser Aufruf einen hatte (Stufe 18e). */
+	fehlversuche?: number;
 };
 
 export class KeinNpssoError extends Error {}
+
+/**
+ * Wie oft eine Seite scheitern darf, bevor der Lauf aufgegeben wird
+ * (Stufe 18e, Abschnitt 10.1).
+ *
+ * Drei: In der Nacht zum 27.09.2026 beendete ein einziger Fehler bei Offset
+ * 200 den ganzen Sync - die 29 folgenden Aufrufe des Fensters taten nichts,
+ * obwohl dieselbe Seite kurz darauf wieder antwortete. Ein Abrufsfehler ohne
+ * Auth-Bezug laesst den Lauf deshalb auf 'laufend'; der naechste Aufruf holt
+ * fuenf Minuten spaeter dieselbe Seite erneut. Drei Anlaeufe sind fuenfzehn
+ * Minuten Geduld gegen eine voruebergehende Stoerung und immer noch ein
+ * klares Ende gegen eine dauerhafte.
+ */
+export const FEHLVERSUCHE_HOECHSTENS = 3;
 
 /**
  * Besorgt einen Access Token.
@@ -135,15 +151,28 @@ export async function syncSchritt(
 		};
 	} catch (fehler) {
 		const meldung = meldungFuer(fehler);
-		await repos.sync.fehlschlagen(lauf.id, meldung);
 
 		// Abgelaufene Zugangsdaten sind laut Abschnitt 7.1 ein regulaerer
-		// Zustand, kein Fehlerfall. Vorhandene Daten bleiben unangetastet.
+		// Zustand, kein Fehlerfall - und kein Fall fuer einen zweiten Anlauf:
+		// Ein abgelehnter Token wird in fuenf Minuten nicht gueltig. Vorhandene
+		// Daten bleiben unangetastet.
 		if (fehler instanceof PsnAuthError || fehler instanceof KeinNpssoError) {
+			await repos.sync.fehlschlagen(lauf.id, meldung);
 			await repos.credentials.statusSetzen("abgelaufen");
-		} else {
-			await repos.credentials.statusSetzen("fehler");
+			return { status: "fehler", phase: lauf.phase, offset, seitenGeholt, titlesSeen: null, weiter: false, meldung };
 		}
+
+		// Alles andere - ein 503, ein Ratenlimit, ein Netzfehler - bekommt
+		// weitere Anlaeufe (Stufe 18e). Der Lauf bleibt 'laufend' und damit
+		// fortsetzbar; `weiter: false` beendet nur DIESEN Aufruf, damit eine
+		// Oberflaeche nicht sofort dreimal hintereinander nachfasst.
+		const fehlversuche = await repos.sync.fehlversuchVermerken(lauf.id, meldung);
+		if (fehlversuche < FEHLVERSUCHE_HOECHSTENS) {
+			return { status: "laufend", phase: lauf.phase, offset, seitenGeholt, titlesSeen: null, weiter: false, meldung, fehlversuche };
+		}
+
+		await repos.sync.fehlschlagen(lauf.id, meldung);
+		await repos.credentials.statusSetzen("fehler");
 		return {
 			status: "fehler",
 			phase: lauf.phase,
@@ -152,6 +181,7 @@ export async function syncSchritt(
 			titlesSeen: null,
 			weiter: false,
 			meldung,
+			fehlversuche,
 		};
 	}
 }
@@ -162,9 +192,17 @@ export async function syncSchritt(
  * Nur eigene Fehlertypen werden woertlich uebernommen. Alles andere wird auf
  * einen festen Text abgebildet, damit kein Fremdtext durchrutscht, der ein
  * Geheimnis enthalten koennte.
+ *
+ * Seit Stufe 18e gehoert `PsnAbrufError` dazu: Sein Text ist eine eigene
+ * Schablone plus der HTTP-Status ("Trophaeenabruf antwortete mit 503."),
+ * enthaelt also nichts von Sony. Vorher stand in der Historie einheitlich
+ * "Der Abruf ist fehlgeschlagen.", und am Morgen des 27.09.2026 war damit
+ * nicht zu unterscheiden, ob PSN gedrosselt, geantwortet oder die Form
+ * geaendert hatte. `test/keine-lecks.spec.ts` haelt fest, dass nur diese
+ * drei Typen durchkommen.
  */
 function meldungFuer(fehler: unknown): string {
-	if (fehler instanceof PsnAuthError || fehler instanceof KeinNpssoError) {
+	if (fehler instanceof PsnAuthError || fehler instanceof KeinNpssoError || fehler instanceof PsnAbrufError) {
 		return fehler.message;
 	}
 	return "Der Abruf ist fehlgeschlagen.";
