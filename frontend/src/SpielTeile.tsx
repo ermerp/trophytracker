@@ -132,7 +132,16 @@ export type Stufenzahlen = { bronze: number; silber: number; gold: number; plati
  *
  * Dieselbe Dreiwertigkeit wie beim Platin-Zeichen: Was es **gar nicht gibt**
  * (`definiert === 0`, bei Platin 93 von 431 Titeln), steht nicht als „0/0" da,
- * sondern fehlt. Was es gibt und nicht erspielt ist, steht im `--aus`-Ton.
+ * sondern fehlt.
+ *
+ * **Die Metallfarbe trägt jeder Pokal, auch ein leerer** (Entscheidung des
+ * Nutzers vom 27.09.2026); erspielt oder nicht sagt allein die **Füllung**.
+ * Bis dahin nahm ein leerer Pokal den `--aus`-Ton an – und bei BioShock
+ * Infinite standen dadurch zwei identisch graue Pokale mit „0/1"
+ * nebeneinander, Platin und Gold, nicht zu unterscheiden. Die Stufe ist hier
+ * anders als beim Platin-Zeichen der Listen kein Zustand, sondern ein
+ * **Zähler**: Welche Stufe gemeint ist, muss lesbar bleiben, auch wenn nichts
+ * erspielt ist. Die Füllung leistet die Unterscheidung ohnehin.
  */
 export function TrophaeenStufen({
 	erspielt,
@@ -150,9 +159,9 @@ export function TrophaeenStufen({
 				return (
 					<span
 						key={s}
-						className="stufe"
+						className={hat ? 'stufe' : 'stufe leer'}
 						title={`${STUFENTEXT[s]}: ${erspielt[s]} von ${definiert[s]}`}
-						style={{ color: hat ? `var(--troph-${s})` : 'var(--aus)' }}
+						style={{ color: `var(--troph-${s})` }}
 					>
 						<Zeichen name="pokal" groesse={groesse} gefuellt={hat} strich={1.5} />
 						<b>{erspielt[s]}</b>
