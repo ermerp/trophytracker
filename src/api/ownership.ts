@@ -129,6 +129,10 @@ export const physicalCopyRoutes = new Hono<AppEnv>()
 		if (!(await c.var.repos.ownership.releaseExistiert(releaseId))) {
 			return c.json({ fehler: "Release nicht gefunden." }, 404);
 		}
+		// Je Release genau eine Disc (Entscheidung des Nutzers vom 27.09.2026).
+		if (await c.var.repos.ownership.hatExemplar(releaseId)) {
+			return c.json({ fehler: "Für dieses Release steht schon eine Disc im Regal." }, 409);
+		}
 
 		const ergebnis = await c.var.repos.ownership.addPhysicalCopy(releaseId, geprueft.felder);
 		const absichten = await absichtenErledigen(c.var.repos, releaseId);

@@ -98,9 +98,15 @@ export function ScanAuswahl({
             <li key={s.id}>
               <span className="titel">{s.titel}</span>{' '}
               {s.releases.map((r) => (
-                <button key={r.id} type="button" disabled={laeuft} onClick={() => onWahl({ releaseId: r.id })}>
+                <button
+                  key={r.id}
+                  type="button"
+                  disabled={laeuft || r.exemplare > 0}
+                  title={r.exemplare > 0 ? 'Steht schon im Regal' : undefined}
+                  onClick={() => onWahl({ releaseId: r.id })}
+                >
                   {r.plattform}
-                  {r.exemplare > 0 && ` · Disc ×${r.exemplare}`}
+                  {r.exemplare > 0 && ' · im Regal'}
                 </button>
               ))}
               {s.releases.length < PLATTFORMEN.length && (

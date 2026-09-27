@@ -43,6 +43,23 @@ describe("POST /api/physical-copies", () => {
 		expect(await antwort.json()).toMatchObject({ releaseId: r, physischStatusGesetzt: true });
 	});
 
+	// Je Release genau eine Disc (Entscheidung des Nutzers vom 27.09.2026).
+	// Die Regel steht nicht im Schema - ein UNIQUE auf release_id waere ein
+	// Tabellenneubau, und sie soll zuruecknehmbar bleiben -, also haelt sie
+	// dieser Test.
+	it("weist eine zweite Disc am selben Release mit 409 ab", async () => {
+		const r = await release();
+		expect((await sende("POST", "/api/physical-copies", { releaseId: r })).status).toBe(201);
+
+		const zweite = await sende("POST", "/api/physical-copies", { releaseId: r });
+		expect(zweite.status).toBe(409);
+
+		const { anzahl } = (await env.DB.prepare("SELECT COUNT(*) AS anzahl FROM physical_copy WHERE release_id = ?")
+			.bind(r)
+			.first()) as { anzahl: number };
+		expect(anzahl).toBe(1);
+	});
+
 	it("uebersetzt die deutschen Felder", async () => {
 		const r = await release();
 		const antwort = await sende("POST", "/api/physical-copies", {
