@@ -60,25 +60,6 @@ export const QUELLENTEXT: Record<Quelle, string> = {
   sonstiges: 'Sonstiges',
 }
 
-/**
- * Dieselben Quellen für enge Stellen – heute nur der Besitzknopf der
- * Release-Karte, dem je rund 50 px bleiben (Wunsch des Nutzers vom
- * 27.09.2026). Überall sonst gilt `QUELLENTEXT`: Ein Kürzel ist eine
- * Notlösung für Platzmangel, kein besserer Name.
- *
- * **„PS+" ist hier Text, kein Zeichen.** Die Markenregel (Abschnitt 13)
- * verbietet ein PS-Monogramm in Icons, Grafiken und Gestaltungselementen –
- * ein gezeichnetes „PS+" anstelle eines Symbols fiele darunter. Als
- * Beschriftung neben dem Wolkenzeichen steht es in derselben Reihe wie
- * „Kauf" und „Testversion" und ist damit dasselbe wie „PS4" oder „Vita":
- * ein Name als Daten.
- */
-export const QUELLENKURZ: Record<Quelle, string> = {
-  kauf: 'Kauf',
-  plus: 'PS+',
-  trial: 'Test',
-  sonstiges: 'Sonstiges',
-}
 
 export type Platin = 'erspielt' | 'offen' | 'nicht_verfuegbar'
 
