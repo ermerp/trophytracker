@@ -17,8 +17,26 @@ body {
   background: var(--grund);
 }
 
+/*
+ * **Kein `min-height: 100dvh`** (entfernt am 27.09.2026, gemessen am Gerät
+ * des Nutzers).
+ *
+ * Es stand hier, damit der dunkle Grund auch bei kurzen Seiten bis unten
+ * reicht. Das leistet aber schon die Regel darüber: Ein Hintergrund auf
+ * `html` füllt die Zeichenfläche, ganz gleich wie hoch der Inhalt ist.
+ *
+ * Schaden angerichtet hat es trotzdem. Auf einem Handy mit
+ * `viewport-fit=cover` ist `100dvh` **grösser als der scrollbare Bereich** –
+ * es zählt die Flächen hinter Status- und Systemleiste mit, der Scrollbereich
+ * nicht. Auf dem Gerät des Nutzers (OnePlus Nord 2, 360 × 800 CSS-px,
+ * sichere Bereiche 37 oben und 17 unten) ergab das 854 gegen 800: Jede Seite
+ * war **54 px zu hoch und liess sich schieben, obwohl aller Inhalt zu sehen
+ * war** – unabhängig davon, wie wenig darauf stand. Auf dem
+ * Entwicklungsrechner sind alle sicheren Bereiche null, dort fällt es nicht
+ * auf; drei Erklärungsversuche gingen deshalb daneben, bis der Block
+ * „Anzeige" in den Einstellungen die echten Zahlen lieferte.
+ */
 body {
   margin: 0;
-  min-height: 100dvh;
   color: var(--text);
 }
