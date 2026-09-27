@@ -52,6 +52,12 @@ export const ZEICHEN = {
 	winkel: '<path d="M9 5.4 15.6 12 9 18.6"/>',
 	filter: '<path d="M4 7.2h9M19.4 7.2h.6M4 12h3.4M11.8 12h8.2M4 16.8h8.2M17 16.8h3"/>' +
 		'<circle cx="16" cy="7.2" r="2.1"/><circle cx="9.6" cy="12" r="2.1"/><circle cx="14.8" cy="16.8" r="2.1"/>',
+	// Stufe 19a: die offenen Posten des Dashboards. Eigene Zeichnung wie alle
+	// anderen; eine Glocke ist kein geschuetztes Zeichen.
+	glocke:
+		'<path d="M12 3.6a5.6 5.6 0 0 0-5.6 5.6c0 4.2-1.3 5.6-1.9 6.3-.3.3-.1.9.4.9h14.2' +
+		'c.5 0 .7-.6.4-.9-.6-.7-1.9-2.1-1.9-6.3A5.6 5.6 0 0 0 12 3.6z"/>' +
+		'<path d="M10.1 19.1a2 2 0 0 0 3.8 0"/>',
 } as const
 
 export type ZeichenName = keyof typeof ZEICHEN
@@ -86,5 +92,48 @@ export function Zeichen({ name, groesse = 22, gefuellt = false, strich = 1.7, cl
 			focusable="false"
 			dangerouslySetInnerHTML={{ __html: ZEICHEN[name] }}
 		/>
+	)
+}
+
+/**
+ * Das App-Symbol als Inline-SVG (Stufe 19a): der eigene Pokal in einem
+ * Fortschrittsring, dieselbe Zeichnung wie `frontend/public/icon.svg`.
+ *
+ * Es steht links vom Schriftzug in der Kopfzeile des Dashboards und nur
+ * dort – eine Marke gehört an den Anfang, nicht auf jede Ansicht. Der
+ * Kastenhintergrund des Dateisymbols fehlt hier: Die Kopfzeile hat ihre
+ * eigene Fläche, ein zweiter Kasten darin wäre ein Aufkleber.
+ */
+export function AppSymbol({ groesse = 32 }: { groesse?: number }) {
+	return (
+		<svg
+			className="logo"
+			width={groesse}
+			height={groesse}
+			viewBox="0 0 512 512"
+			aria-hidden="true"
+			focusable="false"
+		>
+			<circle cx="256" cy="256" r="176" fill="none" stroke="var(--linie)" strokeWidth="34" />
+			{/* Zu 87 % geschlossen – eine Sammlung ist nie ganz fertig. */}
+			<circle
+				cx="256"
+				cy="256"
+				r="176"
+				fill="none"
+				stroke="var(--gold)"
+				strokeWidth="34"
+				strokeLinecap="round"
+				strokeDasharray="962 1106"
+				transform="rotate(-90 256 256)"
+			/>
+			<g fill="var(--gold)" transform="translate(256 256) scale(0.62) translate(-256 -256)">
+				<path d="M152 112h208v96c0 62-46 112-104 112s-104-50-104-112z" />
+				<path d="M152 136h-40c-14 0-24 10-24 24v16c0 44 32 80 74 86l6-32c-26-4-44-26-44-54v-6h28z" />
+				<path d="M360 136h40c14 0 24 10 24 24v16c0 44-32 80-74 86l-6-32c26-4 44-26 44-54v-6h-28z" />
+				<rect x="236" y="318" width="40" height="52" />
+				<path d="M188 370h136c14 0 24 10 24 24v6H164v-6c0-14 10-24 24-24z" />
+			</g>
+		</svg>
 	)
 }

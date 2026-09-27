@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 18c abgenommen** (22.09.2026), Stufen 18d und 19 gebaut (23./24.09.2026), zwei Zahlen im Cron-Verlauf nachgebessert (24.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen bis 18c abgenommen** (22.09.2026), Stufen 18d, 19 und 19a gebaut (23.–27.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -172,12 +172,37 @@ klappt erst auf Tippen auf die Lupe auf, Filter sind Chips, und Kacheln oder
 Zeilen lassen sich je Liste getrennt umschalten (die Wahl liegt im Gerät, nicht
 am Konto). Die Filter stehen in zwei Ebenen: sichtbar ist nur, was gesetzt ist,
 alles Weitere hinter einem Knopf „Filter“.
-Farben, Abstände und Schriften stehen an einer Stelle: `frontend/src/tokens.css`. Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen –
-daraus wird in Stufe 19a das Dashboard.
+Farben, Abstände und Schriften stehen an einer Stelle: `frontend/src/tokens.css`. Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen.
 
-**Als Nächstes: Stufe 19a – Dashboard**, dahinter 19b (Einzeltrophäen). Danach die
-Oberfläche (19), dahinter die Einzeltrophäen je Spiel (19b). Beide
-PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
+**Stufe 19a** (27.09.2026) macht daraus das **Dashboard**. `/start` zeigt jetzt
+den Trophäen-Anteil in Prozent, die Zahl der Spiele, Backlog und To-Do, dann
+Kacheln je Plattform, die Statusverteilung als Kreis mit Legende, die vier
+Trophäenstufen als Pokale in Metalltönen und zuletzt „Neu" – die jüngsten
+Zeilen aus dem Änderungsprotokoll. Auf dem Handy klappen hinter „Je Plattform"
+und „Trophäen" zwei Tabellen auf (Bestand je Plattform mit Disc und Download,
+Anteil je Stufe); am Desktop stehen sie fest, dazu „Zuletzt gespielt · mit
+Platin" mit Cover und der Feed als eigene Spalte. Alles kommt aus einer Route,
+`GET /api/stats`, mit fünf Abfragen in einem Batch – **kein PSN-Abruf**: Die
+Zähler je Stufe sind eine Summe über `trophy_progress`, auch über die noch
+nicht zugeordneten Listen, damit die Summe der Zahl bei PSN entspricht.
+
+**Warnung und Information sind dabei getrennt worden.** Ein gelber Block trägt
+nur noch, was stillsteht – abgelaufener Zugang, fehlgeschlagener Nachtlauf,
+überfällige Sicherung. Alles Zählende liegt hinter der **Glocke** in der
+Kopfzeile: Ohne Warnung ist sie gelb und nennt die offenen Posten, mit Warnung
+wird sie rot und nennt deren Zahl, und ein gelber Punkt sagt, dass außerdem
+Posten warten. Weil die Kopfzeile oben klebt, bleibt das Alarmzeichen über die
+ganze Seite sichtbar.
+
+**Was das Dashboard bewusst nicht zeigt:** das Trophäen-Level von PSN und das
+echte „letztes Platin". Wann ein Platin erspielt wurde, weiß die Datenbank
+nicht – von 164 Spielen mit Platin trägt keines ein Beendet-Datum, und der
+Zeitpunkt je Trophäe kommt erst mit 19b. Der Block heißt deshalb „Zuletzt
+gespielt · mit Platin" und sagt genau das, was die Zahl hergibt.
+
+**Als Nächstes: Stufe 19b** (Einzeltrophäen je Spiel), danach 20 (AWIN-Feed)
+und 21 (PSN Store-Preise). Die PSN-Stufen ergänzen nur, was die Sammlung schon
+kennt, und importieren nichts.
 
 **Stufe 18 ist seit dem 22.09.2026 abgenommen:** PWA installiert und offline
 geprüft, nächtliche Läufe am 20., 21. und 22.09. mit je 431 Titeln, in der Nacht

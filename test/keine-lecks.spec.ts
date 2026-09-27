@@ -268,6 +268,8 @@ describe("Dichtheitsprüfung", () => {
 			}),
 			await ruf(app, "/api/plans/1", { method: "DELETE" }),
 			await ruf(app, "/api/backlog-candidates"),
+			// Stufe 19a: das Dashboard liest breit - Kennzahlen, Zugang, Verlauf.
+			await ruf(app, "/api/stats"),
 			await ruf(app, "/api/gaps?verworfene=1&unbekannte=1"),
 			await ruf(app, "/api/gaps/1/verwerfen", { method: "POST" }),
 			await ruf(app, "/api/releases/1", {

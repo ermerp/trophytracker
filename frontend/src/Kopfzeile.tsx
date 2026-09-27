@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { Ansicht } from './Ansicht'
-import { Zeichen, type ZeichenName } from './Symbole'
+import { AppSymbol, Zeichen, type ZeichenName } from './Symbole'
 
 /**
  * Die Kopfzeile aller Listenansichten (Stufe 19).
@@ -32,9 +32,13 @@ type Props = {
 	ansicht?: Ansicht
 	/** Ein zusätzliches Symbol vor der Lupe, etwa der Barcode in der Sammlung. */
 	aktion?: Aktion
+	/** Das App-Symbol links vom Schriftzug – nur das Dashboard trägt es (Stufe 19a). */
+	logo?: boolean
+	/** Ein eigenes Element vor dem Zahnrad, etwa die Glocke des Dashboards. */
+	zusatz?: React.ReactNode
 }
 
-export function Kopfzeile({ titel, sucheParam, ansicht, aktion }: Props) {
+export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz }: Props) {
 	const [params, setParams] = useSearchParams()
 	const gesetzt = sucheParam ? (params.get(sucheParam) ?? '') : ''
 	const [offen, setOffen] = useState(gesetzt !== '')
@@ -108,6 +112,7 @@ export function Kopfzeile({ titel, sucheParam, ansicht, aktion }: Props) {
 				</>
 			) : (
 				<>
+					{logo && <AppSymbol />}
 					<h1>{titel}</h1>
 					{aktion &&
 						(aktion.ziel ? (
@@ -135,6 +140,7 @@ export function Kopfzeile({ titel, sucheParam, ansicht, aktion }: Props) {
 							<Zeichen name={ansicht.art === 'kacheln' ? 'zeile' : 'raster'} />
 						</button>
 					)}
+					{zusatz}
 					<Link to="/einstellungen" className="ikone nur-handy" aria-label="Einstellungen" title="Einstellungen">
 						<Zeichen name="zahnrad" />
 					</Link>

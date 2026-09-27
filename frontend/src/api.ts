@@ -177,7 +177,22 @@ export const igdbLink = (slug: string | null) => (slug ? `https://www.igdb.com/g
 
 /** Zeitstempel aus D1 (`datetime('now')`, UTC ohne Zone) oder ISO – als Datum und Uhrzeit. */
 export const zeitpunkt = (wert: string | null) =>
-  wert ? new Date(wert.replace(' ', 'T') + (/Z|[+-]\d\d:\d\d$/.test(wert) ? '' : 'Z')).toLocaleString('de-DE') : 'unbekannt'
+  wert ? alsDatum(wert).toLocaleString('de-DE') : 'unbekannt'
+
+/**
+ * Derselbe Zeitstempel als kurzes Datum („26.09."), für Spalten, in denen
+ * die Uhrzeit nur Platz kostet – etwa den Feed des Dashboards.
+ *
+ * `datum()` taugt dafür nicht: Es hängt an ein Datum ohne Uhrzeit ein
+ * `T00:00:00` an und macht aus `2026-09-26 08:14:12` eine ungültige Angabe
+ * (gesehen im Bild vom 27.09.2026).
+ */
+export const kurzesDatum = (wert: string | null) =>
+  wert ? alsDatum(wert).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : 'unbekannt'
+
+/** D1 schreibt `2026-09-26 08:14:12` ohne Zone – das ist UTC, nicht Ortszeit. */
+const alsDatum = (wert: string) =>
+  new Date(wert.replace(' ', 'T') + (/Z|[+-]\d\d:\d\d$/.test(wert) ? '' : 'Z'))
 
 export const KRITIKQUELLE: Record<string, string> = { igdb: 'IGDB', opencritic: 'OpenCritic', manuell: 'von Hand' }
 
@@ -393,3 +408,59 @@ export type Ereignis = {
 }
 
 export type EreignisSeite = { weiter: boolean; ereignisse: Ereignis[] }
+
+/* --- Dashboard (Stufe 19a, GET /api/stats) -------------------------------- */
+
+export const TROPHAEENSTUFEN = ['platin', 'gold', 'silber', 'bronze'] as const
+export type TrophaeenStufe = (typeof TROPHAEENSTUFEN)[number]
+
+export const STUFENTEXT: Record<TrophaeenStufe, string> = {
+  platin: 'Platin',
+  gold: 'Gold',
+  silber: 'Silber',
+  bronze: 'Bronze',
+}
+
+export type PlattformZahlen = {
+  plattform: Plattform
+  releases: number
+  spiele: number
+  mitListe: number
+  /** Dreiwertig: `platinMoeglich` zählt nur Listen, die überhaupt ein Platin kennen. */
+  platin: number
+  platinMoeglich: number
+  disc: number
+  digital: number
+}
+
+/** Das zuletzt **gespielte** Spiel mit Platin – nicht das zuletzt erspielte (19b, 7.7). */
+export type LetztesPlatin = {
+  spielId: number
+  titel: string
+  bild: string | null
+  plattform: Plattform
+  fortschritt: number
+  zuletztGespielt: string | null
+  bronze: number
+  silber: number
+  gold: number
+  platin: number
+}
+
+export type Kennzahlen = {
+  spiele: number
+  releases: number
+  plattformen: PlattformZahlen[]
+  status: Record<PlayStatus, number>
+  trophaeen: {
+    listen: number
+    ohneZuordnung: number
+    erspielt: number
+    definiert: number
+    platinErspielt: number
+    platinMoeglich: number
+    stufen: Array<{ stufe: TrophaeenStufe; erspielt: number; definiert: number }>
+  }
+  listen: { backlog: number; todo: number }
+  letztesPlatin: LetztesPlatin | null
+}

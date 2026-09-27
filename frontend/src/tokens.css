@@ -50,6 +50,20 @@
 	--psvita: #3fb27f;
 
 	/*
+	 * Die vier Trophäenstufen (Stufe 19a). Metalltoene, nicht Zustandsfarben:
+	 * Sie benennen eine Stufe, keinen Zustand. Platin ist blaeulich statt
+	 * weiss, damit es sich von Silber trennt (Wahl des Nutzers vom
+	 * 27.09.2026). Gold ist derselbe Wert wie --gold - die Stufe und der
+	 * Akzent sind hier dasselbe.
+	 *
+	 * Die Namen bilden sich im Code: var(--troph-platin).
+	 */
+	--troph-platin: #8ab6e8;
+	--troph-gold: #e8b923;
+	--troph-silber: #b9c2d0;
+	--troph-bronze: #c1794a;
+
+	/*
 	 * Zustaende. Die Namen sind die Werte aus `play_status`, damit sich der
 	 * Token im Code bilden laesst: var(--st-am_spielen).
 	 *
