@@ -10,7 +10,6 @@ import {
   PLATTFORMEN,
   PLAY_STATUS,
   QUELLEN,
-  QUELLENKURZ,
   QUELLENTEXT,
   STATUSTEXT,
   anfrage,
@@ -601,7 +600,7 @@ function ReleaseKarte({
         <div className="besitzknoepfe">
         <BesitzKnopf
           name="disc"
-          wort={disc && r.exemplare.length > 1 ? `Disc ×${r.exemplare.length}` : 'Disc'}
+          wort="Disc"
           gesetzt={disc}
           satz={disc ? 'im Regal' : 'erfassen'}
           laeuft={laeuft}
@@ -612,7 +611,7 @@ function ReleaseKarte({
         />
         <BesitzKnopf
           name={digital && !gekauft ? 'psplus' : 'wolke'}
-          wort={digital ? QUELLENKURZ[digital.quelle] : 'Digital'}
+          wort={digital ? QUELLENTEXT[digital.quelle] : 'Digital'}
           // Von PSN erkannt heisst: kein Knopf. Der nächste Lauf legte die
           // Zeile ohnehin wieder an (7.7).
           gesetzt={digital !== null}
