@@ -166,22 +166,10 @@ export async function cronSchritt(
 		if (zugang.eingerichtet && zugang.status !== "abgelaufen") {
 			try {
 				const spielzeit = await spielzeitLauf(repos, psn, heute);
-				if (spielzeit) {
-					// Ein geglueckter Abruf raeumt ein altes 'fehler' am Zugang
-					// weg (Stufe 18e). Vorher blieb es bis zum naechsten
-					// erfolgreichen Sync stehen: Am Morgen des 27.09.2026 stand
-					// "Fehler beim letzten Versuch" in den Einstellungen,
-					// obwohl um 03:16 und 03:21 zwei PSN-Abrufe durchgelaufen
-					// waren. `last_success_at` bleibt dem Sync vorbehalten.
-					if (spielzeit.status === "erfolg") await repos.credentials.fehlerStatusLoeschen();
-					return { ...basis, getan: "spielzeit", spielzeit };
-				}
+				if (spielzeit) return { ...basis, getan: "spielzeit", spielzeit };
 
 				const besitz = await besitzLauf(repos, psn, heute);
-				if (besitz) {
-					if (besitz.status === "erfolg") await repos.credentials.fehlerStatusLoeschen();
-					return { ...basis, getan: "besitz", besitz };
-				}
+				if (besitz) return { ...basis, getan: "besitz", besitz };
 			} catch (fehler) {
 				// Ein abgelaufener Zugang oder ein PSN-Ausfall darf die Nacht
 				// nicht beenden - die Wartung laeuft in ihrem eigenen Fenster
@@ -242,6 +230,7 @@ async function spielzeitLauf(repos: Repositories, psn: PsnClient, heute: string)
 
 	const { accessToken } = await sitzungBesorgen(repos, psn);
 	const ergebnis = await spielzeitSchritt(repos, psn, accessToken, offset);
+	if (ergebnis.status === "erfolg") await zugangGeglueckt(repos);
 	if (ergebnis.status === "fehler") {
 		// Der Tag gilt als erledigt, damit ein Ausfall nicht die ganze Nacht
 		// dieselbe Seite anfragt; morgen wird es erneut versucht.
@@ -314,6 +303,7 @@ export async function besitzLauf(
 	const gesehen = laeuft ? (gespeichert.gesehen ?? []) : [];
 	const start = laeuft ? (gespeichert.start ?? 0) : 0;
 	const ergebnis = await besitzSchritt(repos, psn, accessToken, start, gesehen);
+	if (ergebnis.status === "erfolg") await zugangGeglueckt(repos);
 
 	if (ergebnis.status === "fehler") {
 		await repos.sync.fortschrittSetzenWert(SCHLUESSEL_BESITZ, JSON.stringify({ fehlerAm: heute }));
@@ -326,6 +316,20 @@ export async function besitzLauf(
 			: JSON.stringify({ fertigAm: heute }),
 	);
 	return ergebnis;
+}
+
+/**
+ * Ein geglueckter PSN-Abruf raeumt ein altes 'fehler' am Zugang weg
+ * (Stufe 18e).
+ *
+ * Am Schritt, nicht am Cron: Sonst hat der Knopf "Kaufliste jetzt abrufen"
+ * es nicht, und genau das ist am 27.09.2026 passiert - der Handlauf holte
+ * 210 Berechtigungen, und in den Einstellungen stand weiter "Fehler beim
+ * letzten Versuch". `last_success_at` bleibt dem Sync vorbehalten: Es
+ * bedeutet "der Trophäenstand ist von da".
+ */
+async function zugangGeglueckt(repos: Repositories): Promise<void> {
+	await repos.credentials.fehlerStatusLoeschen();
 }
 
 /** Ganze Tage zwischen zwei ISO-Datumsangaben (YYYY-MM-DD). */
