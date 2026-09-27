@@ -2617,11 +2617,16 @@ table.plattformtabelle {
   min-width: 0;
 }
 
+/* "PS Plus" brach in der schmalen Fassung auf zwei Zeilen um und machte den
+   Knopf hoeher als seinen Nachbarn (gesehen in der Produktion, 27.09.2026). */
 .besitzknopf .wort b {
   font-family: var(--schrift-display);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .besitzknopf .wort span {
