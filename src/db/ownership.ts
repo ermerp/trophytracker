@@ -70,6 +70,27 @@ export class OwnershipRepository {
 		return r !== null;
 	}
 
+	/**
+	 * Steht zu diesem Release schon eine Disc im Regal?
+	 *
+	 * **Je Release genau eine** (Entscheidung des Nutzers vom 27.09.2026):
+	 * Mehrere Exemplare desselben Release will er nicht führen, und in der
+	 * Produktion gibt es auch keines (0 von 53 erfassten Discs). Beide
+	 * Schreibwege – die Route und der Scanner – fragen hier und antworten mit
+	 * `409`, wie beim zweiten Kaufeintrag am selben Release (5.3).
+	 *
+	 * Das Schema erzwingt es **nicht**: Ein `UNIQUE` auf `release_id` wäre
+	 * eine Migration mit Tabellenneubau, und die Regel ist eine Entscheidung
+	 * des Nutzers, die er zurücknehmen können soll.
+	 */
+	async hatExemplar(releaseId: number): Promise<boolean> {
+		const r = await this.db
+			.prepare("SELECT 1 AS x FROM physical_copy WHERE release_id = ? LIMIT 1")
+			.bind(releaseId)
+			.first();
+		return r !== null;
+	}
+
 	/** Exemplare und Berechtigungen aller Releases eines Spiels. */
 	async copiesForGame(gameId: number): Promise<{
 		exemplare: PhysicalCopyZeile[];

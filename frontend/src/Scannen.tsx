@@ -15,8 +15,11 @@ import { tonFehler } from './ton'
  *
  * Drei feste Zonen – Kamera, Textfeld als Notnagel, Ergebniskarte –, damit
  * die Bedienelemente bei jeder Disc an derselben Stelle stehen (Darstellungs-
- * regel in Abschnitt 13). Die Kette aus 9.2: Mapping-Treffer → eine Karte mit
- * „Weiteres Exemplar"; sonst die Suche in der eigenen Sammlung (dieselbe
+ * regel in Abschnitt 13). Die Kette aus 9.2: Mapping-Treffer → eine Karte, die
+ * bei einer schon erfassten Disc „schon im Regal" sagt und nicht mehr anlegt
+ * (je Release genau eine, Entscheidung des Nutzers vom 27.09.2026 – beim
+ * Scannen ist die zweimal gezogene Hülle der häufigste Fall eines Versehens);
+ * sonst die Suche in der eigenen Sammlung (dieselbe
  * Abfrage wie die Sammlungsansicht) und darunter „Spiel anlegen" wie in der
  * Sammlung. Zuordnen legt Disc und Mapping an, erledigt Kauf- und Wunsch-
  * einträge und protokolliert „per Barcode"; Rückgängig nimmt alles zurück.
@@ -327,7 +330,7 @@ export function Scannen() {
                     </h2>
                     <p>
                       {k.releases
-                        .map((r) => `${r.plattform}: ${r.exemplare === 0 ? 'noch kein Exemplar' : `im Regal ×${r.exemplare}`}`)
+                        .map((r) => `${r.plattform}: ${r.exemplare === 0 ? 'noch kein Exemplar' : 'im Regal'}`)
                         .join(' · ')}
                     </p>
                     <p className="aktionen">
@@ -335,10 +338,11 @@ export function Scannen() {
                         <button
                           key={r.releaseId}
                           type="button"
-                          disabled={laeuft}
+                          disabled={laeuft || r.exemplare > 0}
+                          title={r.exemplare > 0 ? 'Steht schon im Regal' : undefined}
                           onClick={() => zuordnen(zustand.t.ean, { releaseId: r.releaseId })}
                         >
-                          {r.exemplare === 0 ? `Disc erfassen (${r.plattform})` : `Weiteres Exemplar (${r.plattform})`}
+                          {r.exemplare === 0 ? `Disc erfassen (${r.plattform})` : `${r.plattform}: schon im Regal`}
                         </button>
                       ))}
                     </p>
@@ -413,11 +417,11 @@ function TrefferKarte({
           <Link to={`/spiel/${r.spielId}`}>{r.titel}</Link> ({r.plattform})
         </h2>
         <p>
-          EAN {t.ean} · {r.exemplare === 0 ? 'noch kein Exemplar' : `im Regal ×${r.exemplare}`}
+          EAN {t.ean} · {r.exemplare === 0 ? 'noch kein Exemplar' : 'im Regal'}
         </p>
         <p className="aktionen">
-          <button type="button" disabled={laeuft} onClick={onExemplar}>
-            {r.exemplare === 0 ? 'Disc erfassen' : 'Weiteres Exemplar'}
+          <button type="button" disabled={laeuft || r.exemplare > 0} title={r.exemplare > 0 ? 'Steht schon im Regal' : undefined} onClick={onExemplar}>
+            {r.exemplare === 0 ? 'Disc erfassen' : 'Schon im Regal'}
           </button>
           <button type="button" disabled={laeuft} onClick={onAnderes}>Anderes Spiel</button>
           <button type="button" disabled={laeuft} onClick={onWeiter}>Weiter</button>

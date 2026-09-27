@@ -146,7 +146,7 @@ EREIGNISSE.forEach(([quelle, art, feld, neu, detail], k) => {
  * Die Schleife oben erzeugt Spiele mit genau einem Release und hoechstens
  * einem Exemplar - das ist der Normalfall (421 der 431 Spiele), aber die
  * Detailansicht zeigt daran nur die Haelfte ihrer Faelle. Dieses eine Spiel
- * traegt alles auf einmal: zwei Releases, zwei Exemplare am selben Release,
+ * traegt alles auf einmal: zwei Releases, eine erfasste Disc mit EAN,
  * PS Plus neben gekauftem Download, Spielzeit nur auf der PS5, einen von der
  * Sammlung abweichenden Rohtitel und einen Verlauf.
  *
@@ -182,8 +182,9 @@ s(
 		"datetime('now', '-13 days'), 'manuell');",
 );
 s(`INSERT INTO play_status (release_id, status) VALUES (${R}, 'am_spielen'), (${R + 1}, 'komplettiert');`);
-// Zwei Exemplare am selben Release; eines mit EAN, wie sie der Scanner setzt.
-s(`INSERT INTO physical_copy (release_id, ean) VALUES (${R}, '4012345678901'), (${R}, NULL);`);
+// Genau eine Disc je Release (Entscheidung des Nutzers vom 27.09.2026), mit
+// EAN, wie sie der Scanner setzt.
+s(`INSERT INTO physical_copy (release_id, ean) VALUES (${R}, '4012345678901');`);
 s(`INSERT INTO ean_mapping (ean, release_id, source) VALUES ('4012345678901', ${R}, 'scan');`);
 // Kauf schlaegt PS Plus (7.7) - hier steht beides an verschiedenen Releases.
 s(

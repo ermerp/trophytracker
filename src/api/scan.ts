@@ -173,6 +173,17 @@ export const scanRoutes = new Hono<AppEnv>()
 			releaseId = await c.var.repos.games.releaseFuerPlattform(spielId, k.plattform, "nutzer", "scan");
 		}
 
+		// Je Release genau eine Disc (Entscheidung des Nutzers vom 27.09.2026).
+		// Beim Scannen ist das der haeufigste Fall eines Versehens: dieselbe
+		// Huelle zweimal ueber den Leser gezogen. Das Mapping wird trotzdem
+		// gesetzt - der Code gehoert zu diesem Release, auch wenn die Disc
+		// schon steht, und beim naechsten Scan soll er sofort treffen.
+		if (await c.var.repos.ownership.hatExemplar(releaseId)) {
+			await c.var.repos.scan.zuordnen(ean, releaseId, "manuell");
+			const kopf = await c.var.repos.scan.releaseKopf(releaseId);
+			return c.json({ fehler: "Für dieses Release steht schon eine Disc im Regal.", releaseId, ...kopf }, 409);
+		}
+
 		// Erst die Disc (mit Protokoll), dann das Mapping: Schlaegt das Mapping
 		// fehl, steht die Disc mit ihrer EAN da und der naechste Scan fragt neu.
 		const exemplar = await c.var.repos.ownership.addPhysicalCopy(releaseId, { ean }, "scan");
