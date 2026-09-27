@@ -11,6 +11,7 @@ import { PlanRepository } from "./plan";
 import { PlayStatusRepository } from "./play-status";
 import { ReviewRepository } from "./review";
 import { ScanRepository } from "./scan";
+import { StatsRepository } from "./stats";
 import { SyncRepository } from "./sync";
 import { TrophiesRepository } from "./trophies";
 import { WishlistImportRepository } from "./wunschliste";
@@ -44,6 +45,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		events,
 		review: new ReviewRepository(db, playStatus, kopplung, events),
 		scan: new ScanRepository(db),
+		stats: new StatsRepository(db),
 		export: new ExportRepository(db),
 		wishlistImport: new WishlistImportRepository(db),
 	};

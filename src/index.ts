@@ -11,6 +11,7 @@ import { psnRoutes } from "./api/psn";
 import { releaseRoutes } from "./api/releases";
 import { reviewRoutes } from "./api/review";
 import { scanRoutes } from "./api/scan";
+import { statsRoutes } from "./api/stats";
 import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
@@ -76,6 +77,7 @@ export function createApp(
 	app.route("/api/events", eventRoutes);
 	app.route("/api/review", reviewRoutes);
 	app.route("/api/scan", scanRoutes);
+	app.route("/api/stats", statsRoutes);
 	app.route("/api/export", exportRoutes);
 	app.route("/api/backup", backupRoutes);
 	app.route("/api/physical-copies", physicalCopyRoutes);

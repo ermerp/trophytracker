@@ -3,6 +3,14 @@ import { PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
 import { EXPORT_TABELLEN } from "../src/db/export";
+import {
+	LETZTES_PLATIN_SQL,
+	LISTEN_SQL,
+	PLATTFORM_SQL,
+	SPIELE_SQL,
+	STATUS_SQL,
+	TROPHAEEN_SQL,
+} from "../src/db/stats";
 
 /**
  * Zeilenlese-Kosten der heissen Abfragen.
@@ -609,6 +617,72 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const antwort = await SELF.fetch(`${B}/api/events?limit=5`);
 		expect(antwort.status).toBe(200);
 		await env.DB.prepare("DELETE FROM game_event").run();
+	});
+
+	/**
+	 * Stufe 19a: das Dashboard. Es ist die erste Seite nach jedem Start der
+	 * App und laeuft bei jedem Aufruf - teurer als eine Listenseite darf es
+	 * deshalb nicht sein. Gemessen wird die SQL aus src/db/stats.ts selbst,
+	 * damit Test und Repository nicht auseinanderlaufen.
+	 */
+	it("misst die Kennzahlen des Dashboards (Stufe 19a)", async () => {
+		// Besitz und Listeneintraege, damit die Zaehler nicht auf 0 messen:
+		// jedes dritte Release eine Disc, jedes siebte ein Download, dazu ein
+		// Wunsch auf einem Release ohne alles (das faellt aus der Sammlung).
+		const anweisungen: D1PreparedStatement[] = [];
+		const disc = env.DB.prepare("INSERT INTO physical_copy (release_id, condition) VALUES (?, 'gut')");
+		const dl = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, 'kauf')");
+		for (let i = 1; i <= ANZAHL; i += 3) anweisungen.push(disc.bind(i));
+		for (let i = 2; i <= ANZAHL; i += 7) anweisungen.push(dl.bind(i));
+		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
+		await env.DB.batch([
+			env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (9001, 'Wunschspiel', 'wunschspiel')"),
+			env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (9001, 9001, 'PS5')"),
+			env.DB.prepare("INSERT INTO plan_entry (kind, release_id, status, origin) VALUES ('wunsch', 9001, 'offen', 'manuell')"),
+			env.DB.prepare("INSERT INTO plan_entry (kind, release_id, status, origin) VALUES ('backlog', 1, 'offen', 'manuell')"),
+			env.DB.prepare("INSERT INTO plan_entry (kind, release_id, status, origin, position) VALUES ('todo', 2, 'offen', 'manuell', 1)"),
+		]);
+
+		const plattform = await zeilenGelesen(PLATTFORM_SQL);
+		const status = await zeilenGelesen(STATUS_SQL);
+		const trophaeen = await zeilenGelesen(TROPHAEEN_SQL);
+		const listen = await zeilenGelesen(LISTEN_SQL);
+		const spiele = await zeilenGelesen(SPIELE_SQL);
+		const letztesPlatin = await zeilenGelesen(LETZTES_PLATIN_SQL);
+		const summe = plattform + status + trophaeen + listen + spiele + letztesPlatin;
+		console.info({ plattform, status, trophaeen, listen, spiele, letztesPlatin, summe });
+
+		// Groessenordnung: Die Plattformabfrage laeuft einmal ueber release und
+		// macht je Zeile fuenf Index-Lookups (Migration 0008); die uebrigen
+		// lesen eine Tabelle einmal. Nichts davon skaliert quadratisch - das
+		// waere der Fehler vom 13.09.2026. Zum Vergleich: ein Leerlauf-Aufruf
+		// des Crons liegt bei 2 241, und den gibt es 36-mal je Nacht.
+		expect(plattform).toBeLessThan(12 * ANZAHL);
+		expect(status).toBeLessThan(6 * ANZAHL);
+		expect(trophaeen).toBeLessThan(ANZAHL + 100);
+		expect(listen).toBeLessThan(500);
+		expect(letztesPlatin).toBeLessThan(2 * ANZAHL);
+		expect(summe).toBeLessThan(25 * ANZAHL);
+
+		const antwort = await SELF.fetch(`${B}/api/stats`);
+		expect(antwort.status).toBe(200);
+		const d = (await antwort.json()) as any;
+		// 430 Releases rotieren ueber vier Plattformen; das Wunschrelease
+		// zaehlt nicht mit, obwohl es in der Tabelle steht.
+		expect(d.releases).toBe(ANZAHL);
+		expect(d.plattformen.reduce((s: number, p: any) => s + p.releases, 0)).toBe(ANZAHL);
+		// Jede fuenfte Liste traegt ein erspieltes Platin, alle kennen eines.
+		expect(d.trophaeen.platinErspielt).toBe(Math.floor(ANZAHL / 5));
+		expect(d.trophaeen.platinMoeglich).toBe(ANZAHL);
+		expect(d.listen).toEqual({ backlog: 1, todo: 1 });
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM physical_copy"),
+			env.DB.prepare("DELETE FROM digital_entitlement"),
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("DELETE FROM release WHERE id = 9001"),
+			env.DB.prepare("DELETE FROM game WHERE id = 9001"),
+		]);
 	});
 
 	it("misst einen Leerlauf-Aufruf der Automatik (Stufe 18)", async () => {
