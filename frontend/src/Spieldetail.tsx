@@ -10,6 +10,7 @@ import {
   PLATTFORMEN,
   PLAY_STATUS,
   QUELLEN,
+  QUELLENKURZ,
   QUELLENTEXT,
   STATUSTEXT,
   anfrage,
@@ -611,7 +612,7 @@ function ReleaseKarte({
         />
         <BesitzKnopf
           name={digital && !gekauft ? 'psplus' : 'wolke'}
-          wort={digital ? QUELLENTEXT[digital.quelle] : 'Digital'}
+          wort={digital ? QUELLENKURZ[digital.quelle] : 'Digital'}
           // Von PSN erkannt heisst: kein Knopf. Der nächste Lauf legte die
           // Zeile ohnehin wieder an (7.7).
           gesetzt={digital !== null}
@@ -710,14 +711,16 @@ function ReleaseKarte({
 
       {r.trophaeen && <TrophaeenStufen erspielt={r.trophaeen.erspielt} definiert={r.trophaeen.definiert} />}
 
+      {/* Zwei feste Zeilen statt eines Flusses mit „·": Auf dem Handy brach
+          der Text ohnehin um, und der Umbruch lag je nach Datumslänge
+          woanders (Wunsch des Nutzers vom 27.09.2026). */}
       <p className="still fusszeile">
-        {r.trophaeen && <>zuletzt gespielt {datum(r.trophaeen.zuletztGespielt)}</>}
+        {r.trophaeen && <span className="reihe">zuletzt gespielt {datum(r.trophaeen.zuletztGespielt)}</span>}
         {spielzeitVorgesehen && (
-          <>
-            {r.trophaeen && ' · '}
+          <span className="reihe">
             Spielzeit <span className="zahl">{spielzeitText(r.spielzeit?.sekunden ?? null)}</span>
             {r.spielzeit?.anzahl ? <> in <span className="zahl">{r.spielzeit.anzahl}</span> Sitzungen</> : null}
-          </>
+          </span>
         )}
       </p>
     </section>

@@ -963,7 +963,12 @@ main {
   margin: 0 auto;
   /* Waagerecht gepolstert, senkrecht nicht: Kopfzeile und Chipleiste laufen
      bis an den Rand und holen sich die Polsterung mit negativem Rand zurueck. */
-  padding: 0 var(--a4) calc(var(--leiste-hoehe) + var(--a5));
+  /* Genau so viel, wie die Leiste unten braucht - mehr erzeugt eine Seite,
+     die scrollt, obwohl alles zu sehen ist (Rueckmeldung des Nutzers vom
+     27.09.2026). `env(safe-area-inset-bottom)` gehoert dazu: Die Leiste ist
+     so hoch, und ohne den Anteil verschwaende die Seite ihn nicht, sondern
+     legte den letzten Inhalt darunter. */
+  padding: 0 var(--a4) calc(var(--leiste-hoehe) + env(safe-area-inset-bottom) + var(--a2));
 }
 
 /* Ansichten ohne eigene Kopfzeile (Einstellungen, Scannen, Import …). */
@@ -2460,10 +2465,11 @@ table.plattformtabelle {
    ========================================================================== */
 
 /* Die Kopfzeile klebt oben; ohne eigenen Abstand sass das Cover direkt an
-   ihrer Kante (Rueckmeldung des Nutzers vom 27.09.2026). */
+   ihrer Kante (Rueckmeldung des Nutzers vom 27.09.2026). Unten polstert
+   `main` bereits fuer die Leiste - ein zweites Polster hier waren 24 px, die
+   die Seite grundlos scrollen liessen. */
 .detail {
   padding-top: var(--a4);
-  padding-bottom: var(--a5);
 }
 
 /* --- Heldenblock --- */
@@ -2563,11 +2569,20 @@ table.plattformtabelle {
   margin: 0 0 var(--a2);
 }
 
+/* Die Zeile ist eng: Kennzeichen, zwei Knoepfe und das Punktmenue teilen
+   sich 358 px. Gemessen am 27.09.2026 blieben der Wortspalte je 49 px - genau
+   so viel, wie "erfassen" braucht, und auf dem Geraet des Nutzers eines zu
+   wenig ("erfass..."). Die Abstaende sind deshalb knapper als sonst. */
 .releasekopf {
   display: flex;
   align-items: center;
-  gap: var(--a2);
+  gap: var(--a1);
   margin-bottom: var(--a3);
+}
+
+.releasekopf .ikone {
+  width: 32px;
+  height: 32px;
 }
 
 /* Das Kennzeichen ist hier die Ueberschrift der Karte, nicht eine
@@ -2591,7 +2606,7 @@ table.plattformtabelle {
 .besitzknoepfe {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--a2);
+  gap: var(--a1);
   flex: 1;
   min-width: 0;
 }
@@ -2599,8 +2614,8 @@ table.plattformtabelle {
 .besitzknopf {
   display: flex;
   align-items: center;
-  gap: var(--a2);
-  padding: 5px var(--a2);
+  gap: 6px;
+  padding: 5px 7px;
   border-radius: var(--r2);
   border: 1px solid var(--linie);
   background: var(--flaeche-hoch);
@@ -2715,8 +2730,15 @@ table.plattformtabelle {
   margin-left: auto;
 }
 
+/* Zwei feste Zeilen statt eines Flusses: "zuletzt gespielt 2.8.2026 ·
+   Spielzeit 49 h in 23 Sitzungen" brach auf dem Handy ohnehin um, und der
+   Umbruch lag je nach Datum woanders (Wunsch des Nutzers vom 27.09.2026). */
 .fusszeile {
   margin: var(--a3) 0 0;
+}
+
+.fusszeile span.reihe {
+  display: block;
 }
 
 .fusszeile .zahl {
@@ -3014,4 +3036,22 @@ details.block > div {
 .stufe.leer b {
   color: var(--text-still);
   font-weight: 500;
+}
+
+/*
+ * Unter 360 px (22,4 rem) reicht die Zeile nicht mehr: Bei 320 px bleiben den Knoepfen
+ * je 84 px, und "Disc x2" wie "erfassen" schneiden ab (gemessen 27.09.2026).
+ * Dort ruecken sie unter das Kennzeichen, statt zu kuerzen - die Reihenfolge
+ * bleibt, nur der Umbruch kommt frueher. Auf 360 und 390 px steht weiter
+ * alles in einer Zeile, wie es der Nutzer wollte.
+ */
+@media (max-width: 22.4rem) {
+  .releasekopf {
+    flex-wrap: wrap;
+  }
+
+  .besitzknoepfe {
+    flex-basis: 100%;
+    order: 1;
+  }
 }
