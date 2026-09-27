@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { Ansicht } from './Ansicht'
 import { AppSymbol, Zeichen, type ZeichenName } from './Symbole'
 
@@ -34,12 +34,20 @@ type Props = {
 	aktion?: Aktion
 	/** Das App-Symbol links vom Schriftzug – nur das Dashboard trägt es (Stufe 19a). */
 	logo?: boolean
+	/**
+	 * Ein Zurück-Pfeil links vom Titel – nur das Spieldetail trägt ihn
+	 * (Stufe 19c). Es ist die einzige Ansicht, die kein Ort der Leiste ist:
+	 * Man kommt aus der Sammlung, der Wunschliste, dem Dashboard oder dem
+	 * Scanner, und der Weg zurück ist der, den man gekommen ist.
+	 */
+	zurueck?: boolean
 	/** Ein eigenes Element vor dem Zahnrad, etwa die Glocke des Dashboards. */
 	zusatz?: React.ReactNode
 }
 
-export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz }: Props) {
+export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz, zurueck }: Props) {
 	const [params, setParams] = useSearchParams()
+	const navigate = useNavigate()
 	const gesetzt = sucheParam ? (params.get(sucheParam) ?? '') : ''
 	const [offen, setOffen] = useState(gesetzt !== '')
 	const [text, setText] = useState(gesetzt)
@@ -112,6 +120,11 @@ export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz }: 
 				</>
 			) : (
 				<>
+					{zurueck && (
+						<button type="button" className="ikone" aria-label="Zurück" title="Zurück" onClick={() => navigate(-1)}>
+							<Zeichen name="zurueck" />
+						</button>
+					)}
 					{logo && <AppSymbol />}
 					<h1>{titel}</h1>
 					{aktion &&

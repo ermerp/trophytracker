@@ -52,7 +52,7 @@ s("-- Erfundene Zeilen, erzeugt von scripts/testdaten.mjs. Nur fuer --local.");
 s("PRAGMA foreign_keys = OFF;");
 for (const tabelle of [
 	"game_event", "plan_entry", "play_status", "physical_copy", "digital_entitlement",
-	"review_queue", "trophy_progress", "psn_played_title", "release", "game",
+	"review_queue", "trophy_progress", "psn_played_title", "ean_mapping", "release", "game",
 	"psn_raw_response", "psn_sync_run", "app_setting",
 ]) {
 	s(`DELETE FROM ${tabelle};`);
@@ -139,6 +139,78 @@ EREIGNISSE.forEach(([quelle, art, feld, neu, detail], k) => {
 			`'unbekannt', ${wert(neu)}, ${wert(detail)});`,
 	);
 });
+
+/*
+ * Ein voller Fall fuer das Spieldetail (Stufe 19c).
+ *
+ * Die Schleife oben erzeugt Spiele mit genau einem Release und hoechstens
+ * einem Exemplar - das ist der Normalfall (421 der 431 Spiele), aber die
+ * Detailansicht zeigt daran nur die Haelfte ihrer Faelle. Dieses eine Spiel
+ * traegt alles auf einmal: zwei Releases, zwei Exemplare am selben Release,
+ * PS Plus neben gekauftem Download, Spielzeit nur auf der PS5, einen von der
+ * Sammlung abweichenden Rohtitel und einen Verlauf.
+ *
+ * Die Zeitstempel von PSN stehen als ISO mit `T` und `Z` - genau so schreibt
+ * sie der Sync (`text(e.lastUpdatedDateTime)`). Mit D1-Zeitstempeln im Format
+ * `2026-09-19 22:41:00` zeigte die Ansicht beim Pruefen am 27.09.2026
+ * "Invalid Date", und das sah nach einem Fehler in `datum()` aus - es war der
+ * Fehler der Testdaten.
+ */
+const R = 900;
+s(
+	"INSERT INTO game (id, title, sort_title, cover_url, igdb_id, igdb_slug, release_date, " +
+		"release_status, critic_score, critic_score_count, critic_source, igdb_matched_at, " +
+		"igdb_matched_source, igdb_checked_at) VALUES " +
+		`(${R}, 'Nebelwacht: Zweiter Kreis', 'nebelwacht zweiter kreis', NULL, 112233, ` +
+		"'nebelwacht-zweiter-kreis', '2023-11-14', 'erschienen', 86, 42, 'igdb', " +
+		"datetime('now', '-15 days'), 'automatisch', datetime('now', '-7 days'));",
+);
+s(
+	"INSERT INTO release (id, game_id, platform, physical_release_status, physical_source, " +
+		`psn_product_id) VALUES (${R}, ${R}, 'PS4', 'ja', 'igdb', 'CUSA18822_00'), ` +
+		`(${R + 1}, ${R}, 'PS5', 'unbekannt', NULL, NULL);`,
+);
+s(
+	"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, " +
+		"defined_bronze, defined_silver, defined_gold, defined_platinum, earned_bronze, " +
+		"earned_silver, earned_gold, earned_platinum, progress_pct, last_played_at, synced_at, " +
+		"release_id, matched_at, matched_source) VALUES " +
+		"('NPWR18822_00', 'trophy2', 'Nebelwacht - Zweiter Kreis', 'PS4', 38, 9, 3, 1, 31, 6, 1, 0, " +
+		`68, '2026-09-19T22:41:00Z', datetime('now'), ${R}, datetime('now', '-15 days'), 'automatisch'), ` +
+		"('NPWR18823_00', 'trophy2', 'Nebelwacht - Zweiter Kreis (Deluxe)', 'PS5', 38, 9, 3, 1, " +
+		`38, 9, 3, 1, 100, '2026-08-02T01:12:00Z', datetime('now'), ${R + 1}, ` +
+		"datetime('now', '-13 days'), 'manuell');",
+);
+s(`INSERT INTO play_status (release_id, status) VALUES (${R}, 'am_spielen'), (${R + 1}, 'komplettiert');`);
+// Zwei Exemplare am selben Release; eines mit EAN, wie sie der Scanner setzt.
+s(`INSERT INTO physical_copy (release_id, ean) VALUES (${R}, '4012345678901'), (${R}, NULL);`);
+s(`INSERT INTO ean_mapping (ean, release_id, source) VALUES ('4012345678901', ${R}, 'scan');`);
+// Kauf schlaegt PS Plus (7.7) - hier steht beides an verschiedenen Releases.
+s(
+	"INSERT INTO digital_entitlement (release_id, source, acquired_at, herkunft) VALUES " +
+		`(${R}, 'plus', NULL, 'psn'), (${R + 1}, 'kauf', '2026-07-10', 'psn');`,
+);
+// Spielzeit gibt es nur auf der PS5 - PS3 und Vita liefern grundsaetzlich keine.
+s(
+	"INSERT INTO psn_played_title (title_id, name, platform, play_duration_s, play_count, " +
+		"first_played_at, last_played_at, release_id, synced_at) VALUES " +
+		"('PPSA08822_00', 'Nebelwacht: Zweiter Kreis', 'PS5', 176400, 23, '2026-07-11T19:02:00Z', " +
+		`'2026-08-02T01:12:00Z', ${R + 1}, datetime('now'));`,
+);
+s(
+	"INSERT INTO plan_entry (kind, release_id, status, origin, is_favorite, position) VALUES " +
+		`('todo', ${R}, 'offen', 'manuell', 1, 3), ('wunsch', ${R + 1}, 'offen', 'import', 0, NULL);`,
+);
+s(
+	"INSERT INTO game_event (occurred_at, source, game_id, release_id, label, kind, field, " +
+		"old_value, new_value, detail) VALUES " +
+		`(datetime('now', '-8 days'), 'nutzer', ${R}, ${R}, 'Nebelwacht: Zweiter Kreis', ` +
+		"'bewertung_geaendert', 'status', 'pausiert', 'am_spielen', NULL), " +
+		`(datetime('now', '-7 days'), 'igdb', ${R}, ${R}, 'Nebelwacht: Zweiter Kreis', ` +
+		"'release_geaendert', 'physical_release_status', 'unbekannt', 'ja', NULL), " +
+		`(datetime('now', '-15 days'), 'igdb', ${R}, NULL, 'Nebelwacht: Zweiter Kreis', ` +
+		"'igdb_verknuepft', NULL, NULL, '112233', NULL);",
+);
 
 s(
 	"INSERT INTO psn_sync_run (started_at, finished_at, status, titles_seen, started_by) VALUES " +

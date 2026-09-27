@@ -14,7 +14,8 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19a abgenommen** (27.09.2026), **Stufe 18e gebaut und deployt** (27.09.2026, Abnahme offen)
+**Stufen bis 19a abgenommen** (27.09.2026), **Stufe 18e gebaut und deployt** (27.09.2026, Abnahme offen),
+**Stufe 19c gebaut** (27.09.2026, Abnahme offen)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -210,9 +211,38 @@ nicht – von 164 Spielen mit Platin trägt keines ein Beendet-Datum, und der
 Zeitpunkt je Trophäe kommt erst mit 19b. Der Block heißt deshalb „Zuletzt
 gespielt · mit Platin" und sagt genau das, was die Zahl hergibt.
 
-**Als Nächstes: Stufe 19b** (Einzeltrophäen je Spiel), danach 20 (AWIN-Feed)
-und 21 (PSN Store-Preise). Die PSN-Stufen ergänzen nur, was die Sammlung schon
-kennt, und importieren nichts.
+**Stufe 19c** (27.09.2026) baut das **Spieldetail** neu – die letzte oft
+besuchte Ansicht, die Stufe 19 nicht angefasst hatte. Sie trug keine
+Kopfzeile, kein Zeichen aus `SpielTeile.tsx` und ein Titelfeld, das auf dem
+Handy über den rechten Rand lief. Vor allem gab sie den meisten Platz an
+Felder, die **in keinem einzigen Fall je ausgefüllt waren**: Note, Notiz,
+Begonnen und Beendet stehen bei 0 von 431 Zeilen, Zustand, Kaufdatum und
+Kaufpreis bei 0 von 53, Edition, Region und PSN-Produkt-Id bei 0 von 489.
+Alle neun sind aus der Oberfläche verschwunden; Schema, API und Export
+bleiben unberührt.
+
+Geblieben ist, was eine Quelle füllt oder der Nutzer wirklich entscheidet: je
+Release **zwei grosse Besitzknöpfe** (gesetzt hell, fehlend gestrichelt mit
+„erfassen" und Rückfrage; von PSN Erkanntes ist Anzeige und kein Knopf), der
+Prozentwert in der Zustandsfarbe mit Balken, **der eigene Zustand dazwischen**
+und die vier Trophäenstufen absteigend in ihren Metalltönen. Alles Seltene –
+Disc-Fassung von Hand, PSN-Produkt-Id, der Rohtitel von Sony, das Entfernen
+von Besitz, die IGDB-Aktionen und beide Löschwege – liegt in zwei
+**Punktmenüs**. Am Desktop stehen die Release-Karten nebeneinander; bei nur
+einem Release, dem Fall von 421 der 431 Spiele, rückt der Verlauf daneben.
+
+Zwei Regeln sind dabei entstanden: **Trophäenstufen stehen immer absteigend**
+(Platin, Gold, Silber, Bronze) und kommen aus einer gemeinsamen Komponente –
+Prüfliste und Trophäenliste zählten bis dahin aufwärts, das Dashboard abwärts.
+Und **was eine Quelle für eine Plattform gar nicht erhebt, steht gar nicht da**
+statt „unbekannt": Spielzeit fehlt auf PS3- und Vita-Karten, weil Sony dort
+nie welche geliefert hat – das ist nicht dasselbe wie ein PS4-Release ohne
+Spielzeitzeile.
+
+**Als Nächstes: Stufe 19d** (Wunsch mit Plattform – „ohne Plattform" entfällt
+auch in Wunschliste und Import), dann **19b** (Einzeltrophäen je Spiel), danach
+20 (AWIN-Feed) und 21 (PSN Store-Preise). Die PSN-Stufen ergänzen nur, was die
+Sammlung schon kennt, und importieren nichts.
 
 **Stufe 18 ist seit dem 22.09.2026 abgenommen:** PWA installiert und offline
 geprüft, nächtliche Läufe am 20., 21. und 22.09. mit je 431 Titeln, in der Nacht

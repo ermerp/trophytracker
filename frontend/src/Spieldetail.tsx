@@ -1,47 +1,69 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { spielzeitText } from './spielzeit'
 import {
   DISCQUELLE,
   DISC_FASSUNGEN,
-  PLATINTEXT,
+  KRITIKQUELLE,
+  PLAN_ARTEN,
+  PLAN_ARTTEXT,
   PLATTFORMEN,
   PLAY_STATUS,
-  QUELLEN,
   QUELLENTEXT,
   STATUSTEXT,
-  ZUSTAENDE,
   anfrage,
   datum,
-  euro,
+  igdbLink,
+  zeitpunkt,
   type Bewertung,
   type DiscFassung,
+  type Ereignis,
+  type EreignisSeite,
   type ErfasstAntwort,
+  type IgdbKandidat,
   type Platin,
+  type PlanArt,
   type PlayStatus,
   type Plattform,
   type Quelle,
-  type Zustand,
-  KRITIKQUELLE,
-  PLAN_ARTTEXT,
-  RELEASE_STATUS_TEXT,
-  type PlanArt,
-  igdbLink,
-  neuestePlattform,
-  zeitpunkt,
-  type IgdbKandidat,
   type ReleaseStatus,
-  type Ereignis,
-  type EreignisSeite,
 } from './api'
 import { IgdbSuche, datumOderUnbekannt } from './IgdbSuche'
+import { Kopfzeile } from './Kopfzeile'
+import { Cover, PlattformChip, TrophaeenStufen, zustandsFarbe } from './SpielTeile'
+import { Zeichen } from './Symbole'
 import { Verlauf } from './Verlauf'
 
 /**
- * Spieldetail (Use Cases 1, 2, 7): Releases, Exemplare, Trophäen.
+ * Spieldetail (Use Cases 1, 2, 7), neu gebaut in Stufe 19c.
  *
- * Trophäenfortschritt und eigene Bewertung stehen nebeneinander, nie
- * verrechnet (Abschnitt 1). Preise kommen in Stufe 20/21.
+ * **Warum der Umbau:** Stufe 19 hat die Listen auf die Linie „Vitrine"
+ * gebracht, das Spieldetail blieb liegen – es trug als einzige oft besuchte
+ * Ansicht keine Kopfzeile, kein Zeichen aus `SpielTeile.tsx` und ein
+ * Titelfeld, das über den rechten Rand lief. Vor allem aber gab es den
+ * meisten Platz an Felder, die **in keinem einzigen Fall** je ausgefüllt
+ * waren: Note, Notiz, Begonnen, Beendet (0 von 431), Zustand, Kaufdatum,
+ * Kaufpreis (0 von 53), Edition, Region, PSN-Produkt-Id (0 von 489).
+ * Gemessen gegen die Produktion am 27.09.2026; die Spalten bleiben, der
+ * Export bleibt, nur die Oberfläche zeigt sie nicht mehr.
+ *
+ * Damit stehen je Release nur noch Dinge, die eine Quelle füllt oder die der
+ * Nutzer wirklich entscheidet:
+ *
+ * - **Besitz** als zwei grosse Knöpfe (Disc, digital). Was fehlt, steht
+ *   gestrichelt da und lädt zum Erfassen ein; was von PSN erkannt wurde, ist
+ *   Anzeige und kein Knopf (7.7 – was Sony sagt, korrigiert man bei Sony).
+ * - **Trophäen** von Sony: Prozent in der Zustandsfarbe, Balken, die vier
+ *   Stufen absteigend in ihren Metalltönen.
+ * - **Der eigene Zustand** dazwischen, als Punkt und Wort – er schliesst den
+ *   Prozentwert ab, statt darunter als Formular zu stehen (Wunsch des
+ *   Nutzers vom 27.09.2026).
+ *
+ * Trophäenfortschritt und eigene Bewertung stehen weiter nebeneinander und
+ * werden nie verrechnet (Abschnitt 1). Alles Seltene – Disc-Fassung von Hand,
+ * PSN-Produkt-Id, Löschen, die IGDB-Aktionen – liegt hinter einem
+ * Punktmenü: Ein Extraklick ist dort ein Gewinn, kein Verlust (Entscheidung
+ * des Nutzers vom 27.09.2026).
  */
 
 type Stufen = { bronze: number; silber: number; gold: number; platin: number }
@@ -59,7 +81,7 @@ type Trophaeen = {
 type Exemplar = {
   id: number
   ean: string | null
-  zustand: Zustand | null
+  zustand: string | null
   anleitung: boolean
   kaufdatum: string | null
   kaufpreisCents: number | null
@@ -135,13 +157,10 @@ export function Spieldetail() {
   const [meldung, setMeldung] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [igdbSuche, setIgdbSuche] = useState(false)
-  // '' heisst "ohne Plattform" - der Wunsch haengt dann am Spiel, nicht an einem
-  // Release. Mit Plattform legt der Server das Release an, falls es fehlt.
-  // null = noch nicht angefasst, dann gilt die neueste Plattform des Spiels.
-  const [wunschWahl, setWunschWahl] = useState<string | null>(null)
-  const wunschPlattform = wunschWahl ?? neuestePlattform((spiel?.releases ?? []).map((r) => r.plattform))
+  const [menue, setMenue] = useState(false)
+  const [listen, setListen] = useState(false)
 
-  // Verlauf (8.5): die letzten 20 Ereignisse, „mehr" hängt die nächste Seite an.
+  // Verlauf (8.5): die letzten 20 Ereignisse, „ältere" hängt die nächste Seite an.
   const [verlauf, setVerlauf] = useState<EreignisSeite>({ weiter: false, ereignisse: [] })
 
   const verlaufLaden = useCallback(
@@ -166,33 +185,13 @@ export function Spieldetail() {
     void laden()
   }, [laden])
 
-  /**
-   * Wunsch anlegen - am Spiel oder an einem Release. Vorbelegt ist die
-   * neueste Plattform des Spiels (Entscheidung des Nutzers vom 15.09.2026);
-   * "ohne Plattform" bleibt waehlbar und wird ausdruecklich als "" gesendet.
-   */
-  function wunschAnlegen() {
-    void tue(
-      () => anfrage('/api/plans', { methode: 'POST', koerper: { art: 'wunsch', spielId: spiel!.id, plattform: wunschPlattform } }),
-      'Auf die Wunschliste gesetzt.',
-    )
-  }
-
-  /**
-   * Eintrag entfernen. Raeumt der Worker dabei das Spiel mit ab (Waisen,
-   * Abschnitt 5: nichts als dieser Eintrag hing daran), gibt es hier nichts
-   * mehr zu zeigen - zurueck zur Sammlung statt "Spiel nicht gefunden".
-   */
-  async function vonListeEntfernen(planId: number) {
+  /** Führt einen Schreibzugriff aus und lädt danach neu. */
+  async function tue(aktion: () => Promise<unknown>, erfolg?: string) {
     setLaeuft(true)
     setMeldung(null)
     try {
-      const r = await anfrage<{ spielGeloescht: boolean }>(`/api/plans/${planId}`, { methode: 'DELETE' })
-      if (r.spielGeloescht) {
-        navigate('/sammlung')
-        return
-      }
-      setMeldung('Von der Liste entfernt.')
+      await aktion()
+      if (erfolg) setMeldung(erfolg)
       await laden()
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Fehlgeschlagen.')
@@ -201,12 +200,9 @@ export function Spieldetail() {
     }
   }
 
-  /** Offener Kaufeintrag an diesem Release (Stufe 15) - sperrt den Knopf, dieselbe Regel wie bei To-Do/Backlog. */
-  const aufKaufliste = (releaseId: number) => spiel!.plaene.some((p) => p.releaseId === releaseId && p.art === 'kauf')
-
   /**
    * Besitz erfassen (Stufe 15): Der Worker erledigt dabei offene Kauf- und
-   * Wunscheintraege am Release und am Spiel (Abschnitt 5); die Meldung sagt es.
+   * Wunscheinträge am Release und am Spiel (Abschnitt 5); die Meldung sagt es.
    */
   function erfassen(aktion: () => Promise<ErfasstAntwort>, erfolg: string) {
     return tue(async () => {
@@ -221,33 +217,21 @@ export function Spieldetail() {
     })
   }
 
-  /** Offener To-Do- oder Backlog-Eintrag an diesem Release (Stufe 12). */
-  function listenEintrag(releaseId: number) {
-    return spiel!.plaene.find((p) => p.releaseId === releaseId && (p.art === 'todo' || p.art === 'backlog'))
-  }
-  const aufListe = (releaseId: number) => listenEintrag(releaseId) !== undefined
-
-  function listeAnlegen(art: 'todo' | 'backlog', releaseId: number) {
-    void tue(
-      () => anfrage('/api/plans', { methode: 'POST', koerper: { art, releaseId } }),
-      art === 'todo' ? 'Auf To-Do gesetzt.' : 'Ins Backlog gesetzt.',
-    )
-  }
-
-  /** Gibt es schon einen offenen Wunsch fuer diese Wahl? Dann ist der Knopf aus. */
-  function wunschVorhanden() {
-    return spiel!.plaene.some(
-      (p) => p.art === 'wunsch' && (wunschPlattform === '' ? p.releaseId === null : p.plattform === wunschPlattform),
-    )
-  }
-
-  /** Führt einen Schreibzugriff aus und lädt danach neu. */
-  async function tue(aktion: () => Promise<unknown>, erfolg?: string) {
+  /**
+   * Eintrag entfernen. Räumt der Worker dabei das Spiel mit ab (Waisen,
+   * Abschnitt 5: nichts als dieser Eintrag hing daran), gibt es hier nichts
+   * mehr zu zeigen – zurück zur Sammlung statt „Spiel nicht gefunden".
+   */
+  async function vonListeEntfernen(planId: number) {
     setLaeuft(true)
     setMeldung(null)
     try {
-      await aktion()
-      if (erfolg) setMeldung(erfolg)
+      const r = await anfrage<{ spielGeloescht: boolean }>(`/api/plans/${planId}`, { methode: 'DELETE' })
+      if (r.spielGeloescht) {
+        navigate('/sammlung')
+        return
+      }
+      setMeldung('Von der Liste entfernt.')
       await laden()
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Fehlgeschlagen.')
@@ -340,624 +324,788 @@ export function Spieldetail() {
   if (!spiel) return <p>wird geladen …</p>
 
   const freiePlattformen = PLATTFORMEN.filter((p) => !spiel.releases.some((r) => r.plattform === p))
+  const jahr = spiel.erscheinungsdatum?.slice(0, 4) ?? null
 
   return (
     <>
-      <p><button type="button" onClick={() => navigate(-1)}>← Zurück</button></p>
-
-      <header className="detailkopf">
-        {spiel.bild && <img src={spiel.bild} alt="" className={spiel.igdb.id !== null ? 'cover' : undefined} width={96} height={96} />}
-        <div>
-          <input
-            type="text"
-            className="titelfeld"
-            defaultValue={spiel.titel}
-            key={spiel.titel}
-            aria-label="Titel"
-            onBlur={(e) => {
-              const t = e.target.value.trim()
-              if (t) void umbenennen(t)
-              else e.target.value = spiel.titel
-            }}
-          />
-          <p className="zeile">{spiel.releases.length} Release(s)</p>
-        </div>
-      </header>
-
-      {meldung && <p role="status">{meldung}</p>}
-
-      <section className="igdb-block">
-        <h2>IGDB</h2>
-        {spiel.igdb.id !== null ? (
-          <>
-            <table>
-              <tbody>
-                <tr>
-                  <td>Kritikerwertung</td>
-                  <td>
-                    {spiel.kritik
-                      ? `${spiel.kritik.wert} von 100 (${spiel.kritik.anzahl ?? '?'} Wertungen, ${KRITIKQUELLE[spiel.kritik.quelle ?? ''] ?? 'Quelle unbekannt'})`
-                      : 'unbekannt'}
-                  </td>
-                </tr>
-                <tr>
-                  <td>Erscheinungsdatum</td>
-                  <td>
-                    {datumOderUnbekannt(spiel.erscheinungsdatum)}
-                    {spiel.releaseStatus !== 'unbekannt' && ` · ${RELEASE_STATUS_TEXT[spiel.releaseStatus]}`}
-                  </td>
-                </tr>
-                <tr>
-                  <td>Verknüpfung</td>
-                  <td>
-                    {spiel.igdb.quelle === 'automatisch' ? 'automatisch' : 'von Hand'}
-                    {spiel.igdb.verknuepftAm && ` am ${zeitpunkt(spiel.igdb.verknuepftAm)}`}
-                    {igdbLink(spiel.igdb.slug) && (
-                      <>
-                        {' · '}
-                        <a href={igdbLink(spiel.igdb.slug)!} target="_blank" rel="noreferrer">bei IGDB ansehen</a>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div className="knopfzeile">
-              <button type="button" className="klein" onClick={() => setIgdbSuche(!igdbSuche)} disabled={laeuft}>
-                {igdbSuche ? 'Suche schließen' : 'Anderen Eintrag wählen'}
-              </button>
-              <button type="button" className="klein" onClick={igdbLoesen} disabled={laeuft}>
-                Verknüpfung lösen
-              </button>
-            </div>
-          </>
-        ) : spiel.igdb.abgelehntAm ? (
-          <>
-            <p className="zeile">Als „gibt es bei IGDB nicht" gespeichert ({zeitpunkt(spiel.igdb.abgelehntAm)}).</p>
-            <button type="button" className="klein" onClick={igdbDochSuchen} disabled={laeuft}>
-              Doch suchen
+      <Kopfzeile
+        titel={spiel.titel}
+        zurueck
+        zusatz={
+          <span className="menueanker">
+            <button
+              type="button"
+              className="ikone"
+              aria-label="Mehr zum Spiel"
+              aria-expanded={menue}
+              onClick={() => setMenue(!menue)}
+            >
+              <Zeichen name="mehr" />
             </button>
-          </>
-        ) : (
-          <>
-            <p className="zeile">
-              {spiel.igdb.gesuchtAm ? (
-                <>Ohne eindeutigen Treffer – Kandidaten stehen in der <Link to="/igdb">IGDB-Zuordnung</Link>, oder hier suchen.</>
+          </span>
+        }
+      />
+
+      {menue && (
+        <SpielMenue
+          spiel={spiel}
+          laeuft={laeuft}
+          freiePlattformen={freiePlattformen}
+          schliessen={() => setMenue(false)}
+          onRelease={(p) =>
+            tue(() => anfrage('/api/releases', { methode: 'POST', koerper: { spielId: spiel.id, plattform: p } }), `${p}-Release angelegt.`)
+          }
+          onSuche={() => setIgdbSuche(!igdbSuche)}
+          sucheOffen={igdbSuche}
+          onLoesen={igdbLoesen}
+          onAblehnen={igdbAblehnen}
+          onDochSuchen={igdbDochSuchen}
+          onSpielLoeschen={spielLoeschen}
+        />
+      )}
+
+      <div className="detail">
+        <header className="held">
+          <Cover bild={spiel.bild} cover={spiel.igdb.id !== null} titel={spiel.titel} />
+          <div className="heldtext">
+            <TitelFeld titel={spiel.titel} laeuft={laeuft} onSpeichern={umbenennen} />
+
+            <p className="herkunft">
+              {spiel.kritik ? (
+                <>
+                  <b className="zahl">{spiel.kritik.wert}</b>
+                  <span className="still">/100</span>
+                </>
               ) : (
-                <>Noch nicht bei IGDB gesucht. Der Abgleich läuft in den <Link to="/einstellungen">Einstellungen</Link>, oder hier suchen.</>
+                <span className="still">Wertung unbekannt</span>
+              )}
+              {jahr && <> · <span className="zahl">{jahr}</span></>}
+              {spiel.releaseStatus === 'angekuendigt' && <> · angekündigt</>}
+              {' · '}
+              {igdbLink(spiel.igdb.slug) ? (
+                <a href={igdbLink(spiel.igdb.slug)!} target="_blank" rel="noreferrer">IGDB</a>
+              ) : (
+                <span className="still">ohne IGDB-Eintrag</span>
               )}
             </p>
-            <div className="knopfzeile">
-              <button type="button" className="klein" onClick={() => setIgdbSuche(!igdbSuche)} disabled={laeuft}>
-                {igdbSuche ? 'Suche schließen' : 'Bei IGDB suchen'}
-              </button>
-              <button type="button" className="klein" onClick={igdbAblehnen} disabled={laeuft}>
-                Gibt es bei IGDB nicht
-              </button>
-            </div>
-          </>
-        )}
-        {igdbSuche && <IgdbSuche vorgabe={spiel.titel} plattformen={spiel.releases.map((r) => r.plattform)} onWahl={igdbWaehlen} laeuft={laeuft} />}
-      </section>
 
-      <section className="wunsch-block">
-        <h2>Listen</h2>
-        {spiel.plaene.length > 0 && (
-          <ul className="besitz">
-            {spiel.plaene.map((p) => (
-              <li key={p.id} className="pille">
-                {p.art === 'wunsch' ? '' : `${PLAN_ARTTEXT[p.art]} · `}
-                {p.plattform ?? 'ohne Plattform'}
-                <button
-                  type="button"
-                  aria-pressed={p.favorit}
-                  title={p.favorit ? 'Favorit – klicken zum Entfernen' : 'Als Favorit markieren'}
-                  disabled={laeuft}
-                  onClick={() => tue(() => anfrage(`/api/plans/${p.id}`, { methode: 'PATCH', koerper: { favorit: !p.favorit } }))}
-                >
-                  {p.favorit ? '★' : '☆'}
-                </button>
-                <button
-                  type="button"
-                  title="Von der Liste entfernen"
-                  aria-label="Von der Liste entfernen"
-                  disabled={laeuft}
-                  onClick={() => vonListeEntfernen(p.id)}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="knopfzeile">
-          <label>
-            Plattform{' '}
-            <select value={wunschPlattform} onChange={(e) => setWunschWahl(e.target.value)} disabled={laeuft}>
-              <option value="">ohne Plattform</option>
-              {PLATTFORMEN.map((p) => (
-                <option key={p} value={p}>
-                  {p}{spiel.releases.some((r) => r.plattform === p) ? '' : ' (neues Release)'}
-                </option>
+            <div className="pillen">
+              {spiel.plaene.map((p) => (
+                <span key={p.id} className={p.favorit ? 'pille gold' : 'pille'}>
+                  {p.favorit && (
+                    <span className="zeichen" style={{ color: 'var(--gold)' }}>
+                      <Zeichen name="stern" groesse={12} gefuellt strich={1.5} />
+                    </span>
+                  )}
+                  {PLAN_ARTTEXT[p.art]}
+                  {p.plattform && <> · {p.plattform === 'PSVITA' ? 'Vita' : p.plattform}</>}
+                  <button
+                    type="button"
+                    title="Von der Liste entfernen"
+                    aria-label={`${PLAN_ARTTEXT[p.art]} entfernen`}
+                    disabled={laeuft}
+                    onClick={() => vonListeEntfernen(p.id)}
+                  >
+                    ×
+                  </button>
+                </span>
               ))}
-            </select>
-          </label>
-          <button type="button" className="klein" disabled={laeuft || wunschVorhanden()} onClick={wunschAnlegen}>
-            Auf die Wunschliste
-          </button>
-          <Link to="/wunschliste" className="zeile">zur Wunschliste</Link>
-        </div>
-        {spiel.releases.length > 0 && (
-          <div className="knopfzeile">
-            {/* To-Do und Backlog haengen am Release (Stufe 12) und sind mit der Bewertung gekoppelt (5.5): To-Do heisst am Spielen, Backlog pausiert. Ein offener Eintrag sperrt beide Knoepfe, wie in der Triage (8.1). */}
-            {spiel.releases.map((r) => (
-              <span key={r.id} className="pille">
-                {r.plattform}
-                <button type="button" disabled={laeuft || aufListe(r.id)} onClick={() => listeAnlegen('todo', r.id)}>Auf To-Do</button>
-                <button type="button" disabled={laeuft || aufListe(r.id)} onClick={() => listeAnlegen('backlog', r.id)}>Ins Backlog</button>
-                <button
-                  type="button"
-                  disabled={laeuft || aufKaufliste(r.id)}
-                  onClick={() => tue(() => anfrage('/api/plans', { methode: 'POST', koerper: { art: 'kauf', releaseId: r.id } }), 'Auf die Kaufliste gesetzt.')}
-                >
-                  Auf die Kaufliste
-                </button>
-              </span>
-            ))}
-            <span className="zeile">To-Do heißt „am Spielen", Backlog „pausiert".</span>{' '}
-            <Link to="/todo" className="zeile">zu To-Do und Backlog</Link>{' '}
-            <Link to="/kaufliste" className="zeile">zur Kaufliste</Link>
-          </div>
-        )}
-      </section>
-
-      {spiel.releases.map((r) => (
-        <section key={r.id} className="release-block">
-          <h2>
-            {r.plattform}
-            {r.edition && ` · ${r.edition}`}
-            {r.region && ` · ${r.region}`}
-          </h2>
-
-          {/* Disc-Fassung (Stufe 14): ja/nein von Hand traegt Quelle 'manuell' und wird von IGDB und Feed nie ueberschrieben; 'unbekannt' nimmt das Urteil zurueck. */}
-          <p className="zeile disc-zeile">
-            <label>
-              Disc-Fassung:{' '}
-              <select
-                value={r.discFassung}
-                disabled={laeuft}
-                onChange={(ev) =>
-                  tue(() => anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { discFassung: ev.target.value } }), 'Disc-Fassung gespeichert.')
-                }
-              >
-                {DISC_FASSUNGEN.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </label>
-            {r.discQuelle && ` (${DISCQUELLE[r.discQuelle] ?? r.discQuelle})`}
-            {r.discFassung === 'ja' && !r.exemplare.length && r.trophaeen && r.trophaeen.fortschritt > 0 && (
-              <>
-                {' '}· <Link to="/luecken">Lücke</Link>
-              </>
-            )}
-          </p>
-          <PsnProduktId key={r.psnProductId ?? ''} release={r} laeuft={laeuft} onSpeichern={(wert) => tue(() => anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { psnProductId: wert } }), 'PSN-Produkt-Id gespeichert.')} />
-
-          <div className="nebeneinander">
-            <div>
-              <h3>Trophäen (Sony)</h3>
-              {r.trophaeen ? (
-                <p>
-                  <strong>{r.trophaeen.fortschritt} %</strong> ·{' '}
-                  <span className={`platin ${r.trophaeen.platin}`}>{PLATINTEXT[r.trophaeen.platin]}</span>
-                  <span className="zeile">
-                    {' '}· {r.trophaeen.erspielt.bronze}/{r.trophaeen.definiert.bronze} Bronze ·{' '}
-                    {r.trophaeen.erspielt.silber}/{r.trophaeen.definiert.silber} Silber ·{' '}
-                    {r.trophaeen.erspielt.gold}/{r.trophaeen.definiert.gold} Gold · zuletzt{' '}
-                    {datum(r.trophaeen.zuletztGespielt)}
-                    {r.trophaeen.rohTitel !== spiel.titel && ` · bei Sony: „${r.trophaeen.rohTitel}"`}
-                  </span>
-                </p>
-              ) : (
-                <p className="zeile">keine Trophäenliste</p>
-              )}
-              {/* Spielzeit aus PSN (7.7). Ohne Daten steht hier „unbekannt" –
-                  bei PS3 und Vita dauerhaft, denn Sony erfasst sie erst seit
-                  der PS4. Niemals „0 h" (Abschnitt 3). */}
-              <p className="zeile">
-                Spielzeit: <strong>{spielzeitText(r.spielzeit?.sekunden ?? null)}</strong>
-                {r.spielzeit?.anzahl ? ` · ${r.spielzeit.anzahl}-mal gestartet` : ''}
-                {r.spielzeit?.letztesSpielAm ? ` · zuletzt ${datum(r.spielzeit.letztesSpielAm)}` : ''}
-                {r.spielzeit === null && (r.plattform === 'PS3' || r.plattform === 'PSVITA')
-                  ? ' (PSN liefert für PS3 und Vita keine)'
-                  : ''}
-              </p>
+              <button type="button" className="knopf leiser" disabled={laeuft} onClick={() => setListen(!listen)}>
+                + Auf eine Liste
+              </button>
             </div>
-            <div>
-              <h3>Eigene Bewertung</h3>
-              <BewertungForm
-                bewertung={r.bewertung}
+
+            {listen && (
+              <ListenTafel
+                spiel={spiel}
                 laeuft={laeuft}
-                onSpeichern={(felder) =>
-                  tue(() => anfrage(`/api/releases/${r.id}/play-status`, { methode: 'PUT', koerper: felder }), 'Bewertung gespeichert.')
+                schliessen={() => setListen(false)}
+                onSetzen={(art, releaseId) =>
+                  tue(
+                    () => anfrage('/api/plans', { methode: 'POST', koerper: { art, releaseId } }),
+                    `Auf ${PLAN_ARTTEXT[art]} gesetzt.`,
+                  )
                 }
               />
-            </div>
+            )}
           </div>
+        </header>
 
-          <h3>Exemplare</h3>
-          {r.exemplare.length === 0 && <p className="zeile">keine</p>}
-          {r.exemplare.map((e) => (
-            <ExemplarZeile
-              key={e.id}
-              exemplar={e}
+        {meldung && <p role="status" className="meldung">{meldung}</p>}
+
+        {igdbSuche && (
+          <section className="karte">
+            <h2>IGDB-Eintrag wählen</h2>
+            <IgdbSuche vorgabe={spiel.titel} plattformen={spiel.releases.map((r) => r.plattform)} onWahl={igdbWaehlen} laeuft={laeuft} />
+          </section>
+        )}
+
+        {spiel.igdb.id === null && !igdbSuche && (
+          <p className="hinweiszeile">
+            {spiel.igdb.abgelehntAm ? (
+              <>Als „gibt es bei IGDB nicht" gespeichert ({zeitpunkt(spiel.igdb.abgelehntAm)}).</>
+            ) : spiel.igdb.gesuchtAm ? (
+              <>Ohne eindeutigen IGDB-Treffer – Kandidaten stehen in der <Link to="/igdb">IGDB-Zuordnung</Link>.</>
+            ) : (
+              <>Noch nicht bei IGDB gesucht. Der Abgleich läuft in den <Link to="/einstellungen">Einstellungen</Link>.</>
+            )}
+          </p>
+        )}
+
+        <div className="releasespalten">
+          {spiel.releases.map((r) => (
+            <ReleaseKarte
+              key={r.id}
+              release={r}
+              spiel={spiel}
               laeuft={laeuft}
-              onSpeichern={(felder) =>
-                tue(() => anfrage(`/api/physical-copies/${e.id}`, { methode: 'PATCH', koerper: felder }), 'Exemplar gespeichert.')
-              }
-              onLoeschen={() => {
-                if (confirm('Dieses Exemplar löschen?')) {
-                  void tue(() => anfrage(`/api/physical-copies/${e.id}`, { methode: 'DELETE' }), 'Exemplar gelöscht.')
-                }
-              }}
+              tue={tue}
+              erfassen={erfassen}
+              onLoeschen={() => releaseLoeschen(r)}
             />
           ))}
-          <p>
-            <button
-              type="button"
-              disabled={laeuft}
-              onClick={() =>
-                erfassen(() => anfrage<ErfasstAntwort>('/api/physical-copies', { methode: 'POST', koerper: { releaseId: r.id } }), 'Exemplar angelegt.')
-              }
-            >
-              + Exemplar
-            </button>
-          </p>
 
-          <h3>Digital</h3>
-          {r.digital.length === 0 && <p className="zeile">keine</p>}
-          {r.digital.length > 0 && (
-            <ul className="digital">
-              {r.digital.map((d) => (
-                <li key={d.id}>
-                  {QUELLENTEXT[d.quelle]}
-                  {d.erworbenAm && <span className="zeile"> · erworben {datum(d.erworbenAm)}</span>}
-                  {d.herkunft === 'psn' ? (
-                    // Von PSN erkannt: kein Löschkreuz. Der nächste Lauf legte
-                    // die Zeile ohnehin wieder an – was Sony sagt, korrigiert
-                    // man bei Sony (7.7).
-                    <span className="zeile"> · von PSN erkannt</span>
-                  ) : (
-                    <>
-                      {' '}
-                      <button
-                        type="button"
-                        className="klein"
-                        disabled={laeuft}
-                        aria-label={`${QUELLENTEXT[d.quelle]} entfernen`}
-                        onClick={() => {
-                          if (confirm(`„${QUELLENTEXT[d.quelle]}" entfernen?`)) {
-                            void tue(() => anfrage(`/api/digital-entitlements/${d.id}`, { methode: 'DELETE' }), 'Entfernt.')
-                          }
-                        }}
-                      >
-                        ×
-                      </button>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          <DigitalAnlegen
-            belegt={r.digital.map((d) => d.quelle)}
-            laeuft={laeuft}
-            onAnlegen={(quelle, erworbenAm) =>
-              erfassen(
-                () => anfrage<ErfasstAntwort>('/api/digital-entitlements', { methode: 'POST', koerper: { releaseId: r.id, quelle, erworbenAm } }),
-                `„${QUELLENTEXT[quelle]}" angelegt.`,
-              )
-            }
-          />
-
-          <p>
-            <button type="button" className="gefaehrlich" disabled={laeuft} onClick={() => releaseLoeschen(r)}>
-              Release löschen
-            </button>
-          </p>
-        </section>
-      ))}
-
-      <section className="verlauf-block">
-        <h2>Verlauf</h2>
-        {verlauf.ereignisse.length === 0 ? (
-          <p className="zeile">Noch nichts protokolliert – der Verlauf beginnt mit Stufe 16.</p>
-        ) : (
-          <Verlauf ereignisse={verlauf.ereignisse} mitTitel={false} />
-        )}
-        {verlauf.weiter && (
-          <p>
-            <button type="button" className="klein" disabled={laeuft} onClick={() => void verlaufLaden(letztesEreignis(verlauf.ereignisse))}>
-              ältere anzeigen
-            </button>
-          </p>
-        )}
-      </section>
-
-      <section>
-        <h2>Spiel</h2>
-        {freiePlattformen.length > 0 && (
-          <p className="steuerung">
-            <select id="neue-plattform" aria-label="Plattform für neues Release" defaultValue={freiePlattformen[0]}>
-              {freiePlattformen.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>{' '}
-            <button
-              type="button"
-              disabled={laeuft}
-              onClick={() => {
-                const wahl = (document.getElementById('neue-plattform') as HTMLSelectElement).value
-                void tue(
-                  () => anfrage('/api/releases', { methode: 'POST', koerper: { spielId: spiel.id, plattform: wahl } }),
-                  `${wahl}-Release angelegt.`,
-                )
-              }}
-            >
-              + Release
-            </button>
-          </p>
-        )}
-        <p>
-          <button type="button" className="gefaehrlich" disabled={laeuft} onClick={spielLoeschen}>
-            Spiel löschen
-          </button>
-        </p>
-      </section>
+          <section className="karte">
+            <details className="block">
+              <summary>
+                Verlauf <span className="wert">{verlauf.ereignisse.length > 0 ? `${verlauf.ereignisse.length} Ereignisse` : 'nichts'}</span>
+              </summary>
+              <div>
+                {verlauf.ereignisse.length === 0 ? (
+                  <p className="still">Noch nichts protokolliert – der Verlauf beginnt mit Stufe 16.</p>
+                ) : (
+                  <Verlauf ereignisse={verlauf.ereignisse} mitTitel={false} />
+                )}
+                {verlauf.weiter && (
+                  <p>
+                    <button type="button" className="knopf leiser" disabled={laeuft} onClick={() => void verlaufLaden(letztesEreignis(verlauf.ereignisse))}>
+                      ältere anzeigen
+                    </button>
+                  </p>
+                )}
+              </div>
+            </details>
+          </section>
+        </div>
+      </div>
     </>
   )
 }
 
 const letztesEreignis = (liste: Ereignis[]): number | null => liste[liste.length - 1]?.id ?? null
 
-type ExemplarFelder = {
-  ean?: string | null
-  zustand?: Zustand | null
-  anleitung?: boolean
-  kaufdatum?: string | null
-  kaufpreisCents?: number | null
-  notiz?: string | null
-}
-
-/** Ein Exemplar, inline bearbeitbar. Preis wird in Euro eingegeben und in Cent gesendet. */
-function ExemplarZeile({
-  exemplar: e,
-  laeuft,
-  onSpeichern,
-  onLoeschen,
-}: {
-  exemplar: Exemplar
-  laeuft: boolean
-  onSpeichern: (felder: ExemplarFelder) => Promise<void>
-  onLoeschen: () => void
-}) {
-  const [bearbeitet, setBearbeitet] = useState(false)
-  const [zustand, setZustand] = useState<Zustand | ''>(e.zustand ?? '')
-  const [anleitung, setAnleitung] = useState(e.anleitung)
-  const [kaufdatum, setKaufdatum] = useState(e.kaufdatum ?? '')
-  const [preis, setPreis] = useState(e.kaufpreisCents === null ? '' : (e.kaufpreisCents / 100).toFixed(2))
-  const [ean, setEan] = useState(e.ean ?? '')
-  const [notiz, setNotiz] = useState(e.notiz ?? '')
-
-  async function speichern(ev: React.FormEvent) {
-    ev.preventDefault()
-    const cents = preis.trim() === '' ? null : Math.round(Number(preis.replace(',', '.')) * 100)
-    if (cents !== null && (!Number.isFinite(cents) || cents < 0)) return
-    await onSpeichern({
-      zustand: zustand || null,
-      anleitung,
-      kaufdatum: kaufdatum || null,
-      kaufpreisCents: cents,
-      ean: ean.trim() || null,
-      notiz: notiz.trim() || null,
-    })
-    setBearbeitet(false)
-  }
-
-  if (!bearbeitet) {
-    return (
-      <p className="exemplar">
-        {e.zustand ?? 'Zustand unbekannt'}
-        {e.anleitung && ' · mit Anleitung'}
-        {' · gekauft '}{datum(e.kaufdatum)}
-        {' · '}{euro(e.kaufpreisCents)}
-        {e.ean && ` · EAN ${e.ean}`}
-        {e.notiz && <span className="zeile"> · {e.notiz}</span>}{' '}
-        <button type="button" className="klein" disabled={laeuft} onClick={() => setBearbeitet(true)}>Bearbeiten</button>{' '}
-        <button type="button" className="klein" disabled={laeuft} onClick={onLoeschen} aria-label="Exemplar löschen">×</button>
-      </p>
-    )
-  }
-
-  return (
-    <form className="exemplar-form" onSubmit={speichern}>
-      <label>
-        Zustand{' '}
-        <select value={zustand} onChange={(ev) => setZustand(ev.target.value as Zustand | '')}>
-          <option value="">unbekannt</option>
-          {ZUSTAENDE.map((z) => <option key={z} value={z}>{z}</option>)}
-        </select>
-      </label>
-      <label>
-        <input type="checkbox" checked={anleitung} onChange={(ev) => setAnleitung(ev.target.checked)} /> mit Anleitung
-      </label>
-      <label>
-        Kaufdatum <input type="date" value={kaufdatum} onChange={(ev) => setKaufdatum(ev.target.value)} />
-      </label>
-      <label>
-        Preis (€) <input type="text" inputMode="decimal" value={preis} onChange={(ev) => setPreis(ev.target.value)} placeholder="unbekannt" />
-      </label>
-      <label>
-        EAN <input type="text" inputMode="numeric" value={ean} onChange={(ev) => setEan(ev.target.value)} pattern="[0-9]{8,14}" />
-      </label>
-      <label>
-        Notiz <input type="text" value={notiz} onChange={(ev) => setNotiz(ev.target.value)} />
-      </label>
-      <p>
-        <button type="submit" disabled={laeuft}>Speichern</button>{' '}
-        <button type="button" onClick={() => setBearbeitet(false)}>Abbrechen</button>
-      </p>
-    </form>
-  )
-}
-
-function DigitalAnlegen({
-  belegt,
-  laeuft,
-  onAnlegen,
-}: {
-  belegt: Quelle[]
-  laeuft: boolean
-  onAnlegen: (quelle: Quelle, erworbenAm: string | null) => Promise<void>
-}) {
-  const frei = QUELLEN.filter((q) => !belegt.includes(q))
-  const [quelle, setQuelle] = useState<Quelle | ''>('')
-  const [erworbenAm, setErworbenAm] = useState('')
-
-  if (frei.length === 0) return null
-  const wahl = quelle && frei.includes(quelle) ? quelle : frei[0]
-
-  return (
-    <p className="steuerung">
-      <select value={wahl} onChange={(ev) => setQuelle(ev.target.value as Quelle)} aria-label="Digitale Quelle">
-        {frei.map((q) => <option key={q} value={q}>{QUELLENTEXT[q]}</option>)}
-      </select>{' '}
-      <input type="date" value={erworbenAm} onChange={(ev) => setErworbenAm(ev.target.value)} aria-label="erworben am" />{' '}
-      <button
-        type="button"
-        disabled={laeuft}
-        onClick={async () => {
-          await onAnlegen(wahl, erworbenAm || null)
-          setErworbenAm('')
-        }}
-      >
-        + digital
-      </button>
-    </p>
-  )
-}
-
-type BewertungFelder = {
-  status: PlayStatus
-  begonnenAm: string | null
-  beendetAm: string | null
-  bewertung: number | null
-  notiz: string | null
-}
-
 /**
- * Eigene Bewertung je Release. Steht neben den Trophäen, nie darin
- * verrechnet: Der Fortschritt kommt von Sony, der Status von dir.
+ * Der Titel als Überschrift, mit einem Stift daneben.
+ *
+ * Bis Stufe 19c stand hier ein dauerhaft offenes `<input>`, das bei 390 px
+ * über den rechten Rand lief – „Nebelwacht: Zweite…" war abgeschnitten
+ * (gesehen im Bild vom 27.09.2026). Eine Überschrift bricht um, und das
+ * Umbenennen wird eine bewusste Handlung statt eines Formulars, das immer
+ * offensteht (Entscheidung des Nutzers vom 27.09.2026).
  */
-function BewertungForm({
-  bewertung: b,
-  laeuft,
-  onSpeichern,
-}: {
-  bewertung: Bewertung | null
-  laeuft: boolean
-  onSpeichern: (felder: BewertungFelder) => Promise<void>
-}) {
+function TitelFeld({ titel, laeuft, onSpeichern }: { titel: string; laeuft: boolean; onSpeichern: (t: string) => void }) {
   const [offen, setOffen] = useState(false)
-  const [status, setStatus] = useState<PlayStatus>(b?.status ?? 'nicht_gespielt')
-  const [begonnenAm, setBegonnenAm] = useState(b?.begonnenAm ?? '')
-  const [beendetAm, setBeendetAm] = useState(b?.beendetAm ?? '')
-  const [wertung, setWertung] = useState(b?.bewertung === null || b === null ? '' : String(b.bewertung))
-  const [notiz, setNotiz] = useState(b?.notiz ?? '')
-
-  async function speichern(ev: React.FormEvent) {
-    ev.preventDefault()
-    await onSpeichern({
-      status,
-      begonnenAm: begonnenAm || null,
-      beendetAm: beendetAm || null,
-      bewertung: wertung === '' ? null : Number(wertung),
-      notiz: notiz.trim() || null,
-    })
-    setOffen(false)
-  }
+  const feld = useRef<HTMLInputElement>(null)
 
   if (!offen) {
     return (
-      <p>
-        {b ? (
-          <>
-            <strong>{STATUSTEXT[b.status]}</strong>
-            <span className="zeile">
-              {b.bewertung !== null && ` · ${b.bewertung}/10`}
-              {b.begonnenAm && ` · begonnen ${datum(b.begonnenAm)}`}
-              {b.beendetAm && ` · beendet ${datum(b.beendetAm)}`}
-              {b.notiz && ` · ${b.notiz}`}
-            </span>
-          </>
-        ) : (
-          <span className="zeile">kein Status</span>
-        )}{' '}
-        <button type="button" className="klein" disabled={laeuft} onClick={() => setOffen(true)}>
-          {b ? 'Ändern' : 'Setzen'}
+      <h1 className="spieltitel">
+        {titel}
+        <button type="button" className="stift" aria-label="Titel ändern" disabled={laeuft} onClick={() => setOffen(true)}>
+          <Zeichen name="stift" groesse={16} />
         </button>
-      </p>
+      </h1>
     )
   }
-
   return (
-    <form className="bewertung-form" onSubmit={speichern}>
-      <label>
-        Status{' '}
-        <select value={status} onChange={(ev) => setStatus(ev.target.value as PlayStatus)}>
-          {PLAY_STATUS.map((w) => <option key={w} value={w}>{STATUSTEXT[w]}</option>)}
-        </select>
-      </label>
-      <label>
-        Bewertung{' '}
-        <select value={wertung} onChange={(ev) => setWertung(ev.target.value)}>
-          <option value="">keine</option>
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}/10</option>)}
-        </select>
-      </label>
-      <label>
-        Begonnen <input type="date" value={begonnenAm} onChange={(ev) => setBegonnenAm(ev.target.value)} />
-      </label>
-      <label>
-        Beendet <input type="date" value={beendetAm} onChange={(ev) => setBeendetAm(ev.target.value)} />
-      </label>
-      <label>
-        Notiz <input type="text" value={notiz} onChange={(ev) => setNotiz(ev.target.value)} />
-      </label>
-      <p>
-        <button type="submit" disabled={laeuft}>Speichern</button>{' '}
-        <button type="button" onClick={() => setOffen(false)}>Abbrechen</button>
-      </p>
+    <form
+      className="titelform"
+      onSubmit={(e) => {
+        e.preventDefault()
+        const t = feld.current?.value.trim()
+        if (t) onSpeichern(t)
+        setOffen(false)
+      }}
+    >
+      <label htmlFor="spieltitel" className="nur-vorlesen">Titel</label>
+      <input id="spieltitel" ref={feld} type="text" defaultValue={titel} autoFocus onKeyDown={(e) => e.key === 'Escape' && setOffen(false)} />
+      <button type="submit" className="knopf" disabled={laeuft}>Speichern</button>
+      <button type="button" className="knopf leiser" onClick={() => setOffen(false)}>Abbrechen</button>
     </form>
   )
 }
 
 /**
- * PSN-Produkt-Id je Release (Abschnitt 3, seit Stufe 14 pflegbar) - fuer die
- * Store-Preisabfrage in Stufe 21. Leer heisst unbekannt, nie vorbelegt.
+ * Eine Release-Karte: Besitz, Trophäen, Zustand.
+ *
+ * Die Reihenfolge ist die Entscheidung des Nutzers vom 27.09.2026 – erst der
+ * Prozentwert mit Balken, dann der eigene Zustand, dann die Stufen. So
+ * schliesst der Zustand den Fortschritt ab und leitet zu dem über, was ab
+ * Stufe 19b darunter aufklappt: die einzelnen Trophäen.
  */
-function PsnProduktId({ release, laeuft, onSpeichern }: { release: Release; laeuft: boolean; onSpeichern: (wert: string) => Promise<void> }) {
-  // Der key am Aufruf setzt das Feld nach dem Speichern neu auf.
-  const [wert, setWert] = useState(release.psnProductId ?? '')
-  const geaendert = wert.trim() !== (release.psnProductId ?? '')
+function ReleaseKarte({
+  release: r,
+  spiel,
+  laeuft,
+  tue,
+  erfassen,
+  onLoeschen,
+}: {
+  release: Release
+  spiel: Spiel
+  laeuft: boolean
+  tue: (aktion: () => Promise<unknown>, erfolg?: string) => Promise<void>
+  erfassen: (aktion: () => Promise<ErfasstAntwort>, erfolg: string) => Promise<void>
+  onLoeschen: () => void
+}) {
+  const [menue, setMenue] = useState(false)
+  const [zustand, setZustand] = useState(false)
+
+  const disc = r.exemplare.length > 0
+  const gekauft = r.digital.find((d) => d.quelle !== 'plus')
+  const plus = r.digital.find((d) => d.quelle === 'plus')
+  const digital = gekauft ?? plus ?? null
+  const status = r.bewertung?.status ?? null
+  const listenEintrag = spiel.plaene.find((p) => p.releaseId === r.id && (p.art === 'todo' || p.art === 'backlog'))
+
+  // Spielzeit gibt es nur für PS4 und PS5 (7.7). Bei PS3 und Vita steht
+  // deshalb gar nichts statt „unbekannt": Sie ist dort nicht unbekannt,
+  // sondern nicht vorgesehen – dieselbe Dreiwertigkeit wie beim
+  // Platin-Zeichen (Entscheidung des Nutzers vom 27.09.2026).
+  const spielzeitVorgesehen = r.plattform === 'PS4' || r.plattform === 'PS5'
+
+  const erspielt = r.trophaeen ? summe(r.trophaeen.erspielt) : 0
+  const definiert = r.trophaeen ? summe(r.trophaeen.definiert) : 0
+
   return (
-    <p className="zeile disc-zeile">
+    <section className="karte release">
+      <div className="releasekopf">
+        <PlattformChip plattform={r.plattform} />
+        <span className="menueanker">
+          <button
+            type="button"
+            className="ikone klein"
+            aria-label={`Mehr zum ${r.plattform}-Release`}
+            aria-expanded={menue}
+            onClick={() => setMenue(!menue)}
+          >
+            <Zeichen name="mehr" groesse={20} />
+          </button>
+          {menue && (
+            <ReleaseMenue
+              release={r}
+              laeuft={laeuft}
+              schliessen={() => setMenue(false)}
+              tue={tue}
+              onLoeschen={onLoeschen}
+            />
+          )}
+        </span>
+      </div>
+
+      <div className="besitzknoepfe">
+        <BesitzKnopf
+          name="disc"
+          wort="Disc"
+          gesetzt={disc}
+          satz={disc ? (r.exemplare.length > 1 ? `${r.exemplare.length}× im Regal` : 'im Regal') : 'erfassen'}
+          laeuft={laeuft}
+          onErfassen={() => {
+            if (!confirm(`Disc für ${r.plattform} erfassen?`)) return
+            void erfassen(() => anfrage<ErfasstAntwort>('/api/physical-copies', { methode: 'POST', koerper: { releaseId: r.id } }), 'Disc erfasst.')
+          }}
+        />
+        <BesitzKnopf
+          name={digital && !gekauft ? 'psplus' : 'wolke'}
+          wort={digital ? QUELLENTEXT[digital.quelle] : 'Digital'}
+          gesetzt={digital !== null}
+          // Von PSN erkannt heisst: kein Knopf. Der nächste Lauf legte die
+          // Zeile ohnehin wieder an (7.7).
+          fremd={digital?.herkunft === 'psn'}
+          satz={digital ? (digital.herkunft === 'psn' ? 'von PSN erkannt' : datum(digital.erworbenAm)) : 'erfassen'}
+          laeuft={laeuft}
+          onErfassen={() => {
+            if (!confirm(`Gekauften Download für ${r.plattform} erfassen?`)) return
+            void erfassen(
+              () => anfrage<ErfasstAntwort>('/api/digital-entitlements', { methode: 'POST', koerper: { releaseId: r.id, quelle: 'kauf' } }),
+              'Digital erfasst.',
+            )
+          }}
+        />
+      </div>
+
+      {r.trophaeen ? (
+        <>
+          <p className="trophzeile">
+            <span className="prozent" style={{ color: zustandsFarbe(status) }}>
+              {r.trophaeen.fortschritt}&thinsp;%
+            </span>
+            <span className="still">
+              <span className="zahl">{erspielt}</span> von <span className="zahl">{definiert}</span> Trophäen
+            </span>
+          </p>
+          <div className="balken">
+            <div style={{ width: `${r.trophaeen.fortschritt}%`, background: zustandsFarbe(status) }} />
+          </div>
+        </>
+      ) : (
+        <p className="still">Keine Trophäenliste – dieses Release ist keiner Liste von Sony zugeordnet.</p>
+      )}
+
+      <div className="zustandzeile">
+        <span className="zustand">
+          <span className="punkt" style={{ background: zustandsFarbe(status) }} />
+          {status ? STATUSTEXT[status] : 'kein Status'}
+        </span>
+        {listenEintrag && <span className="still">· auf {PLAN_ARTTEXT[listenEintrag.art]}</span>}
+        <button type="button" className="knopf leiser" disabled={laeuft} onClick={() => setZustand(!zustand)}>
+          ändern
+        </button>
+      </div>
+
+      {zustand && (
+        <ZustandTafel
+          aktuell={status}
+          laeuft={laeuft}
+          schliessen={() => setZustand(false)}
+          onWaehlen={(s) => {
+            setZustand(false)
+            void tue(
+              () => anfrage(`/api/releases/${r.id}/play-status`, { methode: 'PUT', koerper: { status: s } }),
+              `Zustand: ${STATUSTEXT[s]}.`,
+            )
+          }}
+        />
+      )}
+
+      {r.trophaeen && <TrophaeenStufen erspielt={r.trophaeen.erspielt} definiert={r.trophaeen.definiert} />}
+
+      <p className="still fusszeile">
+        {r.trophaeen && <>zuletzt gespielt {datum(r.trophaeen.zuletztGespielt)}</>}
+        {spielzeitVorgesehen && (
+          <>
+            {r.trophaeen && ' · '}
+            Spielzeit <span className="zahl">{spielzeitText(r.spielzeit?.sekunden ?? null)}</span>
+            {r.spielzeit?.anzahl ? <> in <span className="zahl">{r.spielzeit.anzahl}</span> Sitzungen</> : null}
+          </>
+        )}
+      </p>
+    </section>
+  )
+}
+
+const summe = (s: Stufen) => s.bronze + s.silber + s.gold + s.platin
+
+/**
+ * Ein Besitzknopf. Gesetzt ist hell, fehlend steht gestrichelt da und lädt
+ * zum Erfassen ein – dieselbe Regel wie überall: vorhanden hell, fehlend im
+ * `--aus`-Ton (Abschnitt 13).
+ *
+ * **Entfernt wird hier nicht** (Entscheidung des Nutzers vom 27.09.2026): Das
+ * liegt im Punktmenü des Release. In der Praxis wird selten etwas entfernt,
+ * und ein Fehltipp auf einem Knopf, der beides kann, hätte die gescannte EAN
+ * gekostet.
+ */
+function BesitzKnopf({
+  name,
+  wort,
+  satz,
+  gesetzt,
+  fremd,
+  laeuft,
+  onErfassen,
+}: {
+  name: 'disc' | 'wolke' | 'psplus'
+  wort: string
+  satz: string
+  gesetzt: boolean
+  fremd?: boolean
+  laeuft: boolean
+  onErfassen: () => void
+}) {
+  const inhalt = (
+    <>
+      <Zeichen name={name} groesse={26} strich={1.4} />
+      <span className="wort">
+        <b>{wort}</b>
+        <span>{satz}</span>
+      </span>
+    </>
+  )
+  // Gesetzt oder von PSN erkannt: reine Anzeige, kein Knopf.
+  if (gesetzt) {
+    return (
+      <span className="besitzknopf" title={fremd ? 'Von PSN erkannt – wird beim nächsten Abruf bestätigt' : undefined}>
+        {inhalt}
+      </span>
+    )
+  }
+  return (
+    <button type="button" className="besitzknopf aus" disabled={laeuft} onClick={onErfassen}>
+      {inhalt}
+    </button>
+  )
+}
+
+/** Die sieben Zustände als Tafel. To-Do und Backlog ziehen mit (5.5). */
+function ZustandTafel({
+  aktuell,
+  laeuft,
+  schliessen,
+  onWaehlen,
+}: {
+  aktuell: PlayStatus | null
+  laeuft: boolean
+  schliessen: () => void
+  onWaehlen: (s: PlayStatus) => void
+}) {
+  useEscape(schliessen)
+  return (
+    <div className="wahltafel" role="group" aria-label="Zustand wählen">
+      {PLAY_STATUS.map((s) => (
+        <button
+          key={s}
+          type="button"
+          className={s === aktuell ? 'zustandwahl aktiv' : 'zustandwahl'}
+          disabled={laeuft}
+          onClick={() => onWaehlen(s)}
+        >
+          <span className="punkt" style={{ background: zustandsFarbe(s) }} />
+          {STATUSTEXT[s]}
+        </button>
+      ))}
+      <p className="still">„am Spielen" setzt auf To-Do, „pausiert" ins Backlog (5.5).</p>
+    </div>
+  )
+}
+
+/**
+ * Auf eine der vier Listen setzen.
+ *
+ * **Immer an einem Release**, nie am Spiel: Ein Wunsch ohne Plattform ist
+ * keine brauchbare Absicht (Entscheidung des Nutzers vom 27.09.2026), und
+ * alle 56 offenen Wünsche der Produktion tragen ohnehin eine. Der Weg „ohne
+ * Plattform" verschwindet in Stufe 19d auch aus Wunschliste und Import.
+ */
+function ListenTafel({
+  spiel,
+  laeuft,
+  schliessen,
+  onSetzen,
+}: {
+  spiel: Spiel
+  laeuft: boolean
+  schliessen: () => void
+  onSetzen: (art: PlanArt, releaseId: number) => void
+}) {
+  useEscape(schliessen)
+  return (
+    <div className="wahltafel breit" role="group" aria-label="Auf eine Liste setzen">
+      {spiel.releases.map((r) => (
+        <div key={r.id} className="listenzeile">
+          <PlattformChip plattform={r.plattform} />
+          {PLAN_ARTEN.map((art) => {
+            const schon = spiel.plaene.some((p) => p.releaseId === r.id && p.art === art)
+            return (
+              <button
+                key={art}
+                type="button"
+                className="knopf"
+                disabled={laeuft || schon}
+                title={schon ? `Steht schon auf ${PLAN_ARTTEXT[art]}` : undefined}
+                onClick={() => {
+                  schliessen()
+                  onSetzen(art, r.id)
+                }}
+              >
+                {PLAN_ARTTEXT[art]}
+              </button>
+            )
+          })}
+        </div>
+      ))}
+      <p className="still">To-Do und Backlog setzen zugleich den Zustand: „am Spielen" beziehungsweise „pausiert".</p>
+    </div>
+  )
+}
+
+/** Das Punktmenü des Release: Disc-Fassung, PSN-Id, Entfernen, Löschen. */
+function ReleaseMenue({
+  release: r,
+  laeuft,
+  schliessen,
+  tue,
+  onLoeschen,
+}: {
+  release: Release
+  laeuft: boolean
+  schliessen: () => void
+  tue: (aktion: () => Promise<unknown>, erfolg?: string) => Promise<void>
+  onLoeschen: () => void
+}) {
+  useEscape(schliessen)
+  return (
+    <div className="tafel menuetafel" role="menu">
+      {r.trophaeen && (
+        <>
+          {/* Der Rohtitel von Sony steht hier statt auf der Karte: Er weicht
+              bei 132 der 431 Listen ab (gemessen 27.09.2026) und wäre dort
+              auf jedem dritten Spiel eine zweite Zeile. Gebraucht wird er
+              beim Zweifel an der Zuordnung – und dafür schlägt man nach. */}
+          <div className="tafelname">Trophäenliste</div>
+          <p className="menuezeile">
+            <span className="still">
+              bei Sony: „{r.trophaeen.rohTitel}"
+              <br />
+              {r.trophaeen.npCommunicationId}
+            </span>
+          </p>
+        </>
+      )}
+
+      <div className="tafelname">Disc-Fassung</div>
+      <p className="menuezeile">
+        <label>
+          <select
+            value={r.discFassung}
+            disabled={laeuft}
+            onChange={(ev) => {
+              schliessen()
+              void tue(
+                () => anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { discFassung: ev.target.value } }),
+                'Disc-Fassung gespeichert.',
+              )
+            }}
+          >
+            {DISC_FASSUNGEN.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </label>
+        {r.discQuelle && <span className="still"> {DISCQUELLE[r.discQuelle] ?? r.discQuelle}</span>}
+      </p>
+
+      <div className="tafelname">PSN-Produkt-Id</div>
+      <PsnProduktId
+        key={r.psnProductId ?? ''}
+        release={r}
+        laeuft={laeuft}
+        onSpeichern={(wert) => {
+          schliessen()
+          void tue(() => anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { psnProductId: wert } }), 'PSN-Produkt-Id gespeichert.')
+        }}
+      />
+
+      {(r.exemplare.length > 0 || r.digital.some((d) => d.herkunft === 'nutzer')) && (
+        <>
+          <div className="tafelname">Besitz entfernen</div>
+          {r.exemplare.map((e) => (
+            <p key={e.id} className="menuezeile">
+              <span>
+                Disc
+                {/* Die EAN bleibt der Zuordnung erhalten: Sie steht in
+                    `ean_mapping` am Release, nicht am Exemplar, und ein
+                    gelöschtes Exemplar fasst sie nicht an (Abschnitt 9.2). */}
+                {e.ean && <span className="still"> · EAN {e.ean}</span>}
+              </span>
+              <button
+                type="button"
+                className="knopf gefahr"
+                disabled={laeuft}
+                onClick={() => {
+                  if (!confirm('Diese Disc entfernen? Die gescannte EAN bleibt dem Release zugeordnet.')) return
+                  schliessen()
+                  void tue(() => anfrage(`/api/physical-copies/${e.id}`, { methode: 'DELETE' }), 'Disc entfernt.')
+                }}
+              >
+                entfernen
+              </button>
+            </p>
+          ))}
+          {r.digital
+            .filter((d) => d.herkunft === 'nutzer')
+            .map((d) => (
+              <p key={d.id} className="menuezeile">
+                <span>{QUELLENTEXT[d.quelle]}</span>
+                <button
+                  type="button"
+                  className="knopf gefahr"
+                  disabled={laeuft}
+                  onClick={() => {
+                    if (!confirm(`„${QUELLENTEXT[d.quelle]}" entfernen?`)) return
+                    schliessen()
+                    void tue(() => anfrage(`/api/digital-entitlements/${d.id}`, { methode: 'DELETE' }), 'Entfernt.')
+                  }}
+                >
+                  entfernen
+                </button>
+              </p>
+            ))}
+        </>
+      )}
+
+      <div className="tafelname gefahr">Gefährlich</div>
+      <p className="menuezeile">
+        <button
+          type="button"
+          className="knopf gefahr"
+          disabled={laeuft}
+          onClick={() => {
+            schliessen()
+            onLoeschen()
+          }}
+        >
+          Release löschen
+        </button>
+      </p>
+    </div>
+  )
+}
+
+/** Das Punktmenü der Kopfzeile: neues Release, IGDB, Spiel löschen. */
+function SpielMenue({
+  spiel,
+  laeuft,
+  freiePlattformen,
+  schliessen,
+  onRelease,
+  onSuche,
+  sucheOffen,
+  onLoesen,
+  onAblehnen,
+  onDochSuchen,
+  onSpielLoeschen,
+}: {
+  spiel: Spiel
+  laeuft: boolean
+  freiePlattformen: readonly Plattform[]
+  schliessen: () => void
+  onRelease: (p: Plattform) => void
+  onSuche: () => void
+  sucheOffen: boolean
+  onLoesen: () => void
+  onAblehnen: () => void
+  onDochSuchen: () => void
+  onSpielLoeschen: () => void
+}) {
+  useEscape(schliessen)
+  return (
+    <div className="tafel menuetafel kopfmenue" role="menu">
+      <div className="tafelname">IGDB</div>
+      {spiel.igdb.id !== null ? (
+        <>
+          <p className="menuezeile">
+            <span className="still">
+              {spiel.igdb.quelle === 'automatisch' ? 'automatisch' : 'von Hand'} verknüpft
+              {spiel.igdb.verknuepftAm && ` · ${zeitpunkt(spiel.igdb.verknuepftAm)}`}
+            </span>
+          </p>
+          {spiel.kritik && (
+            <p className="menuezeile">
+              <span className="still">
+                {spiel.kritik.wert} von 100 · {spiel.kritik.anzahl ?? '?'} Wertungen ·{' '}
+                {KRITIKQUELLE[spiel.kritik.quelle ?? ''] ?? 'Quelle unbekannt'}
+              </span>
+            </p>
+          )}
+          <p className="menuezeile">
+            <span className="still">erschienen {datumOderUnbekannt(spiel.erscheinungsdatum)}</span>
+          </p>
+          <p className="menuezeile knopfzeile">
+            <button type="button" className="knopf" disabled={laeuft} onClick={() => { schliessen(); onSuche() }}>
+              {sucheOffen ? 'Suche schließen' : 'Anderen Eintrag wählen'}
+            </button>
+            <button type="button" className="knopf leiser" disabled={laeuft} onClick={() => { schliessen(); onLoesen() }}>
+              Verknüpfung lösen
+            </button>
+          </p>
+        </>
+      ) : spiel.igdb.abgelehntAm ? (
+        <p className="menuezeile">
+          <button type="button" className="knopf" disabled={laeuft} onClick={() => { schliessen(); onDochSuchen() }}>
+            Doch suchen
+          </button>
+        </p>
+      ) : (
+        <p className="menuezeile knopfzeile">
+          <button type="button" className="knopf" disabled={laeuft} onClick={() => { schliessen(); onSuche() }}>
+            {sucheOffen ? 'Suche schließen' : 'Bei IGDB suchen'}
+          </button>
+          <button type="button" className="knopf leiser" disabled={laeuft} onClick={() => { schliessen(); onAblehnen() }}>
+            Gibt es bei IGDB nicht
+          </button>
+        </p>
+      )}
+
+      {freiePlattformen.length > 0 && (
+        <>
+          <div className="tafelname">Release hinzufügen</div>
+          <p className="menuezeile knopfzeile">
+            {freiePlattformen.map((p) => (
+              <button
+                key={p}
+                type="button"
+                className="knopf"
+                disabled={laeuft}
+                onClick={() => { schliessen(); onRelease(p) }}
+              >
+                + {p === 'PSVITA' ? 'Vita' : p}
+              </button>
+            ))}
+          </p>
+        </>
+      )}
+
+      <div className="tafelname gefahr">Gefährlich</div>
+      <p className="menuezeile">
+        <button type="button" className="knopf gefahr" disabled={laeuft} onClick={() => { schliessen(); onSpielLoeschen() }}>
+          Spiel löschen
+        </button>
+      </p>
+    </div>
+  )
+}
+
+/** Die PSN-Produkt-Id – für die Store-Preise ab Stufe 21, sonst nirgends gebraucht. */
+function PsnProduktId({
+  release: r,
+  laeuft,
+  onSpeichern,
+}: {
+  release: Release
+  laeuft: boolean
+  onSpeichern: (wert: string | null) => void
+}) {
+  const [wert, setWert] = useState(r.psnProductId ?? '')
+  const geaendert = wert.trim() !== (r.psnProductId ?? '')
+  return (
+    <p className="menuezeile">
       <label>
-        PSN-Produkt-Id:{' '}
-        <input type="text" value={wert} placeholder="unbekannt" size={20} onChange={(ev) => setWert(ev.target.value)} />
-      </label>{' '}
+        <span className="nur-vorlesen">PSN-Produkt-Id</span>
+        <input
+          type="text"
+          value={wert}
+          placeholder="unbekannt"
+          disabled={laeuft}
+          onChange={(e) => setWert(e.target.value)}
+        />
+      </label>
       {geaendert && (
-        <button type="button" className="klein" disabled={laeuft} onClick={() => onSpeichern(wert)}>speichern</button>
+        <button type="button" className="knopf" disabled={laeuft} onClick={() => onSpeichern(wert.trim() === '' ? null : wert.trim())}>
+          speichern
+        </button>
       )}
     </p>
   )
+}
+
+/** Escape schliesst jede Tafel – dieselbe Regel wie bei der Glocke (Stufe 19a). */
+function useEscape(schliessen: () => void) {
+  useEffect(() => {
+    function taste(e: KeyboardEvent) {
+      if (e.key === 'Escape') schliessen()
+    }
+    document.addEventListener('keydown', taste)
+    return () => document.removeEventListener('keydown', taste)
+  }, [schliessen])
 }

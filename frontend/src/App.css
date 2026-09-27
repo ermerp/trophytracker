@@ -222,117 +222,6 @@ button.gefaehrlich {
   padding-left: 1.2rem;
 }
 
-.detailkopf {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.detailkopf img {
-  border-radius: 6px;
-  flex: none;
-}
-
-.titelfeld {
-  font-size: 1.4rem;
-  font-weight: 600;
-  max-width: 100%;
-  margin-bottom: 0.2rem;
-}
-
-/* Disc-Fassung und PSN-Produkt-Id je Release (Stufe 14): eine Zeile, kein Blockformular. */
-.disc-zeile label,
-.disc-zeile input,
-.disc-zeile select {
-  display: inline;
-  width: auto;
-  margin: 0;
-  font-size: inherit;
-}
-
-.disc-zeile input {
-  padding: 0.15rem 0.3rem;
-}
-
-.release-block {
-  border-top: 1px solid var(--linie);
-  padding-top: 0.5rem;
-}
-
-.release-block h3 {
-  font-size: 1rem;
-  margin: 1rem 0 0.3rem;
-}
-
-.exemplar {
-  margin: 0.2rem 0;
-}
-
-.exemplar-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-  gap: 0.4rem 1rem;
-  margin: 0.5rem 0;
-}
-
-.exemplar-form label {
-  font-size: 0.9rem;
-}
-
-.exemplar-form input[type='text'],
-.exemplar-form input[type='date'] {
-  display: block;
-  margin: 0.1rem 0 0;
-}
-
-.exemplar-form p {
-  grid-column: 1 / -1;
-  margin: 0;
-}
-
-ul.digital {
-  padding-left: 1.2rem;
-  margin: 0.2rem 0;
-}
-
-/* --- Stufe 6: Bewertung neben Trophaeen --- */
-
-.nebeneinander {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: 0 2rem;
-}
-
-.nebeneinander h3 {
-  margin-top: 0.8rem;
-}
-
-.bewertung-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-  gap: 0.4rem 1rem;
-  margin: 0.5rem 0;
-}
-
-.bewertung-form label {
-  font-size: 0.9rem;
-}
-
-.bewertung-form select {
-  font: inherit;
-}
-
-.bewertung-form input[type='text'],
-.bewertung-form input[type='date'] {
-  display: block;
-  margin: 0.1rem 0 0;
-}
-
-.bewertung-form p {
-  grid-column: 1 / -1;
-  margin: 0;
-}
-
 /* --- Stufe 18b: Verlauf der Cron-Aufrufe --- */
 
 .cron-verlauf {
@@ -542,21 +431,11 @@ ul.digital {
 
 
 
-.detailkopf img.cover {
-  width: 96px;
-  height: 136px;
-  object-fit: cover;
-}
-
 .knopfzeile {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin: 0.5rem 0;
-}
-
-.igdb-block table {
-  margin-bottom: 0.5rem;
 }
 
 .suchzeile {
@@ -668,10 +547,6 @@ ul.digital {
 .gewichte input {
   width: 5rem;
   font: inherit;
-}
-
-.wunsch-block .knopfzeile {
-  align-items: center;
 }
 
 /* Wunschlisten-Import (Stufe 11) */
@@ -2573,4 +2448,536 @@ table.plattformtabelle {
   .nur-handy-flex {
     display: none;
   }
+}
+
+/* ==========================================================================
+   Spieldetail (Stufe 19c)
+
+   Die Ansicht trug bis hierher als einzige oft besuchte keine Kopfzeile und
+   kein Zeichen aus `SpielTeile.tsx`. Sie besteht jetzt aus drei Teilen: dem
+   Heldenblock mit Cover und Titel, einer Karte je Release und dem
+   zugeklappten Verlauf. Alles Seltene liegt in einer `.menuetafel`.
+   ========================================================================== */
+
+.detail {
+  padding-bottom: var(--a5);
+}
+
+/* --- Heldenblock --- */
+
+.held {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: var(--a3);
+  align-items: start;
+  margin-bottom: var(--a4);
+}
+
+.heldtext {
+  min-width: 0;
+}
+
+.spieltitel {
+  font-family: var(--schrift-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  /* Ein langer Titel bricht um, statt aus der Seite zu laufen. */
+  overflow-wrap: anywhere;
+}
+
+.stift {
+  background: none;
+  border: none;
+  color: var(--text-still);
+  cursor: pointer;
+  padding: 2px;
+  margin-left: var(--a2);
+  vertical-align: middle;
+}
+
+.stift:hover {
+  color: var(--text);
+}
+
+.titelform {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a2);
+  align-items: center;
+}
+
+.titelform input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-family: var(--schrift-display);
+  font-size: 1.1rem;
+}
+
+.herkunft {
+  margin: var(--a2) 0 0;
+  color: var(--text-leise);
+  font-size: 0.9rem;
+}
+
+.herkunft .zahl,
+.herkunft b {
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.pillen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a2);
+  align-items: center;
+  margin-top: var(--a3);
+}
+
+/* --- Release-Karten --- */
+
+.releasespalten {
+  display: grid;
+  gap: var(--a3);
+}
+
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--r3);
+  padding: var(--a3);
+}
+
+.karte > h2 {
+  font-family: var(--schrift-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-still);
+  margin: 0 0 var(--a2);
+}
+
+.releasekopf {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  margin-bottom: var(--a3);
+}
+
+.releasekopf .menueanker {
+  margin-left: auto;
+}
+
+/* Besitz: zwei grosse Knoepfe. Gesetzt ist hell, fehlend gestrichelt -
+   dieselbe Regel wie ueberall (Abschnitt 13). */
+
+.besitzknoepfe {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--a2);
+  margin-bottom: var(--a3);
+}
+
+.besitzknopf {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  padding: var(--a2) var(--a3);
+  border-radius: var(--r2);
+  border: 1px solid var(--linie);
+  background: var(--flaeche-hoch);
+  color: var(--text-leise);
+  font: inherit;
+  text-align: left;
+  min-width: 0;
+}
+
+.besitzknopf .wort {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.besitzknopf .wort b {
+  font-family: var(--schrift-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.besitzknopf .wort span {
+  font-size: 0.72rem;
+  color: var(--text-still);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.besitzknopf.aus {
+  background: none;
+  border-style: dashed;
+  color: var(--aus);
+  cursor: pointer;
+}
+
+.besitzknopf.aus .wort b {
+  color: var(--text-still);
+  font-weight: 500;
+}
+
+.besitzknopf.aus:hover:not(:disabled) {
+  border-color: var(--text-still);
+  color: var(--text-leise);
+}
+
+/* Trophaeen: Prozent, Balken, Stufen. */
+
+.trophzeile {
+  display: flex;
+  align-items: baseline;
+  gap: var(--a2);
+  margin: 0;
+}
+
+.trophzeile .prozent {
+  font-family: var(--schrift-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.6rem;
+}
+
+.stufen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a3);
+  margin-top: var(--a3);
+  font-size: 0.8rem;
+}
+
+.stufe {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.stufe b {
+  font-weight: 600;
+}
+
+.stufe .von {
+  color: var(--text-still);
+}
+
+/* Der eigene Zustand, zwischen Fortschritt und Stufen. */
+
+.zustandzeile {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  margin-top: var(--a3);
+  padding: var(--a2) var(--a2) var(--a2) var(--a3);
+  border-radius: var(--r2);
+  background: var(--flaeche-hoch);
+}
+
+.zustandzeile .zustand {
+  font-family: var(--schrift-display);
+  font-weight: 600;
+}
+
+.zustandzeile > button {
+  margin-left: auto;
+}
+
+.fusszeile {
+  margin: var(--a3) 0 0;
+}
+
+.fusszeile .zahl {
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-leise);
+}
+
+.meldung,
+.hinweiszeile {
+  margin: 0 0 var(--a3);
+  color: var(--text-leise);
+  font-size: 0.9rem;
+}
+
+/* --- Tafeln: Zustand waehlen, auf eine Liste setzen --- */
+
+.wahltafel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a2);
+  margin-top: var(--a2);
+  padding: var(--a3);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+  background: var(--flaeche-hoch);
+}
+
+.wahltafel .still {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.wahltafel.breit {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.listenzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--a2);
+}
+
+.zustandwahl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: var(--r-rund);
+  border: 1px solid var(--linie);
+  background: var(--flaeche);
+  color: var(--text-leise);
+  cursor: pointer;
+}
+
+.zustandwahl.aktiv {
+  border-color: var(--text-still);
+  color: var(--text);
+}
+
+/* --- Punktmenues --- */
+
+.menueanker {
+  position: relative;
+  display: inline-flex;
+}
+
+.menuetafel {
+  position: absolute;
+  top: calc(100% + var(--a1));
+  right: 0;
+  left: auto;
+  width: max-content;
+  min-width: 15rem;
+  max-width: min(22rem, calc(100vw - 2 * var(--a3)));
+}
+
+/* Das Menue der Kopfzeile haengt an der klebenden Leiste, nicht an der Karte. */
+.kopfmenue {
+  position: fixed;
+  top: calc(var(--kopf-hoehe) + env(safe-area-inset-top) + var(--a1));
+  right: var(--a3);
+}
+
+.menuezeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--a2);
+  margin: 0 0 var(--a2);
+  font-size: 0.9rem;
+}
+
+.menuezeile:last-child {
+  margin-bottom: 0;
+}
+
+.menuezeile:not(.knopfzeile) > button:last-child {
+  margin-left: auto;
+}
+
+/* In einer Knopfzeile stehen die Knoepfe beieinander; nur das Gefaehrliche
+   rueckt nach rechts, damit es nicht in Reichweite der haeufigen liegt. */
+.menuezeile.knopfzeile {
+  margin: 0 0 var(--a2);
+}
+
+.menuezeile > .knopf.gefahr:only-child {
+  margin-left: auto;
+}
+
+.menuezeile input[type='text'],
+.menuezeile select {
+  font: inherit;
+  font-size: 0.9rem;
+  margin: 0;
+  width: auto;
+}
+
+.menuetafel .tafelname {
+  margin-top: var(--a3);
+}
+
+.menuetafel .tafelname:first-child {
+  margin-top: 0;
+}
+
+.knopf.gefahr {
+  color: var(--gefahr);
+  border-color: transparent;
+  background: none;
+}
+
+/* --- Desktop: Releases nebeneinander, Verlauf daneben --- */
+
+@media (min-width: 48rem) {
+  .detail {
+    max-width: 62rem;
+  }
+
+  .held {
+    grid-template-columns: 168px 1fr;
+    gap: var(--a4);
+    margin-bottom: var(--a5);
+  }
+
+  .spieltitel {
+    font-size: 1.9rem;
+  }
+
+  /* Zwei Spalten. 421 der 431 Spiele haben genau ein Release - dann steht
+     der Verlauf daneben statt darunter, und die Seite wirkt nicht leer
+     (Rückmeldung des Nutzers vom 27.09.2026). */
+  .releasespalten {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--a4);
+    align-items: start;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Textbausteine (Stufe 19c)
+
+   `.zeile` (0,85 rem, opacity 0.8) war bis hierher das Mittel fuer leisen
+   Text. Es benennt aber eine Zeile und faerbt ueber Deckkraft statt ueber
+   einen Ton - auf einer farbigen Flaeche ergibt das eine andere Farbe als
+   daneben. `.still` und `.leise` greifen stattdessen die Tokens ab.
+   `.zeile` bleibt, solange die noch nicht umgebauten Ansichten es tragen.
+   -------------------------------------------------------------------------- */
+
+.still {
+  color: var(--text-still);
+  font-size: 0.85rem;
+}
+
+.leise {
+  color: var(--text-leise);
+}
+
+/* Tabellenziffern: Zahlen sollen untereinander stehen, nicht tanzen. */
+.zahl {
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.knopf {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 5px 10px;
+  border-radius: var(--r2);
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.knopf:hover:not(:disabled) {
+  border-color: var(--text-still);
+}
+
+.knopf:disabled {
+  color: var(--aus);
+  cursor: default;
+}
+
+.knopf.leiser {
+  background: none;
+  color: var(--text-leise);
+}
+
+/* Ein Favorit faerbt seine Pille - dieselbe Regel wie in den Listen. */
+.pille.gold {
+  border: 1px solid var(--gold-rand);
+  background: var(--gold-flaeche);
+}
+
+/* Aufklappbarer Block: Verlauf heute, die Einzeltrophaeen ab Stufe 19b. */
+details.block > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  font-family: var(--schrift-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+details.block > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.block > summary::after {
+  content: '▾';
+  margin-left: auto;
+  font-size: 0.9rem;
+}
+
+details.block[open] > summary::after {
+  content: '▴';
+}
+
+details.block > summary .wert {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-leise);
+  font-family: var(--schrift);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+details.block > div {
+  margin-top: var(--a3);
+}
+
+/* Der Balken der Release-Karte traegt mehr Gewicht als der in einer Kachel. */
+.release .balken {
+  height: 6px;
+  background: var(--aus);
+  border-radius: var(--r-rund);
+}
+
+.release .balken > div {
+  border-radius: var(--r-rund);
+}
+
+.zustandzeile .zustand {
+  font-family: var(--schrift-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.zustandzeile .zustand .punkt {
+  width: 9px;
+  height: 9px;
 }
