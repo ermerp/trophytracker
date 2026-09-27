@@ -63,11 +63,18 @@ export function Cover({
 	)
 }
 
-/** „PS4" in Versalien und Plattformfarbe. Text, kein Logo (Abschnitt 13). */
-export function PlattformChip({ plattform }: { plattform: Plattform | string }) {
+/**
+ * „PS4" in Versalien und Plattformfarbe. Text, kein Logo (Abschnitt 13).
+ *
+ * `gross` ist die Fassung für die Release-Karte des Spieldetails: Dort ist das
+ * Kennzeichen die Überschrift der Karte und stand neben zwei Besitzknöpfen zu
+ * schwach da (Wunsch des Nutzers vom 27.09.2026). In Kacheln und Zeilen bleibt
+ * es klein – da ist es eine Nebenangabe.
+ */
+export function PlattformChip({ plattform, gross }: { plattform: Plattform | string; gross?: boolean }) {
 	const token = plattform.toLowerCase()
 	return (
-		<span className="plattform" style={{ color: `var(--${token}, var(--text-leise))` }}>
+		<span className={gross ? 'plattform gross' : 'plattform'} style={{ color: `var(--${token}, var(--text-leise))` }}>
 			{plattform === 'PSVITA' ? 'VITA' : plattform}
 		</span>
 	)

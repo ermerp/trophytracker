@@ -331,6 +331,7 @@ export function Spieldetail() {
       <Kopfzeile
         titel={spiel.titel}
         zurueck
+        stillerTitel
         zusatz={
           <span className="menueanker">
             <button
@@ -586,8 +587,44 @@ function ReleaseKarte({
 
   return (
     <section className="karte release">
+      {/* Plattform, Besitz und das Punktmenü stehen in **einer** Zeile
+          (Wunsch des Nutzers vom 27.09.2026). Der Besitz stand vorher als
+          eigener Block darunter und schob die Trophäen nach unten, obwohl er
+          zusammen mit dem Kennzeichen dieselbe Frage beantwortet: Was habe
+          ich hier, und auf welcher Plattform. */}
       <div className="releasekopf">
-        <PlattformChip plattform={r.plattform} />
+        <PlattformChip plattform={r.plattform} gross />
+
+        <div className="besitzknoepfe">
+        <BesitzKnopf
+          name="disc"
+          wort={disc && r.exemplare.length > 1 ? `Disc ×${r.exemplare.length}` : 'Disc'}
+          gesetzt={disc}
+          satz={disc ? 'im Regal' : 'erfassen'}
+          laeuft={laeuft}
+          onErfassen={() => {
+            if (!confirm(`Disc für ${r.plattform} erfassen?`)) return
+            void erfassen(() => anfrage<ErfasstAntwort>('/api/physical-copies', { methode: 'POST', koerper: { releaseId: r.id } }), 'Disc erfasst.')
+          }}
+        />
+        <BesitzKnopf
+          name={digital && !gekauft ? 'psplus' : 'wolke'}
+          wort={digital ? QUELLENTEXT[digital.quelle] : 'Digital'}
+          // Von PSN erkannt heisst: kein Knopf. Der nächste Lauf legte die
+          // Zeile ohnehin wieder an (7.7).
+          gesetzt={digital !== null}
+          satz={digital ? (digital.herkunft === 'psn' ? 'von PSN erkannt' : datum(digital.erworbenAm)) : 'erfassen'}
+          laeuft={laeuft}
+          onErfassen={() => {
+            if (!confirm(`Gekauften Download für ${r.plattform} erfassen?`)) return
+            void erfassen(
+              () => anfrage<ErfasstAntwort>('/api/digital-entitlements', { methode: 'POST', koerper: { releaseId: r.id, quelle: 'kauf' } }),
+              'Digital erfasst.',
+            )
+          }}
+        />
+        </div>
+
         <span className="menueanker">
           <button
             type="button"
@@ -608,37 +645,6 @@ function ReleaseKarte({
             />
           )}
         </span>
-      </div>
-
-      <div className="besitzknoepfe">
-        <BesitzKnopf
-          name="disc"
-          wort="Disc"
-          gesetzt={disc}
-          satz={disc ? (r.exemplare.length > 1 ? `${r.exemplare.length}× im Regal` : 'im Regal') : 'erfassen'}
-          laeuft={laeuft}
-          onErfassen={() => {
-            if (!confirm(`Disc für ${r.plattform} erfassen?`)) return
-            void erfassen(() => anfrage<ErfasstAntwort>('/api/physical-copies', { methode: 'POST', koerper: { releaseId: r.id } }), 'Disc erfasst.')
-          }}
-        />
-        <BesitzKnopf
-          name={digital && !gekauft ? 'psplus' : 'wolke'}
-          wort={digital ? QUELLENTEXT[digital.quelle] : 'Digital'}
-          gesetzt={digital !== null}
-          // Von PSN erkannt heisst: kein Knopf. Der nächste Lauf legte die
-          // Zeile ohnehin wieder an (7.7).
-          fremd={digital?.herkunft === 'psn'}
-          satz={digital ? (digital.herkunft === 'psn' ? 'von PSN erkannt' : datum(digital.erworbenAm)) : 'erfassen'}
-          laeuft={laeuft}
-          onErfassen={() => {
-            if (!confirm(`Gekauften Download für ${r.plattform} erfassen?`)) return
-            void erfassen(
-              () => anfrage<ErfasstAntwort>('/api/digital-entitlements', { methode: 'POST', koerper: { releaseId: r.id, quelle: 'kauf' } }),
-              'Digital erfasst.',
-            )
-          }}
-        />
       </div>
 
       {r.trophaeen ? (
@@ -718,38 +724,42 @@ function BesitzKnopf({
   wort,
   satz,
   gesetzt,
-  fremd,
   laeuft,
   onErfassen,
 }: {
   name: 'disc' | 'wolke' | 'psplus'
   wort: string
+  /** Die Nebenzeile – nur im offenen Zustand sichtbar, sonst der `title`. */
   satz: string
   gesetzt: boolean
-  fremd?: boolean
   laeuft: boolean
   onErfassen: () => void
 }) {
-  const inhalt = (
-    <>
-      <Zeichen name={name} groesse={26} strich={1.4} />
-      <span className="wort">
-        <b>{wort}</b>
-        <span>{satz}</span>
-      </span>
-    </>
-  )
-  // Gesetzt oder von PSN erkannt: reine Anzeige, kein Knopf.
+  const zeichen = <Zeichen name={name} groesse={22} strich={1.4} />
+
+  // Gesetzt: reine Anzeige, kein Knopf – entfernt wird im Punktmenü. Und
+  // **ohne Nebenzeile**: Seit die Knöpfe neben dem Kennzeichen stehen, bleiben
+  // je rund 110 px, und „2× im Regal" wurde zu „2× im R…" (gesehen im Bild vom
+  // 27.09.2026). Das Wort sagt, was es ist, der helle Ton sagt, dass es da
+  // ist – die Herkunft steht im `title` und im Menü. Nur eine Stückzahl über
+  // eins kommt ans Wort, weil sie sonst verschwände.
   if (gesetzt) {
     return (
-      <span className="besitzknopf" title={fremd ? 'Von PSN erkannt – wird beim nächsten Abruf bestätigt' : undefined}>
-        {inhalt}
+      <span className="besitzknopf" title={`${wort} – ${satz}`}>
+        {zeichen}
+        <span className="wort">
+          <b>{wort}</b>
+        </span>
       </span>
     )
   }
   return (
-    <button type="button" className="besitzknopf aus" disabled={laeuft} onClick={onErfassen}>
-      {inhalt}
+    <button type="button" className="besitzknopf aus" disabled={laeuft} onClick={onErfassen} title={`${wort} erfassen`}>
+      {zeichen}
+      <span className="wort">
+        <b>{wort}</b>
+        <span>{satz}</span>
+      </span>
     </button>
   )
 }

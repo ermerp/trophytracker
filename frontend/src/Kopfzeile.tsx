@@ -41,11 +41,20 @@ type Props = {
 	 * Scanner, und der Weg zurück ist der, den man gekommen ist.
 	 */
 	zurueck?: boolean
+	/**
+	 * Der Titel steht nur als `aria-label` in der Leiste, nicht sichtbar
+	 * (Rückmeldung des Nutzers vom 27.09.2026: „nochmal der Name ist
+	 * unnötig"). Das Spieldetail trägt den Titel gross im Heldenblock
+	 * darunter; zweimal derselbe Name kostete eine Zeile und sagte nichts
+	 * Neues. Die Leiste bleibt trotzdem, weil sie klebt: Zurück und das
+	 * Punktmenü sollen auch weit unten erreichbar sein.
+	 */
+	stillerTitel?: boolean
 	/** Ein eigenes Element vor dem Zahnrad, etwa die Glocke des Dashboards. */
 	zusatz?: React.ReactNode
 }
 
-export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz, zurueck }: Props) {
+export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz, zurueck, stillerTitel }: Props) {
 	const [params, setParams] = useSearchParams()
 	const navigate = useNavigate()
 	const gesetzt = sucheParam ? (params.get(sucheParam) ?? '') : ''
@@ -126,7 +135,8 @@ export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz, zu
 						</button>
 					)}
 					{logo && <AppSymbol />}
-					<h1>{titel}</h1>
+					{stillerTitel ? <h1 className="nur-vorlesen">{titel}</h1> : <h1>{titel}</h1>}
+					{stillerTitel && <span className="fueller" />}
 					{aktion &&
 						(aktion.ziel ? (
 							<Link to={aktion.ziel} className="ikone" aria-label={aktion.text} title={aktion.text}>

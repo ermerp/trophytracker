@@ -1,4 +1,5 @@
-import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, Navigate, Route, Routes, useLocation, useNavigationType } from 'react-router-dom'
 import { Abweichungen } from './Abweichungen'
 import { Aenderungen } from './Aenderungen'
 import { Backlog } from './Backlog'
@@ -33,6 +34,39 @@ import './App.css'
  * funktionieren.
  */
 
+/**
+ * Ein neuer Ort beginnt oben (Nachbesserung zu 19c, 27.09.2026).
+ *
+ * React Router scrollt bei einem Wechsel nicht von selbst, und ohne diese
+ * Zusicherung hängt die Scrollhöhe davon ab, was der Browser gerade für
+ * richtig hält – Scroll-Anchoring, wiederhergestellte History-Einträge,
+ * asynchron nachwachsender Inhalt.
+ *
+ * **Das ist eine Zusicherung, keine belegte Fehlerbehebung.** Der Nutzer hat
+ * am 27.09.2026 gemeldet, dass ein Spiel auf dem Handy nach unten gescrollt
+ * aufgeht; im Headless-Browser liess sich das **nicht** nachstellen – weder
+ * lokal noch gegen die Produktion, beide öffneten bei 0. Die wahrscheinlichere
+ * Ursache ist der fehlende Abstand über dem Cover (`.detail`): Es sass direkt
+ * an der klebenden Kopfzeile, und schon ein kleiner Scroll schob es darunter.
+ * Beides ist geändert, aber nur das Zweite ist gemessen – wer später sucht,
+ * soll nicht glauben, hier stünde die Ursache.
+ *
+ * **Nur bei PUSH**, nicht bei POP: Ein „Zurück" soll die Liste dort zeigen,
+ * wo man sie verlassen hat – dieselbe Absicht wie bei den Filtern in der URL
+ * (Abschnitt 13). Gemessen: Der Rückweg stellt die Höhe heute ohnehin nicht
+ * wieder her, weder mit noch ohne diese Zusicherung.
+ */
+function NeuerOrtBeginntOben() {
+	const { pathname } = useLocation()
+	const art = useNavigationType()
+
+	useEffect(() => {
+		if (art !== 'POP') window.scrollTo(0, 0)
+	}, [pathname, art])
+
+	return null
+}
+
 /** Werkzeuge, die keine Dauernavigation sind (Abschnitt 13). */
 function Werkzeuge() {
   return (
@@ -58,6 +92,7 @@ function App() {
     <div className="app">
       <Navigation />
       <main>
+        <NeuerOrtBeginntOben />
         <Offline />
         <Routes>
           {/* Die Startseite ist seit Stufe 19 ein eigener Ort; bis zum

@@ -601,7 +601,15 @@ describe("cronSchritt", () => {
 		});
 	});
 
-	it("eine ganze Nacht passt in den Verlauf - der Zweck der Verdichtung", async () => {
+	// 20 s statt der voreingestellten 5: Dieser eine Test spielt **sechzig
+	// Cron-Aufrufe** gegen die lokale D1 durch - beide Fenster einer ganzen
+	// Nacht -, waehrend jeder andere Test hier einen einzelnen Aufruf prueft.
+	// Lokal braucht er 546 ms, im GitHub-Runner lief er am 27.09.2026 in die
+	// 5-s-Grenze und riss einen Deploy, dessen Aenderung eine einzige
+	// Textzeile im Frontend war (die ganze Datei brauchte dort 13 s statt 3).
+	// Die Grenze schuetzt hier vor einer Endlosschleife, nicht vor Langsamkeit
+	// - dafuer ist sie mit reichlich Luft immer noch scharf.
+	it("eine ganze Nacht passt in den Verlauf - der Zweck der Verdichtung", { timeout: 20_000 }, async () => {
 		// Die Probe auf Stufe 18e: Vorher waren es einunddreissig Zeilen, und
 		// die zwanzig aufgehobenen zeigten die Sync-Aufrufe nicht mehr. Hier
 		// laeuft eine vollstaendige Nacht durch - beide Fenster, jeder Aufruf

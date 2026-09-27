@@ -2459,7 +2459,10 @@ table.plattformtabelle {
    zugeklappten Verlauf. Alles Seltene liegt in einer `.menuetafel`.
    ========================================================================== */
 
+/* Die Kopfzeile klebt oben; ohne eigenen Abstand sass das Cover direkt an
+   ihrer Kante (Rueckmeldung des Nutzers vom 27.09.2026). */
 .detail {
+  padding-top: var(--a4);
   padding-bottom: var(--a5);
 }
 
@@ -2567,25 +2570,37 @@ table.plattformtabelle {
   margin-bottom: var(--a3);
 }
 
+/* Das Kennzeichen ist hier die Ueberschrift der Karte, nicht eine
+   Nebenangabe wie in einer Kachel (Wunsch des Nutzers vom 27.09.2026). */
+.plattform.gross {
+  font-size: 0.85rem;
+  padding: 3px 9px;
+  border-width: 1.5px;
+  flex: none;
+}
+
 .releasekopf .menueanker {
-  margin-left: auto;
+  flex: none;
 }
 
 /* Besitz: zwei grosse Knoepfe. Gesetzt ist hell, fehlend gestrichelt -
    dieselbe Regel wie ueberall (Abschnitt 13). */
 
+/* Zwei Knoepfe in derselben Zeile wie das Kennzeichen. Sie teilen sich den
+   Rest der Breite; die Nebenzeile kuerzt mit Ellipse, statt umzubrechen. */
 .besitzknoepfe {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--a2);
-  margin-bottom: var(--a3);
+  flex: 1;
+  min-width: 0;
 }
 
 .besitzknopf {
   display: flex;
   align-items: center;
   gap: var(--a2);
-  padding: var(--a2) var(--a3);
+  padding: 5px var(--a2);
   border-radius: var(--r2);
   border: 1px solid var(--linie);
   background: var(--flaeche-hoch);
@@ -2980,4 +2995,10 @@ details.block > div {
 .zustandzeile .zustand .punkt {
   width: 9px;
   height: 9px;
+}
+
+/* Traegt die Kopfzeile ihren Titel nur fuer Vorlesegeraete, schiebt ein
+   Fueller die Symbole nach rechts - sonst rutschen sie an den Zurueck-Pfeil. */
+.kopfzeile .fueller {
+  flex: 1;
 }
