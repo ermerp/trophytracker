@@ -150,12 +150,15 @@ gekauft/PS+ – ohne dass etwas von Hand einzutragen wäre. Die Spielzeit steht 
 Spieldetail und ist Sortierkriterium der Sammlung; digitale Berechtigungen
 erscheinen als Pillen an der Kachel wie bisher, nur eben von allein. Gemessen am
 echten Konto: 236 Releases bekommen Spielzeit, 56 Kauf- und 160 PS+-Einträge
-sollten entstehen. **Die Spielzeit steht in der Produktion, der Besitz nicht**
-(geprüft am 27.09.2026): Der erste Kauflisten-Lauf scheiterte am 23.09. auf seiner
-ersten Seite, und weil ein Fehler damals dieselbe Marke hinterließ wie ein
-fertiger Lauf, ruhte der Schritt danach sieben Tage – sichtbar wurde es erst, als
-niemand eine Zeile mit `herkunft='psn'` fand. Stufe 18e trennt die beiden Marken,
-lässt den Statuscode durch und gibt den Schritt als Knopf in die Einstellungen.
+sollten entstehen. Vier Tage lang stand
+davon **nur die Spielzeit** in der Produktion: Der erste Kauflisten-Lauf scheiterte
+am 23.09. auf seiner ersten Seite, und weil ein Fehler damals dieselbe Marke
+hinterließ wie ein fertiger Lauf, ruhte der Schritt danach sieben Tage – sichtbar
+wurde es erst, als niemand eine Zeile mit `herkunft='psn'` fand. Stufe 18e trennt
+die beiden Marken, lässt den Statuscode durch und gibt den Schritt als Knopf in die
+Einstellungen; **am 27.09.2026 nachgeholt**: 54 Kauf- und 156 PS+-Einträge. Was die
+eine Nacht zum Scheitern brachte, ist unerklärt geblieben – derselbe Worker erreicht
+denselben Endpunkt problemlos.
 **Stufe 18d** (23.09.2026) kam aus einer Analyse der Nachtläufe: Die Nächte liefen
 sauber, nur sah man es nicht. Der Verlauf zeigte fünfmal „nichts" aus dem Leerlauf
 nach 05:36, während Sync, Spielzeit, Besitz und 49 aufgefrischte Spiele darunter

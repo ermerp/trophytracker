@@ -621,6 +621,21 @@ describe("cronSchritt", () => {
 			expect(await besitzLauf(repos(), psnOhneKaufliste(403), "2026-09-28")).not.toBeNull();
 		});
 
+		it("ein geglueckter Abruf raeumt ein altes fehler am Zugang weg - auch von Hand", async () => {
+			// Am 27.09.2026 holte der Knopf "Kaufliste jetzt abrufen" 210
+			// Berechtigungen, und in den Einstellungen stand weiter "Fehler
+			// beim letzten Versuch": Das Wegraeumen hing am Cron statt am
+			// Schritt.
+			await repos().credentials.statusSetzen("fehler");
+			await besitzLauf(repos(), psnLeereKaufliste(), "2026-09-27", { erzwingen: true });
+			expect((await repos().credentials.anzeige()).status).toBe("ok");
+
+			// 'abgelaufen' raeumt nur ein neues NPSSO weg, kein Abruf.
+			await repos().credentials.statusSetzen("abgelaufen");
+			await besitzLauf(repos(), psnLeereKaufliste(), "2026-09-28", { erzwingen: true });
+			expect((await repos().credentials.anzeige()).status).toBe("abgelaufen");
+		});
+
 		it("ein vollstaendiger Lauf ruht die Frist ab - und weicht dem Knopf", async () => {
 			const psn = psnLeereKaufliste();
 			expect(await besitzLauf(repos(), psn, "2026-09-27")).toMatchObject({ status: "erfolg", weiter: false });
