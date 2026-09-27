@@ -468,7 +468,14 @@ export function Spieldetail() {
           <section className="karte">
             <details className="block">
               <summary>
-                Verlauf <span className="wert">{verlauf.ereignisse.length > 0 ? `${verlauf.ereignisse.length} Ereignisse` : 'nichts'}</span>
+                Verlauf{' '}
+                <span className="wert">
+                  {verlauf.ereignisse.length === 0
+                    ? 'nichts'
+                    : verlauf.ereignisse.length === 1
+                      ? '1 Ereignis'
+                      : `${verlauf.ereignisse.length} Ereignisse${verlauf.weiter ? '+' : ''}`}
+                </span>
               </summary>
               <div>
                 {verlauf.ereignisse.length === 0 ? (
