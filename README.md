@@ -14,8 +14,8 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19a abgenommen** (27.09.2026), **Stufe 18e gebaut und deployt** (27.09.2026, Abnahme offen),
-**Stufe 19c gebaut** (27.09.2026, Abnahme offen)
+**Stufen bis 19a und 19c abgenommen** (27.09.2026), **Stufe 18e gebaut und deployt**
+(27.09.2026, Abnahme offen)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -238,6 +238,24 @@ Und **was eine Quelle für eine Plattform gar nicht erhebt, steht gar nicht da**
 statt „unbekannt": Spielzeit fehlt auf PS3- und Vita-Karten, weil Sony dort
 nie welche geliefert hat – das ist nicht dasselbe wie ein PS4-Release ohne
 Spielzeitzeile.
+
+**Die Abnahme von 19c lief über sechs Runden am Gerät des Nutzers** und brachte
+mehr als Feinschliff. Sechs Befunde, von denen keiner beim Lesen des Codes zu
+sehen war: der doppelte Titel in der Kopfzeile, das Cover ohne Abstand zur
+klebenden Leiste, zu enge Besitzknöpfe (der Wortspalte blieben bei 390 px genau
+49 px – so viel, wie „erfassen" braucht), eine Fußzeile, die je nach Datumslänge
+anders umbrach, zwei ununterscheidbar graue Stufenzähler bei einem Spiel ohne
+erspieltes Gold, und ein stiller Standardwert beim digitalen Besitz – derselbe
+Fehler, der in der Produktion schon acht falsche Einträge erzeugt hatte.
+
+Der letzte Befund betraf die ganze Anwendung: **`min-height: 100dvh` auf `body`**
+machte mit `viewport-fit=cover` jede Seite um die sicheren Bereiche zu hoch – auf
+dem Gerät des Nutzers 854 statt 800 px, also 54 px, die sich schieben ließen,
+obwohl aller Inhalt zu sehen war. Auf einem Entwicklungsrechner sind alle
+sicheren Bereiche null; der Fehler existiert dort nicht. Gefunden wurde er über
+den neuen Block **„Anzeige"** in den Einstellungen, der Fenster, Bildschirm,
+sichere Bereiche und Überhang dort ausliest, wo sie gelten – und über das
+Nachstellen dieser Geometrie im Testbrowser mit festen Pixelwerten.
 
 **Als Nächstes: Stufe 19d** (Wunsch mit Plattform – „ohne Plattform" entfällt
 auch in Wunschliste und Import), dann **19b** (Einzeltrophäen je Spiel), danach
