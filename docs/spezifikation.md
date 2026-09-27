@@ -468,6 +468,10 @@ Entscheidung; er hat weder Cover noch Kritikerwertung (8.3).
   falls es fehlt (Abschnitt 3). `PATCH /api/plans/:id { plattform }` hängt einen Eintrag später um;
   der Filter „ohne Plattform" der Wunschliste findet, was nachzupflegen ist. Freitext hat kein
   Spiel und deshalb nie eine Plattform.
+
+  **Dieser Absatz beschreibt den Stand bis Stufe 19d.** „Ohne Plattform" und der zugehörige
+  Filter entfallen dann (Entscheidung des Nutzers vom 27.09.2026, oben in diesem Abschnitt);
+  im Spieldetail sind sie seit 19c schon weg.
 - **Ein offener Eintrag am Spiel und einer an einem seiner Releases sind kein Duplikat**, sondern
   zwei verschiedene Aussagen; sie blockieren sich nicht. Ein zweiter offener Eintrag **derselben Art
   an genau demselben Ziel** ist eines und wird mit `409` abgewiesen. Erledigte und verworfene
