@@ -14,7 +14,8 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19a abgenommen** (27.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen bis 19a abgenommen** (27.09.2026), **Stufe 18e gebaut** (27.09.2026, Abnahme offen)
+([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -132,7 +133,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
 | Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 20 (Migration 0018). **Stufe 15 abgenommen am 16.09.2026** |
 | Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt der nächtliche Cron nach, außerdem „Metadaten auffrischen" (Stufe 18) |
-| Automatik | Cron Trigger, nachts alle fünf Minuten zwischen 03:00 und 05:59 UTC, je Aufruf ein Schritt: Erschienene freigeben, hängende Läufe abbrechen, Trophäen-Sync (ein Versuch je Nacht), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, zuletzt Aufräumen alter Rohantworten (Stufe 18d). Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen, Leerläufe verdichtet; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migration 0021) |
+| Automatik | Zwei Cron-Fenster (Stufe 18e), je Aufruf ein Schritt. **PSN, 03:00–05:59 UTC:** hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht, eine gescheiterte Seite wird bis zu dreimal erneut geholt), Spielzeit, Kaufliste. **Wartung, 06:00–07:59 UTC:** erschienene Titel freigeben, IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, alte Rohantworten. Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen – gleichartige Arbeit zu einer Zeile verdichtet, Fortschritt als Spanne; Knopf „Kaufliste jetzt abrufen"; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migrationen 0021, 0024) |
 | App | Installierbar (PWA) mit eigenem Symbol – ein Pokal im Fortschrittsring; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
 | Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
 | Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen, „Verwerfen" wirft eine Fehllesung sofort weg (mit Rückfrage). Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. „Überspringen" geht weiter, ohne etwas zu speichern (seit Stufe 17d – davor „Später" und ein Sammelmodus, beides mit offenen Scans entfallen). Unbekannte Codes löst seit Stufe 17c eBay live auf; ein Treffer aus der Sammlung erscheint als dieselbe Karte wie ein bekannter Code – mit Cover, „im Regal ×n" und „Disc erfassen" (9.2) |
@@ -147,8 +148,14 @@ den Login unter `trophytracker.cloudflareaccess.com`.
 (`playDuration`, `playCount`) und den digitalen Besitz samt der Unterscheidung
 gekauft/PS+ – ohne dass etwas von Hand einzutragen wäre. Die Spielzeit steht im
 Spieldetail und ist Sortierkriterium der Sammlung; digitale Berechtigungen
-erscheinen als Pillen an der Kachel wie bisher, nur eben von allein. Gemessen:
-236 Releases bekommen Spielzeit, 56 Kauf- und 160 PS+-Einträge entstehen.
+erscheinen als Pillen an der Kachel wie bisher, nur eben von allein. Gemessen am
+echten Konto: 236 Releases bekommen Spielzeit, 56 Kauf- und 160 PS+-Einträge
+sollten entstehen. **Die Spielzeit steht in der Produktion, der Besitz nicht**
+(geprüft am 27.09.2026): Der erste Kauflisten-Lauf scheiterte am 23.09. auf seiner
+ersten Seite, und weil ein Fehler damals dieselbe Marke hinterließ wie ein
+fertiger Lauf, ruhte der Schritt danach sieben Tage – sichtbar wurde es erst, als
+niemand eine Zeile mit `herkunft='psn'` fand. Stufe 18e trennt die beiden Marken,
+lässt den Statuscode durch und gibt den Schritt als Knopf in die Einstellungen.
 **Stufe 18d** (23.09.2026) kam aus einer Analyse der Nachtläufe: Die Nächte liefen
 sauber, nur sah man es nicht. Der Verlauf zeigte fünfmal „nichts" aus dem Leerlauf
 nach 05:36, während Sync, Spielzeit, Besitz und 49 aufgefrischte Spiele darunter
@@ -270,7 +277,9 @@ mit einem Testeinstieg für den Cron; ein Aufruf entspricht einem nächtlichen
 Schritt:
 
 ```bash
-curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"   # PSN-Fenster
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+6-7+*+*+*"   # Wartungsfenster
+curl "http://localhost:8787/cdn-cgi/handler/scheduled"                      # ohne Ausdruck: beides
 ```
 
 Der Pfad `/cdn-cgi/` läuft am Asset-Fallback vorbei; das ältere `/__scheduled`
@@ -447,28 +456,47 @@ auch im Hinweisblock der Sammlung – „der nächtliche Abruf steht still".
 
 ## Automatik
 
-Seit Stufe 18 läuft ein Cron Trigger (`wrangler.jsonc`, `*/5 3-5 * * *`):
-**alle fünf Minuten zwischen 03:00 und 05:59 UTC**, also 5–8 Uhr Sommerzeit
-beziehungsweise 4–7 Uhr Winterzeit, 36 Aufrufe je Nacht. Der Free Tier gibt
-einem Cron-Aufruf dieselben 10 ms CPU wie einer Anfrage; deshalb tut jeder
-Aufruf genau **eine** Sache und merkt sich den Stand in der Datenbank
-([Abschnitt 10.1](docs/spezifikation.md#101-automatik-der-cron-trigger-stufe-18)):
+Seit Stufe 18 läuft ein Cron Trigger, seit **Stufe 18e zwei** (`wrangler.jsonc`).
+Der Free Tier gibt einem Cron-Aufruf dieselben 10 ms CPU wie einer Anfrage;
+deshalb tut jeder Aufruf genau **eine** Sache und merkt sich den Stand in der
+Datenbank ([Abschnitt 10.1](docs/spezifikation.md#101-automatik-der-cron-trigger-stufe-18)).
 
-1. erschienene Titel freigeben (`angekuendigt → erschienen`, nur SQL)
-2. einen seit über drei Stunden hängenden Sync-Lauf auf `fehler` setzen
-3. läuft ein Sync, einen Schritt davon (eine Seite holen oder auswerten)
-3b. Spielzeit (täglich, zwei Aufrufe) und die Kaufliste (wöchentlich, rund 15
-   Aufrufe) – beide seitenweise, beide ergänzen nur und importieren nichts
-4. sonst, wenn heute noch kein Cron-Lauf war und kein Handabruf erfolgreich: einen
-   Sync starten – **ein Versuch je Nacht**, ein Fehler wird erst in der nächsten
-   Nacht wiederholt
-5. sonst IGDB-Metadaten auffrischen – 50 Spiele, deren Stand älter als sieben Tage ist
-6. sonst Disc-Fassungen aus IGDB prüfen (30-Tage-Frist)
-7. sonst alte PSN-Rohantworten löschen (seit Stufe 18d) – die Seiten der jüngsten
-   drei Läufe und alles noch nicht Normalisierte bleiben
+**Fenster 1 – PSN (`*/5 3-5 * * *`, 36 Aufrufe):** alle fünf Minuten zwischen
+03:00 und 05:59 UTC, also 5–8 Uhr Sommerzeit beziehungsweise 4–7 Uhr Winterzeit.
 
-Ein voller Sync braucht bei 431 Titeln rund elf Aufrufe. Ist der Zugang
-`abgelaufen`, legt der Cron gar keinen Lauf an; ein neues NPSSO in den
+1. einen seit über drei Stunden hängenden Sync-Lauf auf `fehler` setzen
+2. läuft ein Sync, einen Schritt davon (eine Seite holen oder auswerten)
+3. sonst, wenn heute noch kein Cron-Lauf war und kein Handabruf erfolgreich: einen
+   Sync starten – **ein Lauf je Nacht**
+4. sonst Spielzeit (täglich, zwei Aufrufe)
+5. sonst die Kaufliste (wöchentlich, rund 15 Aufrufe) – seitenweise, ergänzt nur
+   und importiert nichts
+
+**Fenster 2 – Wartung (`*/5 6-7 * * *`, 24 Aufrufe):** 06:00–07:59 UTC, also
+8–10 Uhr Sommerzeit. Nichts davon spricht PlayStation an.
+
+6. erschienene Titel freigeben (`angekuendigt → erschienen`, nur SQL)
+7. sonst IGDB-Metadaten auffrischen – 50 Spiele, deren Stand älter als sieben Tage ist
+8. sonst Disc-Fassungen aus IGDB prüfen (30-Tage-Frist)
+9. sonst alte PSN-Rohantworten löschen (seit Stufe 18d) – die Seiten der jüngsten
+   drei Läufe und alles noch nicht Normalisierte bleiben; seit 18e auch die Waisen
+   endgültig gescheiterter Läufe
+
+**Warum zwei Fenster:** In einem gingen 37 Aufrufe Bedarf auf 36 Slots – elf Sync,
+zwei Spielzeit, fünfzehn Kaufliste, acht IGDB nach einem Rückstand, einer
+Aufräumen. Der Schnitt liegt bei „spricht PSN an oder nicht": Die PSN-Kette
+braucht die vielen Aufrufe, die Wartung ist billig und verschiebbar. Welches
+Fenster gefeuert hat, steht in `event.cron`; ein unbekannter Ausdruck lässt den
+Worker beides tun, damit eine Änderung an `wrangler.jsonc` nicht die halbe
+Automatik still abschaltet.
+
+Ein voller Sync braucht bei 431 Titeln rund elf Aufrufe. **Scheitert eine Seite**,
+gilt der Lauf seit Stufe 18e nicht mehr als verloren: Der nächste Aufruf holt sie
+fünf Minuten später erneut, nach drei Fehlversuchen ohne Fortschritt ist Schluss.
+In der Nacht zum 27.09.2026 hatte ein einziger Fehler um 03:10 den ganzen Sync
+gekostet, während 29 Aufrufe leer liefen – dieselbe Seite antwortete um 03:16
+wieder. Ein abgelehnter Token bekommt keinen zweiten Anlauf; ist der Zugang
+`abgelaufen`, legt der Cron gar keinen Lauf an, und ein neues NPSSO in den
 Einstellungen genügt, dann geht es in der nächsten Nacht von allein weiter.
 
 Was der Cron tut, steht an vier Stellen: in den Einstellungen unter **Automatik**
@@ -479,14 +507,21 @@ Worker-Logs (Cloudflare-Dashboard → Worker → Logs) – nur Zahlen und feste 
 Der Eintrag in der Datenbank ist seit Stufe 18b dabei, weil Worker-Logs nur live
 einsehbar sind: Ohne ihn lässt sich am Morgen nicht sagen, ob ein Schritt
 scheiterte oder schlicht nichts zu tun fand. Aufgehoben werden **die letzten
-zwanzig** Aufrufe, und aufeinanderfolgende Aufrufe ohne Wirkung stehen als eine
-Zeile da (`cron: nichts ×21`). **Einmal in der Woche reichen zwanzig Einträge
-nicht:** In der Nacht, in der auch die Kaufliste läuft, sind es rund einunddreißig
-Aufrufe, und die ältesten – die des Syncs – fallen aus dem Verlauf. Dass der Sync
-lief, steht dann weiter oben im Block („letzter automatischer Abruf"); nur seine
-Zwischenschritte fehlen. Nächste solche Nacht: 30.09.2026. Mit fünf Einträgen ohne Verdichtung sah man
-ausschließlich das leere Ende der Nacht – die Arbeit ist gegen 04:10 getan,
-danach folgen gut zwanzig Leerläufe (Befund vom 23.09.2026, Stufe 18d).
+zwanzig** Aufrufe, und seit Stufe 18e stehen aufeinanderfolgende Aufrufe
+**derselben Arbeit** als eine Zeile da, mit dem Fortschritt als Spanne:
+
+```
+2026-09-28 06:00–07:55 cron: nichts ×24 bereich=wartung
+2026-09-28 03:00–03:50 cron: sync ×11 bereich=psn sync=laufend→erfolg/normalisierung offen=4→0
+```
+
+Eine Nacht sind damit rund sechs Zeilen statt einunddreißig – zwanzig Einträge
+fassten eine Kaufliste-Nacht vorher nicht, und weg fielen gerade die
+Sync-Zeilen. Verdichtet wird nur bei gleicher Feldfolge, und eine Zeile mit
+`meldung=` nie: Ein Fehler bleibt stehen. Bewegt sich eine Zahl bei `×3` nicht,
+ist der Schritt hängengeblieben – vorher war das nicht zu unterscheiden. Mit fünf
+Einträgen ohne Verdichtung sah man ausschließlich das leere Ende der Nacht
+(Befund vom 23.09.2026, Stufe 18d).
 
 Beim Lesen der Zeile lohnen zwei Zahlen (nachgebessert am 24.09.2026): In der
 **Normalisierung** steht dort `offen=` – die noch unverarbeiteten Rohantworten,

@@ -19,7 +19,7 @@ import { erstelleEbayClient, zugangAus as ebayZugangAus, type EbayClient } from 
 import { erstelleUpcitemdbClient, type UpcitemdbClient } from "./ean/upcitemdb";
 import { erstelleIgdbClient, zugangAus, type IgdbClient } from "./igdb/client";
 import { erstellePsnClient, type PsnClient } from "./psn/client";
-import { cronLogzeile, cronSchritt, cronWirkungslos } from "./sync/cron";
+import { bereichFuerAusdruck, cronLogzeile, cronSchritt } from "./sync/cron";
 import type { AppEnv } from "./types";
 
 /**
@@ -124,14 +124,19 @@ export function createScheduled(
 	psnFactory: () => PsnClient = () => erstellePsnClient(),
 	igdbFactory: (env: Env) => IgdbClient = igdbJeInstanz(),
 ): ExportedHandlerScheduledHandler<Env> {
-	return async (_event, env) => {
+	return async (event, env) => {
 		if (!env.NPSSO_KEY) {
 			console.log("cron: uebersprungen, NPSSO_KEY ist nicht gesetzt.");
 			return;
 		}
 		const repos = createRepositories(env.DB, env.NPSSO_KEY);
 		try {
-			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env));
+			// Welcher der beiden Eintraege gerufen hat, steht im Ereignis
+			// (Stufe 18e): das PSN-Fenster oder das Wartungsfenster. Ein
+			// unbekannter Ausdruck - etwa nach einer Aenderung an
+			// wrangler.jsonc - macht alles, statt still die Haelfte zu lassen.
+			const bereich = bereichFuerAusdruck(event.cron);
+			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env), { bereich });
 			const zeile = cronLogzeile(ergebnis);
 			console.log(zeile);
 			// Der Cron ist der einzige Schreiber ohne Zuschauer, und Worker-Logs
@@ -140,7 +145,7 @@ export function createScheduled(
 			// unterscheiden, ob er scheiterte oder nichts zu tun fand. Aufrufe
 			// ohne Wirkung werden dabei verdichtet, damit die zwanzig leeren am
 			// Ende der Nacht nicht die Arbeit davor verdraengen (Stufe 18d).
-			await repos.sync.cronAusgangVermerken(zeitstempel(), zeile, cronWirkungslos(ergebnis));
+			await repos.sync.cronAusgangVermerken(zeitstempel(), zeile);
 		} catch (fehler) {
 			// Ein Absturz darf nicht spurlos bleiben. Nur eigene Texte, kein
 			// Fremdtext - der koennte ein Geheimnis zitieren.

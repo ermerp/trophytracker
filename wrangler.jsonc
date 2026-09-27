@@ -17,16 +17,28 @@
 		"enabled": true
 	},
 	/**
-	 * Naechtliche Automatik (Stufe 18, Abschnitt 10.1): alle fuenf Minuten
-	 * zwischen 03:00 und 05:59 UTC, 36 Aufrufe je Nacht. Auf dem Free Tier
+	 * Naechtliche Automatik (Stufe 18, Abschnitt 10.1). Auf dem Free Tier
 	 * gilt fuer einen Cron-Aufruf dieselbe 10-ms-CPU-Grenze wie fuer eine
 	 * Anfrage; jeder Aufruf tut deshalb genau einen Schritt (eine Seite
-	 * holen oder auswerten), der Fortschritt liegt in der Datenbank. Ein
-	 * voller Sync braucht rund elf Aufrufe, der Rest der Nacht geht an
-	 * IGDB-Auffrischen und Disc-Fassungen. Ein Eintrag von fuenf erlaubten.
+	 * holen oder auswerten), der Fortschritt liegt in der Datenbank.
+	 *
+	 * Seit Stufe 18e sind es zwei Fenster von fuenf erlaubten Eintraegen:
+	 *
+	 * 1. 03:00-05:59 UTC (05-08 Uhr MESZ), 36 Aufrufe - alles, was PSN
+	 *    anfasst: Sync (rund elf Aufrufe), Spielzeit (zwei), Kaufliste
+	 *    (fuenfzehn, woechentlich). Zusammen 28 an einer Kaufliste-Nacht.
+	 * 2. 06:00-07:59 UTC (08-10 Uhr MESZ), 24 Aufrufe - die Wartung:
+	 *    erschienene Titel freigeben, IGDB-Auffrischen (nach einem Rueckstand
+	 *    bis zu acht Aufrufe), Disc-Fassungen, alte Rohantworten loeschen.
+	 *
+	 * Vorher lag beides in einem Fenster, und die Rechnung ging nicht mehr
+	 * auf: 37 Aufrufe Bedarf gegen 36 Slots (Messung vom 24.09.2026, 10.1).
+	 * Die Ausdruecke stehen zusaetzlich als Konstanten in src/sync/cron.ts -
+	 * der Worker leitet daraus ab, welche Haelfte er tun soll; ein Test haelt
+	 * beide Seiten zusammen.
 	 */
 	"triggers": {
-		"crons": ["*/5 3-5 * * *"]
+		"crons": ["*/5 3-5 * * *", "*/5 6-7 * * *"]
 	},
 	"upload_source_maps": true,
 	/**

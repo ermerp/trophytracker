@@ -1,0 +1,22 @@
+-- Migration 0024: Fehlversuche je Sync-Lauf (Stufe 18e, Abschnitt 10.1)
+--
+-- Bis hierher beendete ein einziger Abrufsfehler den Sync fuer die ganze
+-- Nacht: syncSchritt setzte den Lauf auf 'fehler', und syncFaellig startet
+-- keinen zweiten Cron-Lauf am selben Tag. In der Nacht zum 27.09.2026 ist
+-- das eingetreten - die dritte von fuenf Seiten scheiterte um 03:10, und die
+-- restlichen 29 Aufrufe des Fensters taten nichts, obwohl derselbe Endpunkt
+-- kurz darauf wieder antwortete (die Spielzeit-Schritte um 03:16 und 03:21
+-- liefen erfolgreich). 431 Titel blieben einen Tag alt, und die zwei schon
+-- geholten Seiten wurden zu Waisen.
+--
+-- Ein Abrufsfehler ohne Auth-Bezug laesst den Lauf deshalb auf 'laufend';
+-- der naechste Aufruf holt dieselbe Seite ab next_offset erneut. Der Zaehler
+-- begrenzt das: nach drei Fehlversuchen ohne Fortschritt gilt der Lauf als
+-- gescheitert. Jeder Fortschritt setzt ihn auf 0 zurueck - gezaehlt werden
+-- Versuche an derselben Stelle, nicht ueber die Nacht verteilte.
+--
+-- Abwaertskompatibel: ADD COLUMN mit Default, der alte Worker laeuft
+-- waehrend der Migration weiter und kennt die Spalte einfach nicht. Keine
+-- View steht auf psn_sync_run, die Regel aus CLAUDE.md greift hier nicht.
+
+ALTER TABLE psn_sync_run ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0;

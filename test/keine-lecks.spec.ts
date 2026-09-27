@@ -6,6 +6,7 @@ import { Geheimnis } from "../src/domain/secret";
 import { erstelleEbayClient } from "../src/ebay/client";
 import { erstelleIgdbClient } from "../src/igdb/client";
 import { erstellePsnClient } from "../src/psn/client";
+import { CRON_WARTUNG } from "../src/sync/cron";
 import { spielRoh } from "./igdb-fake";
 import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophySeite } from "./psn-fake";
 
@@ -170,6 +171,27 @@ function psnKaputt() {
 			[/oauth\/authorize/, () => new Response(null, { status: 403 })],
 			[/oauth\/token/, () => jsonAntwort({ error: "invalid_grant" }, 400)],
 			[/trophyTitles/, () => new Response(null, { status: 500 })],
+		]).fetch,
+	);
+}
+
+/**
+ * PSN, dessen Anmeldung klappt und dessen Fehlerantworten MARKIERTEN Text im
+ * Koerper tragen (Stufe 18e).
+ *
+ * Seit 18e geht der Text von `PsnAbrufError` woertlich in Meldung, Log und
+ * Verlauf - er ist eine eigene Schablone plus Statuscode. Dieser Fake haelt
+ * fest, dass dabei nichts aus der Antwort mitkommt: Wer die Schablone spaeter
+ * um den Antwortkoerper erweitert, faellt hier auf.
+ */
+function psnFehlertextMarkiert() {
+	return erstellePsnClient(
+		fakeFetch([
+			[/oauth\/authorize/, () => redirectAntwort("v3.abc")],
+			[/oauth\/token/, () => jsonAntwort(TOKEN_ANTWORT)],
+			[/trophyTitles/, () => new Response(`Fehler: ${MARKIERUNGEN.accessToken}`, { status: 503 })],
+			[/gamelist\/v2/, () => new Response(`Fehler: ${MARKIERUNGEN.accessToken}`, { status: 503 })],
+			[/graphql/, () => new Response(`Fehler: ${MARKIERUNGEN.accessToken}`, { status: 403 })],
 		]).fetch,
 	);
 }
@@ -341,11 +363,31 @@ describe("Dichtheitsprüfung", () => {
 		for (let i = 0; i < 6; i++) await gut(ereignis, env, ctx);
 
 		await env.DB.prepare("DELETE FROM psn_sync_run").run();
-		await createScheduled(psnKaputt, () => igdbKaputt(500))(ereignis, env, ctx);
-		await createScheduled(psnKaputt, () => igdbAbrufKaputt(429))(ereignis, env, ctx);
+		// Beide Fenster: Der PSN-Eintrag fasst IGDB gar nicht an (Stufe 18e),
+		// die Fehlerpfade von IGDB gehoeren also an den Wartungs-Eintrag.
+		const wartung = { ...ereignis, cron: CRON_WARTUNG };
+		for (const igdb of [() => igdbKaputt(500), () => igdbAbrufKaputt(429)]) {
+			await createScheduled(psnKaputt, igdb)(ereignis, env, ctx);
+			await createScheduled(psnKaputt, igdb)(wartung, env, ctx);
+		}
+
+		// Und der Fall, um den es in 18e geht: Fehlerantworten mit markiertem
+		// Koerper, deren Statuscode jetzt woertlich in Meldung und Verlauf
+		// steht. Drei Aufrufe, damit auch der dritte Fehlversuch dabei ist.
+		await env.DB.prepare("DELETE FROM psn_sync_run").run();
+		// Die Fehlerpfade oben haben den Zugang auf 'abgelaufen' gesetzt; ohne
+		// gueltigen Zugang legt der Cron gar keinen Lauf an (10.1, Schritt 3).
+		const repos = createRepositories(env.DB, env.NPSSO_KEY);
+		await repos.credentials.npssoSpeichern(new Geheimnis(MARKIERUNGEN.npsso));
+		for (let i = 0; i < 3; i++) {
+			await createScheduled(psnFehlertextMarkiert, () => igdbMarkiert())(ereignis, env, ctx);
+		}
+		const verlauf = await repos.sync.cronVerlauf();
+		expect(verlauf.join("\n")).toContain("Trophäenabruf antwortete mit 503.");
 
 		expect(ausgabe.length).toBeGreaterThan(6);
-		expect(istDicht(ausgabe.join("\n")), ausgabe.join("\n")).toMatchObject({ dicht: true });
+		const alles = [...ausgabe, ...verlauf].join("\n");
+		expect(istDicht(alles), alles).toMatchObject({ dicht: true });
 	});
 
 	it("gibt auf keiner eBay-Route ein Geheimnis heraus - Fehlerpfade (Stufe 17c)", async () => {

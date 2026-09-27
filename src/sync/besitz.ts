@@ -2,7 +2,7 @@ import type { Repositories } from "../db";
 import type { GespielterTitel } from "../db/besitz";
 import { dauerInSekunden, plattformAusKategorie } from "../domain/psn-besitz";
 import { titelSchluessel } from "../domain/titel";
-import { PsnAuthError, type PsnClient } from "../psn/client";
+import { PsnAbrufError, PsnAuthError, type PsnClient } from "../psn/client";
 
 /**
  * Spielzeit und digitaler Besitz aus PSN holen (Abschnitt 7.7, Stufe 18c).
@@ -169,8 +169,16 @@ export async function besitzSchritt(
 	}
 }
 
-/** Nur eigene Fehlertypen woertlich - kein Fremdtext, der ein Geheimnis zitieren koennte. */
+/**
+ * Nur eigene Fehlertypen woertlich - kein Fremdtext, der ein Geheimnis
+ * zitieren koennte.
+ *
+ * `PsnAbrufError` kam mit Stufe 18e dazu: Sein Text ist eine eigene
+ * Schablone plus der HTTP-Status ("Abruf der Kaufliste antwortete mit 403."),
+ * und genau der fehlte, als der Kauflisten-Schritt am 23.09.2026 stumm
+ * scheiterte (7.7).
+ */
 function meldungFuer(fehler: unknown): string {
-	if (fehler instanceof PsnAuthError) return fehler.message;
+	if (fehler instanceof PsnAuthError || fehler instanceof PsnAbrufError) return fehler.message;
 	return "Der PSN-Abruf ist fehlgeschlagen.";
 }

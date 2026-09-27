@@ -103,6 +103,18 @@ export class CredentialsRepository {
 			.run();
 	}
 
+	/**
+	 * Ein altes 'fehler' wegraeumen, wenn ein PSN-Abruf wieder geglueckt ist
+	 * (Stufe 18e). 'abgelaufen' bleibt unberuehrt - das raeumt nur ein neues
+	 * NPSSO weg -, und `last_success_at` bleibt dem Sync vorbehalten: Es
+	 * bedeutet "der Trophaeenstand ist von da".
+	 */
+	async fehlerStatusLoeschen(): Promise<void> {
+		await this.db
+			.prepare("UPDATE psn_credentials SET status = 'ok' WHERE id = 1 AND status = 'fehler'")
+			.run();
+	}
+
 	async statusSetzen(status: CredentialStatus): Promise<void> {
 		await this.db
 			.prepare("UPDATE psn_credentials SET status = ? WHERE id = 1")
