@@ -32,9 +32,15 @@ export const ZEICHEN = {
 	wolke:
 		'<path d="M7.4 17.2a3.9 3.9 0 0 1 .3-7.7 5.1 5.1 0 0 1 9.8 1.1 3.4 3.4 0 0 1 .2 6.6"/>' +
 		'<path d="M12 10.8v7.4m0 0-2.5-2.5M12 18.2l2.5-2.5"/>',
-	// PS Plus: ein fettes Kreuz, nur die Aussenlinie, kein Kreis darum
-	// (Wunsch des Nutzers vom 24.09.2026).
-	psplus: '<path d="M9.3 4.2h5.4v5.1h5.1v5.4h-5.1v5.1H9.3v-5.1H4.2V9.3h5.1z"/>',
+	// PS Plus: dieselbe Wolke wie der Kauf, aber mit einem Kreuz statt des
+	// Pfeils – digital, und zwar ueber das Abo. Bis zum 27.09.2026 stand hier
+	// ein fettes Kreuz allein; in der Release-Karte des Spieldetails sitzt es
+	// seit Stufe 19c in einem Knopf neben „Disc erfassen" und las sich dort wie
+	// ein Plus zum Hinzufuegen (Entscheidung des Nutzers, aus sechs Varianten).
+	// Kauf und Abo sind damit verwandte Zeichen statt zweier fremder Bilder.
+	psplus:
+		'<path d="M7.4 17.2a3.9 3.9 0 0 1 .3-7.7 5.1 5.1 0 0 1 9.8 1.1 3.4 3.4 0 0 1 .2 6.6"/>' +
+		'<path d="M12 11.2v7M8.5 14.7h7"/>',
 	pokal:
 		'<path d="M8 4.2h8v4.4a4 4 0 0 1-8 0z"/><path d="M8 5.4H5.4v1.7a3.6 3.6 0 0 0 2.9 3.5"/>' +
 		'<path d="M16 5.4h2.6v1.7a3.6 3.6 0 0 1-2.9 3.5"/><path d="M12 12.6v3.3"/>' +
@@ -44,6 +50,9 @@ export const ZEICHEN = {
 	barcode: '<path d="M4 5.5v13M7.4 5.5v13M10.8 5.5v9M14.2 5.5v13M17.6 5.5v9M20.4 5.5v13"/>',
 	muell: '<path d="M4.6 6.6h14.8M9.2 6.6V4.4h5.6v2.2M6.6 6.6l1 12.9h8.8l1-12.9"/>',
 	kreuz: '<path d="M6.4 6.4 17.6 17.6M17.6 6.4 6.4 17.6"/>',
+	// Drei Punkte: alles Seltene eines Ortes an einer Stelle (Stufe 19c).
+	mehr: '<circle cx="5.4" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.6" cy="12" r="1.3"/>',
+	stift: '<path d="M4 20h4L18.6 9.4l-4-4L4 16z"/><path d="M13.9 6.1l4 4"/>',
 	plus: '<path d="M12 5.4v13.2M5.4 12h13.2"/>',
 	durchgespielt: '<circle cx="12" cy="12" r="8.4"/><path d="M8.2 12.3l2.9 2.9 5.1-5.9"/>',
 	abgebrochen: '<circle cx="12" cy="12" r="8.4"/><path d="M9.2 9.2l5.6 5.6M14.8 9.2l-5.6 5.6"/>',

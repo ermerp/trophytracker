@@ -1,5 +1,16 @@
 import { Link } from 'react-router-dom'
-import { PLATINTEXT, QUELLENTEXT, STATUSTEXT, type Platin, type PlayStatus, type Plattform, type Quelle } from './api'
+import {
+	PLATINTEXT,
+	QUELLENTEXT,
+	STATUSTEXT,
+	STUFENTEXT,
+	TROPHAEENSTUFEN,
+	type Platin,
+	type PlayStatus,
+	type Plattform,
+	type Quelle,
+	type TrophaeenStufe,
+} from './api'
 import { Zeichen } from './Symbole'
 
 /**
@@ -98,6 +109,51 @@ export function PlatinZeichen({ platin, groesse = 15 }: { platin: Platin | null;
 		>
 			<Zeichen name="pokal" groesse={groesse} gefuellt={erspielt} strich={1.5} />
 		</span>
+	)
+}
+
+export type Stufenzahlen = { bronze: number; silber: number; gold: number; platin: number }
+
+/**
+ * Die vier Trophäenstufen als Pokale in ihren Metalltönen.
+ *
+ * **Immer absteigend – Platin, Gold, Silber, Bronze** (Regel seit Stufe 19c,
+ * Entscheidung des Nutzers vom 27.09.2026). Die Reihenfolge kommt aus
+ * `TROPHAEENSTUFEN` und wird nirgends von Hand hingeschrieben: Spieldetail,
+ * Prüfliste und die Trophäenliste zählten vorher jede für sich aufwärts,
+ * während das Dashboard schon absteigend zählte.
+ *
+ * Dieselbe Dreiwertigkeit wie beim Platin-Zeichen: Was es **gar nicht gibt**
+ * (`definiert === 0`, bei Platin 93 von 431 Titeln), steht nicht als „0/0" da,
+ * sondern fehlt. Was es gibt und nicht erspielt ist, steht im `--aus`-Ton.
+ */
+export function TrophaeenStufen({
+	erspielt,
+	definiert,
+	groesse = 13,
+}: {
+	erspielt: Stufenzahlen
+	definiert: Stufenzahlen
+	groesse?: number
+}) {
+	return (
+		<div className="stufen">
+			{TROPHAEENSTUFEN.filter((s) => definiert[s] > 0).map((s: TrophaeenStufe) => {
+				const hat = erspielt[s] > 0
+				return (
+					<span
+						key={s}
+						className="stufe"
+						title={`${STUFENTEXT[s]}: ${erspielt[s]} von ${definiert[s]}`}
+						style={{ color: hat ? `var(--troph-${s})` : 'var(--aus)' }}
+					>
+						<Zeichen name="pokal" groesse={groesse} gefuellt={hat} strich={1.5} />
+						<b>{erspielt[s]}</b>
+						<span className="von">/{definiert[s]}</span>
+					</span>
+				)
+			})}
+		</div>
 	)
 }
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { TrophaeenStufen } from './SpielTeile'
 import {
   AKTIONSTEXT,
   PLATINTEXT,
@@ -166,10 +167,8 @@ export function Pruefliste() {
               <strong>{e.fortschritt} %</strong> ·{' '}
               <span className={`platin ${e.platin}`}>{PLATINTEXT[e.platin ?? 'nicht_verfuegbar']}</span>
               <br />
-              <span className="zeile">
-                {e.erspielt.bronze}/{e.definiert.bronze} Bronze · {e.erspielt.silber}/{e.definiert.silber} Silber ·{' '}
-                {e.erspielt.gold}/{e.definiert.gold} Gold · zuletzt {datum(e.zuletztGespielt)}
-              </span>
+              <TrophaeenStufen erspielt={e.erspielt} definiert={e.definiert} />
+              <span className="zeile">zuletzt {datum(e.zuletztGespielt)}</span>
             </p>
           )}
           <p>

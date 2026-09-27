@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { TrophaeenStufen } from './SpielTeile'
 
 /**
  * Trophäenliste – die erste Ansicht auf echten Daten.
@@ -136,12 +137,8 @@ export function Trophaeen() {
                     {t.plattform} · {t.fortschritt} % ·{' '}
                     <span className={`platin ${t.platin}`}>{PLATINTEXT[t.platin]}</span>
                   </div>
-                  <div className="zeile">
-                    {t.erspielt.bronze}/{t.definiert.bronze} Bronze ·{' '}
-                    {t.erspielt.silber}/{t.definiert.silber} Silber ·{' '}
-                    {t.erspielt.gold}/{t.definiert.gold} Gold · zuletzt{' '}
-                    {datum(t.zuletztGespielt)}
-                  </div>
+                  <TrophaeenStufen erspielt={t.erspielt} definiert={t.definiert} />
+                  <div className="zeile">zuletzt {datum(t.zuletztGespielt)}</div>
                 </div>
               </li>
             ))}
