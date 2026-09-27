@@ -240,6 +240,21 @@ was produktiv tatsächlich ausgeliefert wird, `npm run build` und dann
 Die lokale Entwicklung läuft gegen eine **lokale** D1 in `.wrangler/`, nicht gegen
 die produktive Datenbank. Nur Befehle mit `--remote` fassen die echten Daten an.
 
+**Testdaten für die lokale D1:**
+
+```bash
+node scripts/testdaten.mjs > /tmp/testdaten.sql
+npx wrangler d1 execute trophytracker --local --file=/tmp/testdaten.sql
+```
+
+Das erzeugt rund 430 erfundene Trophäenlisten über die vier Plattformen – die
+Größenordnung der echten Sammlung, aber Phantasietitel. Gebraucht wird das, um
+Ansichten vor dem Deploy anzusehen (headless Chrome gegen `wrangler dev`) und
+nicht nur zu bauen. **Echte PSN-Daten kommen dafür nie in Frage:** Die
+Rohantworten in der Produktion enthalten die vollständige Spielhistorie, und
+dieses Repository ist öffentlich. Das Skript beginnt mit `DELETE` über alle
+Fachtabellen und gehört deshalb niemals an `--remote`.
+
 **Scanner lokal testen:** Kamerazugriff braucht einen sicheren Kontext –
 `http://localhost:5173` und `http://localhost:8787` sind einer, eine Adresse im
 LAN vom Handy aus nicht. Am Laptop läuft der Scanner also unter `npm run dev`
