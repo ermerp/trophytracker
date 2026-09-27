@@ -9,6 +9,7 @@ import {
   PLAN_ARTTEXT,
   PLATTFORMEN,
   PLAY_STATUS,
+  QUELLEN,
   QUELLENTEXT,
   STATUSTEXT,
   anfrage,
@@ -568,6 +569,7 @@ function ReleaseKarte({
 }) {
   const [menue, setMenue] = useState(false)
   const [zustand, setZustand] = useState(false)
+  const [quellenwahl, setQuellenwahl] = useState(false)
 
   const disc = r.exemplare.length > 0
   const gekauft = r.digital.find((d) => d.quelle !== 'plus')
@@ -613,15 +615,15 @@ function ReleaseKarte({
           // Von PSN erkannt heisst: kein Knopf. Der nächste Lauf legte die
           // Zeile ohnehin wieder an (7.7).
           gesetzt={digital !== null}
-          satz={digital ? (digital.herkunft === 'psn' ? 'von PSN erkannt' : datum(digital.erworbenAm)) : 'erfassen'}
+          satz={digital ? (digital.herkunft === 'psn' ? 'von PSN erkannt' : datum(digital.erworbenAm)) : 'wählen'}
           laeuft={laeuft}
-          onErfassen={() => {
-            if (!confirm(`Gekauften Download für ${r.plattform} erfassen?`)) return
-            void erfassen(
-              () => anfrage<ErfasstAntwort>('/api/digital-entitlements', { methode: 'POST', koerper: { releaseId: r.id, quelle: 'kauf' } }),
-              'Digital erfasst.',
-            )
-          }}
+          // Kein stiller Standardwert: Die erste Fassung von 19c legte ohne
+          // Rückfrage „Kauf" an – genau der vorbelegte Wert, der in der
+          // Produktion acht falsche Einträge erzeugt hat, alle am Anfang des
+          // Alphabets (Befund vom 27.09.2026). Ein freiwilliges Feld bleibt
+          // leer, statt mit einem plausiblen Wert vorbelegt zu werden
+          // (Abschnitt 3).
+          onErfassen={() => setQuellenwahl(!quellenwahl)}
         />
         </div>
 
@@ -646,6 +648,21 @@ function ReleaseKarte({
           )}
         </span>
       </div>
+
+      {quellenwahl && (
+        <QuellenTafel
+          belegt={r.digital.map((d) => d.quelle)}
+          laeuft={laeuft}
+          schliessen={() => setQuellenwahl(false)}
+          onWaehlen={(q) => {
+            setQuellenwahl(false)
+            void erfassen(
+              () => anfrage<ErfasstAntwort>('/api/digital-entitlements', { methode: 'POST', koerper: { releaseId: r.id, quelle: q } }),
+              `„${QUELLENTEXT[q]}" erfasst.`,
+            )
+          }}
+        />
+      )}
 
       {r.trophaeen ? (
         <>
@@ -761,6 +778,45 @@ function BesitzKnopf({
         <span>{satz}</span>
       </span>
     </button>
+  )
+}
+
+/**
+ * Woher der Download kommt – Kauf, PS Plus, Testversion, Sonstiges.
+ *
+ * **Ohne Vorauswahl.** Das alte Formular hatte ein Auswahlfeld, dessen erster
+ * Eintrag „Kauf" war; wer sich durch die Sammlung klickte, legte damit acht
+ * falsche Einträge an, alle am Anfang des Alphabets (gemessen am 27.09.2026).
+ * Die erste Fassung von Stufe 19c wiederholte den Fehler, indem der Knopf
+ * „Digital" stillschweigend `kauf` schrieb. Hier steht jede Quelle als eigener
+ * Knopf, und keiner ist der Vorschlag.
+ *
+ * Schon belegte Quellen fehlen: `UNIQUE (release_id, source)` liesse sie
+ * ohnehin nicht zweimal zu.
+ */
+function QuellenTafel({
+  belegt,
+  laeuft,
+  schliessen,
+  onWaehlen,
+}: {
+  belegt: readonly Quelle[]
+  laeuft: boolean
+  schliessen: () => void
+  onWaehlen: (q: Quelle) => void
+}) {
+  useEscape(schliessen)
+  const offen = QUELLEN.filter((q) => !belegt.includes(q))
+  if (offen.length === 0) return null
+  return (
+    <div className="wahltafel" role="group" aria-label="Woher kommt der Download?">
+      {offen.map((q) => (
+        <button key={q} type="button" className="knopf" disabled={laeuft} onClick={() => onWaehlen(q)}>
+          {QUELLENTEXT[q]}
+        </button>
+      ))}
+      <p className="still">Was PSN selbst erkennt, steht ohne Zutun hier – von Hand nur, was dort fehlt.</p>
+    </div>
   )
 }
 
