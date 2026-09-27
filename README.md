@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 18c abgenommen** (22.09.2026), Stufen 18d, 19 und 19a gebaut (23.–27.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+**Stufen bis 19a abgenommen** (27.09.2026) ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -174,7 +174,7 @@ am Konto). Die Filter stehen in zwei Ebenen: sichtbar ist nur, was gesetzt ist,
 alles Weitere hinter einem Knopf „Filter“.
 Farben, Abstände und Schriften stehen an einer Stelle: `frontend/src/tokens.css`. Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen.
 
-**Stufe 19a** (27.09.2026) macht daraus das **Dashboard**. `/start` zeigt jetzt
+**Stufe 19a** (abgenommen am 27.09.2026) macht daraus das **Dashboard**. `/start` zeigt jetzt
 den Trophäen-Anteil in Prozent, die Zahl der Spiele, Backlog und To-Do, dann
 Kacheln je Plattform, die Statusverteilung als Kreis mit Legende, die vier
 Trophäenstufen als Pokale in Metalltönen und zuletzt „Neu" – die jüngsten
