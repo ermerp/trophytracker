@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigationType } from 'react-router-dom'
 import { Abweichungen } from './Abweichungen'
 import { Aenderungen } from './Aenderungen'
+import { Anzeigewerte } from './Anzeigewerte'
 import { Backlog } from './Backlog'
 import { Luecken } from './Luecken'
 import { Einstellungen } from './Einstellungen'
@@ -118,6 +119,7 @@ function App() {
                 <Igdb />
                 <Sicherung />
                 <Abweichungen />
+                <Anzeigewerte />
                 <Werkzeuge />
               </>
             }
