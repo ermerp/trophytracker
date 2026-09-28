@@ -155,6 +155,36 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		await env.DB.prepare("DELETE FROM psn_played_title").run();
 	});
 
+	it("misst den Titelabgleich der Sync-Schritte (Nachbesserung zu 18c)", async () => {
+		// Diese eine Abfrage sucht das Release zu einem PSN-Titel
+		// (GamesRepository.releasesNachSchluessel). Sie ist fuer sich winzig und
+		// deshalb hier lange gar nicht gemessen worden - sie laeuft aber in einer
+		// Schleife: 303-mal je Nacht im Spielzeit-Schritt und 730-mal je
+		// woechentlichem Kaufliste-Durchlauf (7.7). Ohne Index war sie ein
+		// Tabellenscan ueber game, gemessen 480 Zeilen je Aufruf gegen die
+		// Produktion - also rund 145 000 Zeilen je Nacht und 350 000 je
+		// Kaufliste. Migration 0025 legt idx_game_sort_title an.
+		//
+		// Die Lehre steckt in der Zeile darunter: Dieser Test hat bis zum
+		// 28.09.2026 nur Leseansichten gemessen. Ein Schreibschritt, der je
+		// Eintrag eine Abfrage macht, gehoert genauso hierher.
+		const treffer = await zeilenGelesen(
+			"SELECT r.id, r.platform FROM release r JOIN game g ON g.id = r.game_id WHERE g.sort_title = ?",
+			"spiel 0215",
+		);
+		const danebenObwohlVorhanden = await zeilenGelesen(
+			"SELECT r.id, r.platform FROM release r JOIN game g ON g.id = r.game_id WHERE g.sort_title = ?",
+			"gibt es nicht",
+		);
+		console.info({ titelabgleich: treffer, titelabgleichOhneTreffer: danebenObwohlVorhanden });
+
+		// Ein Index-Lookup plus die Releases des Treffers. Der Schwellwert ist
+		// bewusst klein: Bei 430 Spielen waere ein Scan sofort dreistellig, und
+		// genau das soll hier nie wieder unbemerkt passieren.
+		expect(treffer).toBeLessThan(10);
+		expect(danebenObwohlVorhanden).toBeLessThan(10);
+	});
+
 	it("misst die Abfragen der Sammlung einzeln", async () => {
 		const zuletzt =
 			"(SELECT MAX(t2.last_played_at) FROM trophy_progress t2 JOIN release r2 ON r2.id = t2.release_id WHERE r2.game_id = g.id)";
