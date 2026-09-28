@@ -6,7 +6,7 @@ import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, type
 import { istErlaubtePlattform, plattformenAus, titelSchluessel } from "../domain/titel";
 import { IgdbKonfigError } from "../igdb/client";
 import { igdbAbgleichSchritt, igdbAuffrischSchritt, igdbPhysischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
-import { zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
+import { KeinePlattformError, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
 import type { AppEnv } from "../types";
 import { eintragAntwort } from "./plans";
 
@@ -213,11 +213,16 @@ export const unmatchedRoutes = new Hono<AppEnv>()
 		if (!Number.isInteger(igdbId) || igdbId <= 0) {
 			return c.json({ fehler: "Feld 'igdbId' fehlt oder ist ungültig." }, 400);
 		}
-		// Plattform wie bei POST /api/plans: fehlt oder "auto" → die neueste, "" → ohne.
+		// Plattform wie bei POST /api/plans: fehlt oder "auto" → die neueste.
+		// Seit Stufe 19d sind "" und null abgewiesen, und der fehlende Schluessel
+		// ist davon unterschieden (Abschnitt 5).
+		const hatPlattform = koerper !== null && typeof koerper === "object" && "plattform" in koerper;
 		const roh = (koerper as { plattform?: unknown }).plattform;
 		let wahl: PlattformWahl = "auto";
-		if (roh === null || roh === "") wahl = null;
-		else if (typeof roh === "string" && roh !== "auto") {
+		if (hatPlattform && (roh === null || roh === "")) {
+			return c.json({ fehler: "Ein Eintrag braucht eine Plattform." }, 400);
+		}
+		if (typeof roh === "string" && roh !== "auto") {
 			if (!istErlaubtePlattform(roh)) return c.json({ fehler: `Unbekannte Plattform: ${roh}` }, 400);
 			wahl = roh;
 		}
@@ -233,6 +238,8 @@ export const unmatchedRoutes = new Hono<AppEnv>()
 			ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, wahl);
 		} catch (fehler) {
 			if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
+			// "auto" hat keine Plattform gefunden (Stufe 19d) - kein IGDB-Problem.
+			if (fehler instanceof KeinePlattformError) return c.json({ fehler: fehler.message }, 400);
 			return c.json({ fehler: meldungFuer(fehler) }, 502);
 		}
 		if (!ergebnis) return c.json({ fehler: "IGDB kennt diesen Eintrag nicht." }, 404);

@@ -37,7 +37,8 @@ export const SORTIERTEXT = {
 } as const
 export type Sortierung = keyof typeof SORTIERTEXT
 
-const PLATTFORM_FILTER = [...PLATTFORMEN, 'ohne'] as const
+// Seit Stufe 19d ohne 'ohne': Jeder Eintrag hängt an einem Release (Abschnitt 5).
+const PLATTFORM_FILTER = PLATTFORMEN
 
 /** Dieselbe Ordnung wie im Worker, damit eine Änderung die Kachel sofort an ihren Platz rückt. */
 const nachTitel = (a: PlanEintrag, b: PlanEintrag) => a.titel.localeCompare(b.titel, 'de') || a.id - b.id
@@ -128,7 +129,7 @@ export function usePlanListe(art: PlanArt) {
         e.art === art &&
         (alle || e.status === 'offen') &&
         (!nurFavoriten || e.favorit) &&
-        (plattformen.size === 0 || plattformen.has(e.plattform ?? 'ohne')) &&
+        (plattformen.size === 0 || (e.plattform !== null && plattformen.has(e.plattform))) &&
         (suche === '' || e.titel.toLocaleLowerCase('de').includes(suche.toLocaleLowerCase('de')))
       return { ...d, eintraege: (bleibt ? [...rest, e] : rest).sort(VERGLEICH[sortierung]) }
     })
@@ -250,10 +251,7 @@ export const PLAN_CHIPS: readonly ChipGruppe[] = [
 		param: 'plattform',
 		titel: 'Plattform',
 		mehrfach: true,
-		werte: [
-			...PLATTFORMEN.map((p) => [p, p === 'PSVITA' ? 'Vita' : p] as const),
-			['ohne', 'ohne Plattform'] as const,
-		],
+    werte: PLATTFORMEN.map((p) => [p, p === 'PSVITA' ? 'Vita' : p] as const),
 	},
 	{ param: 'favorit', titel: 'Auswahl', werte: [['1', 'Favoriten']] },
 	{ param: 'status', titel: 'Erledigte', werte: [['alle', 'auch erledigte und verworfene']] },
@@ -352,8 +350,8 @@ function IKnopf({
  *   und Spieldetail – „es reicht, wenn sie nicht angezeigt wird".
  * - **Die Plattform ist nur in der Kachel änderbar.** In der Zeile steht sie
  *   als Kennzeichen; das Dropdown hätte dort die Knopfreihe verdrängt. Das
- *   Umhängen ist seltene Nachpflege, für die es den Filter „ohne Plattform"
- *   gibt (Abschnitt 5).
+ *   Umhängen bleibt seltene Nachpflege – seit Stufe 19d trägt jeder Eintrag
+ *   von Anfang an eine der vier Plattformen (Abschnitt 5).
  */
 export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zieher }: KarteProps) {
   const { aendern, entfernen, bewerten } = liste
@@ -379,7 +377,10 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
   const meta = (
     <div className="release-daten umbrechend">
       {e.spielId === null ? (
-        <span className="plattform leer">ohne Plattform</span>
+        // Freitext hat kein Spiel und deshalb keine Plattform - der eine Fall,
+        // in dem es keine gibt (Abschnitt 5). Das Kennzeichen sagt den Grund,
+        // seit Stufe 19d nicht mehr "ohne Plattform".
+        <span className="plattform leer">Freitext</span>
       ) : plattformOffen ? (
         <select
           value={e.plattform ?? ''}
@@ -391,7 +392,6 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
             void aendern(e.id, { plattform: ev.target.value })
           }}
         >
-          <option value="">ohne Plattform</option>
           {PLATTFORMEN.map((p) => (
             <option key={p} value={p}>
               {p}
@@ -406,7 +406,9 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
           onClick={() => setPlattformOffen(true)}
           onPointerDown={(ev) => ev.stopPropagation()}
         >
-          {e.plattform ? <PlattformChip plattform={e.plattform} /> : <span className="plattform leer">ohne Plattform</span>}
+          {/* Seit Stufe 19d entsteht kein Eintrag mehr ohne Release; ein alter
+              zeigt hier eine Einladung, keinen gültigen Zustand. */}
+          {e.plattform ? <PlattformChip plattform={e.plattform} /> : <span className="plattform leer">Plattform wählen</span>}
         </button>
       )}
       {e.art !== 'wunsch' && e.eigenerStatus && <ZustandsZeile status={e.eigenerStatus} klein />}

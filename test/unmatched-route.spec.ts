@@ -74,10 +74,16 @@ describe("POST /api/unmatched/plan_*/:id/link", () => {
 		expect(await env.DB.prepare("SELECT title_raw FROM plan_entry WHERE id = 10").first()).toEqual({ title_raw: "Nur Text" });
 	});
 
-	it("nimmt die Plattform aus dem Koerper - '' heisst ohne", async () => {
-		const { client } = fakeIgdb([[spielRoh({ id: 77, name: "Nur Text", platforms: [48, 167] })]]);
-		const a = await app(client).request("/api/unmatched/plan_wunsch/10/link", json({ igdbId: 77, plattform: "" }), env);
-		expect(await a.json()).toMatchObject({ plattform: null, spielAngelegt: true });
+	it("nimmt die Plattform aus dem Koerper; '' und null bekommen 400 (Stufe 19d)", async () => {
+		const { client } = fakeIgdb([
+			[spielRoh({ id: 77, name: "Nur Text", platforms: [48, 167] })],
+			[spielRoh({ id: 77, name: "Nur Text", platforms: [48, 167] })],
+		]);
+		expect((await app(client).request("/api/unmatched/plan_wunsch/10/link", json({ igdbId: 77, plattform: "" }), env)).status).toBe(400);
+		expect((await app(client).request("/api/unmatched/plan_wunsch/10/link", json({ igdbId: 77, plattform: null }), env)).status).toBe(400);
+		// Ohne Angabe die neueste des Treffers: 167 ist PS5, 48 ist PS4.
+		const a = await app(client).request("/api/unmatched/plan_wunsch/10/link", json({ igdbId: 77 }), env);
+		expect(await a.json()).toMatchObject({ plattform: "PS5", spielAngelegt: true });
 		expect((await app(client).request("/api/unmatched/plan_backlog/11/link", json({ igdbId: 4711, plattform: "Switch" }), env)).status).toBe(400);
 	});
 

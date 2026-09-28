@@ -42,7 +42,7 @@ export function ErscheintBald() {
               <div>
                 <Link to={`/spiel/${e.spielId}`} className="titel">{e.favorit ? '★ ' : ''}{e.titel}</Link>
                 <div className="zeile">
-                  erscheint {e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'} · {e.plattform ?? 'ohne Plattform'} · {PLAN_ARTTEXT[e.art]}
+                  erscheint {e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'} · {e.plattform ?? 'Plattform fehlt'} · {PLAN_ARTTEXT[e.art]}
                 </div>
               </div>
             </li>

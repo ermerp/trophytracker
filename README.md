@@ -15,7 +15,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 ## Stand
 
 **Stufen bis 19a und 19c abgenommen** (27.09.2026), **Stufe 18e gebaut, deployt und im
-Nachtlauf zum 28.09.2026 bestätigt** (Abnahme offen)
+Nachtlauf zum 28.09.2026 bestätigt** (Abnahme offen), **Stufe 19d gebaut** (28.09.2026)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -126,7 +126,7 @@ Was steht und in Betrieb nachgewiesen ist:
 | Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer (Stand vor Migration 0011; seit Migration 0012 sind es 21 Tabellen und 25 Indizes) |
 | Nur PlayStation | PS3, PS4, PS5, Vita – sonst nichts: IGDB-Einträge ohne genannte PlayStation-Plattform sind nirgends ein Treffer (auch nicht ohne Plattformangabe, seit 16.09.2026), jede IGDB-Abfrage filtert, `release.platform` erlaubt nur die vier Werte |
 | IGDB-Titel | Ein von Hand oder aus einem Wunsch angelegtes Spiel übernimmt beim Verknüpfen den IGDB-Namen als Titel (nicht beim Auffrischen, nie bei Spielen mit Trophäenliste); änderbar im Spieldetail – die Überschrift ist ein Eingabefeld |
-| Wunschliste | Eigene Ansicht in der Leiste: Favoriten zuerst, dann Kritikerwertung (auch Wertung, Titel, Erscheinungsdatum, zuletzt angelegt); Filter Favoriten, Plattformen, „ohne Plattform"; Favorit-Stern, Plattform-Dropdown je Eintrag, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform-Dropdown an jedem Treffer, vorbelegt mit dessen neuester – mit Plattform ein Release, das erst mit Besitz oder Fortschritt in der Sammlung erscheint, ohne Plattform ein Spiel ohne Release; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026**; Priorität und Rang danach auf Wunsch des Nutzers entfernt (Migration 0013) |
+| Wunschliste | Eigene Ansicht in der Leiste: Favoriten zuerst, dann Kritikerwertung (auch Wertung, Titel, Erscheinungsdatum, zuletzt angelegt); Filter Favoriten und Plattformen; Favorit-Stern, Plattform-Dropdown je Eintrag, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform-Dropdown an jedem Treffer, vorbelegt mit dessen neuester – **eine der vier ist seit Stufe 19d Pflicht**, das Release entsteht dabei und erscheint erst mit Besitz oder Fortschritt in der Sammlung; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026**; Priorität und Rang danach auf Wunsch des Nutzers entfernt (Migration 0013) |
 | Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
 | Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
 | To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert. **Gekoppelt mit der Bewertung** (Entscheidung vom 16.09.2026): To-Do heißt „am Spielen", „ins Backlog" setzt „pausiert", „durchgespielt"/„abgebrochen" auf der Kachel schließen den Eintrag |
@@ -277,9 +277,21 @@ wird –, und die „Nacht rund 54 000 Zeilen“ waren nur die **Leerlauf**-Aufr
 waren nie gemessen, es waren gut 200 000. `test/lesekosten.spec.ts` misst den Titelabgleich
 seither mit, denn es hat bis dahin nur Leseansichten geprüft, keinen Schreibschritt.
 
-**Als Nächstes: Stufe 19d** (Wunsch mit Plattform – „ohne Plattform" entfällt
-auch in Wunschliste und Import), dann **19b** (Einzeltrophäen je Spiel), danach
-20 (AWIN-Feed) und 21 (PSN Store-Preise). Die PSN-Stufen ergänzen nur, was die
+**Stufe 19d** (28.09.2026) nimmt „ohne Plattform" aus Wunschliste, Import, API und Filter –
+**in allen vier Listen**, nicht nur bei Wünschen: Gemessen hängen alle 94 Einträge der
+Produktion an einem Release, keiner am Spiel, keiner als Freitext. Ein **fehlender**
+Plattform-Schlüssel heißt weiter „die neueste" (die entschiedene Ausnahme vom 15.09.2026),
+ein ausdrückliches `null` oder ein leerer Text bekommt `400`. Beides auseinanderzuhalten war
+der eigentliche Punkt: Im JSON sind das `undefined` und `null`, und ein `?? 'auto'` würde
+still einen Wert schreiben, wo der Aufrufer „ohne" gesagt hat. Dabei fiel ein Pfad auf, der
+die Regel ausgehebelt hätte: Fand „auto" keine Plattform – ein Spiel ohne Releases und ohne
+IGDB-Eintrag –, entstand stillschweigend ein Eintrag am Spiel. Das ist jetzt auch `400`.
+**Freitext** bleibt die eine Stelle ohne Plattform und trägt in der Liste das Kennzeichen
+„Freitext" statt „ohne Plattform". Keine Migration; der Umbau lief über den Typ, der `null`
+verlor, worauf der Compiler alle sieben Stellen zeigte.
+
+**Als Nächstes: Stufe 19b** (Einzeltrophäen je Spiel), danach 20 (AWIN-Feed)
+und 21 (PSN Store-Preise). Die PSN-Stufen ergänzen nur, was die
 Sammlung schon kennt, und importieren nichts.
 
 **Stufe 18 ist seit dem 22.09.2026 abgenommen:** PWA installiert und offline
@@ -1117,11 +1129,12 @@ zuerst, dann Kritikerwertung; eine Rangformel mit Gewichten gab es bis
 Migration 0013 (Priorität entfernt, Entscheidung vom 15.09.2026). Die
 Plattform wird mit der **neuesten** vorbelegt, die Releases oder IGDB-Eintrag
 nennen (`plattform` fehlt oder `'auto'`), und ist vor dem Speichern und
-später per `PATCH` änderbar; `''` heißt ausdrücklich ohne. Mit Plattform
-entsteht das Release, und es zählt **nicht zur Sammlung, solange es nur den
-Wunsch trägt** – ein Wunsch ist kein Besitz. Ohne Plattform bleibt ein Spiel
-aus der IGDB-Suche **ohne Release**; der Filter „ohne Plattform" findet solche
-Wünsche zum Nachpflegen. Im Spieldetail ist das Spiel immer sichtbar. Ein Wunsch am Spiel und einer an einem
+später per `PATCH` änderbar. **Seit Stufe 19d ist eine der vier Pflicht:** Ein
+ausdrückliches `null` oder ein leerer Text antwortet mit `400`, und auch ein
+`'auto'`, das keine Plattform findet – ein Eintrag ohne Release wäre keine
+brauchbare Absicht. Das Release entsteht dabei und zählt **nicht zur Sammlung,
+solange es nur den Wunsch trägt** – ein Wunsch ist kein Besitz. Im Spieldetail
+ist das Spiel immer sichtbar. Ein Wunsch am Spiel und einer an einem
 seiner Releases sind zwei verschiedene Aussagen und blockieren sich nicht; nur
 dasselbe Ziel derselben Art antwortet mit `409`.
 
@@ -1161,8 +1174,8 @@ stehen als Liste zur Einzelentscheidung: Kandidat übernehmen, anders suchen,
 „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen („Mass Effect 1+2+3"),
 überspringen. Jede Entscheidung ist sofort gespeichert und überlebt ein
 Neuladen; Rückgängig löscht den angelegten Wunsch wieder. Der Wunsch hängt am
-Release der gewählten Plattform (entsteht bei Bedarf), ohne Plattform am
-Spiel. Hängt am Ziel schon ein offener Wunsch, wird die Zeile als
+Release der gewählten Plattform, das bei Bedarf entsteht; seit Stufe 19d lässt
+sich die Plattform einer Zeile nicht mehr leeren. Hängt am Ziel schon ein offener Wunsch, wird die Zeile als
 „schon auf der Wunschliste" ausgelassen – ein zweiter Import derselben Datei
 erzeugt keine Dubletten.
 

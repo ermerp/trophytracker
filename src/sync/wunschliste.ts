@@ -5,7 +5,7 @@ import { eindeutigerTreffer, normalisiereTrefferliste, ordneKandidaten, type Igd
 import { istErlaubtePlattform, neuestePlattform, titelSchluessel, type Plattform } from "../domain/titel";
 import { IgdbRateError, type IgdbClient } from "../igdb/client";
 import { KANDIDATEN_JE_SPIEL, kandidatenSuchen, meldungFuer } from "./igdb";
-import { zielAusKandidat } from "./plan-ziel";
+import { zielAmSpiel, zielAusKandidat } from "./plan-ziel";
 
 /**
  * Wunschlisten-Import in begrenzten Schritten (Abschnitt 8.2).
@@ -230,15 +230,23 @@ export async function importUebernahmeSchritt(
 					);
 					continue;
 				}
-				const e = await zielAusKandidat(repos, kandidat, plattform, "import");
+				const e = await zielAusKandidat(repos, kandidat, plattform ?? "auto", "import");
 				ziel = e.ziel;
 				if (e.spielAngelegt) spieleAngelegt++;
 			} else if (zeile.game_id !== null) {
 				// Die Plattform der Zeile (aus der Liste oder vorgeschlagen, vom
-				// Nutzer aenderbar) entscheidet: Release, das bei Bedarf entsteht,
-				// oder ohne Plattform das Spiel.
-				if (plattform !== null) ziel = { releaseId: await repos.games.releaseFuerPlattform(zeile.game_id, plattform, "import") };
-				else ziel = { gameId: zeile.game_id };
+				// Nutzer aenderbar) entscheidet, an welchem Release der Eintrag haengt;
+				// es entsteht bei Bedarf. Seit Stufe 19d gibt es keinen Zweig mehr, der
+				// den Eintrag ans Spiel haengt - traegt die Zeile keine Plattform, gilt
+				// der Vorschlag ("auto").
+				//
+				// Loest auch der nichts auf, wirft `zielAmSpiel` einen
+				// KeinePlattformError, und der Sammel-catch unten beendet die
+				// Uebernahme mit `weiter: false`. Das ist Absicht: Ein Ueberspringen
+				// liesse die Zeile in der Klar-Menge stehen, und die Schleife der
+				// Oberflaeche holte sie in jeder Runde erneut. Gemessen am 28.09.2026
+				// kann der Fall nicht eintreten - 0 von 478 Spielen haben kein Release.
+				ziel = await zielAmSpiel(repos, zeile.game_id, plattform ?? "auto", "import");
 			} else {
 				continue;
 			}

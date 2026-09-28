@@ -14,7 +14,7 @@ import {
 } from "../db/plan";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
-import { zielAmSpiel, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
+import { KeinePlattformError, zielAmSpiel, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
 import { ERLAUBTE_PLATTFORMEN, istErlaubtePlattform, suchbar } from "../domain/titel";
 import type { AppEnv } from "../types";
 import { liesJson } from "./validierung";
@@ -46,7 +46,9 @@ type Sortierung = (typeof SORTIERUNGEN)[number];
 const KAUF_HERKUNFT = ["luecke", "wunsch"] as const;
 
 /** Plattformfilter: die vier Plattformen und "ohne" fuer Eintraege am Spiel oder Freitext. */
-const PLATTFORM_FILTER = [...ERLAUBTE_PLATTFORMEN, "ohne"] as const;
+// Seit Stufe 19d ohne den Token "ohne": Jeder Eintrag haengt an einem Release
+// und hat damit eine Plattform (Abschnitt 5).
+const PLATTFORM_FILTER = ERLAUBTE_PLATTFORMEN;
 
 type Koerper = Record<string, unknown>;
 
@@ -89,13 +91,26 @@ function pruefeFelder(k: Koerper): { felder: PlanFelder } | { fehler: string } {
 }
 
 /**
- * Plattformwahl aus dem Koerper: fehlt → "auto" (neueste des Treffers bzw.
- * der Releases), "" oder null → ohne, sonst eine der vier. undefined im
- * Ergebnis heisst "Feld nicht im Koerper".
+ * Seit Stufe 19d gibt es kein "ohne Plattform" mehr - erst die Plattform
+ * entscheidet ueber Luecke, Kauf und Preis (Abschnitt 5).
+ */
+const OHNE_PLATTFORM = "Ein Eintrag braucht eine Plattform.";
+
+/**
+ * Plattformwahl aus dem Koerper: fehlt → "auto" (neueste des Treffers bzw. der
+ * Releases), sonst eine der vier. `undefined` im Ergebnis heisst "Feld nicht im
+ * Koerper" - und das ist etwas anderes als ein ausdrueckliches `null`.
+ *
+ * SEIT STUFE 19D werden "" und null abgewiesen: Ein Eintrag haengt immer an
+ * einem Release (Abschnitt 5, Entscheidung des Nutzers vom 27.09.2026). Die
+ * Unterscheidung laeuft ueber `"plattform" in k`, nicht ueber `?? "auto"` -
+ * letzteres wuerde fehlenden Schluessel und ausdrueckliches null gleich
+ * behandeln und damit still einen Wert schreiben, wo der Aufrufer "ohne"
+ * gesagt hat.
  */
 function pruefePlattform(k: Koerper): { wahl: PlattformWahl | undefined } | { fehler: string } {
 	if (!("plattform" in k)) return { wahl: undefined };
-	if (k.plattform === null || k.plattform === "") return { wahl: null };
+	if (k.plattform === null || k.plattform === "") return { fehler: OHNE_PLATTFORM };
 	if (k.plattform === "auto") return { wahl: "auto" };
 	if (typeof k.plattform === "string" && istErlaubtePlattform(k.plattform)) return { wahl: k.plattform };
 	return { fehler: `Unbekannte Plattform: ${String(k.plattform)}` };
@@ -188,10 +203,10 @@ const vergleicher: Record<Sortierung, (a: Eintrag, b: Eintrag) => number> = {
 	position: (a, b) => (a.position ?? Infinity) - (b.position ?? Infinity) || a.id - b.id,
 };
 
-/** Plattformfilter aus `plattform=PS4,PS5,ohne`; leer heisst alle. */
+/** Plattformfilter aus `plattform=PS4,PS5`; leer heisst alle. */
 function plattformFilter(roh: string | undefined): Set<string> {
 	const werte = (roh ?? "").split(",").map((p) => p.trim().toUpperCase()).filter((p) => p !== "");
-	return new Set(werte.map((p) => (p === "OHNE" ? "ohne" : p)).filter((p) => (PLATTFORM_FILTER as readonly string[]).includes(p)));
+	return new Set(werte.filter((p) => (PLATTFORM_FILTER as readonly string[]).includes(p)));
 }
 
 function ohneZugang(c: { json: (o: unknown, s: 503) => Response }) {
@@ -217,7 +232,7 @@ export const planRoutes = new Hono<AppEnv>()
 		const eintraege = zeilen
 			.map((z) => eintragAntwort(z))
 			.filter((e) => !nurFavoriten || e.favorit)
-			.filter((e) => plattformen.size === 0 || plattformen.has(e.plattform ?? "ohne"))
+			.filter((e) => plattformen.size === 0 || (e.plattform !== null && plattformen.has(e.plattform)))
 			.filter((e) => suche === "" || suchbar(e.titel).includes(suche))
 			.sort(vergleicher[sortierung]);
 
@@ -232,8 +247,10 @@ export const planRoutes = new Hono<AppEnv>()
 	 * den die Oberflaeche nur auf ausdrueckliche Anweisung schickt (8.2).
 	 *
 	 * Plattform (nur zu spielId und igdbId): fehlt sie oder ist "auto", wird
-	 * die neueste der Releases beziehungsweise des IGDB-Eintrags genommen;
-	 * "" heisst ausdruecklich ohne Plattform (Abschnitt 5).
+	 * die neueste der Releases beziehungsweise des IGDB-Eintrags genommen.
+	 * Seit Stufe 19d werden "" und null mit 400 abgewiesen - ein Eintrag haengt
+	 * immer an einem Release (Abschnitt 5). Findet auch "auto" keine Plattform,
+	 * ist das ebenfalls 400 statt eines Eintrags am Spiel.
 	 *
 	 * Duplikate (Abschnitt 5): Ein offener Eintrag am Spiel und einer an einem
 	 * seiner Releases sind zwei Aussagen und blockieren sich nicht; nur
@@ -302,7 +319,13 @@ export const planRoutes = new Hono<AppEnv>()
 				if (!(await c.var.repos.games.spielExistiert(gameId))) {
 					return c.json({ fehler: "Spiel nicht gefunden." }, 404);
 				}
-				ziel = await zielAmSpiel(c.var.repos, gameId, wahl);
+				try {
+					ziel = await zielAmSpiel(c.var.repos, gameId, wahl);
+				} catch (fehler) {
+					// "auto" ohne Releases und ohne IGDB-Plattform (Stufe 19d).
+					if (fehler instanceof KeinePlattformError) return c.json({ fehler: fehler.message }, 400);
+					throw fehler;
+				}
 				break;
 			}
 			case "igdbId": {
@@ -315,6 +338,7 @@ export const planRoutes = new Hono<AppEnv>()
 					ergebnis = await zielAusIgdbId(c.var.repos, c.var.igdb, igdbId, wahl);
 				} catch (fehler) {
 					if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
+					if (fehler instanceof KeinePlattformError) return c.json({ fehler: fehler.message }, 400);
 					return c.json({ fehler: meldungFuer(fehler) }, 502);
 				}
 				if (!ergebnis) return c.json({ fehler: "IGDB kennt diesen Eintrag nicht." }, 404);
@@ -361,10 +385,12 @@ export const planRoutes = new Hono<AppEnv>()
 	})
 
 	/**
-	 * Aendern. `plattform` haengt einen Eintrag mit Spiel um - an das Release
-	 * der Plattform (entsteht bei Bedarf) oder mit "" zurueck ans Spiel; das
-	 * Nachpflegen aus dem Filter "ohne Plattform". Freitext hat kein Spiel
-	 * und deshalb keine Plattform.
+	 * Aendern. `plattform` haengt einen Eintrag um - an das Release dieser
+	 * Plattform, das bei Bedarf entsteht.
+	 *
+	 * SEIT STUFE 19D ohne den Weg "zurueck ans Spiel": "" und null werden
+	 * abgewiesen (Abschnitt 5). Freitext hat kein Spiel und deshalb keine
+	 * Plattform - das ist der eine Fall, in dem es keine gibt, und er bleibt.
 	 */
 	.patch("/:id", async (c) => {
 		const id = idAus(c.req.param("id"));
@@ -381,7 +407,13 @@ export const planRoutes = new Hono<AppEnv>()
 
 		if (gepruefteWahl.wahl !== undefined) {
 			if (vorher.spiel_id === null) return c.json({ fehler: "Freitext hat kein Spiel und deshalb keine Plattform." }, 400);
-			const ziel = await zielAmSpiel(c.var.repos, vorher.spiel_id, gepruefteWahl.wahl);
+			let ziel: PlanZiel;
+			try {
+				ziel = await zielAmSpiel(c.var.repos, vorher.spiel_id, gepruefteWahl.wahl);
+			} catch (fehler) {
+				if (fehler instanceof KeinePlattformError) return c.json({ fehler: fehler.message }, 400);
+				throw fehler;
+			}
 			const doppelt = await c.var.repos.plan.offenerEintrag(vorher.kind, ziel);
 			if (doppelt !== null && doppelt !== id) {
 				return c.json({ fehler: "Dafür gibt es schon einen offenen Eintrag.", eintragId: doppelt }, 409);
