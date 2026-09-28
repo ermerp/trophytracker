@@ -14,8 +14,8 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19a und 19c abgenommen** (27.09.2026), **Stufe 18e gebaut und deployt**
-(27.09.2026, Abnahme offen)
+**Stufen bis 19a und 19c abgenommen** (27.09.2026), **Stufe 18e gebaut, deployt und im
+Nachtlauf zum 28.09.2026 bestätigt** (Abnahme offen)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -256,6 +256,26 @@ sicheren Bereiche null; der Fehler existiert dort nicht. Gefunden wurde er über
 den neuen Block **„Anzeige"** in den Einstellungen, der Fenster, Bildschirm,
 sichere Bereiche und Überhang dort ausliest, wo sie gelten – und über das
 Nachstellen dieser Geometrie im Testbrowser mit festen Pixelwerten.
+
+**Der erste Nachtlauf mit zwei Cron-Fenstern (28.09.2026) hat 18e bestätigt** und einen
+fremden Fehler mitgebracht. Bestätigt: 13 von 36 Aufrufen im PSN-Fenster (5 Abruf, 5
+Normalisierung, 1 Abschluss, 2 Spielzeit), 1 von 24 in der Wartung, genau **sieben**
+Verlaufszeilen für die Nacht – die Zahl, die die Stufe vorhergesagt hatte –, Fortschritt als
+Spanne (`offset=100→400`, `offen=4→0`), keine Verdichtung über die Fenstergrenze, und der
+Zugang sprang von `fehler` auf `ok`, weil das Wegräumen jetzt am Schritt hängt. Die
+Wiederholung nach einem Abrufsfehler hatte nichts zu tun: Keine Seite ist gescheitert, dieser
+Teil von 18e hat also weiter nur den Test als Beleg.
+
+**Der Fehler daneben:** `game.sort_title` trug keinen Index. Die Abfrage, mit der jeder
+Titelabgleich sein Release sucht, war damit ein Tabellenscan – gemessen **480 gelesene Zeilen
+je einzelnem Abgleich**, und der Spielzeit-Schritt ruft sie 303-mal je Nacht auf, die Kaufliste
+730-mal je Durchlauf. Aufgefallen ist es an `rows_read_24h = 1 335 628` ohne jeden Import.
+**Migration 0025** legt den Index an (vier Zeilen je Abgleich statt 480). Zwei Sätze der
+Spezifikation waren dabei zu eng beziehungsweise falsch und sind korrigiert: Die Indexregel
+nannte nur Fremdschlüssel – jetzt gilt sie für jede Spalte, über die in einer Schleife gesucht
+wird –, und die „Nacht rund 54 000 Zeilen“ waren nur die **Leerlauf**-Aufrufe; die arbeitenden
+waren nie gemessen, es waren gut 200 000. `test/lesekosten.spec.ts` misst den Titelabgleich
+seither mit, denn es hat bis dahin nur Leseansichten geprüft, keinen Schreibschritt.
 
 **Als Nächstes: Stufe 19d** (Wunsch mit Plattform – „ohne Plattform" entfällt
 auch in Wunschliste und Import), dann **19b** (Einzeltrophäen je Spiel), danach

@@ -1,0 +1,40 @@
+-- Migration 0025: Index auf game.sort_title (Nachbesserung zu Stufe 18c,
+-- Abschnitte 2, 7.2 und 7.7)
+--
+-- Befund vom 28.09.2026, bei der Abnahme des ersten Nachtlaufs mit zwei
+-- Cron-Fenstern. `game` trug genau einen Index, und der liegt auf igdb_id.
+-- Die Abfrage, mit der jeder Titelabgleich sein Release sucht
+-- (GamesRepository.releasesNachSchluessel, "WHERE g.sort_title = ?"), war
+-- damit ein Tabellenscan: gemessen gegen die Produktion 480 gelesene Zeilen
+-- je EINZELNEM Abgleich bei 477 Spielen.
+--
+-- Das multipliziert sich an drei Stellen, alle set-artig:
+--
+--   * Spielzeit-Schritt (7.7): ein Abgleich je gefiltertem Eintrag, 303 je
+--     Nacht -> rund 145 000 gelesene Zeilen. JEDE Nacht.
+--   * Kaufliste (7.7): 730 Eintraege je woechentlichem Durchlauf -> rund
+--     350 000 Zeilen.
+--   * Automatische Zuordnung nach der Normalisierung (7.2): ein Abgleich je
+--     noch nicht zugeordneter Liste.
+--
+-- Deshalb stand `rows_read_24h` am 28.09.2026 bei 1 335 628, also ueber der
+-- Million, die CLAUDE.md als Signal nennt, ohne dass ein Import gelaufen
+-- war. Gefaehrlich war es nicht (Budget 5 Millionen), aber es ist dieselbe
+-- Gattung Fehler wie am 13.09.2026 - ein fehlender Index auf einer Spalte,
+-- ueber die in einer Schleife gesucht wird.
+--
+-- Warum es niemand sah: Die Regel aus Migration 0008 verlangt einen Index
+-- fuer jeden FREMDSCHLUESSEL. sort_title ist keiner, sondern eine
+-- Nachschlagespalte - und test/lesekosten.spec.ts misst die Leseansichten,
+-- nie die Schreibschritte des Syncs. Beide Luecken schliesst dieselbe
+-- Aenderung: der Index hier, die Messung im Test.
+--
+-- KEIN UNIQUE: Zwei Spiele duerfen denselben Schluessel tragen. Genau das
+-- ist der mehrdeutige Fall, der laut 7.2 dem Nutzer gehoert und nie
+-- automatisch zugeordnet wird.
+--
+-- Abwaertskompatibel: ein reiner Index, keine Spalte, keine View, kein
+-- Datensatz wird angefasst. Der alte Worker laeuft waehrend der Migration
+-- unveraendert weiter und profitiert sofort.
+
+CREATE INDEX idx_game_sort_title ON game(sort_title);
