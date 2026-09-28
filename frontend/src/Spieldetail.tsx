@@ -857,10 +857,11 @@ function ZustandTafel({
 /**
  * Auf eine der vier Listen setzen.
  *
- * **Immer an einem Release**, nie am Spiel: Ein Wunsch ohne Plattform ist
- * keine brauchbare Absicht (Entscheidung des Nutzers vom 27.09.2026), und
- * alle 56 offenen Wünsche der Produktion tragen ohnehin eine. Der Weg „ohne
- * Plattform" verschwindet in Stufe 19d auch aus Wunschliste und Import.
+ * **Immer an einem Release**, nie am Spiel: Ein Eintrag ohne Plattform ist
+ * keine brauchbare Absicht (Entscheidung des Nutzers vom 27.09.2026) – erst
+ * die Plattform entscheidet über Lücke, Kauf und Preis. Seit Stufe 19d gilt
+ * das überall: in Wunschliste, Import, Filter und API, für alle vier Listen.
+ * Gemessen am 28.09.2026 hingen ohnehin alle 94 Einträge an einem Release.
  */
 function ListenTafel({
   spiel,

@@ -113,7 +113,7 @@ describe("importAbgleichSchritt", () => {
 		expect(await env.DB.prepare("SELECT platform FROM release WHERE id = ?").bind(z.release_id).first()).toEqual({ platform: "PS5" });
 	});
 
-	it("laesst die Plattform einer Zeile vor der Uebernahme aendern oder leeren", async () => {
+	it("laesst die Plattform einer Zeile aendern, aber nicht leeren (Stufe 19d)", async () => {
 		await spiel(1, "Bloodborne", "bloodborne", ["PS4", "PS5"]);
 		const id = await lauf("Bloodborne\n");
 		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
@@ -121,14 +121,22 @@ describe("importAbgleichSchritt", () => {
 		const a = app(fakeIgdb([[]]).client);
 		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ plattform: "PS3" }, "PATCH"), env)).status).toBe(200);
 		expect((await zeilen(id))[0]).toMatchObject({ platform: "PS3", match_kind: "sammlung" });
-		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ plattform: "" }, "PATCH"), env)).status).toBe(200);
-		expect((await zeilen(id))[0]).toMatchObject({ platform: null });
+		// Leeren gibt es nicht mehr - die Zeile behaelt ihre Plattform.
+		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ plattform: "" }, "PATCH"), env)).status).toBe(400);
+		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ plattform: null }, "PATCH"), env)).status).toBe(400);
+		expect((await zeilen(id))[0]).toMatchObject({ platform: "PS3" });
 		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ plattform: "Switch" }, "PATCH"), env)).status).toBe(400);
 		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({}, "PATCH"), env)).status).toBe(400);
 
-		// Ohne Plattform haengt die Uebernahme den Wunsch ans Spiel.
+		// Die Uebernahme haengt den Wunsch an das Release dieser Plattform; es
+		// entsteht dabei, weil das Spiel nur PS4 und PS5 hat.
 		await importUebernahmeSchritt(repos(), fakeIgdb([[]]).client, id);
-		expect(await plaene()).toEqual([expect.objectContaining({ game_id: 1, release_id: null })]);
+		const angelegt = await plaene();
+		expect(angelegt).toHaveLength(1);
+		expect(angelegt[0].game_id).toBeNull();
+		expect(
+			await env.DB.prepare("SELECT platform FROM release WHERE id = ?").bind(angelegt[0].release_id).first(),
+		).toEqual({ platform: "PS3" });
 	});
 
 	it("nimmt bei zwei gleichnamigen Spielen das mit der Plattform aus der Liste", async () => {
@@ -322,15 +330,19 @@ describe("Einzelentscheidungen", () => {
 		expect((await zeilen(id))[0]).toMatchObject({ decision: "offen", plan_entry_id: null });
 	});
 
-	it("laesst die Plattform ausdruecklich weg, wenn der Koerper '' schickt", async () => {
+	it("weist ein leeres oder null als Plattform mit 400 ab (Stufe 19d)", async () => {
 		const { id, zeileId } = await unklar();
-		await app(fakeIgdb([[spielRoh({ id: 2, name: "MediEvil" })]]).client).request(
-			`/api/imports/wishlist/${id}/zeilen/${zeileId}/entscheiden`,
-			json({ aktion: "igdb", igdbId: 2, plattform: "" }),
-			env,
-		);
-		expect((await plaene())[0]).toMatchObject({ release_id: null });
-		expect((await plaene())[0].game_id).not.toBeNull();
+		const a = app(fakeIgdb([[spielRoh({ id: 2, name: "MediEvil" })], [spielRoh({ id: 2, name: "MediEvil" })]]).client);
+		for (const wert of ["", null]) {
+			const antwort = await a.request(
+				`/api/imports/wishlist/${id}/zeilen/${zeileId}/entscheiden`,
+				json({ aktion: "igdb", igdbId: 2, plattform: wert }),
+				env,
+			);
+			expect(antwort.status).toBe(400);
+			expect(await antwort.json()).toMatchObject({ fehler: "Ein Eintrag braucht eine Plattform." });
+		}
+		expect(await plaene()).toHaveLength(0);
 	});
 
 	it("legt Freitext nur auf ausdrueckliche Anweisung an, ohne Plattform", async () => {

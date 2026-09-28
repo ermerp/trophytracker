@@ -57,8 +57,9 @@ export function Wunschliste() {
 				{hinzufuegen && (
 					<section className="anlegen">
 						<p className="ruhig klein">
-							Bei IGDB suchen und übernehmen. Die Plattform steht an jedem Treffer, vorbelegt mit seiner neuesten;
-							Freitext bleibt immer ohne Plattform.
+							Bei IGDB suchen und übernehmen. Die Plattform steht an jedem Treffer, vorbelegt mit seiner
+							neuesten und vor dem Speichern änderbar. Nur ein Freitext hat kein Spiel und deshalb keine
+							Plattform.
 						</p>
 						<IgdbSuche vorgabe="" onWahl={igdbWaehlen} onOhneTreffer={ohneTreffer} laeuft={laeuft} mitPlattform />
 						{/* Der zweite Weg, Wünsche anzulegen – er gehört hinter dasselbe

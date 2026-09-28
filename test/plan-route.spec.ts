@@ -219,7 +219,7 @@ describe("GET /api/plans", () => {
 		expect((await hole(a, "/api/plans?kind=wunsch&favorit=1")).eintraege).toHaveLength(1);
 	});
 
-	it("filtert nach Plattformen und nach 'ohne Plattform'", async () => {
+	it("filtert nach Plattformen; 'ohne' ist seit Stufe 19d kein Wert mehr", async () => {
 		const [ps4] = await spiel(1, "Auf PS4", ["PS4", "PS5"]);
 		await spiel(2, "Am Spiel", ["PS3"]);
 		const r = repos().plan;
@@ -229,8 +229,10 @@ describe("GET /api/plans", () => {
 		const a = app();
 		const titel = (l: { eintraege: Array<{ titel: string }> }) => l.eintraege.map((e) => e.titel);
 		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=PS4"))).toEqual(["Auf PS4"]);
-		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=ohne"))).toEqual(["Am Spiel", "Freitext"]);
-		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=PS4,ohne"))).toHaveLength(3);
+		// 'ohne' wird wie jeder unbekannte Wert ignoriert, nicht als Filter
+		// verstanden: Seit Stufe 19d haengt jeder neue Eintrag an einem Release.
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=ohne"))).toHaveLength(3);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=PS4,ohne"))).toEqual(["Auf PS4"]);
 		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=PS3"))).toEqual([]);
 		// Unbekannte Werte werden ignoriert, nicht mit 400 beantwortet.
 		expect(titel(await hole(a, "/api/plans?kind=wunsch&plattform=Switch"))).toHaveLength(3);
@@ -238,17 +240,50 @@ describe("GET /api/plans", () => {
 });
 
 describe("POST /api/plans", () => {
-	it("nimmt ohne Angabe die neueste Plattform des Spiels, mit '' ausdruecklich keine", async () => {
+	/**
+	 * Drei Faelle, die auseinandergehalten werden muessen (Stufe 19d): Ein
+	 * FEHLENDER Schluessel heisst "auto" - die neueste Plattform, die
+	 * ausdrueckliche Ausnahme vom 15.09.2026. Ein ausdrueckliches null und ein
+	 * leerer Text heissen "ohne Plattform", und das gibt es nicht mehr.
+	 *
+	 * Im JSON sind das undefined und null; ein `?? "auto"` wuerde beide gleich
+	 * behandeln und damit still einen Wert schreiben, wo der Aufrufer "ohne"
+	 * gesagt hat. Deshalb steht hier je ein Test.
+	 */
+	it("nimmt ohne Angabe die neueste Plattform des Spiels", async () => {
 		await spiel(1, "Bloodborne", ["PS4", "PS3"]);
-		const a = app();
-		const auto = await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1 });
+		const auto = await sende(app(), "POST", "/api/plans", { art: "wunsch", spielId: 1 });
 		expect(auto.status).toBe(201);
 		expect(await auto.json()).toMatchObject({
 			art: "wunsch", spielId: 1, plattform: "PS4", favorit: false, herkunft: "manuell", spielAngelegt: false,
 		});
-		const ohne = await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" });
-		expect(ohne.status).toBe(201);
-		expect(await ohne.json()).toMatchObject({ spielId: 1, releaseId: null, plattform: null });
+	});
+
+	it("weist ein ausdrueckliches null als Plattform mit 400 ab", async () => {
+		await spiel(1, "Bloodborne", ["PS4", "PS3"]);
+		const antwort = await sende(app(), "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: null });
+		expect(antwort.status).toBe(400);
+		expect(await antwort.json()).toMatchObject({ fehler: "Ein Eintrag braucht eine Plattform." });
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM plan_entry").first<{ n: number }>()).toMatchObject({ n: 0 });
+	});
+
+	it("weist einen leeren Text als Plattform mit 400 ab", async () => {
+		await spiel(1, "Bloodborne", ["PS4", "PS3"]);
+		const antwort = await sende(app(), "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" });
+		expect(antwort.status).toBe(400);
+		expect(await antwort.json()).toMatchObject({ fehler: "Ein Eintrag braucht eine Plattform." });
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM plan_entry").first<{ n: number }>()).toMatchObject({ n: 0 });
+	});
+
+	it("weist auch ein 'auto' ohne auffindbare Plattform mit 400 ab", async () => {
+		// Ein Spiel ohne Release und ohne IGDB-Eintrag: Hier gab "auto" bis
+		// Stufe 19d stillschweigend einen Eintrag am Spiel zurueck - genau das,
+		// was die Stufe verbietet, ueber die Tuer, die als Ausnahme gedacht war.
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (1, 'Ohne alles', 'ohne alles')").run();
+		const antwort = await sende(app(), "POST", "/api/plans", { art: "wunsch", spielId: 1 });
+		expect(antwort.status).toBe(400);
+		expect(await antwort.json()).toMatchObject({ fehler: expect.stringContaining("keine Plattform bekannt") });
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM plan_entry").first<{ n: number }>()).toMatchObject({ n: 0 });
 	});
 
 	it("legt einen Wunsch am Release an und lehnt ein Duplikat am selben Release mit 409 ab", async () => {
@@ -258,8 +293,10 @@ describe("POST /api/plans", () => {
 		expect(erste.status).toBe(201);
 		expect(await erste.json()).toMatchObject({ spielId: 1, releaseId: ps4, plattform: "PS4" });
 
-		// Am Spiel selbst: eine andere Aussage, kein Duplikat.
-		expect((await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" })).status).toBe(201);
+		// Am Spiel selbst: eine andere Aussage, kein Duplikat. Seit Stufe 19d legt
+		// die API so etwas nicht mehr an; die Regel gilt weiter fuer Eintraege,
+		// die es schon gibt, deshalb entsteht er hier ueber das Repository.
+		await repos().plan.anlegen("wunsch", { gameId: 1 }, "manuell");
 		// Ohne Angabe waere es die neueste Plattform - also dasselbe Release: Duplikat.
 		expect((await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1 })).status).toBe(409);
 		// Dasselbe Release noch einmal: Duplikat.
@@ -298,14 +335,20 @@ describe("POST /api/plans", () => {
 		expect(aufrufe.filter((a) => /igdb\.com/.test(a.url))).toHaveLength(0);
 	});
 
-	it("legt ohne Plattform ein Spiel ohne Release an, das nicht in der Sammlung steht", async () => {
-		const { client } = fakeIgdb([[spielRoh({ id: 1001, name: "Bloodborne" })]]);
-		const antwort = await sende(app(client), "POST", "/api/plans", { art: "wunsch", igdbId: 1001, plattform: "" });
+	it("legt aus einem IGDB-Treffer das Spiel MIT Release an; '' bekommt 400", async () => {
+		// Bis Stufe 19d entstand hier ein Spiel ohne jedes Release, das in der
+		// Sammlung gar nicht auftauchte. Jetzt gilt die neueste Plattform des
+		// Treffers (PS4), und "ohne" ist kein Weg mehr (Abschnitt 5).
+		const { client } = fakeIgdb([[spielRoh({ id: 1001, name: "Bloodborne" })], [spielRoh({ id: 1001, name: "Bloodborne" })]]);
+		const abgewiesen = await sende(app(client), "POST", "/api/plans", { art: "wunsch", igdbId: 1001, plattform: "" });
+		expect(abgewiesen.status).toBe(400);
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM game").first<{ n: number }>()).toMatchObject({ n: 0 });
+
+		const antwort = await sende(app(client), "POST", "/api/plans", { art: "wunsch", igdbId: 1001 });
 		expect(antwort.status).toBe(201);
 		const e = await antwort.json();
-		expect(e).toMatchObject({ releaseId: null, plattform: null, spielAngelegt: true });
-		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM release").first<{ n: number }>()).toMatchObject({ n: 0 });
-		expect((await hole(app(client), "/api/games")).gesamt).toBe(0);
+		expect(e).toMatchObject({ plattform: "PS4", spielAngelegt: true });
+		expect(e.releaseId).not.toBeNull();
 		const detail = await hole(app(client), `/api/games/${e.spielId}`);
 		expect(detail.plaene).toEqual([expect.objectContaining({ id: e.id, art: "wunsch" })]);
 	});
@@ -379,10 +422,12 @@ describe("POST /api/plans", () => {
 });
 
 describe("PATCH /api/plans/:id mit Plattform", () => {
-	it("haengt den Eintrag an das Release der Plattform um, zurueck ans Spiel, und prueft Duplikate", async () => {
+	it("haengt den Eintrag an das Release der Plattform um und prueft Duplikate", async () => {
 		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
 		const a = app();
-		const { id } = await (await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" })).json();
+		// Ausgangslage ist ein alter Eintrag am Spiel - seit Stufe 19d entsteht so
+		// einer nicht mehr, umhaengen muss er sich trotzdem lassen.
+		const id = await repos().plan.anlegen("wunsch", { gameId: 1 }, "manuell");
 		expect(await zeile(id)).toMatchObject({ game_id: 1, release_id: null });
 
 		const p = await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "PS5" });
@@ -396,9 +441,13 @@ describe("PATCH /api/plans/:id mit Plattform", () => {
 		expect((await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "PS4" })).status).toBe(409);
 		expect(await (await sende(a, "PATCH", `/api/plans/${id}`, {})).json()).toMatchObject({ plattform: "PS5" });
 
-		// Zurueck ans Spiel; dieselbe Plattform noch einmal ist kein Duplikat mit sich selbst.
-		expect(await (await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "" })).json()).toMatchObject({ plattform: null, spielId: 1 });
-		expect(await (await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "PS5" })).json()).toMatchObject({ plattform: "PS5" });
+		// Zurueck ans Spiel gibt es seit Stufe 19d nicht mehr.
+		const zurueck = await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "" });
+		expect(zurueck.status).toBe(400);
+		expect(await zurueck.json()).toMatchObject({ fehler: "Ein Eintrag braucht eine Plattform." });
+		expect((await sende(a, "PATCH", `/api/plans/${id}`, { plattform: null })).status).toBe(400);
+		// Unveraendert, und dieselbe Plattform noch einmal ist kein Duplikat mit sich selbst.
+		expect(await (await sende(a, "PATCH", `/api/plans/${id}`, {})).json()).toMatchObject({ plattform: "PS5" });
 		expect(await (await sende(a, "PATCH", `/api/plans/${id}`, { plattform: "PS5" })).json()).toMatchObject({ plattform: "PS5" });
 
 		const { id: frei } = await (await sende(a, "POST", "/api/plans", { art: "wunsch", titel: "Freitext" })).json();
@@ -409,7 +458,9 @@ describe("PATCH /api/plans/:id mit Plattform", () => {
 
 describe("PATCH und DELETE /api/plans/:id", () => {
 	it("aendert Favorit, Status und Art und loescht", async () => {
-		await spiel(1, "Bloodborne", []);
+		// Mit Release: Seit Stufe 19d braucht ein Eintrag am Spiel eine Plattform,
+		// die "auto" finden kann.
+		await spiel(1, "Bloodborne", ["PS4"]);
 		const a = app();
 		const { id } = await (await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1 })).json();
 
@@ -547,7 +598,7 @@ describe("To-Do, Backlog und Kandidaten (Stufe 12)", () => {
 
 		// Ein erledigter Zweiteintrag am Spiel haelt Release und Spiel. Backlog am nie
 		// gestarteten Release koppelt keinen Status, das Release bleibt leer.
-		const alt = await (await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" })).json();
+		const alt = { id: await repos().plan.anlegen("wunsch", { gameId: 1 }, "manuell") };
 		await sende(a, "PATCH", `/api/plans/${alt.id}`, { status: "erledigt" });
 		e = await (await sende(a, "POST", "/api/plans", { art: "backlog", releaseId: ps4 })).json();
 		expect(await (await sende(a, "DELETE", `/api/plans/${e.id}`)).json()).toMatchObject({ releaseGeloescht: true, spielGeloescht: false });
@@ -561,7 +612,9 @@ describe("To-Do, Backlog und Kandidaten (Stufe 12)", () => {
 
 describe("Kaufliste (Stufe 15)", () => {
 	it("nimmt eine Herkunft nur fuer die Kaufliste und nur luecke oder wunsch", async () => {
-		const [ps4] = await spiel(1, "Bloodborne", ["PS4"]);
+		// Zwei Plattformen: Der zweite Eintrag laeuft ueber "auto" auf PS5 und ist
+		// damit kein Duplikat des ersten an PS4.
+		const [ps4] = await spiel(1, "Bloodborne", ["PS4", "PS5"]);
 		const a = app();
 		const p = await sende(a, "POST", "/api/plans", { art: "kauf", releaseId: ps4, herkunft: "luecke" });
 		expect(p.status).toBe(201);
@@ -569,8 +622,9 @@ describe("Kaufliste (Stufe 15)", () => {
 
 		expect((await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps4, herkunft: "luecke" })).status).toBe(400);
 		expect((await sende(a, "POST", "/api/plans", { art: "kauf", spielId: 1, herkunft: "triage" })).status).toBe(400);
-		const ohne = await sende(a, "POST", "/api/plans", { art: "kauf", spielId: 1, plattform: "" });
-		expect(await ohne.json()).toMatchObject({ herkunft: "manuell" });
+		// Ohne Herkunft: "manuell". Die Plattform kommt aus "auto" (PS4).
+		const ohne = await sende(a, "POST", "/api/plans", { art: "kauf", spielId: 1 });
+		expect(await ohne.json()).toMatchObject({ herkunft: "manuell", plattform: "PS5" });
 	});
 
 	it("ein Wunsch kommt als Kopie auf die Kaufliste; der Wunsch nennt den Kaufeintrag und bleibt offen", async () => {
@@ -591,7 +645,9 @@ describe("Kaufliste (Stufe 15)", () => {
 		const [ps4, ps5] = await spiel(1, "Bloodborne", ["PS4", "PS5"]);
 		const a = app();
 		const wRelease = await (await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps4 })).json();
-		const wSpiel = await (await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1, plattform: "" })).json();
+		// Der Wunsch am Spiel entsteht ueber das Repository: Die API legt seit
+		// Stufe 19d keinen mehr an, das Mit-Erledigen gilt fuer ihn weiter.
+		const wSpiel = { id: await repos().plan.anlegen("wunsch", { gameId: 1 }, "manuell") };
 		const wAnderes = await (await sende(a, "POST", "/api/plans", { art: "wunsch", releaseId: ps5 })).json();
 		const k = await (await sende(a, "POST", "/api/plans", { art: "kauf", releaseId: ps4, herkunft: "wunsch" })).json();
 
@@ -673,8 +729,8 @@ describe("Kaufliste (Stufe 15)", () => {
 
 describe("GET /api/plans?suche=", () => {
 	it("filtert als Teilstring im Titel, ohne Gross-/Kleinschreibung", async () => {
-		await spiel(1, "Divinity: Original Sin II", []);
-		await spiel(2, "Bloodborne", []);
+		await spiel(1, "Divinity: Original Sin II", ["PS4"]);
+		await spiel(2, "Bloodborne", ["PS4"]);
 		const a = app();
 		await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 1 });
 		await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 2 });
@@ -685,7 +741,7 @@ describe("GET /api/plans?suche=", () => {
 	});
 
 	it("uebergeht Apostrophe (19.09.2026)", async () => {
-		await spiel(3, "Assassin's Creed II", []);
+		await spiel(3, "Assassin's Creed II", ["PS4"]);
 		const a = app();
 		await sende(a, "POST", "/api/plans", { art: "wunsch", spielId: 3 });
 		const d = await hole(a, "/api/plans?kind=wunsch&suche=assassins%20creed");

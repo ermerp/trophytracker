@@ -285,7 +285,11 @@ function ImportLaufAnsicht({ id }: { id: number }) {
   }
 
   const uebernehmenIgdb = (zeile: ImportZeile, k: IgdbKandidat, plattform: string) =>
-    entscheiden(zeile, { aktion: 'igdb', igdbId: k.igdbId, plattform }, (z) => `„${zeile.titel}" → ${k.name} (${z.wunsch?.plattform ?? 'ohne Plattform'}) auf die Wunschliste gesetzt.`)
+    entscheiden(
+      zeile,
+      { aktion: 'igdb', igdbId: k.igdbId, plattform },
+      (z) => `„${zeile.titel}" → ${k.name}${z.wunsch?.plattform ? ` (${z.wunsch.plattform})` : ''} auf die Wunschliste gesetzt.`,
+    )
 
   const ueberspringen = (zeile: ImportZeile) => entscheiden(zeile, { aktion: 'ueberspringen' }, () => `„${zeile.titel}" übersprungen.`)
 
@@ -519,7 +523,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
         <>
           {TREFFERTEXT[zeile.treffer]}:{' '}
           {zeile.spielId !== null ? <Link to={`/spiel/${zeile.spielId}`}>{zeile.spielTitel}</Link> : zeile.spielTitel}
-          {zeile.plattform ? (zeile.releasePlattform === zeile.plattform ? ` (${zeile.plattform})` : ` (${zeile.plattform}, Release entsteht)`) : ' (am Spiel, ohne Plattform)'}
+          {zeile.plattform ? (zeile.releasePlattform === zeile.plattform ? ` (${zeile.plattform})` : ` (${zeile.plattform}, Release entsteht)`) : ' (Plattform wählen)'}
           {zeile.treffer === 'sammlung' && ' – schon gespielt, Wunsch bleibt'}
         </>
       )
@@ -544,7 +548,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
           <strong>{zeile.titel}</strong>
           {rohAnders.length > 0 && <span className="zeile"> · in der Liste: {rohAnders.join(' / ')}</span>}
           <div className="zeile">
-            {zeile.listenDatum ? `Liste ${zeile.listenDatum}` : 'ohne Datum'} · {zeile.plattform ?? 'ohne Plattform'}
+            {zeile.listenDatum ? `Liste ${zeile.listenDatum}` : 'ohne Datum'} · {zeile.plattform ?? 'Plattform wählen'}
             {zeile.entscheidung === 'schon_vorhanden' && ' · schon auf der Wunschliste'}
             {zeile.entscheidung === 'uebersprungen' && ' · übersprungen'}
             {zeile.entscheidung === 'uebernommen' && ' · übernommen'}
@@ -557,10 +561,17 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
         <label className="zeile">
           Plattform{' '}
           <select value={zeile.plattform ?? ''} onChange={(e) => void aktionen.plattformSetzen(zeile, e.target.value)} disabled={beschaeftigt}>
+            {/* Seit Stufe 19d ist eine der vier Pflicht (Abschnitt 5). Trägt die
+                Zeile noch keine, steht hier ein nicht wählbarer Platzhalter –
+                sonst zeigte das Feld stillschweigend die erste Plattform an. */}
+            {zeile.plattform === null && (
+              <option value="" disabled>
+                Plattform wählen
+              </option>
+            )}
             {PLATTFORMEN.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
-            <option value="">ohne Plattform</option>
           </select>
         </label>
       )}

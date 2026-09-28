@@ -5,7 +5,7 @@ import { istErlaubtePlattform, type Plattform } from "../domain/titel";
 import { jahrAusDateiname, parseWunschliste } from "../domain/wunschliste";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
-import { zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
+import { KeinePlattformError, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
 import { importAbgleichSchritt, importUebernahmeSchritt } from "../sync/wunschliste";
 import type { AppEnv } from "../types";
 import { eintragAntwort } from "./plans";
@@ -221,11 +221,18 @@ export const importRoutes = new Hono<AppEnv>()
 			const igdbId = idAus(k.igdbId);
 			if (igdbId === null) return c.json({ fehler: "Feld 'igdbId' fehlt oder ist ungültig." }, 400);
 			// Plattform: ausdruecklich aus dem Koerper, sonst die der Zeile, sonst
-			// die neueste des Treffers ("auto"); "" heisst ausdruecklich ohne.
+			// die neueste des Treffers ("auto"). Seit Stufe 19d gibt es kein "ohne".
+			//
+			// `zeile.platform ?? "auto"` bleibt: Das ist eine DB-Spalte, kein
+			// Koerperfeld - NULL heisst dort "noch nicht gewaehlt", und der
+			// Vorschlag ist die ausdrueckliche Ausnahme vom 15.09.2026. Nur im
+			// KOERPER sind fehlender Schluessel und null zu unterscheiden.
 			let plattform: PlattformWahl = zeile.platform ?? "auto";
-			if (k.plattform !== undefined) {
-				if (k.plattform === null || k.plattform === "") plattform = null;
-				else if (k.plattform === "auto") plattform = "auto";
+			if ("plattform" in k) {
+				if (k.plattform === null || k.plattform === "") {
+					return c.json({ fehler: "Ein Eintrag braucht eine Plattform." }, 400);
+				}
+				if (k.plattform === "auto") plattform = "auto";
 				else if (typeof k.plattform === "string" && istErlaubtePlattform(k.plattform)) plattform = k.plattform;
 				else return c.json({ fehler: `Unbekannte Plattform: ${String(k.plattform)}` }, 400);
 			}
@@ -235,6 +242,8 @@ export const importRoutes = new Hono<AppEnv>()
 				ergebnis = await zielAusIgdbId(repos, c.var.igdb, igdbId, plattform, "import");
 			} catch (fehler) {
 				if (fehler instanceof IgdbKonfigError) return ohneZugang(c);
+				// "auto" hat keine Plattform gefunden (Stufe 19d) - kein IGDB-Problem.
+				if (fehler instanceof KeinePlattformError) return c.json({ fehler: fehler.message }, 400);
 				return c.json({ fehler: meldungFuer(fehler) }, 502);
 			}
 			if (!ergebnis) return c.json({ fehler: "IGDB kennt diesen Eintrag nicht." }, 404);
@@ -272,13 +281,16 @@ export const importRoutes = new Hono<AppEnv>()
 		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
 		if (k.titel === undefined && k.plattform === undefined) return c.json({ fehler: "Feld 'titel' oder 'plattform' angeben." }, 400);
 		if (k.plattform !== undefined) {
-			let plattform: Plattform | null = null;
-			if (k.plattform !== null && k.plattform !== "") {
-				if (typeof k.plattform !== "string" || !istErlaubtePlattform(k.plattform)) {
-					return c.json({ fehler: `Unbekannte Plattform: ${String(k.plattform)}` }, 400);
-				}
-				plattform = k.plattform;
+			// Seit Stufe 19d gibt es kein Leeren mehr: Eine Zeile traegt eine der
+			// vier Plattformen, weil der uebernommene Eintrag an einem Release
+			// haengt (Abschnitt 5). Der Abgleich belegt sie ohnehin vor.
+			if (k.plattform === null || k.plattform === "") {
+				return c.json({ fehler: "Ein Eintrag braucht eine Plattform." }, 400);
 			}
+			if (typeof k.plattform !== "string" || !istErlaubtePlattform(k.plattform)) {
+				return c.json({ fehler: `Unbekannte Plattform: ${String(k.plattform)}` }, 400);
+			}
+			const plattform: Plattform = k.plattform;
 			if (!(await c.var.repos.wishlistImport.plattformSetzen(geladen.zeile.id, plattform))) {
 				return c.json({ fehler: "Eine übernommene Zeile lässt sich nicht ändern." }, 409);
 			}
