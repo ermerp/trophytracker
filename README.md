@@ -15,7 +15,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 ## Stand
 
 **Stufen bis 19a und 19c abgenommen** (27.09.2026), **Stufe 18e gebaut, deployt und im
-Nachtlauf zum 28.09.2026 bestätigt** (Abnahme offen), **Stufe 19d gebaut** (28.09.2026)
+Nachtlauf zum 28.09.2026 bestätigt** (Abnahme offen), **Stufe 19d abgenommen** (28.09.2026)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -288,7 +288,10 @@ die Regel ausgehebelt hätte: Fand „auto" keine Plattform – ein Spiel ohne R
 IGDB-Eintrag –, entstand stillschweigend ein Eintrag am Spiel. Das ist jetzt auch `400`.
 **Freitext** bleibt die eine Stelle ohne Plattform und trägt in der Liste das Kennzeichen
 „Freitext" statt „ohne Plattform". Keine Migration; der Umbau lief über den Typ, der `null`
-verlor, worauf der Compiler alle sieben Stellen zeigte.
+verlor, worauf der Compiler alle sieben Stellen zeigte. **Abgenommen am 28.09.2026** an
+einem von Hand angelegten Wunsch: „Satisfactory" (PS5) hängt an einem eigens dafür
+entstandenen Release, `game_id` ist leer, und das Release zählt trotzdem nicht zur
+Sammlung – es trägt weder Besitz noch Fortschritt.
 
 **Als Nächstes: Stufe 19b** (Einzeltrophäen je Spiel), danach 20 (AWIN-Feed)
 und 21 (PSN Store-Preise). Die PSN-Stufen ergänzen nur, was die
