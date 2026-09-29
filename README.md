@@ -14,8 +14,8 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19a und 19c abgenommen** (27.09.2026), **Stufe 18e gebaut, deployt und im
-Nachtlauf zum 28.09.2026 bestätigt** (Abnahme offen), **Stufe 19d abgenommen** (28.09.2026)
+**Stufen bis 19a, 19c und 19d abgenommen**, **Stufe 18e abgenommen** (29.09.2026,
+nachdem beide Cron-Fenster einzeln unter Last liefen)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
