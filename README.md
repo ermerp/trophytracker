@@ -14,8 +14,8 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19a, 19c und 19d abgenommen**, **Stufe 18e abgenommen** (29.09.2026,
-nachdem beide Cron-Fenster einzeln unter Last liefen)
+**Stufen bis 19a, 19c, 19d und 18e abgenommen** (29.09.2026), **Stufe 19e gebaut**
+(29.09.2026)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -485,9 +485,29 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
 Die Anbindung ist inoffiziell. Der Zugang läuft über das **NPSSO** – ein Cookie
 aus dem angemeldeten Browser, kein Passwort:
 
-1. Bei PlayStation anmelden
-2. https://ca.account.sony.com/api/v1/ssocookie aufrufen
-3. Den Wert des Feldes `npsso` in den Einstellungen der App eintragen
+Seit Stufe 19e führt der Knopf **„Zugang erneuern"** in den Einstellungen durch den
+Vorgang:
+
+1. Knopf drücken – Sonys Seite geht in einem neuen Tab auf
+2. Dort **alles markieren und kopieren** (bei PlayStation angemeldet sein)
+3. Zurück zu Trophytracker – die App liest die Zwischenablage, prüft den Zugang
+   gegen PSN und speichert ihn
+
+Nichts heraussuchen: Das Feld nimmt den blanken Wert, das ganze JSON und die ganze
+Seite an. Fehlt die Zwischenablage-Berechtigung, steht der Weg von Hand darunter.
+
+**Automatisch geht es nicht, und das ist gemessen** (29.09.2026): Sony erlaubt den
+Abruf von fremder Herkunft zwar (CORS steht offen), aber der Browser hängt das
+Cookie dabei nicht an (`SameSite`) – dieselbe Regel, die verhindert, dass eine
+beliebige Webseite deine PSN-Sitzung mitliest. Ein neues Tab auslesen darf eine
+Seite ebenso wenig. Der Kopierschritt ist deshalb nicht wegzubekommen, nur kurz zu
+halten.
+
+**Wie lange ein Zugang hält, zeichnet die App auf** (`psn_zugang`, Migration 0026).
+Sony kündigt beim Ausstellen rund 60 Tage an; der Zugang vom 04.09.2026 hielt 25.
+Gewarnt wird deshalb nach Alter – ab 18 Tagen –, nicht nach Sonys Zahl, und gezählt
+werden nur abgelehnte Zugänge: Wer früher erneuert, erfährt nie, wie lange seiner
+gehalten hätte.
 
 **Ablage.** NPSSO und Refresh-Token liegen AES-GCM-verschlüsselt in D1, der
 Schlüssel als Cloudflare Secret. Ein Datenbank-Dump enthält damit keinen

@@ -3055,3 +3055,174 @@ details.block > div {
     order: 1;
   }
 }
+
+/* --------------------------------------------------------------------------
+   PlayStation-Verbindung (Stufe 19e)
+
+   Der Abschnitt war eine Tabelle mit drei Zeilen und darunter ein Formular
+   mit einem Link im Fliesstext. Jetzt steht der Zustand vorn - gross, mit
+   Punkt und in seiner Farbe -, weil er die eine Frage beantwortet, wegen der
+   man herkommt: Laeuft der naechtliche Abruf noch?
+
+   Dreistufig und in dieser Reihenfolge: Gruen laeuft, Gold kuemmer dich bald,
+   Rot steht still. Gold traegt hier ZUM ERSTEN MAL eine Handlungsaufforderung
+   statt einer Auszeichnung (Entscheidung des Nutzers vom 29.09.2026,
+   Abschnitt 13) - `--warnung` waere falsch, weil ein bald ablaufender Zugang
+   noch gar nicht stillsteht.
+   -------------------------------------------------------------------------- */
+
+.zugangkopf {
+  display: flex;
+  align-items: baseline;
+  gap: var(--a2);
+  flex-wrap: wrap;
+}
+
+.zugangwort {
+  font-family: var(--schrift-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.zugang .punkt {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  align-self: center;
+}
+
+.zugang.ok .punkt { background: var(--st-am_spielen); }
+.zugang.ok .zugangwort { color: var(--st-am_spielen); }
+.zugang.bald .punkt { background: var(--gold); }
+.zugang.bald .zugangwort { color: var(--gold); }
+.zugang.weg .punkt { background: var(--gefahr); }
+.zugang.weg .zugangwort { color: var(--gefahr); }
+
+.zugangsatz { margin: var(--a2) 0 0; }
+
+/* Zwei Spalten: Die Werte stehen direkt neben ihrer Bezeichnung und trotzdem
+   untereinander - nicht an den rechten Rand geschoben (Wunsch des Nutzers). */
+.zugang .fakten {
+  margin: var(--a3) 0 0;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: 2px var(--a3);
+  font-size: 0.85rem;
+}
+
+.zugang .fakten > span { color: var(--text-leise); }
+
+.zugang .fakten > b {
+  font-weight: 500;
+  color: var(--text);
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.knopf.gross {
+  width: 100%;
+  padding: 11px 14px;
+  font-size: 0.95rem;
+  margin-top: var(--a3);
+  font-family: var(--schrift-display);
+  font-weight: 600;
+}
+
+.knopf.gross.betont {
+  border-color: var(--gold-rand);
+  background: var(--gold-flaeche);
+  color: var(--gold);
+}
+
+/* Die drei Schritte stehen nur da, solange der Vorgang laeuft - danach waeren
+   sie eine Anleitung fuer etwas, das niemand gerade tut. */
+.schritte {
+  margin: var(--a3) 0 0;
+  padding: var(--a3);
+  border: 1px dashed var(--linie);
+  border-radius: var(--r2);
+  display: grid;
+  gap: var(--a2);
+}
+
+.schritt {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr;
+  gap: var(--a2);
+  font-size: 0.85rem;
+  color: var(--text-leise);
+  align-items: start;
+}
+
+.schritt .nr {
+  font-family: var(--schrift-display);
+  color: var(--text-still);
+  font-variant-numeric: tabular-nums;
+}
+
+.schritt.jetzt { color: var(--text); }
+.schritt.jetzt .nr { color: var(--gold); }
+.schritt.fertig .nr { color: var(--st-am_spielen); }
+
+/* Eine Leiste, drei Zustaende, nie zwei zugleich. */
+.rueck {
+  margin-top: var(--a3);
+  padding: var(--a2) var(--a3);
+  border-radius: var(--r2);
+  border: 1px solid var(--linie);
+  font-size: 0.9rem;
+  display: flex;
+  gap: var(--a2);
+  align-items: center;
+}
+
+.rueck.laeuft { color: var(--text-leise); }
+.rueck.gut { border-color: var(--st-am_spielen); color: var(--st-am_spielen); }
+.rueck.schlecht { border-color: var(--gefahr); color: var(--gefahr); }
+
+.rueck .zeichen {
+  flex: none;
+  width: 1.1rem;
+  text-align: center;
+  font-family: var(--schrift-display);
+}
+
+.zugang details { margin-top: var(--a3); }
+
+.zugang details > summary {
+  cursor: pointer;
+  color: var(--text-still);
+  font-size: 0.85rem;
+  list-style: none;
+}
+
+.zugang details > summary::-webkit-details-marker { display: none; }
+.zugang details > summary::before { content: '▸ '; }
+.zugang details[open] > summary::before { content: '▾ '; }
+
+.handfeld {
+  display: flex;
+  gap: var(--a2);
+  margin-top: var(--a2);
+}
+
+.handfeld input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 8px;
+  background: var(--grund);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+  color: var(--text);
+}
+
+.zugangsliste {
+  margin: var(--a2) 0 0;
+  padding-left: var(--a4);
+  font-size: 0.85rem;
+  color: var(--text-leise);
+}

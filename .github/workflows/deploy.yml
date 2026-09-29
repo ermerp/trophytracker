@@ -137,7 +137,9 @@ jobs:
                     (SELECT COUNT(*) FROM app_setting WHERE key = 'cron_letzter_ausgang') AS cron_alt,
                     (SELECT COUNT(*) FROM psn_played_title) AS gespielte_titel,
                     (SELECT COUNT(*) FROM digital_entitlement WHERE herkunft = 'nutzer') AS besitz_hand,
-                    (SELECT COUNT(*) FROM digital_entitlement WHERE herkunft = 'psn') AS besitz_psn" \
+                    (SELECT COUNT(*) FROM digital_entitlement WHERE herkunft = 'psn') AS besitz_psn,
+                    (SELECT COUNT(*) FROM psn_zugang) AS zugaenge,
+                    (SELECT COUNT(*) FROM psn_zugang WHERE gestorben_am IS NOT NULL) AS zugaenge_gestorben" \
             | jq -r '.[0].results[0] |
                 "zugeordnete Listen: \(.zugeordnet)",
                 "play_status: \(.play_status) Zeilen, erwartet mindestens \(.ps_erwartet) (zugeordnete Listen mit Fortschritt)",
@@ -149,7 +151,8 @@ jobs:
                 "reviewed_progress_pct: \(.mit_prozent) Listen mit Prozentwert, erwartet \(.gestempelt) (gestempelte Listen, Migration 0016)",
                 "Besitz: \(.offen_trotz_besitz) offene Wuensche/Kaeufe an Releases mit Besitz, erwartet 0; \(.erledigte_absichten) erledigte Wuensche/Kaeufe insgesamt (Migration 0018)",
                 "Cron-Verlauf: \(.cron_alt) alte Einzeleintraege, erwartet 0 (Migration 0022)",
-                "Spielzeit/Besitz: \(.gespielte_titel) gespielte Titel, \(.besitz_hand) Berechtigungen von Hand, \(.besitz_psn) von PSN erkannt (Migration 0023, vor dem ersten Lauf 0 und 0)"'
+                "Spielzeit/Besitz: \(.gespielte_titel) gespielte Titel, \(.besitz_hand) Berechtigungen von Hand, \(.besitz_psn) von PSN erkannt (Migration 0023, vor dem ersten Lauf 0 und 0)",
+                "Zugaenge: \(.zugaenge) aufgezeichnet, davon \(.zugaenge_gestorben) gestorben - erwartet 1 und 1 beim ersten Lauf nach Migration 0026 (der Zugang vom 04.09., gestorben in der Nacht zum 29.09.)"'
 
       - name: Worker und Assets deployen
         uses: cloudflare/wrangler-action@v4

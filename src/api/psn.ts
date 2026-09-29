@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { SyncLauf } from "../db/sync";
+import { npssoAusText } from "../domain/npsso";
 import { Geheimnis } from "../domain/secret";
 import { PsnAuthError } from "../psn/client";
 import { heuteIso } from "../domain/igdb";
@@ -28,7 +29,24 @@ export const psnRoutes = new Hono<AppEnv>()
 			return c.json({ fehler: "Feld 'npsso' fehlt oder ist leer." }, 400);
 		}
 
-		const npsso = new Geheimnis(roh.trim());
+		// Seit Stufe 19e nimmt die Route ALLES an, was der Nutzer einfuegt:
+		// den blanken Wert, das ganze JSON von Sonys Seite, die ganze Seite.
+		// Das Heraussuchen war der unangenehmste Schritt des Vorgangs - auf
+		// einem Handydisplay das Markieren von 64 Zeichen zwischen zwei
+		// Anfuehrungszeichen (Wunsch des Nutzers vom 29.09.2026).
+		const erkannt = npssoAusText(roh);
+		if (!erkannt) {
+			return c.json(
+				{
+					fehler:
+						"Darin steckt kein Zugang. Erwartet werden 64 Zeichen aus Buchstaben und Ziffern - " +
+						"der ganze Text von Sonys Seite reicht.",
+				},
+				400,
+			);
+		}
+
+		const npsso = new Geheimnis(erkannt.wert);
 		const psn = c.var.psn;
 
 		// Erst pruefen, dann speichern: Ein ungueltiges NPSSO soll den
@@ -44,7 +62,7 @@ export const psnRoutes = new Hono<AppEnv>()
 			return c.json({ fehler: meldung }, 400);
 		}
 
-		await c.var.repos.credentials.npssoSpeichern(npsso);
+		await c.var.repos.credentials.npssoSpeichern(npsso, erkannt.laeuftAbUm);
 		await c.var.repos.credentials.refreshTokenSpeichern(
 			sitzung.refreshToken,
 			sitzung.refreshLaeuftAbUm,
@@ -96,13 +114,14 @@ export const psnRoutes = new Hono<AppEnv>()
 	 * daraus einen fehlgeschlagenen Nachtlauf, den niemand am Bildschirm sah.
 	 */
 	.get("/sync/status", async (c) => {
-		const [lauf, cronLauf, cronVerlauf, zugang, trophaeen, besitz] = await Promise.all([
+		const [lauf, cronLauf, cronVerlauf, zugang, trophaeen, besitz, zugaenge] = await Promise.all([
 			c.var.repos.sync.letzterLauf(),
 			c.var.repos.sync.letzterLauf("cron"),
 			c.var.repos.sync.cronVerlauf(),
 			c.var.repos.credentials.anzeige(),
 			c.var.repos.trophies.anzahl(),
 			besitzStand(c.var.repos),
+			c.var.repos.credentials.zugaenge(),
 		]);
 
 		return c.json({
@@ -118,6 +137,17 @@ export const psnRoutes = new Hono<AppEnv>()
 			// zu sehen, und genau daran blieb der Fehler aus 18c vier Tage
 			// unbemerkt.
 			besitz: { fertigAm: besitz.fertigAm ?? null, fehlerAm: besitz.fehlerAm ?? null, laeuft: typeof besitz.start === "number" },
+			// Wie lange die bisherigen Zugaenge gehalten haben (Stufe 19e).
+			// Nur `gestorben` ist eine Messung - `ersetzt` heisst, der Nutzer
+			// hat frueher erneuert, und wie lange der Zugang gehalten haette,
+			// erfaehrt niemand (7.1).
+			zugaenge: zugaenge.map((z) => ({
+				eingetragenAm: z.eingetragen_am,
+				angekuendigtBis: z.angekuendigt_bis,
+				letzterErfolgAm: z.letzter_erfolg_am,
+				ausgang: z.gestorben_am !== null ? "gestorben" : z.ersetzt_am !== null ? "ersetzt" : "offen",
+				endeAm: z.gestorben_am ?? z.ersetzt_am,
+			})),
 		});
 	});
 
