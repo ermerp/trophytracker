@@ -709,7 +709,11 @@ wer es geöffnet hat.
 die *Seite*. Jede Abkürzung läuft deshalb über eine Geste — Kopieren. Der Ablauf ist:
 
 1. Knopf **„Zugang erneuern"** öffnet Sonys Seite in einem neuen Tab.
-2. Dort alles markieren und kopieren. **Nichts heraussuchen:** Das Feld nimmt den blanken Wert, das
+2. Dort kopieren. Auf dem Handy am einfachsten mit einem **langen Tippen auf die Zeichenfolge** –
+   die Anführungszeichen begrenzen sie, sie wird also am Stück markiert; „Alles auswählen" geht
+   genauso. Sonys Seite gibt rohes JSON aus und stellt es **sehr klein** dar (Rückmeldung des
+   Nutzers vom 29.09.2026, am Gerät geprüft) – lesen muss man es nicht, und vergrößern lässt es
+   sich nicht: Es ist eine fremde Seite. **Nichts heraussuchen:** Das Feld nimmt den blanken Wert, das
    ganze JSON und die ganze Seite an (`npssoAusText`, `src/domain/npsso.ts`) — gesucht wird der Wert
    selbst, 64 freistehende Zeichen aus Buchstaben und Ziffern. Genau einer muss es sein; bei keinem
    oder mehreren wird abgelehnt statt geraten.

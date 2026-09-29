@@ -14,8 +14,8 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19a, 19c, 19d und 18e abgenommen** (29.09.2026), **Stufe 19e gebaut**
-(29.09.2026)
+**Stufen bis 19a, 19c, 19d und 18e abgenommen**, **Stufe 19e gebaut und am Gerät
+erprobt** (29.09.2026)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -489,7 +489,9 @@ Seit Stufe 19e führt der Knopf **„Zugang erneuern"** in den Einstellungen dur
 Vorgang:
 
 1. Knopf drücken – Sonys Seite geht in einem neuen Tab auf
-2. Dort **alles markieren und kopieren** (bei PlayStation angemeldet sein)
+2. Dort kopieren – am Handy mit einem langen Tippen auf die Zeichenfolge, die
+   damit am Stück markiert ist; „Alles auswählen" geht genauso. Sonys Seite
+   stellt das JSON sehr klein dar; lesen muss man es nicht
 3. Zurück zu Trophytracker – die App liest die Zwischenablage, prüft den Zugang
    gegen PSN und speichert ihn
 
