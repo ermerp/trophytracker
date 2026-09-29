@@ -321,7 +321,8 @@ export function ZugangBlock({
           <div className="schritt jetzt">
             <span className="nr">2</span>
             <span>
-              Dort <b>alles markieren und kopieren</b> – der ganze Text reicht, du musst nichts heraussuchen.
+              Dort <b>lange auf die lange Zeichenfolge tippen</b> – sie wird am Stück markiert – und kopieren.
+              Genauso gut: „Alles auswählen". Der Text ist klein, aber du musst ihn nicht lesen.
             </span>
           </div>
           <div className="schritt">
