@@ -192,8 +192,15 @@ export const kurzesDatum = (wert: string | null) =>
   wert ? alsDatum(wert).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : 'unbekannt'
 
 /** D1 schreibt `2026-09-26 08:14:12` ohne Zone – das ist UTC, nicht Ortszeit. */
-const alsDatum = (wert: string) =>
+export const alsDatum = (wert: string) =>
   new Date(wert.replace(' ', 'T') + (/Z|[+-]\d\d:\d\d$/.test(wert) ? '' : 'Z'))
+
+/**
+ * Datum mit Jahr („28.11.2026") – für Fristen, die Monate entfernt liegen.
+ * `kurzesDatum` lässt das Jahr weg und taugt dafür nicht (Stufe 19e).
+ */
+export const datumMitJahr = (wert: string | null) =>
+  wert ? alsDatum(wert).toLocaleDateString('de-DE') : 'unbekannt'
 
 export const KRITIKQUELLE: Record<string, string> = { igdb: 'IGDB', opencritic: 'OpenCritic', manuell: 'von Hand' }
 

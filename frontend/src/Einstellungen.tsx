@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { alsDatum, datumMitJahr } from './api'
 
 /**
  * Einstellungen: NPSSO hinterlegen und Sync auslösen.
@@ -12,8 +13,19 @@ type Zugang = {
   eingerichtet: boolean
   status: 'ok' | 'abgelaufen' | 'fehler' | null
   npssoHinterlegtAm: string | null
+  /** Sonys Ankündigung aus `expires_in` – eine Angabe, keine Zusage (7.1). */
+  npssoLaeuftAbUm: string | null
   refreshLaeuftAbUm: string | null
   letzterErfolgAm: string | null
+}
+
+/** Ein aufgezeichneter Zugang (Stufe 19e) – nur Zeitpunkte, nie ein Token. */
+type ZugangVerlauf = {
+  eingetragenAm: string
+  angekuendigtBis: string | null
+  letzterErfolgAm: string | null
+  ausgang: 'gestorben' | 'ersetzt' | 'offen'
+  endeAm: string | null
 }
 
 type Lauf = {
@@ -36,6 +48,8 @@ export type StatusAntwort = {
   trophaeen: number
   /** Stand der wöchentlichen Kaufliste (Stufe 18e, 7.7). */
   besitz?: { fertigAm: string | null; fehlerAm: string | null; laeuft: boolean }
+  /** Wie lange die bisherigen Zugänge gehalten haben (Stufe 19e). */
+  zugaenge?: ZugangVerlauf[]
 }
 
 type SyncAntwort = {
@@ -88,12 +102,6 @@ const datumNurTag = (wert: string | null) =>
 const datum = (wert: string | null) =>
   wert ? new Date(wert.replace(' ', 'T') + (wert.includes('Z') ? '' : 'Z')).toLocaleString('de-DE') : 'unbekannt'
 
-const STATUSTEXT: Record<string, string> = {
-  ok: 'in Ordnung',
-  abgelaufen: 'abgelaufen – bitte ein neues NPSSO eintragen',
-  fehler: 'Fehler beim letzten Versuch',
-}
-
 const AUSLOESERTEXT: Record<string, string> = { nutzer: 'von Hand', cron: 'automatisch' }
 
 /** Eine Zeile zu einem Lauf: Status, Ausloeser, Start, Titel, Meldung. */
@@ -105,9 +113,294 @@ function laufText(lauf: NonNullable<Lauf>): string {
   )
 }
 
+/**
+ * Der Zugangsblock (Stufe 19e).
+ *
+ * Der alte Ablauf war sechs Schritte lang, und der unangenehmste davon war
+ * das Markieren von 64 Zeichen zwischen zwei Anführungszeichen auf einem
+ * Handydisplay. Er lässt sich nicht abschaffen – das NPSSO ist ein Cookie auf
+ * Sonys Domain, und keine Seite fremder Herkunft darf es lesen (gemessen am
+ * 29.09.2026: CORS steht offen, `SameSite` nicht). Was bleibt, ist ihn kurz
+ * zu machen:
+ *
+ *   Knopf → Tab geht auf → alles kopieren → zurück → fertig.
+ *
+ * Den letzten Schritt macht die Anwendung selbst: Sie merkt am
+ * `visibilitychange`, dass du zurück bist, liest die Zwischenablage und
+ * prüft, was darin steht. Klappt das nicht – keine Berechtigung, nichts
+ * Brauchbares drin –, bleibt der Weg von Hand darunter stehen.
+ */
+
+const SONY_URL = 'https://ca.account.sony.com/api/v1/ssocookie'
+
+/**
+ * Ab wann gemeldet wird, dass der Zugang bald abläuft.
+ *
+ * 18 Tage, nicht Sonys Ankündigung: Die lautete rund 60 Tage, gehalten hat
+ * der Zugang 25 (gemessen am 29.09.2026, 7.1). Sieben Tage Vorlauf auf die
+ * gemessene Lebensdauer – eine Faustregel auf EINEM Messpunkt, die durch die
+ * Aufzeichnung in `psn_zugang` mit jeder Runde besser wird.
+ */
+const WARNEN_AB_TAGEN = 18
+
+/** Grob genug: ganze Tage seit einem Zeitpunkt aus D1 oder ISO. */
+function tageSeit(wert: string | null): number | null {
+  if (!wert) return null
+  const t = alsDatum(wert)
+  if (!t) return null
+  return Math.floor((Date.now() - t.getTime()) / 86_400_000)
+}
+
+function tageText(tage: number | null): string {
+  if (tage === null) return 'unbekannt'
+  if (tage === 0) return 'heute'
+  if (tage === 1) return 'gestern'
+  return `vor ${tage} Tagen`
+}
+
+type Zustand = 'ok' | 'bald' | 'weg'
+const ZUSTANDSWORT: Record<Zustand, string> = {
+  ok: 'Verbunden',
+  bald: 'Läuft bald ab',
+  weg: 'Abgelaufen',
+}
+
+function zustandAus(zugang: Zugang): Zustand {
+  if (!zugang.eingerichtet || zugang.status === 'abgelaufen') return 'weg'
+  const tage = tageSeit(zugang.npssoHinterlegtAm)
+  return tage !== null && tage >= WARNEN_AB_TAGEN ? 'bald' : 'ok'
+}
+
+type Rueckmeldung = { art: 'laeuft' | 'gut' | 'schlecht'; text: string } | null
+
+export function ZugangBlock({
+  zugang,
+  zugaenge,
+  trophaeen,
+  neuLaden,
+}: {
+  zugang: Zugang | undefined
+  zugaenge: ZugangVerlauf[]
+  trophaeen: number | undefined
+  neuLaden: () => Promise<void>
+}) {
+  const [wartet, setWartet] = useState(false)
+  const [rueck, setRueck] = useState<Rueckmeldung>(null)
+  const [handfeld, setHandfeld] = useState('')
+  const [laeuft, setLaeuft] = useState(false)
+
+  const eintragen = useCallback(
+    async (text: string) => {
+      setLaeuft(true)
+      setRueck({ art: 'laeuft', text: 'Zugang erkannt – wird bei PlayStation geprüft …' })
+      try {
+        const antwort = await fetch('/api/settings/npsso', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ npsso: text }),
+        })
+        const daten = (await antwort.json()) as { fehler?: string; npssoLaeuftAbUm?: string | null }
+        if (!antwort.ok) {
+          setRueck({ art: 'schlecht', text: daten.fehler ?? 'Der Zugang konnte nicht gespeichert werden.' })
+          return false
+        }
+        setHandfeld('')
+        setRueck({
+          art: 'gut',
+          text: daten.npssoLaeuftAbUm
+            ? `Zugang geprüft und gespeichert. Gültig bis ${datumMitJahr(daten.npssoLaeuftAbUm)}.`
+            : 'Zugang geprüft und gespeichert.',
+        })
+        await neuLaden()
+        return true
+      } finally {
+        setLaeuft(false)
+      }
+    },
+    [neuLaden],
+  )
+
+  /**
+   * Zurück in der Anwendung: nachsehen, ob in der Zwischenablage etwas liegt,
+   * das wie ein Zugang aussieht.
+   *
+   * Die lose Prüfung hier entscheidet nur, ob es sich lohnt zu fragen – die
+   * verbindliche macht der Worker (`npssoAusText`). Jeder Fehler ist
+   * harmlos: keine Berechtigung, kein Fokus, nichts Passendes drin – dann
+   * bleibt der Weg von Hand.
+   */
+  useEffect(() => {
+    if (!wartet) return
+    const zurueck = () => {
+      if (document.visibilityState !== 'visible') return
+      setWartet(false)
+      void (async () => {
+        try {
+          const text = await navigator.clipboard.readText()
+          if (!/(^|[^A-Za-z0-9])[A-Za-z0-9]{64}([^A-Za-z0-9]|$)/.test(text)) {
+            setRueck({
+              art: 'schlecht',
+              text: 'In der Zwischenablage stand kein Zugang. Bist du bei PlayStation angemeldet?',
+            })
+            return
+          }
+          await eintragen(text)
+        } catch {
+          setRueck({
+            art: 'schlecht',
+            text: 'Die Zwischenablage ließ sich nicht lesen. Füge den Text unten von Hand ein.',
+          })
+        }
+      })()
+    }
+    document.addEventListener('visibilitychange', zurueck)
+    return () => document.removeEventListener('visibilitychange', zurueck)
+  }, [wartet, eintragen])
+
+  if (!zugang) return null
+  const zustand = zustandAus(zugang)
+  const tage = tageSeit(zugang.npssoHinterlegtAm)
+  const gemessen = zugaenge.filter((z) => z.ausgang === 'gestorben' && z.endeAm)
+
+  return (
+    <section className={`karte zugang ${zustand}`}>
+      <h2>PlayStation-Verbindung</h2>
+
+      <div className="zugangkopf">
+        <span className="punkt" />
+        <span className="zugangwort">{zugang.eingerichtet ? ZUSTANDSWORT[zustand] : 'Nicht eingerichtet'}</span>
+      </div>
+
+      {zustand === 'bald' && (
+        <p className="still zugangsatz">
+          Ein Zugang hielt bisher rund 25 Tage. Erneuere ihn, wenn es dir passt – sonst steht der nächtliche
+          Abruf still.
+        </p>
+      )}
+      {zustand === 'weg' && zugang.eingerichtet && (
+        <p className="still zugangsatz">
+          Der nächtliche Abruf steht still, bis ein neuer Zugang eingetragen ist. Vorhandene Daten bleiben
+          unverändert.
+        </p>
+      )}
+
+      {zugang.eingerichtet && (
+        <div className="fakten">
+          <span>Zugang eingetragen</span>
+          <b>{tageText(tage)}</b>
+          <span>Letzter Abruf</span>
+          <b>{zugang.letzterErfolgAm ? datumMitJahr(zugang.letzterErfolgAm) : 'noch keiner'}</b>
+          {zugang.npssoLaeuftAbUm && (
+            <>
+              <span>Sony nennt als Frist</span>
+              <b>{datumMitJahr(zugang.npssoLaeuftAbUm)}</b>
+            </>
+          )}
+          {trophaeen !== undefined && (
+            <>
+              <span>Trophäenlisten</span>
+              <b className="zahl">{trophaeen}</b>
+            </>
+          )}
+        </div>
+      )}
+
+      {rueck && (
+        <div className={`rueck ${rueck.art}`} role="status">
+          <span className="zeichen">{rueck.art === 'gut' ? '✓' : rueck.art === 'schlecht' ? '✕' : '◌'}</span>
+          <span>{rueck.text}</span>
+        </div>
+      )}
+
+      {wartet ? (
+        <div className="schritte">
+          <div className="schritt fertig">
+            <span className="nr">1</span>
+            <span>Sonys Seite ist in einem neuen Tab offen.</span>
+          </div>
+          <div className="schritt jetzt">
+            <span className="nr">2</span>
+            <span>
+              Dort <b>alles markieren und kopieren</b> – der ganze Text reicht, du musst nichts heraussuchen.
+            </span>
+          </div>
+          <div className="schritt">
+            <span className="nr">3</span>
+            <span>Zurück zu Trophytracker – den Rest mache ich.</span>
+          </div>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        className={`knopf gross${zustand === 'ok' ? '' : ' betont'}`}
+        disabled={laeuft}
+        onClick={() => {
+          setRueck(null)
+          setWartet(true)
+          window.open(SONY_URL, '_blank', 'noopener')
+        }}
+      >
+        {wartet ? 'Tab noch einmal öffnen' : 'Zugang erneuern'}
+      </button>
+
+      <details>
+        <summary>Von Hand eintragen</summary>
+        <form
+          className="handfeld"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void eintragen(handfeld)
+          }}
+        >
+          <input
+            type="password"
+            autoComplete="off"
+            value={handfeld}
+            placeholder="Wert oder ganzen Text einfügen"
+            onChange={(e) => setHandfeld(e.target.value)}
+          />
+          <button type="submit" className="knopf" disabled={laeuft || handfeld.trim() === ''}>
+            Speichern
+          </button>
+        </form>
+        <p className="still zugangsatz">
+          Beides wird angenommen: der ganze Text von Sonys Seite oder nur der Wert.
+        </p>
+      </details>
+
+      {gemessen.length > 0 && (
+        <details>
+          <summary>Wie lange Zugänge halten</summary>
+          <ul className="zugangsliste">
+            {gemessen.map((z) => (
+              <li key={z.eingetragenAm}>
+                <span className="zahl">{tageZwischen(z.eingetragenAm, z.endeAm)}</span> Tage – eingetragen{' '}
+                {datumMitJahr(z.eingetragenAm)}
+                {z.angekuendigtBis ? `, angekündigt bis ${datumMitJahr(z.angekuendigtBis)}` : ''}
+              </li>
+            ))}
+          </ul>
+          <p className="still zugangsatz">
+            Gezählt werden nur abgelehnte Zugänge. Wer früher erneuert, erfährt nie, wie lange seiner
+            gehalten hätte.
+          </p>
+        </details>
+      )}
+    </section>
+  )
+}
+
+/** Ganze Tage zwischen zwei Zeitpunkten, für die Liste oben. */
+function tageZwischen(von: string, bis: string | null): number | string {
+  const a = alsDatum(von)
+  const b = bis ? alsDatum(bis) : null
+  if (!a || !b) return 'unbekannt'
+  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86_400_000))
+}
+
 export function Einstellungen() {
   const [status, setStatus] = useState<StatusAntwort | null>(null)
-  const [npsso, setNpsso] = useState('')
   const [meldung, setMeldung] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [fortschritt, setFortschritt] = useState<string | null>(null)
@@ -120,29 +413,6 @@ export function Einstellungen() {
   useEffect(() => {
     void statusLaden()
   }, [statusLaden])
-
-  async function npssoSpeichern(ereignis: React.FormEvent) {
-    ereignis.preventDefault()
-    setMeldung(null)
-    setLaeuft(true)
-    try {
-      const antwort = await fetch('/api/settings/npsso', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ npsso }),
-      })
-      const daten = (await antwort.json()) as { fehler?: string }
-      if (!antwort.ok) {
-        setMeldung(daten.fehler ?? 'Das NPSSO konnte nicht gespeichert werden.')
-        return
-      }
-      setNpsso('')
-      setMeldung('NPSSO geprüft und gespeichert.')
-      await statusLaden()
-    } finally {
-      setLaeuft(false)
-    }
-  }
 
   /**
    * Normalisierung erneut ausführen – ohne PSN-Zugriff.
@@ -252,50 +522,12 @@ export function Einstellungen() {
 
   return (
     <section>
-      <h2>PlayStation-Verbindung</h2>
-
-      {zugang && !zugang.eingerichtet && (
-        <p>Noch kein NPSSO hinterlegt.</p>
-      )}
-      {zugang?.eingerichtet && (
-        <table>
-          <tbody>
-            <tr>
-              <td>Zustand</td>
-              <td>{STATUSTEXT[zugang.status ?? ''] ?? 'unbekannt'}</td>
-            </tr>
-            <tr>
-              <td>NPSSO hinterlegt</td>
-              <td>{datum(zugang.npssoHinterlegtAm)}</td>
-            </tr>
-            <tr>
-              <td>Letzter Erfolg</td>
-              <td>{datum(zugang.letzterErfolgAm)}</td>
-            </tr>
-          </tbody>
-        </table>
-      )}
-
-      <form onSubmit={npssoSpeichern}>
-        <label htmlFor="npsso">
-          Neues NPSSO – zu finden unter{' '}
-          <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noreferrer">
-            ca.account.sony.com/api/v1/ssocookie
-          </a>{' '}
-          im angemeldeten Browser
-        </label>
-        <input
-          id="npsso"
-          type="password"
-          autoComplete="off"
-          value={npsso}
-          onChange={(e) => setNpsso(e.target.value)}
-          placeholder="npsso-Wert einfügen"
-        />
-        <button type="submit" disabled={laeuft || npsso.trim() === ''}>
-          Prüfen und speichern
-        </button>
-      </form>
+      <ZugangBlock
+        zugang={zugang}
+        zugaenge={status?.zugaenge ?? []}
+        trophaeen={status?.trophaeen}
+        neuLaden={statusLaden}
+      />
 
       <h2>Trophäen abrufen</h2>
       <p>

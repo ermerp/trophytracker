@@ -51,6 +51,9 @@ export const EXPORT_TABELLEN = [
 	"psn_sync_run",
 	"game_event",
 	"psn_played_title",
+	// Nur Zeitpunkte, kein Token (Migration 0026). Die Zeitreihe ist der ganze
+	// Zweck der Tabelle und nach einem Verlust nicht wiederherstellbar.
+	"psn_zugang",
 ] as const;
 
 /** Tabellen, die es gibt und die absichtlich nicht exportiert werden. */
