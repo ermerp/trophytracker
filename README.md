@@ -317,7 +317,11 @@ PSN-Abrufe, der nächtliche Füllschritt und der Knopf **„Trophäen jetzt
 holen"** in den Einstellungen. Der erste Durchlauf dauert rund vier Minuten
 und lässt sich jederzeit abbrechen – der nächste Druck macht dort weiter.
 Mehr als einmal am Tag geht er nicht: 18 355 Trophäen sind rund 29 500
-geschriebene Zeilen, und D1 erlaubt 100 000 am Tag. Danach hält der Nachtlauf
+geschriebene Zeilen, und D1 erlaubt 100 000 am Tag. Der Durchlauf hält den
+Bildschirm wach, solange er läuft – sonst sperrt das Handy nach gut einer
+Minute, der Tab wandert in den Hintergrund und verliert seine Abrufe. Reißt
+die Verbindung doch ab, sagt die Seite es und nennt die Zahl, bei der sie
+stehengeblieben ist; ein erneuter Druck macht dort weiter. Danach hält der Nachtlauf
 den Bestand selbst aktuell und holt nur Listen nach, an denen sich etwas
 geändert hat. **Die Anzeige folgt als Teil 2**, gebaut an den echten Daten.
 
