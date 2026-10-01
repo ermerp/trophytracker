@@ -134,7 +134,7 @@ export async function trophaeenPortion(
 		}
 	}
 
-	const stand = await repos.trophaeen.fuellstand();
+	const stand = await repos.trophaeen.offeneListen();
 	return { listen: getan, trophaeen, offen: stand.offen, gesamt: stand.gesamt, meldung };
 }
 
