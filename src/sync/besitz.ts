@@ -31,6 +31,13 @@ export type SpielzeitErgebnis = {
 	zugeordnet: number;
 	weiter: boolean;
 	meldung?: string;
+	/**
+	 * Fehlversuche an DERSELBEN Seite, wenn dieser Aufruf einen hatte
+	 * (Stufe 18f). Wie beim Sync seit 18e: Die Zahl gehoert in die
+	 * Verlaufszeile, damit "dreimal dieselbe Seite" nicht wie "drei Seiten
+	 * geholt" aussieht.
+	 */
+	versuche?: number;
 };
 
 export type BesitzErgebnis = {
