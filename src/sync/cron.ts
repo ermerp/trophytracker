@@ -11,7 +11,7 @@ import {
 } from "./igdb";
 import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis } from "./besitz";
 import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
-import { eineListe, levelSchritt, type ListenErgebnis } from "./trophaeen";
+import { eineListe, jahreSchritt, levelSchritt, type ListenErgebnis } from "./trophaeen";
 
 /**
  * Die naechtliche Automatik (Stufe 18, Abschnitt 10.1).
@@ -108,6 +108,7 @@ export type CronErgebnis = {
 		| "besitz"
 		| "trophaeen"
 		| "level"
+		| "jahre"
 		| "igdb_auffrischen"
 		| "igdb_physisch"
 		| "aufraeumen"
@@ -127,6 +128,7 @@ export type CronErgebnis = {
 	besitz?: BesitzErgebnis;
 	trophaeen?: ListenErgebnis;
 	level?: number;
+	jahre?: number;
 	auffrischen?: AuffrischErgebnis;
 	physisch?: PhysischErgebnis;
 };
@@ -236,6 +238,13 @@ export async function cronSchritt(
 		//    und deshalb ganz hinten. Sie belegt einen Aufruf, der sonst
 		//    "nichts" tut, und niemals denselben wie eine schwere Arbeit: Jeder
 		//    Schritt davor kehrt bei Erfolg sofort zurueck (CPU-Grenze, 10.1).
+		// 11. Sonst die Trophäen je Jahr durchrechnen - einmal am Tag, im
+		//     billigen Fenster. 18 060 gelesene Zeilen sind für die Startseite
+		//     zu teuer (Abschnitt 2); hier stören sie niemanden, und das
+		//     Dashboard liest danach eine Zeile aus app_setting.
+		const jahre = await jahreSchritt(repos, heute);
+		if (jahre) return { ...basis, getan: "jahre", jahre: jahre.jahre.length };
+
 		const geloescht = await repos.sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE);
 		if (geloescht > 0) return { ...basis, getan: "aufraeumen", geloescht };
 	}
@@ -464,6 +473,7 @@ export function cronLogzeile(e: CronErgebnis): string {
 		if (e.trophaeen.gruppen) teile.push(`gruppen=${e.trophaeen.gruppen}`);
 	}
 	if (e.level) teile.push(`level=${e.level}`);
+	if (e.jahre) teile.push(`jahre=${e.jahre}`);
 	if (e.spielzeit) {
 		teile.push(
 			`spielzeit=${e.spielzeit.status}`,

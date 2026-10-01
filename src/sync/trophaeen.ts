@@ -40,6 +40,8 @@ export const PORTION = 4;
 export const SCHLUESSEL_KNOPF = "trophaeen_knopf_tag";
 /** Level und Punkte aus trophySummary, zuletzt geholt am. */
 export const SCHLUESSEL_LEVEL = "trophaeen_level";
+/** Trophaeen je Jahr, einmal je Nacht gerechnet (Stufe 19b). */
+export const SCHLUESSEL_JAHRE = "trophaeen_jahre";
 
 export type ListenErgebnis = {
 	npCommunicationId: string;
@@ -195,6 +197,47 @@ export async function levelStand(repos: Repositories): Promise<LevelStand | null
 	if (!roh) return null;
 	try {
 		return JSON.parse(roh) as LevelStand;
+	} catch {
+		return null;
+	}
+}
+
+/** Was im Zwischenspeicher der Jahre steht. */
+export type JahreStand = { standAm: string; jahre: Array<{ jahr: number; anzahl: number }> };
+
+/**
+ * Die Trophaeen je Jahr einmal durchrechnen und ablegen.
+ *
+ * **Eine bewusste Ausnahme von "Berechnetes nicht speichern" (5.2)**, auf
+ * Vorschlag des Nutzers vom 01.10.2026 - und sie ist begruendbar: Die
+ * Auswertung liest 18 060 Zeilen, das ganze uebrige Dashboard 6 840, und ein
+ * Indexhinweis hilft nicht (gemessen). Vergangene Jahre sind abgeschlossene
+ * Tatsachen; nur das laufende Jahr aendert sich, und das wird beim Lesen live
+ * gezaehlt. Gespeichert wird also kein Rang und keine Sortierung - der Fall,
+ * den die Regel meint -, sondern eine Summe ueber unveraenderliche Geschichte.
+ *
+ * Die Zahl wird nachts neu gerechnet. Faellt der Zwischenspeicher aus oder
+ * fehlt er, rechnet die Route einmal live: Es ist eine Beschleunigung, keine
+ * Quelle.
+ */
+export async function jahreSchritt(repos: Repositories, heute: string): Promise<JahreStand | null> {
+	const vorhanden = await jahreStand(repos);
+	if (vorhanden?.standAm === heute) return null;
+
+	const jahre = (await repos.trophaeen.jahre()).map((j) => ({ jahr: Number(j.jahr), anzahl: j.anzahl }));
+	if (jahre.length === 0) return null;
+
+	const neu: JahreStand = { standAm: heute, jahre };
+	await repos.sync.fortschrittSetzenWert(SCHLUESSEL_JAHRE, JSON.stringify(neu));
+	return neu;
+}
+
+export async function jahreStand(repos: Repositories): Promise<JahreStand | null> {
+	const roh = await repos.sync.fortschritt(SCHLUESSEL_JAHRE);
+	if (!roh) return null;
+	try {
+		const wert = JSON.parse(roh) as JahreStand;
+		return Array.isArray(wert?.jahre) ? wert : null;
 	} catch {
 		return null;
 	}

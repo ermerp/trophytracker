@@ -709,12 +709,21 @@ function ReleaseKarte({
         />
       )}
 
-      {r.trophaeen && <TrophaeenStufen erspielt={r.trophaeen.erspielt} definiert={r.trophaeen.definiert} />}
-
-      {/* Die einzelnen Trophäen, aufklappbar (Stufe 19b). Erst beim Öffnen
-          geladen: Eine Liste sind rund 91 gelesene Zeilen, und ein Spiel mit
-          drei Releases soll sie nicht alle mitbringen. */}
-      {r.trophaeen && <Trophaeenliste releaseId={r.id} />}
+      {/* Überschrift mit Zahl und Pfeil, darunter die Zeichen, darunter – beim
+          Aufklappen – die einzelnen Trophäen (Stufe 19b, Rückmeldung des
+          Nutzers vom 01.10.2026). Die Zeichen bleiben beim Öffnen stehen.
+          Geladen wird erst beim Öffnen: Eine Liste sind rund 91 gelesene
+          Zeilen, und ein Spiel mit drei Releases soll sie nicht alle
+          mitbringen. */}
+      {r.trophaeen && (
+        <Trophaeenliste
+          releaseId={r.id}
+          erspielt={erspielt}
+          definiert={definiert}
+        >
+          <TrophaeenStufen erspielt={r.trophaeen.erspielt} definiert={r.trophaeen.definiert} />
+        </Trophaeenliste>
+      )}
 
       {/* Zwei feste Zeilen statt eines Flusses mit „·": Auf dem Handy brach
           der Text ohnehin um, und der Umbruch lag je nach Datumslänge
