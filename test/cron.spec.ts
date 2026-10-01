@@ -18,7 +18,7 @@ import {
 } from "../src/sync/cron";
 import { FEHLVERSUCHE_HOECHSTENS } from "../src/sync/run";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
-import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophySeite } from "./psn-fake";
+import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophaeenRegeln, trophySeite } from "./psn-fake";
 
 /**
  * Die naechtliche Automatik (Stufe 18, Abschnitt 10.1) gegen die lokale D1,
@@ -50,6 +50,9 @@ function psnMit(total: number) {
 				return new Response(trophySeite(offset, total));
 			},
 		],
+		// Die Einzeltrophaeen aus Stufe 19b: Ohne sie fiele jeder Abruf auf
+		// den 404 des Fakes und saehe aus wie "PSN kennt die Liste nicht".
+		...trophaeenRegeln(),
 	]);
 	return { psn: erstellePsnClient(fetch), aufrufe };
 }
@@ -216,13 +219,15 @@ describe("cronSchritt", () => {
 		for (let i = 0; i < 20; i++) {
 			const e = await cronSchritt(repos(), psn, igdbOhne());
 			schritte.push(e);
-			if (e.getan === "nichts") break;
+			if (e.getan === "nichts" || e.getan === "trophaeen") break;
 		}
 
 		// 2 Seiten holen, 2 auswerten, 1 Abschluss - danach die beiden
-		// PSN-Zusatzabrufe (Stufe 18c, hier leer), dann ist nichts mehr zu tun.
-		expect(schritte.map((s) => s.getan)).toEqual([
-			"sync", "sync", "sync", "sync", "sync", "spielzeit", "besitz", "nichts",
+		// PSN-Zusatzabrufe (Stufe 18c, hier leer) und dann die Einzeltrophaeen
+		// (Stufe 19b), eine Liste je Aufruf. Geprueft wird der Anfang: Dass
+		// der Fuellschritt 150-mal laeuft, ist Sache seines eigenen Tests.
+		expect(schritte.slice(0, 8).map((s) => s.getan)).toEqual([
+			"sync", "sync", "sync", "sync", "sync", "spielzeit", "besitz", "trophaeen",
 		]);
 		expect(schritte[4].sync).toMatchObject({ status: "erfolg", titlesSeen: 150 });
 		expect(await laeufe()).toEqual([expect.objectContaining({ status: "erfolg", started_by: "cron" })]);
@@ -251,7 +256,10 @@ describe("cronSchritt", () => {
 		for (let i = 0; i < 5; i++) await cronSchritt(repos(), psn, igdbOhne());
 		expect(await laeufe()).toHaveLength(1);
 
-		expect((await cronSchritt(repos(), psn, igdbOhne(), { heute: HEUTE })).getan).toBe("nichts");
+		// Kein ZWEITER Lauf heute. Was der Aufruf stattdessen tut, ist offen -
+		// seit Stufe 19b fuellt er Einzeltrophaeen. Geprueft wird deshalb, dass
+		// er keinen Sync startet, nicht dass er nichts tut.
+		expect((await cronSchritt(repos(), psn, igdbOhne(), { heute: HEUTE })).getan).not.toBe("sync");
 		expect(await laeufe()).toHaveLength(1);
 
 		expect((await cronSchritt(repos(), psn, igdbOhne(), { heute: MORGEN })).getan).toBe("sync");

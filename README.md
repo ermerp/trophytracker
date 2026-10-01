@@ -296,6 +296,41 @@ Sammlung – es trägt weder Besitz noch Fortschritt.
 und 21 (PSN Store-Preise). Die PSN-Stufen ergänzen nur, was die
 Sammlung schon kennt, und importieren nichts.
 
+Der Zuschnitt von 19b steht seit dem 01.10.2026 (Abschnitt 7.7): Die Antworten
+werden **nicht roh abgelegt** – Rohablage gibt es nur, wo teurer Abruf, komplexe
+Normalisierung und einzige Aufzeichnung zusammentreffen, und das ist allein der
+Sync. Die Erstbefüllung läuft **nachts und auf Knopfdruck** (Portionen, Pause
+dazwischen, Abbruch bei `429`), aber **höchstens einmal am Tag**: 18 355
+Trophäen sind mit Index rund 37 000 geschriebene Zeilen, und D1 erlaubt im Free
+Tier 100 000 am Tag. **Gruppen und Trophäen-Level** gehören dazu – ohne die
+Gruppe zählt „was fehlt mir noch zu Platin" bei Spielen mit DLC falsch, und das
+Level ist die Lücke, die das Dashboard aus 19a ausdrücklich offen gelassen hat.
+Wie die Trophäenliste im Spieldetail **aussieht**, ist am Prototyp entschieden
+(01.10.2026, vier Runden): Symbol, Name, Beschreibung, Stufe, Seltenheit als
+Zahl und Wort, Erspiel-Datum und der Fortschrittszähler. Erspielt ist hell,
+offen ist dunkel – das Symbol trägt den Zustand ohne ein Wort. Platin steht
+für sich. Versteckte Trophäen sind zugedeckt und lassen sich einzeln per
+Klick oder für die ganze Liste per Schieberegler aufdecken.
+
+**Teil 1 ist gebaut (01.10.2026): die Daten.** Migration 0027, die vier
+PSN-Abrufe, der nächtliche Füllschritt und der Knopf **„Trophäen jetzt
+holen"** in den Einstellungen. Der erste Durchlauf dauert rund vier Minuten
+und lässt sich jederzeit abbrechen – der nächste Druck macht dort weiter.
+Mehr als einmal am Tag geht er nicht: 18 355 Trophäen sind rund 29 500
+geschriebene Zeilen, und D1 erlaubt 100 000 am Tag. Danach hält der Nachtlauf
+den Bestand selbst aktuell und holt nur Listen nach, an denen sich etwas
+geändert hat. **Die Anzeige folgt als Teil 2**, gebaut an den echten Daten.
+
+Der Feed „Neu" auf dem Dashboard bekommt damit eine **zweite Quelle**: Eine
+erspielte Trophäe ist kein Änderungsereignis – niemand hat etwas geschrieben –,
+also liest der Feed sie direkt aus `trophy` und mischt sie nach dem echten
+Erspielt-Datum unter die Ereignisse, verdichtet je Spiel und Tag („12 Trophäen,
+davon 1 Gold"), Platin immer als eigene Zeile. Das Änderungsprotokoll unter
+`/aenderungen` bleibt dagegen bei seiner einen Quelle. Damit die Erstbefüllung
+den Feed nicht flutet, zählt dessen Zeitfenster das Erspielt-Datum statt des
+Abrufzeitpunkts, **und** der Feed zeigt Trophäenzeilen erst, wenn die
+Erstbefüllung durch ist.
+
 **Stufe 18 ist seit dem 22.09.2026 abgenommen:** PWA installiert und offline
 geprüft, nächtliche Läufe am 20., 21. und 22.09. mit je 431 Titeln, in der Nacht
 zum 22.09. zusätzlich 368 aufgefrischte Spiele. Der IGDB-Schritt hatte zwei

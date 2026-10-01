@@ -2,7 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
-import { EXPORT_TABELLEN } from "../src/db/export";
+import { EXPORT_ORDNUNG, EXPORT_TABELLEN } from "../src/db/export";
 import {
 	LETZTES_PLATIN_SQL,
 	LISTEN_SQL,
@@ -267,7 +267,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Tabellenliste aus der Konstante, nicht abgeschrieben: kommt eine
 		// Tabelle dazu, misst dieser Test sie automatisch mit.
 		const ergebnisse = await env.DB.batch(
-			EXPORT_TABELLEN.map((t) => env.DB.prepare(`SELECT * FROM ${t} ORDER BY rowid`)),
+			EXPORT_TABELLEN.map((t) => env.DB.prepare(`SELECT * FROM ${t} ORDER BY ${EXPORT_ORDNUNG[t] ?? "rowid"}`)),
 		);
 		const backupJson = ergebnisse.reduce((summe, r) => summe + (r.meta.rows_read ?? 0), 0);
 
@@ -713,6 +713,92 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("DELETE FROM release WHERE id = 9001"),
 			env.DB.prepare("DELETE FROM game WHERE id = 9001"),
 		]);
+	});
+
+	/**
+	 * Einzeltrophaeen (Stufe 19b). Gemessen wird BEIDES - die Leseansicht und
+	 * der Schreibschritt. Bis zum 28.09.2026 mass diese Datei ausschliesslich
+	 * Leseansichten, und ein Sync-Schritt mit einer Abfrage je Eintrag lief
+	 * deshalb acht Tage lang ungemessen (Abschnitt 2).
+	 */
+	it("misst die Trophaeen eines Spiels und die Auswahl des Fuellschritts (Stufe 19b)", async () => {
+		// Ein Bestand in Produktionsgroesse: 430 Listen mit je 43 Trophaeen
+		// sind rund 18 500 Zeilen - die Sammlung des Nutzers hat 18 355.
+		const listen = (
+			await env.DB.prepare("SELECT np_communication_id FROM trophy_progress ORDER BY np_communication_id").all<{
+				np_communication_id: string;
+			}>()
+		).results;
+
+		// Die Zeitpunkte ueber dreizehn Jahre verteilt, nicht alle auf heute:
+		// Der Nutzer sammelt seit 2012, und das Zeitfenster des Feeds soll
+		// einen kleinen Ausschnitt treffen und nicht den ganzen Bestand -
+		// sonst misst dieser Test eine Lage, die es nie gibt.
+		const tagVor = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 19).replace("T", " ");
+		for (let i = 0; i < listen.length; i += 10) {
+			await env.DB.batch(
+				listen.slice(i, i + 10).flatMap((l, j) =>
+					Array.from({ length: 43 }, (_, n) =>
+						env.DB.prepare(
+							"INSERT INTO trophy (np_communication_id, trophy_id, grade, name, earned, earned_at, earned_rate) " +
+								"VALUES (?, ?, 'bronze', 'Trophäe', ?, ?, 12.5)",
+						).bind(l.np_communication_id, n, n % 2, n % 2 ? tagVor(((i + j) * 43 + n) % 4_800) : null),
+					),
+				),
+			);
+		}
+
+		// Die Trophaeen EINES Spiels. Der Primaerschluessel beginnt mit der
+		// Listen-Id, das ist ein Bereich statt eines Scans ueber alle 18 000.
+		const spiel = await env.DB.prepare("SELECT game_id FROM release WHERE game_id IS NOT NULL LIMIT 1").first<{
+			game_id: number;
+		}>();
+		const jeSpiel = await zeilenGelesen(
+			"SELECT t.trophy_id, t.grade, t.name, t.earned, t.earned_at, t.earned_rate FROM trophy t " +
+				"JOIN trophy_progress tp ON tp.np_communication_id = t.np_communication_id " +
+				"JOIN release r ON r.id = tp.release_id WHERE r.game_id = ? ORDER BY t.np_communication_id, t.trophy_id",
+			spiel?.game_id ?? 0,
+		);
+
+		// Die Auswahl des Fuellschritts laeuft in JEDEM Aufruf des
+		// PSN-Fensters, auch wenn nichts offen ist.
+		const summe =
+			"(earned_bronze + earned_silver + earned_gold + earned_platinum + " +
+			"defined_bronze + defined_silver + defined_gold + defined_platinum)";
+		const auswahlSql =
+			"SELECT np_communication_id, np_service_name FROM trophy_progress " +
+			`WHERE trophies_synced_at IS NULL OR trophies_synced_sum <> ${summe} ` +
+			"ORDER BY np_communication_id LIMIT 1";
+		const auswahlOffen = await zeilenGelesen(auswahlSql);
+
+		// Und derselbe Fall im DAUERBETRIEB: Ist nichts offen, muss die
+		// Abfrage alle Listen ansehen, um das festzustellen - und genau diese
+		// Lage laeuft 36-mal je Nacht, waehrend die obere nur waehrend der
+		// Erstbefuellung auftritt. Nur den guenstigen Fall zu messen waere
+		// derselbe Fehler wie "nur den Leerlauf zaehlen" (10.1).
+		await env.DB.prepare(`UPDATE trophy_progress SET trophies_synced_at = datetime('now'), trophies_synced_sum = ${summe}`).run();
+		const auswahlLeer = await zeilenGelesen(auswahlSql);
+
+		// Der Feed liest die erspielten Trophaeen eines Zeitfensters. Ohne den
+		// Teilindex aus Migration 0027 waere das ein Scan ueber alles - und
+		// der Feed ist die erste Seite nach jedem Start der App (8.5).
+		const feed = await zeilenGelesen(
+			"SELECT t.np_communication_id, date(t.earned_at) AS tag, COUNT(*) AS n FROM trophy t " +
+				"WHERE t.earned = 1 AND t.earned_at >= datetime('now', '-30 days') " +
+				"GROUP BY t.np_communication_id, tag ORDER BY MAX(t.earned_at) DESC LIMIT 8",
+		);
+
+		console.info({ jeSpiel, auswahlOffen, auswahlLeer, feed, nacht: auswahlLeer * 36 });
+
+		// Je Spiel die Groessenordnung einer Liste, nicht der Tabelle.
+		expect(jeSpiel).toBeLessThan(300);
+		// Die Auswahl liest trophy_progress, nicht trophy - im Dauerbetrieb
+		// einmal die Listentabelle, 36-mal je Nacht also rund 15 000 Zeilen.
+		expect(auswahlOffen).toBeLessThan(50);
+		expect(auswahlLeer).toBeLessThan(listen.length + 50);
+		expect(auswahlLeer * 36).toBeLessThan(20_000);
+		// Der Feed bleibt im Fenster statt im Bestand.
+		expect(feed).toBeLessThan(2_000);
 	});
 
 	it("misst einen Leerlauf-Aufruf der Automatik (Stufe 18)", async () => {

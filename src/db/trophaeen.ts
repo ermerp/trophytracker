@@ -1,0 +1,225 @@
+import type { GruppeZeile, TrophaeeZeile } from "../domain/trophaee";
+
+/** Eine Liste, die der Fuellschritt als Naechstes holen soll. */
+export type ZuFuellen = { npCommunicationId: string; npServiceName: string };
+
+/** Eine Trophaee, wie die Anzeige sie liest. */
+export type TrophaeeAnzeige = {
+	trophy_id: number;
+	grade: string;
+	name: string;
+	detail: string | null;
+	icon_url: string | null;
+	hidden: number;
+	group_id: string;
+	earned: number;
+	earned_at: string | null;
+	earned_rate: number | null;
+	progress_target: number | null;
+	progress_value: number | null;
+};
+
+/**
+ * Die Summe aller acht Zaehler einer Liste. Dieselbe Formel im Stempel und in
+ * der Auswahl - sie steht deshalb genau einmal hier.
+ */
+const ZAEHLERSUMME =
+	"(earned_bronze + earned_silver + earned_gold + earned_platinum + " +
+	"defined_bronze + defined_silver + defined_gold + defined_platinum)";
+
+/**
+ * Hoechstens sechs Trophaeen je INSERT: D1 erlaubt 100 gebundene Werte je
+ * Statement, und eine Trophaee braucht fuenfzehn (Abschnitt 2). Sechs sind
+ * 90 - die groesste Liste der Sammlung (128 Trophaeen) wird damit zu 22
+ * Statements in einem Batch.
+ */
+const JE_INSERT = 6;
+
+/**
+ * Einzeltrophaeen (Stufe 19b, Abschnitt 7.7).
+ *
+ * Schreibt immer die ganze Liste auf einmal: erst loeschen, dann einfuegen,
+ * dann stempeln - in EINEM Batch. Damit gibt es keinen Zwischenstand, in dem
+ * eine Liste halb gefuellt waere, und der Stempel kommt nie ohne die Zeilen,
+ * zu denen er gehoert.
+ *
+ * Kein `game_event` (Entscheidung des Nutzers vom 01.10.2026): Eine erspielte
+ * Trophaee ist kein Schreibvorgang eines Nutzers, und 11 168 Zeilen Fremddaten
+ * im Protokoll widersprechen "der Sync protokolliert nur Erkanntes" (8.5). Der
+ * Dashboard-Feed liest sie stattdessen direkt aus dieser Tabelle.
+ */
+export class TrophaeenRepository {
+	constructor(private readonly db: D1Database) {}
+
+	/**
+	 * Die naechsten Listen, die geholt werden muessen.
+	 *
+	 * Zwei Faelle, und beide stehen in derselben Zeile - es braucht keine
+	 * zweite Abfrage und keine Absprache mit der Aenderungserkennung:
+	 *
+	 *   1. `trophies_synced_at IS NULL` - noch nie geholt (Erstbefuellung).
+	 *   2. Die Zaehlersumme weicht vom Stempel ab - seit dem letzten Holen ist
+	 *      eine Trophaee dazugekommen oder erspielt worden (7.7, "danach nur
+	 *      bei Aenderung").
+	 *
+	 * Sortiert nach Id, damit die Reihenfolge ueber Aufrufe hinweg stabil ist
+	 * und ein Abbruch genau dort weitermacht, wo er aufgehoert hat.
+	 */
+	async naechsteZumFuellen(limit: number): Promise<ZuFuellen[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT np_communication_id, np_service_name FROM trophy_progress " +
+					`WHERE trophies_synced_at IS NULL OR trophies_synced_sum <> ${ZAEHLERSUMME} ` +
+					"ORDER BY np_communication_id LIMIT ?",
+			)
+			.bind(limit)
+			.all<{ np_communication_id: string; np_service_name: string }>();
+		return results.map((r) => ({
+			npCommunicationId: r.np_communication_id,
+			npServiceName: r.np_service_name,
+		}));
+	}
+
+	/**
+	 * Wie viele Listen noch offen sind, wie viele es gibt, und wie viele
+	 * Trophaeen schon gespeichert sind. `gespeichert` heisst bewusst nicht
+	 * `trophaeen`: Im Ergebnis einer Portion steht unter diesem Namen die
+	 * Zahl der gerade GESCHRIEBENEN, und zwei verschiedene Zahlen unter einem
+	 * Namen sind ein Fehler, der in der Oberflaeche landet.
+	 */
+	async fuellstand(): Promise<{ offen: number; gesamt: number; gespeichert: number }> {
+		const zeile = await this.db
+			.prepare(
+				"SELECT COUNT(*) AS gesamt, " +
+					`SUM(trophies_synced_at IS NULL OR trophies_synced_sum <> ${ZAEHLERSUMME}) AS offen ` +
+					"FROM trophy_progress",
+			)
+			.first<{ gesamt: number; offen: number | null }>();
+		const anzahl = await this.db.prepare("SELECT COUNT(*) AS n FROM trophy").first<{ n: number }>();
+		return { offen: zeile?.offen ?? 0, gesamt: zeile?.gesamt ?? 0, gespeichert: anzahl?.n ?? 0 };
+	}
+
+	/**
+	 * Eine Liste vollstaendig schreiben. `zeilen` leer ist erlaubt und heisst
+	 * "PSN kennt diese Liste nicht mehr" - dann wird trotzdem gestempelt,
+	 * sonst waehlt der naechste Aufruf dieselbe Liste wieder (Migration 0027).
+	 */
+	async schreibeListe(
+		npCommunicationId: string,
+		zeilen: TrophaeeZeile[],
+		gruppen: GruppeZeile[],
+	): Promise<number> {
+		const statements: D1PreparedStatement[] = [
+			this.db.prepare("DELETE FROM trophy WHERE np_communication_id = ?").bind(npCommunicationId),
+			this.db.prepare("DELETE FROM trophy_group WHERE np_communication_id = ?").bind(npCommunicationId),
+		];
+
+		for (let i = 0; i < zeilen.length; i += JE_INSERT) {
+			const teil = zeilen.slice(i, i + JE_INSERT);
+			const werte = teil.map(() => "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").join(", ");
+			statements.push(
+				this.db
+					.prepare(
+						"INSERT INTO trophy (np_communication_id, trophy_id, grade, name, detail, icon_url, " +
+							"hidden, group_id, earned, earned_at, earned_rate, progress_target, progress_value, " +
+							`progress_rate, progressed_at) VALUES ${werte}`,
+					)
+					.bind(
+						...teil.flatMap((z) => [
+							npCommunicationId,
+							z.trophyId,
+							z.grade,
+							z.name,
+							z.detail,
+							z.iconUrl,
+							z.hidden,
+							z.groupId,
+							z.earned,
+							z.earnedAt,
+							z.earnedRate,
+							z.progressTarget,
+							z.progressValue,
+							z.progressRate,
+							z.progressedAt,
+						]),
+					),
+			);
+		}
+
+		// Neun Werte je Gruppe, hoechstens elf Gruppen je Statement.
+		for (let i = 0; i < gruppen.length; i += 11) {
+			const teil = gruppen.slice(i, i + 11);
+			const werte = teil.map(() => "(?,?,?,?,?,?,?,?,?)").join(", ");
+			statements.push(
+				this.db
+					.prepare(
+						"INSERT INTO trophy_group (np_communication_id, group_id, name, detail, icon_url, " +
+							`defined_bronze, defined_silver, defined_gold, defined_platinum) VALUES ${werte}`,
+					)
+					.bind(
+						...teil.flatMap((g) => [
+							npCommunicationId,
+							g.groupId,
+							g.name,
+							g.detail,
+							g.iconUrl,
+							g.bronze,
+							g.silber,
+							g.gold,
+							g.platin,
+						]),
+					),
+			);
+		}
+
+		// Der Stempel zuletzt, im selben Batch: Er kommt nie ohne die Zeilen.
+		statements.push(
+			this.db
+				.prepare(
+					"UPDATE trophy_progress SET trophies_synced_at = datetime('now'), " +
+						`trophies_synced_sum = ${ZAEHLERSUMME} WHERE np_communication_id = ?`,
+				)
+				.bind(npCommunicationId),
+		);
+
+		await this.db.batch(statements);
+		return zeilen.length;
+	}
+
+	/**
+	 * Die Trophaeen eines Spiels, ueber seine Releases.
+	 *
+	 * Der Primaerschluessel beginnt mit `np_communication_id`, die Auswahl ist
+	 * damit ein Bereich je Liste statt eines Scans ueber alle 18 355 Zeilen
+	 * (Migration 0027). Sortiert wie Sony sie liefert - die Reihenfolge ist
+	 * seine Entscheidung und wird uebernommen (13).
+	 */
+	async fuerSpiel(gameId: number): Promise<TrophaeeAnzeige[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT t.trophy_id, t.grade, t.name, t.detail, t.icon_url, t.hidden, t.group_id, " +
+					"t.earned, t.earned_at, t.earned_rate, t.progress_target, t.progress_value " +
+					"FROM trophy t " +
+					"JOIN trophy_progress tp ON tp.np_communication_id = t.np_communication_id " +
+					"JOIN release r ON r.id = tp.release_id " +
+					"WHERE r.game_id = ? ORDER BY t.np_communication_id, t.trophy_id",
+			)
+			.bind(gameId)
+			.all<TrophaeeAnzeige>();
+		return results;
+	}
+
+	/** Die Gruppen eines Spiels; leer, wo es keine DLC gibt. */
+	async gruppenFuerSpiel(gameId: number): Promise<{ group_id: string; name: string }[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT g.group_id, g.name FROM trophy_group g " +
+					"JOIN trophy_progress tp ON tp.np_communication_id = g.np_communication_id " +
+					"JOIN release r ON r.id = tp.release_id " +
+					"WHERE r.game_id = ? ORDER BY g.np_communication_id, g.group_id",
+			)
+			.bind(gameId)
+			.all<{ group_id: string; name: string }>();
+		return results;
+	}
+}

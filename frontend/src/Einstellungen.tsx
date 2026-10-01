@@ -400,20 +400,44 @@ function tageZwischen(von: string, bis: string | null): number | string {
   return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86_400_000))
 }
 
+/** Was `GET /api/sync/trophaeen` sagt (Stufe 19b). */
+type TrophaeenStand = {
+  offen: number
+  gesamt: number
+  gespeichert: number
+  level: { level: number; punkte: number; bisNaechstes: number; prozent: number } | null
+}
+
+/** Was eine Portion zurueckgibt (`POST /api/sync/trophaeen`). */
+type TrophaeenAntwort = {
+  listen: number
+  trophaeen: number
+  offen: number
+  gesamt: number
+  meldung?: string
+}
+
 export function Einstellungen() {
   const [status, setStatus] = useState<StatusAntwort | null>(null)
   const [meldung, setMeldung] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [fortschritt, setFortschritt] = useState<string | null>(null)
+  const [trophaeen, setTrophaeen] = useState<TrophaeenStand | null>(null)
 
   const statusLaden = useCallback(async () => {
     const antwort = await fetch('/api/sync/status')
     if (antwort.ok) setStatus((await antwort.json()) as StatusAntwort)
   }, [])
 
+  const trophaeenStandLaden = useCallback(async () => {
+    const antwort = await fetch('/api/sync/trophaeen')
+    if (antwort.ok) setTrophaeen((await antwort.json()) as TrophaeenStand)
+  }, [])
+
   useEffect(() => {
     void statusLaden()
-  }, [statusLaden])
+    void trophaeenStandLaden()
+  }, [statusLaden, trophaeenStandLaden])
 
   /**
    * Normalisierung erneut ausführen – ohne PSN-Zugriff.
@@ -509,6 +533,55 @@ export function Einstellungen() {
     }
   }
 
+  /**
+   * Einzeltrophäen holen (Stufe 19b, 7.7).
+   *
+   * Ruft Portionen nach, bis nichts mehr offen ist – 431 Listen sind rund
+   * 31 Aufrufe und zusammen etwa vier Minuten. Dass die Oberfläche das
+   * treiben muss, ist keine Umständlichkeit: Ein Worker-Aufruf darf
+   * höchstens 50 Fremdanfragen machen, und eine Liste kostet zwei bis drei.
+   *
+   * Bricht ab, sobald eine Portion eine Meldung zurückgibt – bei `429` ist
+   * das Sonys Bitte aufzuhören. Was geschrieben wurde, bleibt stehen; der
+   * nächste Druck macht dort weiter.
+   */
+  async function trophaeenHolen() {
+    setMeldung(null)
+    setLaeuft(true)
+    setFortschritt('Trophäen werden geholt …')
+    let listen = 0
+    let trophaeen = 0
+    try {
+      for (let runde = 0; runde < 60; runde++) {
+        const antwort = await fetch('/api/sync/trophaeen', { method: 'POST' })
+        const daten = (await antwort.json()) as TrophaeenAntwort
+        if (!antwort.ok) {
+          setMeldung(daten.meldung ?? 'Der Abruf der Trophäen ist fehlgeschlagen.')
+          break
+        }
+        listen += daten.listen
+        trophaeen += daten.trophaeen
+        setFortschritt(
+          daten.offen > 0
+            ? `${listen} von ${daten.gesamt} Listen, ${trophaeen} Trophäen …`
+            : `Fertig: ${listen} Listen, ${trophaeen} Trophäen.`,
+        )
+        // Pause zwischen den Portionen: Die Trophäen-API ist inoffiziell, und
+        // 940 Anfragen am Stück wären ein Schwall (Entscheidung des Nutzers
+        // vom 01.10.2026).
+        if (daten.meldung) {
+          setMeldung(daten.meldung)
+          break
+        }
+        if (daten.offen === 0) break
+        await new Promise((fertig) => setTimeout(fertig, 400))
+      }
+      await trophaeenStandLaden()
+    } finally {
+      setLaeuft(false)
+    }
+  }
+
   async function synchronisieren() {
     setMeldung(null)
     setLaeuft(true)
@@ -576,6 +649,27 @@ export function Einstellungen() {
       <p className="zeile">
         Sonys Kaufliste sagt, was gekauft und was über PS Plus im Katalog ist. Sie läuft sonst einmal
         wöchentlich mit; der Knopf holt sie sofort.
+      </p>
+      <h3>Einzeltrophäen</h3>
+      <p className="zeile">
+        {trophaeen === null
+          ? 'Wird geladen …'
+          : trophaeen.offen === 0
+            ? `Vollständig: ${trophaeen.gespeichert} Trophäen aus ${trophaeen.gesamt} Listen.`
+            : `${trophaeen.gesamt - trophaeen.offen} von ${trophaeen.gesamt} Listen geholt, ${trophaeen.gespeichert} Trophäen.`}
+        {trophaeen?.level ? ` Trophäen-Level ${trophaeen.level.level}.` : ''}
+      </p>
+      <button
+        type="button"
+        onClick={trophaeenHolen}
+        disabled={laeuft || !zugang?.eingerichtet || trophaeen?.offen === 0}
+      >
+        Trophäen jetzt holen
+      </button>
+      <p className="zeile">
+        Holt Name, Beschreibung, Seltenheit und Erspiel-Datum jeder einzelnen Trophäe. Der erste
+        Durchlauf dauert rund vier Minuten und lässt sich jederzeit abbrechen – der nächste Druck
+        macht dort weiter. Danach hält der Nachtlauf den Bestand selbst aktuell.
       </p>
       <h3>Letzte Cron-Aufrufe</h3>
       {status && status.cronVerlauf.length === 0 ? (

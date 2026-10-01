@@ -56,6 +56,8 @@ Seit Stufe 16 hält `game_event` fest, wer wann was geschrieben hat (Abschnitt 8
 
 **Auch die Nebenwirkung gehört an den Schritt, nicht an seinen Auslöser.** In Stufe 18e hing das Wegräumen eines alten `fehler` am Zugang zunächst in `cronSchritt`: Der Knopf „Kaufliste jetzt abrufen" holte 210 Berechtigungen, und in den Einstellungen stand weiter „Fehler beim letzten Versuch". Wer einen zweiten Weg zu einem Schritt baut, erbt dessen Wirkung sonst nicht.
 
+**Nicht jede Zeile im Dashboard-Feed ist ein Ereignis.** Seit 19b liest „Neu" aus zwei Quellen – `game_event` und den erspielten Trophäen aus `trophy`, zur Lesezeit nach Zeit gemischt. Eine erspielte Trophäe wird **nicht** protokolliert: Niemand hat etwas geschrieben. Das Änderungsprotokoll (`/api/events`, Verlauf eines Spiels) behält deshalb seine eine Quelle und sein Keyset über `id`; wer den Feed erweitert, erweitert nicht das Protokoll (8.5).
+
 Die Quelle (`nutzer` / `sync` / `igdb` / `import`, `feed` und `migration` reserviert) wird aus vorhandenen Feldern abgeleitet (`quelleAusHerkunft`, `quelleAusMatch`), nicht durch die Routen gereicht. Der Sync protokolliert nur Erkanntes, IGDB nur Entscheidungen und Statuswechsel, nichts bei unverändertem Stand (Entscheidungen des Nutzers vom 16.09.2026). Der Satz für die Oberfläche entsteht zur Lesezeit in `src/domain/ereignis.ts` und wird nie gespeichert; eine neue Ereignisart kommt dort in `EREIGNIS_ARTEN` und bekommt einen Satz (Test hält das fest). Wer einen neuen Schreiber baut – Cron (18), Feed (20) –, protokolliert von Anfang an; der Scanner (17) tut es über `addPhysicalCopy(…, 'scan')` und schreibt nichts Eigenes.
 
 ### Keine PlayStation-Marken in der Gestaltung
@@ -112,6 +114,7 @@ Der Free Tier erlaubt 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit z
 - Abgleiche im Worker bereiten den Bestand **einmal** vor, nicht je Eingabe: 430 Spieltitel × 56 offene Scans wären 24 000 Zerlegungen in einem Aufruf (`vorbereiten` in `src/domain/scan-titel.ts`)
 - Große Fremddaten (Händler-Feeds) werden in der GitHub Action geparst und gefiltert; der Worker bekommt nur fertige Batches
 - Rohantworten seitenweise speichern, nicht am Stück parsen
+- **Ein Aufruf darf höchstens 50 Fremdanfragen machen.** Der Free Tier zählt `fetch` je Aufruf (Paid: 10 000); eine Wall-Clock-Grenze gibt es dagegen nicht, solange der Client verbunden bleibt. Wer einen Schritt baut, der viele fremde Seiten holt, portioniert deshalb **nicht wegen der Dauer, sondern wegen dieser Zahl**: Die Erstbefüllung der Einzeltrophäen (19b) braucht 940 Anfragen und damit mindestens 19 Aufrufe, egal wie schnell sie antworten (gegen Cloudflares Dokumentation geprüft am 01.10.2026)
 - **D1 erlaubt höchstens fünf Terme in einem zusammengesetzten SELECT.** Fünf `UNION ALL`-Teile gehen, sechs antworten mit `too many terms in compound SELECT` (SQLITE_ERROR 7500) – gemessen am 24.09.2026 gegen Produktion **und** lokale D1, anders als beim Bind-Limit scheitert es also schon im Test. Eine Zählertabelle als ein grosses `UNION ALL` ist damit ausgeschlossen: `SUM(bedingung)` und `GROUP BY` in einem Batch (`src/db/stats.ts`)
 - **D1 erlaubt 100 gebundene Werte je Statement.** Ein `INSERT … VALUES (?,?,?), …` über eine ganze Seite passt nicht; in Stücke teilen (`TrophiesRepository.listeNeuStatements`: 33 Titel × 3 Werte). Dasselbe gilt für `IN (?,…)` über eine Seite: `/api/games` kappt `limit` deshalb auf 100 – mit 200 antwortete die Produktion mit `500` (18.09.2026)
 
@@ -137,13 +140,11 @@ IGDB-Client-Secret und Twitch-Token nehmen denselben Weg; seit Stufe 17c auch eB
 
 **Maschinen-Endpunkte tragen keine eigene Token-Prüfung.** `/api/export/*`, `/api/backup/*` und später `/api/imports/feed` laufen über ein Access Service Token; Access steht vor dem ganzen Worker. Kein Bearer-Token im Code — in Stufe 8 entschieden, begründet in Abschnitt 15.3.
 
-### Rohdaten vor Normalisierung
+### Rohablage nur, wo der Abruf die einzige Aufzeichnung ist
 
-PSN-Antworten werden zuerst unverändert in `psn_raw_response` geschrieben, danach normalisiert. Die beiden Schritte bleiben getrennt, damit die Normalisierung ohne PSN-Zugriff wiederholbar ist.
+`psn_raw_response` ist nicht die Regel für alle Fremddaten, sondern für **einen** Abruf: die Trophäenseiten des Syncs. Dort treffen drei Merkmale zusammen — der Abruf ist teuer (fünf Seiten über eine inoffizielle Schnittstelle), die Normalisierung ist komplex (Zähler, Zuordnung, Änderungserkennung), und die Antwort ist die **einzige** Aufzeichnung dessen, was Sony an diesem Tag gesagt hat. Deshalb hat der Sync zwei Phasen (`psn_sync_run.phase`): erst `abruf`, dann `normalisierung`, beide mit begrenzter Arbeit je Aufruf, und `POST /api/sync/normalize` wiederholt die zweite ohne PSN.
 
-Der Sync hat deshalb zwei Phasen (`psn_sync_run.phase`): erst `abruf`, dann `normalisierung`, beide mit begrenzter Arbeit je Aufruf. `POST /api/sync/normalize` setzt `normalized_at` zurück und lässt die Normalisierung erneut laufen — ohne PSN.
-
-Das gilt für die **Trophäenseiten**: teurer Abruf, komplexe Normalisierung, einzige Aufzeichnung. Die beiden Zusatzabrufe aus Stufe 18c (Spielzeit, Kaufliste) sind ausdrücklich ausgenommen (Entscheidung des Nutzers vom 22.09.2026, Abschnitt 7.7) – zusammen rund 17 Anfragen, jederzeit neu abrufbar, Normalisierung ist Feldkopieren plus Titelabgleich. IGDB-Antworten werden **nicht** roh abgelegt — offizielle Schnittstelle, klein, jederzeit neu abrufbar; `igdb_candidate` hält nur die normalisierten Kandidaten und ist deshalb `NICHT_EXPORTIERT`.
+Fehlt eines der drei Merkmale, wird **nicht** roh abgelegt. Die Rohdaten wären dann kein Beweisstück, sondern Ballast, der über `d1 export` in jede wöchentliche Sicherung wandert — genau dafür musste Stufe 18d einen Aufräumschritt bauen. So liegen ohne Rohablage: IGDB (offizielle Schnittstelle, klein, `igdb_candidate` hält nur die normalisierten Kandidaten und ist deshalb `NICHT_EXPORTIERT`), Spielzeit und Kaufliste aus Stufe 18c (zusammen rund 17 Anfragen, Normalisierung ist Feldkopieren plus Titelabgleich) und die Einzeltrophäen aus Stufe 19b (je Liste ein eigener, jederzeit wiederholbarer Abruf — roh grob 9 MB gegen 1,79 MB Datenbank). Wer eine neue Quelle anbindet, prüft die drei Merkmale, statt der Liste einen Namen hinzuzufügen.
 
 ### Titelnormalisierung ist geteilte Logik
 

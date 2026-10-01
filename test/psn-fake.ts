@@ -60,3 +60,73 @@ export const redirectAntwort = (code: string) =>
 			location: `com.scee.psxandroid.scecompcall://redirect/?code=${code}&cid=x`,
 		},
 	});
+
+/**
+ * Die drei Abrufe zu den Einzeltrophaeen (Stufe 19b) und das Level.
+ *
+ * Nachgebaut, nicht kopiert (CLAUDE.md): Die Form stammt aus der Messung vom
+ * 01.10.2026 - Zahlen als Text, `earnedDateTime` nur an erspielten,
+ * `trophyProgressTargetValue` nur an einzelnen.
+ */
+export function trophaeenDefinitionen(anzahl: number, hatGruppen = false) {
+	const stufen = ["platinum", "gold", "silver", "bronze"];
+	return {
+		totalItemCount: anzahl,
+		hasTrophyGroups: hatGruppen,
+		trophies: Array.from({ length: anzahl }, (_, i) => ({
+			trophyId: i,
+			trophyType: i === 0 ? "platinum" : stufen[(i % 3) + 1],
+			trophyName: `Trophäe ${i}`,
+			trophyDetail: `Tu etwas zum ${i}. Mal.`,
+			trophyIconUrl: `https://beispiel.test/t${i}.png`,
+			trophyHidden: i % 5 === 0,
+			trophyGroupId: hatGruppen && i > anzahl - 3 ? "001" : "default",
+			...(i === 2 ? { trophyProgressTargetValue: "20" } : {}),
+		})),
+	};
+}
+
+export function trophaeenStand(anzahl: number, erspielt: number) {
+	return {
+		trophies: Array.from({ length: anzahl }, (_, i) => ({
+			trophyId: i,
+			earned: i < erspielt,
+			...(i < erspielt ? { earnedDateTime: `2026-09-${String((i % 28) + 1).padStart(2, "0")}T10:00:00Z` } : {}),
+			trophyEarnedRate: String(((i * 7) % 90) + 1),
+			...(i === 2 && i >= erspielt ? { progress: "15", progressRate: "75" } : {}),
+		})),
+	};
+}
+
+export const GRUPPEN_ANTWORT = {
+	trophyGroups: [
+		{ trophyGroupId: "default", trophyGroupName: "Hauptspiel", definedTrophies: { bronze: 5, silver: 2, gold: 1, platinum: 1 } },
+		{ trophyGroupId: "001", trophyGroupName: "Zusatzinhalt", definedTrophies: { bronze: 2, silver: 0, gold: 0, platinum: 0 } },
+	],
+};
+
+export const SUMMARY_ANTWORT = {
+	trophyLevel: 514,
+	trophyPoint: 310_380,
+	trophyLevelBasePoint: 310_140,
+	trophyLevelNextPoint: 311_940,
+	progress: 13,
+};
+
+/**
+ * Die Regeln fuer `fakeFetch`. Die Reihenfolge zaehlt: Der eigene Stand
+ * steht unter `/users/me/...` und muss VOR den Definitionen geprueft werden,
+ * sonst faengt deren Muster ihn mit ab.
+ */
+export function trophaeenRegeln(
+	anzahl = 8,
+	erspielt = 3,
+	hatGruppen = false,
+): Array<[RegExp, () => Response]> {
+	return [
+		[/users\/me\/npCommunicationIds\/.*\/trophies/, () => jsonAntwort(trophaeenStand(anzahl, erspielt))],
+		[/npCommunicationIds\/.*\/trophyGroups\/all\/trophies/, () => jsonAntwort(trophaeenDefinitionen(anzahl, hatGruppen))],
+		[/npCommunicationIds\/.*\/trophyGroups(\?|$)/, () => jsonAntwort(GRUPPEN_ANTWORT)],
+		[/trophySummary/, () => jsonAntwort(SUMMARY_ANTWORT)],
+	];
+}
