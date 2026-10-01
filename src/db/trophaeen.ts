@@ -111,11 +111,41 @@ export class TrophaeenRepository {
 	}
 
 	/**
+	 * Nur die Zahl der offenen Listen - ohne `COUNT(*) FROM trophy`.
+	 *
+	 * **Die teure Zeile aus `fuellstand` gehoert nicht in jeden Seitenaufruf.**
+	 * Der Feed fragt bei jedem Oeffnen des Dashboards, ob die Erstbefuellung
+	 * durch ist; mit `fuellstand` las er dafuer die ganze Trophaeentabelle mit,
+	 * 18 355 Zeilen je Aufruf. Am 01.10.2026 standen deshalb 4,16 von 5 Mio.
+	 * gelesenen Zeilen auf der Uhr (Hinweis des Nutzers). Diese Abfrage liest
+	 * `trophy_progress`, also 431 Zeilen.
+	 *
+	 * Die Lehre ist dieselbe wie am 28.09.2026: Gemessen war die ABFRAGE des
+	 * Feeds (183 Zeilen), nicht die ROUTE - und die Route machte noch eine
+	 * zweite.
+	 */
+	async offeneListen(): Promise<{ offen: number; gesamt: number }> {
+		const zeile = await this.db
+			.prepare(
+				"SELECT COUNT(*) AS gesamt, " +
+					`SUM(trophies_synced_at IS NULL OR trophies_synced_sum <> ${ZAEHLERSUMME}) AS offen ` +
+					"FROM trophy_progress",
+			)
+			.first<{ gesamt: number; offen: number | null }>();
+		return { offen: zeile?.offen ?? 0, gesamt: zeile?.gesamt ?? 0 };
+	}
+
+	/**
 	 * Wie viele Listen noch offen sind, wie viele es gibt, und wie viele
 	 * Trophaeen schon gespeichert sind. `gespeichert` heisst bewusst nicht
 	 * `trophaeen`: Im Ergebnis einer Portion steht unter diesem Namen die
 	 * Zahl der gerade GESCHRIEBENEN, und zwei verschiedene Zahlen unter einem
 	 * Namen sind ein Fehler, der in der Oberflaeche landet.
+	 *
+	 * **Nur fuer die Einstellungen und den Portionsknopf**, nicht fuer Seiten,
+	 * die oft geoeffnet werden: `COUNT(*) FROM trophy` liest den ganzen
+	 * Bestand. Wer nur wissen will, ob noch etwas offen ist, nimmt
+	 * `offeneListen`.
 	 */
 	async fuellstand(): Promise<{ offen: number; gesamt: number; gespeichert: number }> {
 		const zeile = await this.db

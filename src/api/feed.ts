@@ -35,7 +35,9 @@ type Zeile = {
 };
 
 export const feedRoutes = new Hono<AppEnv>().get("/", async (c) => {
-	const stand = await c.var.repos.trophaeen.fuellstand();
+	// Nur die offenen Listen, nicht der ganze Bestand: Diese Route laeuft bei
+	// jedem Oeffnen des Dashboards.
+	const stand = await c.var.repos.trophaeen.offeneListen();
 	const vollstaendig = stand.gesamt > 0 && stand.offen === 0;
 
 	const [ereignisse, trophaeen] = await Promise.all([

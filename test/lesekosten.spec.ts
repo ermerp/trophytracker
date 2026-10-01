@@ -808,7 +808,23 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			"2027-01-01",
 		);
 
-		console.info({ jeSpiel, auswahlOffen, auswahlLeer, feed, jahre, jahreIndex, jahrLaufend });
+		/*
+		 * Die GANZE Feed-Route, nicht nur ihre Abfrage.
+		 *
+		 * Am 01.10.2026 war genau das der Fehler: Gemessen war die
+		 * Feed-Abfrage (183 Zeilen), die Route machte aber noch eine zweite -
+		 * "ist die Erstbefuellung durch?" - und die las mit `COUNT(*) FROM
+		 * trophy` den ganzen Bestand mit. Bei jedem Oeffnen des Dashboards.
+		 * Auf der Uhr standen 4,16 von 5 Mio. gelesenen Zeilen.
+		 */
+		const feedStand = await zeilenGelesen(
+			"SELECT COUNT(*) AS gesamt, " +
+				`SUM(trophies_synced_at IS NULL OR trophies_synced_sum <> ${summe}) AS offen ` +
+				"FROM trophy_progress",
+		);
+		const feedRoute = feed + feedStand;
+
+		console.info({ jeSpiel, auswahlOffen, auswahlLeer, feed, feedRoute, jahre, jahreIndex, jahrLaufend });
 
 		// Je Spiel die Groessenordnung einer Liste, nicht der Tabelle.
 		expect(jeSpiel).toBeLessThan(300);
@@ -817,8 +833,10 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(auswahlOffen).toBeLessThan(50);
 		expect(auswahlLeer).toBeLessThan(listen.length + 50);
 		expect(auswahlLeer * 36).toBeLessThan(20_000);
-		// Der Feed bleibt im Fenster statt im Bestand.
+		// Der Feed bleibt im Fenster statt im Bestand - und die Route auch:
+		// Sie darf den Bestand nicht ein zweites Mal durchzaehlen.
 		expect(feed).toBeLessThan(2_000);
+		expect(feedRoute).toBeLessThan(2_000);
 		/*
 		 * Die Jahre muessen jede erspielte Trophaee ansehen - das ist der Zweck
 		 * der Zahl, und ein Indexhinweis aendert daran nichts (beides gemessen
