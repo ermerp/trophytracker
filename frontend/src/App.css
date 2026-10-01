@@ -155,7 +155,17 @@ input[type='search'] {
 /* --- Stufe 5: Layout mit Navigation, Sammlung, Spieldetail --- */
 
 main {
-  max-width: 64rem;
+  /*
+   * 80 rem, nicht 64 (Entscheidung des Nutzers vom 01.10.2026).
+   *
+   * Gemeldet war, dass die Kopfzeile auf einem breiten Bildschirm mitten im
+   * Fenster endet und die Glocke weit vom Rand sitzt – beides, weil die Zeile
+   * mit dem Inhalt endet. Der erste Versuch hob den Deckel ganz auf; das
+   * behob es, zog aber **jede** Ansicht über die volle Bildschirmbreite, und
+   * genau das fiel dem Nutzer am nächsten Tag auf. 80 rem ist der Mittelweg:
+   * breiter als vorher, aber eine Textzeile bleibt lesbar.
+   */
+  max-width: 80rem;
   padding-bottom: 5rem; /* Platz für die Leiste unten */
 }
 
@@ -3744,18 +3754,3 @@ button.jahr.best.gewaehlt .saeule {
   background: var(--gold);
 }
 
-/*
- * Breite Fenster: Der Inhalt darf die Fläche nehmen.
- *
- * `main` ist auf 64 rem gedeckelt – auf einem Handy und am Notebook richtig,
- * auf einem breiten Bildschirm nicht: Dort endete die Kopfzeile samt ihrer
- * Linie mitten im Fenster, und die Glocke saß weit vom rechten Rand entfernt,
- * weil sie am Ende dieser Linie hängt (Rückmeldung des Nutzers vom
- * 01.10.2026 mit Bildschirmfoto). Ab 80 rem fällt der Deckel; der Abstand zum
- * Rand kommt weiter aus der Polsterung der Seite.
- */
-@media (min-width: 80rem) {
-  main {
-    max-width: none;
-  }
-}
