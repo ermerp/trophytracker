@@ -80,6 +80,51 @@ function psnMitAussetzer(total: number, aussetzer: number[]) {
 	return { psn: erstellePsnClient(fetch), aufrufe };
 }
 
+/**
+ * PSN, dessen ZWEITE Spielzeit-Seite die ersten `aussetzer` Male mit 403
+ * antwortet - der Fall aus der Nacht zum 01.10.2026 (Stufe 18f). Der Sync
+ * selbst laeuft sauber durch, nur `gamelist/v2` stolpert.
+ */
+function psnMitSpielzeitAussetzer(aussetzer: number) {
+	let gestolpert = 0;
+	const { fetch, aufrufe } = fakeFetch([
+		[/oauth\/authorize/, () => redirectAntwort("v3.abc")],
+		[/oauth\/token/, () => jsonAntwort(TOKEN_ANTWORT)],
+		[
+			/gamelist\/v2/,
+			() => {
+				const letzte = aufrufe[aufrufe.length - 1].url;
+				const offset = Number(new URL(letzte).searchParams.get("offset") ?? 0);
+				// Zwei Seiten wie in der Produktion: 200 und 179 von 379. Die
+				// Titel muessen echt sein, sonst endet die Blaetterung nach der
+				// ersten Seite (`weiter` verlangt titel.length > 0).
+				const seite = (n: number) =>
+					jsonAntwort({
+						totalItemCount: 379,
+						titles: Array.from({ length: n }, (_, i) => ({
+							titleId: `CUSA${offset + i}`,
+							name: `Erfundenes Spiel ${offset + i}`,
+							category: "ps4_game",
+							playDuration: "PT1H30M",
+						})),
+					});
+				if (offset === 0) return seite(200);
+				if (gestolpert < aussetzer) {
+					gestolpert++;
+					return new Response("nein", { status: 403 });
+				}
+				return seite(179);
+			},
+		],
+		[
+			/graphql/,
+			() => jsonAntwort({ data: { purchasedTitlesRetrieve: { games: [], pageInfo: { totalCount: 0 } } } }),
+		],
+		[/trophyTitles/, () => new Response(trophySeite(0, 0))],
+	]);
+	return { psn: erstellePsnClient(fetch), aufrufe };
+}
+
 /** PSN, das nur die Kaufliste verweigert - fuer den stummen Fehler aus 18c. */
 const psnOhneKaufliste = (status: number) =>
 	erstellePsnClient(
@@ -645,6 +690,87 @@ describe("cronSchritt", () => {
 		expect(await repos().trophies.anzahl()).toBe(431);
 	});
 
+	describe("Spielzeit: Wiederholung nach einem Abrufsfehler (Stufe 18f)", () => {
+		/**
+		 * Der Fall aus der Nacht zum 01.10.2026: Die erste Seite kam durch, die
+		 * zweite bekam 403. Bis Stufe 18f schrieb der Schritt daraufhin `-1` -
+		 * der Tag war erledigt, 179 von 379 Titeln blieben ohne frische
+		 * Spielzeit, und 20 Aufrufe des Fensters liefen leer.
+		 */
+		beforeEach(async () => {
+			await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
+		});
+
+		async function stand() {
+			const z = await env.DB.prepare(
+				"SELECT value FROM app_setting WHERE key = 'psn_spielzeit_stand'",
+			).first<{ value: string }>();
+			return z?.value ?? null;
+		}
+
+		/**
+		 * Einen erledigten Sync fuer diesen Tag voraussetzen, damit der Schritt
+		 * sofort an die Spielzeit kommt. Ohne das startet `syncFaellig` in
+		 * jedem Aufruf einen neuen Lauf, sobald `heute` hinter der Uhr der
+		 * Datenbank liegt - und die Spielzeit kaeme nie dran.
+		 */
+		async function syncSchonErledigt(heute: string) {
+			await env.DB.prepare(
+				"INSERT INTO psn_sync_run (started_at, finished_at, status, titles_seen) VALUES (?, ?, 'erfolg', 0)",
+			)
+				.bind(`${heute} 03:00:00`, `${heute} 03:50:00`)
+				.run();
+		}
+
+		it("holt dieselbe Seite erneut, statt den Tag zu beenden", async () => {
+			const { psn } = psnMitSpielzeitAussetzer(1);
+			const heute = "2026-10-01";
+			await syncSchonErledigt(heute);
+
+			const erste = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			expect(erste).toMatchObject({ getan: "spielzeit", spielzeit: { status: "erfolg", geholt: 200 } });
+			expect(await stand()).toBe(`${heute}:200`);
+
+			const gescheitert = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			expect(gescheitert.spielzeit).toMatchObject({ status: "fehler", versuche: 1 });
+			// Der Offset bleibt stehen: Der naechste Aufruf holt dieselbe Seite.
+			expect(await stand()).toBe(`${heute}:200:1`);
+
+			const nachgeholt = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			expect(nachgeholt.spielzeit).toMatchObject({ status: "erfolg", geholt: 179 });
+			// Fortschritt setzt den Zaehler zurueck; der Tag ist sauber durch.
+			expect(await stand()).toBe(`${heute}:-1`);
+		});
+
+		it("gibt nach drei Anlaeufen auf und laesst den Tag ruhen", async () => {
+			const { psn } = psnMitSpielzeitAussetzer(99);
+			const heute = "2026-10-01";
+			await syncSchonErledigt(heute);
+
+			await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			const versuche: Array<number | undefined> = [];
+			for (let i = 0; i < 5; i++) {
+				const e = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+				if (e.getan === "spielzeit") versuche.push(e.spielzeit?.versuche);
+			}
+
+			// Genau drei Anlaeufe an derselben Seite, dann ruht der Tag.
+			expect(versuche).toEqual([1, 2, FEHLVERSUCHE_HOECHSTENS]);
+			expect(await stand()).toBe(`${heute}:-1`);
+		});
+
+		it("liest einen alten Stand ohne Versuchszaehler weiter", async () => {
+			const heute = "2026-10-01";
+			await syncSchonErledigt(heute);
+			// So steht er seit der Nacht zum 01.10.2026 in der Produktion.
+			await repos().sync.fortschrittSetzenWert("psn_spielzeit_stand", `${heute}:-1`);
+			const { psn } = psnMitSpielzeitAussetzer(0);
+
+			const e = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			expect(e.getan).not.toBe("spielzeit");
+		});
+	});
+
 	describe("Kaufliste (7.7, Nachbesserung in Stufe 18e)", () => {
 		beforeEach(async () => {
 			await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
@@ -828,5 +954,27 @@ describe("cronSchritt", () => {
 		});
 
 		expect(zeile).toBe("cron: spielzeit spielzeit=erfolg geholt=200 geschrieben=160 zugeordnet=117");
+	});
+
+	it("nennt den Fehlversuch der Spielzeit als Zahl (Stufe 18f)", () => {
+		const zeile = cronLogzeile({
+			getan: "spielzeit",
+			erschienen: 0,
+			abgebrochen: 0,
+			spielzeit: {
+				status: "fehler",
+				geholt: 0,
+				geschrieben: 0,
+				zugeordnet: 0,
+				weiter: false,
+				versuche: 2,
+				meldung: "Abruf der Spielzeiten antwortete mit 403.",
+			},
+		});
+
+		expect(zeile).toBe(
+			'cron: spielzeit spielzeit=fehler geholt=0 geschrieben=0 zugeordnet=0 versuch=2/3 ' +
+				'meldung="Abruf der Spielzeiten antwortete mit 403."',
+		);
 	});
 });

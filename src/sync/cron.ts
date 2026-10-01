@@ -217,26 +217,49 @@ export async function cronSchritt(
 /**
  * Eine Seite Spielzeit, wenn heute noch nicht alles geholt wurde.
  *
- * Der Stand steht als "datum:offset" in app_setting: Ein neuer Tag beginnt
- * bei 0, ein abgeschlossener Tag traegt offset -1 und laesst den Schritt
- * ruhen. Damit macht jeder Aufruf genau eine Seite - dieselbe Blaetterung
- * wie beim Trophaeen-Sync (Abschnitt 2).
+ * Der Stand steht als "datum:offset[:versuche]" in app_setting: Ein neuer Tag
+ * beginnt bei 0, ein abgeschlossener Tag traegt offset -1 und laesst den
+ * Schritt ruhen. Damit macht jeder Aufruf genau eine Seite - dieselbe
+ * Blaetterung wie beim Trophaeen-Sync (Abschnitt 2). Das dritte Feld fehlt in
+ * alten Werten und zaehlt dann als 0.
+ *
+ * **Ein Abrufsfehler beendet den Tag nicht mehr (Stufe 18f).** Bis hierher
+ * schrieb jeder Fehler `-1`, und der Tag war erledigt. In der Nacht zum
+ * 01.10.2026 ist das eingetreten: Die erste Seite kam durch, die zweite
+ * bekam 403, und damit blieben 179 von 379 Titeln ohne frische Spielzeit,
+ * waehrend 20 Aufrufe des Fensters leer liefen. Genau denselben Fall hat 18e
+ * fuer den Sync geloest - dieser Schritt ist aelter als die Einsicht und hat
+ * sie nie bekommen.
+ *
+ * Jetzt bleibt der Offset bei einem Fehler stehen, und der naechste Aufruf
+ * holt fuenf Minuten spaeter dieselbe Seite erneut. Nach
+ * FEHLVERSUCHE_HOECHSTENS Anlaeufen ruht der Tag wie bisher; jeder Fortschritt
+ * setzt den Zaehler zurueck. Ein abgelehnter Token kommt hier nicht an: Den
+ * wirft `sitzungBesorgen` als PsnAuthError, bevor der Schritt laeuft.
  */
 async function spielzeitLauf(repos: Repositories, psn: PsnClient, heute: string): Promise<SpielzeitErgebnis | null> {
 	const stand = await repos.sync.fortschritt(SCHLUESSEL_SPIELZEIT);
-	const [tag, offsetRoh] = (stand ?? "").split(":");
-	const offset = tag === heute ? Number(offsetRoh) : 0;
-	if (tag === heute && offset < 0) return null;
+	const [tag, offsetRoh, versucheRoh] = (stand ?? "").split(":");
+	const vonHeute = tag === heute;
+	const offset = vonHeute ? Number(offsetRoh) : 0;
+	const bisher = vonHeute ? Number(versucheRoh ?? 0) || 0 : 0;
+	if (vonHeute && offset < 0) return null;
 
 	const { accessToken } = await sitzungBesorgen(repos, psn);
 	const ergebnis = await spielzeitSchritt(repos, psn, accessToken, offset);
 	if (ergebnis.status === "erfolg") await zugangGeglueckt(repos);
 	if (ergebnis.status === "fehler") {
-		// Der Tag gilt als erledigt, damit ein Ausfall nicht die ganze Nacht
-		// dieselbe Seite anfragt; morgen wird es erneut versucht.
-		await repos.sync.fortschrittSetzenWert(SCHLUESSEL_SPIELZEIT, `${heute}:-1`);
-		return ergebnis;
+		const versuche = bisher + 1;
+		// Unter der Grenze bleibt der Offset stehen - der naechste Aufruf holt
+		// dieselbe Seite. Erst danach ruht der Tag.
+		await repos.sync.fortschrittSetzenWert(
+			SCHLUESSEL_SPIELZEIT,
+			versuche < FEHLVERSUCHE_HOECHSTENS ? `${heute}:${offset}:${versuche}` : `${heute}:-1`,
+		);
+		return { ...ergebnis, versuche };
 	}
+	// Fortschritt setzt den Zaehler zurueck: Gezaehlt werden Versuche an
+	// derselben Stelle, nicht ueber die Nacht verteilte.
 	await repos.sync.fortschrittSetzenWert(
 		SCHLUESSEL_SPIELZEIT,
 		ergebnis.weiter ? `${heute}:${offset + ergebnis.geholt}` : `${heute}:-1`,
@@ -394,6 +417,9 @@ export function cronLogzeile(e: CronErgebnis): string {
 			`geschrieben=${e.spielzeit.geschrieben}`,
 			`zugeordnet=${e.spielzeit.zugeordnet}`,
 		);
+		// Wie beim Sync (18e): Die Zahl trennt "dreimal dieselbe Seite" von
+		// "drei Seiten geholt".
+		if (e.spielzeit.versuche) teile.push(`versuch=${e.spielzeit.versuche}/${FEHLVERSUCHE_HOECHSTENS}`);
 		if (e.spielzeit.meldung) teile.push(`meldung="${e.spielzeit.meldung}"`);
 	}
 	if (e.besitz) {

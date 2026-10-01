@@ -23,7 +23,10 @@ echo "Dump: $(wc -c < "$dump") Byte, $(grep -c 'INSERT INTO' "$dump" || true) IN
 
 # app_setting steht seit Stufe 8 mit in der Liste: Dort liegt der Vermerk der
 # letzten Sicherung, die Tabelle ist also nicht mehr nur Konfiguration.
-tabellen="trophy_progress game release physical_copy digital_entitlement play_status review_queue plan_entry app_setting"
+# psn_zugang kam mit Stufe 19e dazu (Migration 0026): Zeitpunkte, keine
+# Geheimnisse - und die Zeitreihe ist nach einem Verlust nicht
+# wiederherstellbar, also gehoert sie in den Abgleich.
+tabellen="trophy_progress game release physical_copy digital_entitlement play_status review_queue plan_entry app_setting psn_zugang"
 
 abfrage=""
 for t in $tabellen; do abfrage="$abfrage (SELECT COUNT(*) FROM $t) AS $t,"; done
