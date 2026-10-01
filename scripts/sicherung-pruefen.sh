@@ -31,6 +31,28 @@ echo "Dump: $(wc -c < "$dump") Byte, $(grep -c 'INSERT INTO' "$dump" || true) IN
 # eine abgeschnittene Sicherung faellt gerade dort am ehesten auf.
 tabellen="trophy_progress trophy trophy_group game release physical_copy digital_entitlement play_status review_queue plan_entry app_setting psn_zugang"
 
+# NUR pruefen, was es in der Datenbank schon gibt.
+#
+# Dieses Skript laeuft im Deploy-Job VOR der Migration - eine Tabelle, die
+# erst diese Migration anlegt, kann es hier noch nicht geben. Bis zum
+# 01.10.2026 ging die Liste ungeprueft in ein SELECT mit einer Unterabfrage je
+# Tabelle; eine fehlende liess die ganze Abfrage scheitern, jq brach mit
+# "Cannot index object with number" ab, und der Deploy der Stufe 19b blieb
+# stehen, bevor die Migration lief. Fehlende Tabellen werden deshalb genannt
+# und uebersprungen - beim naechsten Deploy sind sie da und werden gezaehlt.
+# Eine Tabelle, die aus der Produktion VERSCHWINDET, faellt in dieser Zeile
+# genauso auf.
+vorhanden=$(npx wrangler d1 execute "$datenbank" --remote --json \
+  --command "SELECT name FROM sqlite_master WHERE type = 'table'" | jq -r '.[0].results[].name')
+
+zu_pruefen=""
+fehlend=""
+for t in $tabellen; do
+  if echo "$vorhanden" | grep -qx "$t"; then zu_pruefen="$zu_pruefen $t"; else fehlend="$fehlend $t"; fi
+done
+[ -z "$fehlend" ] || echo "Noch nicht in der Datenbank (kommt mit einer Migration):$fehlend"
+tabellen="$zu_pruefen"
+
 abfrage=""
 for t in $tabellen; do abfrage="$abfrage (SELECT COUNT(*) FROM $t) AS $t,"; done
 zaehlung=$(npx wrangler d1 execute "$datenbank" --remote --json \

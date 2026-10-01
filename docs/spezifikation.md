@@ -1192,10 +1192,20 @@ Listen, `GET /api/sync/trophaeen` sagt, wie weit es ist. Die Vierzehn kommt nich
 drei, und mit sechzehn wären es 48 plus eine mögliche Token-Erneuerung. Die Oberfläche ruft nach,
 bis nichts mehr offen ist: 431 Listen sind rund 31 Aufrufe.
 
-**Ein Fund beim Bauen, den ein Test gefunden hat, bevor er irgendwo hinkam:** Der Vollexport
-sortierte jede Tabelle mit `ORDER BY rowid` – und eine `WITHOUT ROWID`-Tabelle hat keine. Der
-ganze Export antwortete mit `500`. Er sortiert jetzt nach dem Primärschlüssel, wo einer eingetragen
-ist (`EXPORT_ORDNUNG`, `src/db/export.ts`).
+**Zwei Funde beim Bauen, beide an Stellen, die eine neue Tabelle für selbstverständlich hielten:**
+
+- Der Vollexport sortierte jede Tabelle mit `ORDER BY rowid` – und eine `WITHOUT ROWID`-Tabelle
+  hat keine. Der ganze Export antwortete mit `500`. Er sortiert jetzt nach dem Primärschlüssel, wo
+  einer eingetragen ist (`EXPORT_ORDNUNG`, `src/db/export.ts`). Gefunden von
+  `test/export-route.spec.ts`, bevor es irgendwo hinkam.
+- `scripts/sicherung-pruefen.sh` setzte seine Tabellenliste ungeprüft in ein `SELECT` mit einer
+  Unterabfrage je Tabelle. Das Skript läuft im Deploy-Job **vor** der Migration – eine Tabelle, die
+  erst diese Migration anlegt, kann es dort noch nicht geben; die Abfrage scheiterte, `jq` brach ab,
+  und der erste Deploy-Versuch der Stufe 19b blieb stehen, **bevor** die Migration lief. Die
+  Produktion blieb dabei unberührt, der Abbruch war die richtige Reaktion auf die falsche Ursache.
+  Jetzt fragt das Skript zuerst `sqlite_master`, nennt fehlende Tabellen im Log und überspringt
+  sie – beim nächsten Deploy sind sie da und werden gezählt. Eine Tabelle, die aus der Produktion
+  **verschwindet**, fällt in derselben Zeile auf.
 
 ### Was daraus folgt
 
