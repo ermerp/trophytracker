@@ -248,3 +248,54 @@ export function beschreibeEreignis(e: Ereignis): string {
 			return "Erschienen (war angekündigt)";
 	}
 }
+
+/**
+ * Feed-Zeilen aus erspielten Trophaeen (Stufe 19b, 8.5).
+ *
+ * Eine EIGENE Liste neben EREIGNIS_ARTEN, und das ist Absicht: Was nie in
+ * `game_event` geschrieben wird, gehoert nicht in die Liste dessen, was dort
+ * stehen darf. Eine erspielte Trophaee ist kein Schreibvorgang - niemand hat
+ * etwas geschrieben -, also liest der Feed sie direkt aus `trophy` und mischt
+ * sie zur Lesezeit unter die Ereignisse (Entscheidung des Nutzers vom
+ * 01.10.2026). Das Aenderungsprotokoll behaelt dagegen seine eine Quelle.
+ */
+export const FEED_ARTEN = ["trophaeen_erspielt", "platin_erspielt"] as const;
+export type FeedArt = (typeof FEED_ARTEN)[number];
+
+export type FeedTrophaeenZeile = {
+	art: FeedArt;
+	anzahl: number;
+	gold: number;
+	silber: number;
+	bronze: number;
+	platin: string | null;
+};
+
+/**
+ * Der Satz zur Lesezeit, wie bei den Ereignissen - nie gespeichert (5.2).
+ *
+ * "12 Trophäen, davon 1 Gold" (Wortlaut des Nutzers vom 01.10.2026).
+ * **Bronze wird nie genannt:** Es ist die Grundmenge, die sich aus der
+ * Gesamtzahl abziehen laesst, und "12 Trophäen, davon 1 Gold und 11 Bronze"
+ * sagt dasselbe zweimal. Genannt wird, was heraussticht - Gold und Silber.
+ * Platin hat ohnehin seine eigene Zeile.
+ */
+export function beschreibeFeedTrophaeen(z: FeedTrophaeenZeile): string {
+	if (z.art === "platin_erspielt") return z.platin ? `Platin: ${z.platin}` : "Platin erspielt";
+
+	const wort = z.anzahl === 1 ? "Trophäe" : "Trophäen";
+
+	// Besteht die Zeile NUR aus einer Stufe, wird sie direkt benannt: "1
+	// Gold-Trophäe" statt "1 Trophäe, davon 1 Gold" - das sagte dasselbe
+	// zweimal (gesehen beim Rendern am 01.10.2026).
+	if (z.gold === z.anzahl) return `${z.anzahl} Gold-${wort}`;
+	if (z.silber === z.anzahl) return `${z.anzahl} Silber-${wort}`;
+
+	const davon: string[] = [];
+	if (z.gold) davon.push(`${z.gold} Gold`);
+	if (z.silber) davon.push(`${z.silber} Silber`);
+
+	return davon.length > 0
+		? `${z.anzahl} ${wort}, davon ${davon.join(" und ")}`
+		: `${z.anzahl} ${wort}`;
+}

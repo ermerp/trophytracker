@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
+import { beschreibeFeedTrophaeen } from "../src/domain/ereignis";
 import {
 	SELTENHEIT_SCHWELLEN,
 	seltenheitStufe,
@@ -308,5 +309,49 @@ describe("Fuellschritt", () => {
 		const zweit = await levelSchritt(repos(), client, accessToken, HEUTE);
 		expect(zweit).toBeNull();
 		expect(aufrufe.filter((a) => /trophySummary/.test(a.url))).toHaveLength(1);
+	});
+});
+
+describe("Feed-Sätze", () => {
+	// "12 Trophäen, davon 1 Gold" (Entscheidung des Nutzers vom 01.10.2026).
+	it("nennt nur, was über Bronze hinausgeht", () => {
+		expect(
+			beschreibeFeedTrophaeen({ art: "trophaeen_erspielt", anzahl: 12, gold: 1, silber: 0, bronze: 11, platin: null }),
+		).toBe("12 Trophäen, davon 1 Gold");
+	});
+
+	// Bronze ist die Grundmenge und wird nie genannt - auch nicht, wenn es
+	// nicht die ganze Zeile ist.
+	it("verschweigt Bronze", () => {
+		expect(
+			beschreibeFeedTrophaeen({ art: "trophaeen_erspielt", anzahl: 3, gold: 0, silber: 0, bronze: 3, platin: null }),
+		).toBe("3 Trophäen");
+		expect(
+			beschreibeFeedTrophaeen({ art: "trophaeen_erspielt", anzahl: 5, gold: 0, silber: 2, bronze: 3, platin: null }),
+		).toBe("5 Trophäen, davon 2 Silber");
+	});
+
+	it("beugt die Einzahl", () => {
+		expect(
+			beschreibeFeedTrophaeen({ art: "trophaeen_erspielt", anzahl: 1, gold: 0, silber: 0, bronze: 1, platin: null }),
+		).toBe("1 Trophäe");
+	});
+
+	it("gibt dem Platin seinen Namen", () => {
+		expect(
+			beschreibeFeedTrophaeen({ art: "platin_erspielt", anzahl: 1, gold: 0, silber: 0, bronze: 0, platin: "Alles erreicht" }),
+		).toBe("Platin: Alles erreicht");
+	});
+});
+
+describe("Feed-Sätze, Sonderfälle", () => {
+	// "1 Trophäe, davon 1 Gold" sagt dasselbe zweimal.
+	it("benennt eine reine Stufe direkt", () => {
+		expect(
+			beschreibeFeedTrophaeen({ art: "trophaeen_erspielt", anzahl: 1, gold: 1, silber: 0, bronze: 0, platin: null }),
+		).toBe("1 Gold-Trophäe");
+		expect(
+			beschreibeFeedTrophaeen({ art: "trophaeen_erspielt", anzahl: 2, gold: 0, silber: 2, bronze: 0, platin: null }),
+		).toBe("2 Silber-Trophäen");
 	});
 });

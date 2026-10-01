@@ -35,6 +35,36 @@ const ZAEHLERSUMME =
  */
 const JE_INSERT = 6;
 
+/** Eine Zeile des Dashboard-Feeds aus erspielten Trophäen (8.5). */
+export type FeedTrophaeen = {
+	spielId: number | null;
+	titel: string | null;
+	plattform: string;
+	zeitpunkt: string;
+	anzahl: number;
+	gold: number;
+	silber: number;
+	bronze: number;
+	/** Gesetzt, wenn die Zeile ein einzelnes Platin ist. */
+	platin: string | null;
+};
+
+/** Trophäen je Jahr, für das Dashboard. */
+export type JahrZeile = { jahr: string; anzahl: number };
+
+/**
+ * Das Fenster des Feeds. Als Text im Statement, nicht als Bind - ein
+ * Datums-Modifier gehört nicht an einen gebundenen Wert (Abschnitt 2).
+ */
+const FEED_FENSTER = "-30 days";
+
+/** Dieselben drei JOINs für jede Feed-Abfrage. */
+const FEED_HERKUNFT =
+	"FROM trophy t " +
+	"JOIN trophy_progress tp ON tp.np_communication_id = t.np_communication_id " +
+	"JOIN release r ON r.id = tp.release_id " +
+	"LEFT JOIN game g ON g.id = r.game_id ";
+
 /**
  * Einzeltrophaeen (Stufe 19b, Abschnitt 7.7).
  *
@@ -187,38 +217,104 @@ export class TrophaeenRepository {
 	}
 
 	/**
-	 * Die Trophaeen eines Spiels, ueber seine Releases.
+	 * Die Trophaeen EINES RELEASE.
+	 *
+	 * Nicht je Spiel: Die Trophaeenliste haengt bei Sony am Titel, und ein
+	 * Spiel mit PS4- und PS5-Fassung hat zwei davon mit eigenem Fortschritt.
+	 * Sie zusammenzuwerfen ergaebe einen Zaehler, den es nirgends gibt.
 	 *
 	 * Der Primaerschluessel beginnt mit `np_communication_id`, die Auswahl ist
 	 * damit ein Bereich je Liste statt eines Scans ueber alle 18 355 Zeilen
 	 * (Migration 0027). Sortiert wie Sony sie liefert - die Reihenfolge ist
 	 * seine Entscheidung und wird uebernommen (13).
 	 */
-	async fuerSpiel(gameId: number): Promise<TrophaeeAnzeige[]> {
+	async fuerRelease(releaseId: number): Promise<TrophaeeAnzeige[]> {
 		const { results } = await this.db
 			.prepare(
 				"SELECT t.trophy_id, t.grade, t.name, t.detail, t.icon_url, t.hidden, t.group_id, " +
 					"t.earned, t.earned_at, t.earned_rate, t.progress_target, t.progress_value " +
 					"FROM trophy t " +
 					"JOIN trophy_progress tp ON tp.np_communication_id = t.np_communication_id " +
-					"JOIN release r ON r.id = tp.release_id " +
-					"WHERE r.game_id = ? ORDER BY t.np_communication_id, t.trophy_id",
+					"WHERE tp.release_id = ? ORDER BY t.np_communication_id, t.trophy_id",
 			)
-			.bind(gameId)
+			.bind(releaseId)
 			.all<TrophaeeAnzeige>();
 		return results;
 	}
 
-	/** Die Gruppen eines Spiels; leer, wo es keine DLC gibt. */
-	async gruppenFuerSpiel(gameId: number): Promise<{ group_id: string; name: string }[]> {
+	/**
+	 * Die Zeilen des Dashboard-Feeds aus erspielten Trophaeen (8.5).
+	 *
+	 * Zwei Abfragen in einem Batch, weil Platin eine eigene Zeile bekommt und
+	 * in der Sammelzeile desselben Tages NICHT mitzaehlt: Ein Platin ist der
+	 * Abschluss, keine Position in einer Liste (Entscheidung des Nutzers vom
+	 * 01.10.2026).
+	 *
+	 * **Das Fenster zaehlt das Erspielt-Datum, nicht den Abrufzeitpunkt.**
+	 * Sonst stuenden beim ersten Fuellen 11 168 Trophaeen aus fuenfzehn Jahren
+	 * als "neu" im Feed. Der zweite Schutz liegt beim Aufrufer: Solange die
+	 * Erstbefuellung laeuft, fragt er gar nicht erst - sie geht Liste fuer
+	 * Liste statt nach Datum, und der Feed wuechse sonst nach hinten.
+	 *
+	 * Der Zeitpunkt einer Sammelzeile ist das SPAETESTE earned_at ihres Tages,
+	 * damit sie sich richtig zwischen die Ereignisse sortiert.
+	 */
+	async feed(limit: number): Promise<FeedTrophaeen[]> {
+		const [sammel, platin] = await this.db.batch<FeedTrophaeen>([
+			this.db
+				.prepare(
+					"SELECT r.game_id AS spielId, g.title AS titel, r.platform AS plattform, " +
+						"MAX(t.earned_at) AS zeitpunkt, COUNT(*) AS anzahl, " +
+						"SUM(t.grade = 'gold') AS gold, SUM(t.grade = 'silber') AS silber, " +
+						"SUM(t.grade = 'bronze') AS bronze, NULL AS platin " +
+						FEED_HERKUNFT +
+						"WHERE t.earned = 1 AND t.grade <> 'platin' " +
+						`AND t.earned_at >= datetime('now', '${FEED_FENSTER}') ` +
+						"GROUP BY r.game_id, date(t.earned_at) ORDER BY zeitpunkt DESC LIMIT ?",
+				)
+				.bind(limit),
+			this.db
+				.prepare(
+					"SELECT r.game_id AS spielId, g.title AS titel, r.platform AS plattform, " +
+						"t.earned_at AS zeitpunkt, 1 AS anzahl, 0 AS gold, 0 AS silber, 0 AS bronze, " +
+						"t.name AS platin " +
+						FEED_HERKUNFT +
+						"WHERE t.earned = 1 AND t.grade = 'platin' " +
+						`AND t.earned_at >= datetime('now', '${FEED_FENSTER}') ` +
+						"ORDER BY t.earned_at DESC LIMIT ?",
+				)
+				.bind(limit),
+		]);
+		return [...(sammel.results ?? []), ...(platin.results ?? [])];
+	}
+
+	/**
+	 * Trophaeen je Jahr aus dem Erspiel-Datum (Dashboard, Stufe 19b).
+	 *
+	 * Liest den ganzen Bestand - das ist der Punkt der Zahl. Sie laeuft
+	 * deshalb im Batch von /api/stats und wird dort gemessen.
+	 */
+	async jahre(): Promise<JahrZeile[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT strftime('%Y', earned_at) AS jahr, COUNT(*) AS anzahl FROM trophy " +
+					"WHERE earned = 1 AND earned_at IS NOT NULL GROUP BY jahr ORDER BY jahr",
+			)
+			.all<JahrZeile>();
+		return results;
+	}
+
+	/** Die Gruppen eines Release; leer, wo es keine DLC gibt. */
+	async gruppenFuerRelease(releaseId: number): Promise<{ group_id: string; name: string }[]> {
 		const { results } = await this.db
 			.prepare(
 				"SELECT g.group_id, g.name FROM trophy_group g " +
 					"JOIN trophy_progress tp ON tp.np_communication_id = g.np_communication_id " +
-					"JOIN release r ON r.id = tp.release_id " +
-					"WHERE r.game_id = ? ORDER BY g.np_communication_id, g.group_id",
+					// Das Hauptspiel zuerst: Sony nennt es "default", und alphabetisch
+					// stuende "001" davor. Danach die DLC in ihrer eigenen Reihenfolge.
+					"WHERE tp.release_id = ? ORDER BY g.np_communication_id, (g.group_id <> 'default'), g.group_id",
 			)
-			.bind(gameId)
+			.bind(releaseId)
 			.all<{ group_id: string; name: string }>();
 		return results;
 	}

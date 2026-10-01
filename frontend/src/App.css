@@ -2403,8 +2403,18 @@ table.plattformtabelle {
     order: 5;
   }
 
-  .dlinks > .dtabellen {
+  /* Die Jahre stehen unter den Trophäen und über die ganze Breite: Fünfzehn
+     Säulen in einer halben Spalte wären drei Pixel breit. Ohne eigene
+     Ordnungszahl landet ein Block hier ganz vorn – `order: 0` ist die Vorgabe
+     (gesehen beim Rendern am 01.10.2026: „Trophäen je Jahr" stand über den
+     Kennzahlen). */
+  .dlinks > .b-jahre {
     order: 6;
+    grid-column: 1 / -1;
+  }
+
+  .dlinks > .dtabellen {
+    order: 7;
     grid-column: 1 / -1;
   }
 
@@ -3225,4 +3235,440 @@ details.block > div {
   padding-left: var(--a4);
   font-size: 0.85rem;
   color: var(--text-leise);
+}
+
+/* --- Trophäenliste je Release (Stufe 19b) --------------------------------
+   An einem Prototyp in vier Runden abgestimmt (01.10.2026). Alle Farben und
+   Abstände aus tokens.css; kein Literalwert hier. */
+
+.trophliste {
+  margin-top: var(--a4);
+  padding-top: var(--a3);
+  border-top: 1px solid var(--linie);
+  /* Grundlage fuer die Spaltenregel unten: Sie richtet sich nach der Breite
+     DIESES Kastens, nicht nach der des Fensters. */
+  container-type: inline-size;
+}
+
+.trophkopf {
+  display: flex;
+  align-items: center;
+  gap: var(--a3);
+  flex-wrap: wrap;
+  margin: var(--a3) 0 var(--a4);
+}
+
+.trophgruppe {
+  margin-top: var(--a5);
+}
+
+.trophgruppe:first-of-type {
+  margin-top: 0;
+}
+
+.gruppenname {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  margin-bottom: var(--a2);
+  font-family: var(--schrift-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-leise);
+}
+
+.gruppenname .linie {
+  flex: 1;
+  height: 1px;
+  background: var(--linie);
+}
+
+.gruppenname .zahl {
+  color: var(--text-still);
+}
+
+.troph {
+  display: flex;
+  gap: var(--a3);
+  padding: var(--a3) 0;
+  border-top: 1px solid var(--linie);
+}
+
+.troph:first-of-type {
+  border-top: none;
+}
+
+/* Vorhanden ist hell, nicht vorhanden ist dunkel – dieselbe Regel wie bei
+   Disc und Download (tokens.css). Das Symbol trägt den Zustand ohne ein Wort. */
+.troph img,
+.troph .kein-symbol {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r1);
+  flex: none;
+  background: var(--flaeche-hoch);
+}
+
+.troph.offen img {
+  opacity: 0.32;
+  filter: grayscale(0.7);
+}
+
+.troph .wer {
+  min-width: 0;
+  flex: 1;
+}
+
+.troph .name {
+  font-family: var(--schrift-display);
+  font-weight: 500;
+}
+
+.troph.offen .name {
+  color: var(--text-leise);
+}
+
+.troph .was {
+  color: var(--text-still);
+  font-size: 0.82rem;
+}
+
+.troph .meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--a1) var(--a2);
+  margin-top: var(--a1);
+  font-size: 0.76rem;
+  color: var(--text-still);
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.stufepunkt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stufepunkt i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.s-platin { color: var(--troph-platin); }
+.s-platin i { background: var(--troph-platin); }
+.s-gold { color: var(--troph-gold); }
+.s-gold i { background: var(--troph-gold); }
+.s-silber { color: var(--troph-silber); }
+.s-silber i { background: var(--troph-silber); }
+.s-bronze { color: var(--troph-bronze); }
+.s-bronze i { background: var(--troph-bronze); }
+
+/* Gold bleibt sparsam: nur „ultra selten" bekommt den Akzent. */
+.selten.ultra {
+  color: var(--gold);
+}
+
+.versteckt {
+  color: var(--text-still);
+  font-style: italic;
+}
+
+/* Platin ist das Ziel der ganzen Liste und keine Zeile wie die anderen. */
+.troph.platin {
+  border-top: none;
+  margin-bottom: var(--a2);
+  padding: var(--a3);
+  border-left: 3px solid var(--troph-platin);
+  border-radius: 0 var(--r2) var(--r2) 0;
+  background: var(--flaeche-hoch);
+}
+
+.troph.platin img {
+  width: 52px;
+  height: 52px;
+}
+
+.troph.platin .name {
+  font-size: 1.05rem;
+}
+
+/* Versteckte sind zugedeckt, nicht weggelassen; Stufe und Seltenheit
+   bleiben sichtbar, weil sie nichts verraten. */
+.troph.zu img {
+  filter: grayscale(1) blur(4px);
+  opacity: 0.4;
+}
+
+/* Nicht `.deckel`: Den Namen gibt es schon fuer den Cover-Platzhalter, mit
+   Seitenverhaeltnis und 1,6 rem Schrift. Beim Rendern am 01.10.2026 wurde die
+   zugedeckte Trophaee dadurch zu einem riesigen leeren Kasten - im Code war
+   davon nichts zu sehen. */
+.trophdeckel .wort {
+  font-family: var(--schrift-display);
+  font-weight: 500;
+  color: var(--text-leise);
+  font-style: italic;
+}
+
+.aufdecken {
+  font: inherit;
+  font-size: 0.76rem;
+  margin-top: 2px;
+  padding: 2px 10px;
+  border: 1px solid var(--linie);
+  border-radius: var(--r-rund);
+  background: none;
+  color: var(--text-leise);
+  cursor: pointer;
+}
+
+.troph .fortschritt {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  margin-top: 6px;
+}
+
+.troph .fortschritt .balken {
+  flex: 1;
+  max-width: 140px;
+}
+
+.troph .fortschritt .zahl {
+  font-size: 0.76rem;
+  color: var(--text-leise);
+}
+
+/* Der Schieberegler deckt alle auf einmal auf. */
+.regler {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-leise);
+  cursor: pointer;
+}
+
+.regler input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.regler .spur {
+  width: 38px;
+  height: 22px;
+  border-radius: var(--r-rund);
+  background: var(--aus);
+  position: relative;
+  transition: background 0.15s;
+  flex: none;
+}
+
+.regler .spur::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s;
+}
+
+.regler input:checked + .spur {
+  background: var(--gold);
+}
+
+.regler input:checked + .spur::after {
+  transform: translateX(16px);
+  background: var(--grund);
+}
+
+/*
+ * Zwei Spalten, sobald die LISTE breit genug ist – nicht das Fenster.
+ *
+ * Im Prototyp lag die Liste über die ganze Seite, und `@media (min-width:
+ * 48rem)` war richtig. In der Anwendung steht sie in der Release-Karte, und
+ * die ist bei 1280 px Fenster rund 470 px breit: Die Regel griff, jede Spalte
+ * bekam 230 px, und „Schließe die Einführung ab." stand auf zwei Zeilen
+ * (gesehen beim Rendern am 01.10.2026). Eine Container-Abfrage misst den
+ * Platz, der wirklich da ist.
+ *
+ * Eine Zeile braucht rund 30 rem; erst ab 38 rem lohnen sich zwei. Platin
+ * bleibt über beide Spalten – es ist das Ziel, kein Eintrag.
+ *
+ * Die Striche fallen dort weg: Zeilen zweier Spalten sind verschieden hoch,
+ * ein Trennstrich stünde links und rechts auf unterschiedlicher Höhe und sähe
+ * aus wie ein Fehler. Der Abstand trennt genauso gut.
+ */
+@container (min-width: 38rem) {
+  .gruppeninhalt {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--a5);
+    row-gap: var(--a2);
+  }
+
+  .gruppeninhalt > .troph {
+    border-top: none;
+  }
+
+  .gruppeninhalt > .troph.platin {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- Trophäen-Block und Jahre auf dem Dashboard (Stufe 19b) --------------
+   Level und die vier Stufen in einer Zeile; an einem Prototyp in vier Runden
+   abgestimmt (01.10.2026). */
+
+.levelzeile {
+  display: flex;
+  align-items: baseline;
+  gap: var(--a3);
+  flex-wrap: wrap;
+}
+
+.level {
+  display: flex;
+  align-items: baseline;
+  gap: var(--a2);
+}
+
+.level .wert {
+  font-family: var(--schrift-display);
+  font-size: 2.4rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--gold);
+}
+
+.level .wort {
+  font-family: var(--schrift-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+/*
+ * Die vier Stufen nehmen die Fläche zwischen Level-Zahl und rechtem Rand ein,
+ * statt als Grüppchen am Rand zu kleben. `min-width` erzwingt den Umbruch,
+ * statt die Zahlen zu quetschen: Reicht der Platz nicht, rutscht die Reihe
+ * auf eine eigene Zeile und nimmt sie ganz ein. Ohne das schrumpft der
+ * Flex-Kasten und die letzte Zahl läuft aus dem Block (bei 360 px gesehen).
+ */
+.stufenkurz {
+  flex: 1 1 auto;
+  min-width: 15rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--a2);
+}
+
+.sk {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.15rem;
+  font-weight: 600;
+  /* Eine Zahl bricht nie mitten durch: „2 348" wurde bei 360 px zu „2" und
+     „348" in zwei Zeilen, weil das Tausendertrennzeichen ein Leerraum ist. */
+  white-space: nowrap;
+}
+
+.sk svg {
+  flex: none;
+  align-self: center;
+}
+
+@media (min-width: 30rem) {
+  .sk {
+    font-size: 1.5rem;
+    gap: 8px;
+  }
+}
+
+@media (min-width: 48rem) {
+  .stufenkurz {
+    padding-left: var(--a5);
+    justify-content: space-around;
+  }
+
+  .sk {
+    font-size: 2.4rem;
+    gap: 10px;
+  }
+}
+
+.levelbalken {
+  margin-top: var(--a3);
+  height: 6px;
+  border-radius: 6px;
+}
+
+.levelfuss {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--text-still);
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Trophäen je Jahr: Balken, die von unten wachsen. Gold nur fürs beste Jahr. */
+.jahre {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 92px;
+  margin-top: var(--a2);
+}
+
+.jahr {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.jahr .saeule {
+  background: var(--aus);
+  border-radius: 2px 2px 0 0;
+}
+
+.jahr.best .saeule {
+  background: var(--gold);
+}
+
+.jahrnamen {
+  display: flex;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.jahrnamen span {
+  flex: 1;
+  text-align: center;
+  font-size: 0.6rem;
+  color: var(--text-still);
+  font-family: var(--schrift-display);
+}
+
+.jahrfuss {
+  margin-top: var(--a2);
 }
