@@ -153,13 +153,13 @@ export function TrophaeenStufen({
 	groesse?: number
 }) {
 	return (
-		<div className="stufen">
+		<div className="stufenzeichen">
 			{TROPHAEENSTUFEN.filter((s) => definiert[s] > 0).map((s: TrophaeenStufe) => {
 				const hat = erspielt[s] > 0
 				return (
 					<span
 						key={s}
-						className={hat ? 'stufe' : 'stufe leer'}
+						className={hat ? 'stufenzeichen-teil' : 'stufenzeichen-teil leer'}
 						title={`${STUFENTEXT[s]}: ${erspielt[s]} von ${definiert[s]}`}
 						style={{ color: `var(--troph-${s})` }}
 					>
