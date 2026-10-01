@@ -308,6 +308,16 @@ Level ist die Lücke, die das Dashboard aus 19a ausdrücklich offen gelassen hat
 Wie die Trophäenliste im Spieldetail **aussieht**, ist noch offen und bekommt
 einen Prototyp, bevor Code entsteht.
 
+Der Feed „Neu" auf dem Dashboard bekommt damit eine **zweite Quelle**: Eine
+erspielte Trophäe ist kein Änderungsereignis – niemand hat etwas geschrieben –,
+also liest der Feed sie direkt aus `trophy` und mischt sie nach dem echten
+Erspielt-Datum unter die Ereignisse, verdichtet je Spiel und Tag („12 Trophäen,
+davon 1 Gold"), Platin immer als eigene Zeile. Das Änderungsprotokoll unter
+`/aenderungen` bleibt dagegen bei seiner einen Quelle. Damit die Erstbefüllung
+den Feed nicht flutet, zählt dessen Zeitfenster das Erspielt-Datum statt des
+Abrufzeitpunkts, **und** der Feed zeigt Trophäenzeilen erst, wenn die
+Erstbefüllung durch ist.
+
 **Stufe 18 ist seit dem 22.09.2026 abgenommen:** PWA installiert und offline
 geprüft, nächtliche Läufe am 20., 21. und 22.09. mit je 431 Titeln, in der Nacht
 zum 22.09. zusätzlich 368 aufgefrischte Spiele. Der IGDB-Schritt hatte zwei

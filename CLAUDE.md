@@ -56,6 +56,8 @@ Seit Stufe 16 hält `game_event` fest, wer wann was geschrieben hat (Abschnitt 8
 
 **Auch die Nebenwirkung gehört an den Schritt, nicht an seinen Auslöser.** In Stufe 18e hing das Wegräumen eines alten `fehler` am Zugang zunächst in `cronSchritt`: Der Knopf „Kaufliste jetzt abrufen" holte 210 Berechtigungen, und in den Einstellungen stand weiter „Fehler beim letzten Versuch". Wer einen zweiten Weg zu einem Schritt baut, erbt dessen Wirkung sonst nicht.
 
+**Nicht jede Zeile im Dashboard-Feed ist ein Ereignis.** Seit 19b liest „Neu" aus zwei Quellen – `game_event` und den erspielten Trophäen aus `trophy`, zur Lesezeit nach Zeit gemischt. Eine erspielte Trophäe wird **nicht** protokolliert: Niemand hat etwas geschrieben. Das Änderungsprotokoll (`/api/events`, Verlauf eines Spiels) behält deshalb seine eine Quelle und sein Keyset über `id`; wer den Feed erweitert, erweitert nicht das Protokoll (8.5).
+
 Die Quelle (`nutzer` / `sync` / `igdb` / `import`, `feed` und `migration` reserviert) wird aus vorhandenen Feldern abgeleitet (`quelleAusHerkunft`, `quelleAusMatch`), nicht durch die Routen gereicht. Der Sync protokolliert nur Erkanntes, IGDB nur Entscheidungen und Statuswechsel, nichts bei unverändertem Stand (Entscheidungen des Nutzers vom 16.09.2026). Der Satz für die Oberfläche entsteht zur Lesezeit in `src/domain/ereignis.ts` und wird nie gespeichert; eine neue Ereignisart kommt dort in `EREIGNIS_ARTEN` und bekommt einen Satz (Test hält das fest). Wer einen neuen Schreiber baut – Cron (18), Feed (20) –, protokolliert von Anfang an; der Scanner (17) tut es über `addPhysicalCopy(…, 'scan')` und schreibt nichts Eigenes.
 
 ### Keine PlayStation-Marken in der Gestaltung
