@@ -799,7 +799,16 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				"WHERE earned = 1 AND earned_at IS NOT NULL GROUP BY jahr ORDER BY jahr",
 		);
 
-		console.info({ jeSpiel, auswahlOffen, auswahlLeer, feed, jahre, jahreIndex, nacht: auswahlLeer * 36 });
+		// Das LAUFENDE Jahr allein - die einzige Zahl, die sich noch aendert.
+		// Vergangene Jahre stehen seit der Nachbesserung vom 01.10.2026 im
+		// Zwischenspeicher, und nur diese Abfrage laeuft beim Dashboard mit.
+		const jahrLaufend = await zeilenGelesen(
+			"SELECT COUNT(*) AS n FROM trophy WHERE earned = 1 AND earned_at >= ? AND earned_at < ?",
+			"2026-01-01",
+			"2027-01-01",
+		);
+
+		console.info({ jeSpiel, auswahlOffen, auswahlLeer, feed, jahre, jahreIndex, jahrLaufend });
 
 		// Je Spiel die Groessenordnung einer Liste, nicht der Tabelle.
 		expect(jeSpiel).toBeLessThan(300);
@@ -820,6 +829,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		 */
 		expect(jahre).toBeGreaterThan(listen.length * 20);
 		expect(jahreIndex).toBe(jahre);
+		// Das laufende Jahr bleibt dagegen ein Bereich, kein Lauf ueber alles.
+		expect(jahrLaufend).toBeLessThan(jahre / 4);
 	});
 
 	it("misst einen Leerlauf-Aufruf der Automatik (Stufe 18)", async () => {
