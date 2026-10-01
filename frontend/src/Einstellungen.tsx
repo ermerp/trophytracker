@@ -551,6 +551,12 @@ export function Einstellungen() {
   async function trophaeenHolen() {
     setTrophText('Trophäen werden geholt …')
     setLaeuft(true)
+    // `listen` zaehlt, was DIESER Druck geholt hat; `erledigt` kommt vom
+    // Server und ist der Stand des ganzen Bestands. Die beiden sind
+    // auseinanderzuhalten: Beim ersten Entwurf stand die eine Zahl neben der
+    // Gesamtzahl der anderen – nach einem Abbruch begann die Anzeige damit
+    // wieder bei null, obwohl schon 168 Listen geholt waren (Rückmeldung des
+    // Nutzers vom 01.10.2026).
     let listen = 0
     let trophaeen = 0
 
@@ -592,7 +598,8 @@ export function Einstellungen() {
             daten = await einePortion()
           } catch {
             setTrophText(
-              `Die Verbindung ist bei ${listen} Listen abgerissen. Ein erneuter Druck macht dort weiter.`,
+              `Die Verbindung ist abgerissen – ${listen} Listen in diesem Durchlauf geholt. ` +
+                'Ein erneuter Druck macht dort weiter.',
             )
             break
           }
@@ -608,8 +615,8 @@ export function Einstellungen() {
         )
         setTrophText(
           daten.offen > 0
-            ? `${listen} von ${daten.gesamt} Listen, ${trophaeen} Trophäen …`
-            : `Fertig: ${listen} Listen, ${trophaeen} Trophäen.`,
+            ? `${daten.gesamt - daten.offen} von ${daten.gesamt} Listen · ${trophaeen} Trophäen in diesem Durchlauf …`
+            : `Fertig: alle ${daten.gesamt} Listen. ${trophaeen} Trophäen in diesem Durchlauf geholt.`,
         )
         if (daten.meldung) {
           /*
@@ -624,7 +631,7 @@ export function Einstellungen() {
            */
           const limit = daten.meldung.includes('429')
           setTrophText(
-            `${daten.meldung} Bei ${listen} Listen angehalten – ` +
+            `${daten.meldung} Angehalten bei ${daten.gesamt - daten.offen} von ${daten.gesamt} Listen – ` +
               (limit
                 ? 'PlayStation drosselt gerade. Warte ein paar Minuten, dann macht ein erneuter Druck dort weiter.'
                 : 'ein erneuter Druck macht dort weiter.'),
