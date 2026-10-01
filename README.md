@@ -296,6 +296,18 @@ Sammlung – es trägt weder Besitz noch Fortschritt.
 und 21 (PSN Store-Preise). Die PSN-Stufen ergänzen nur, was die
 Sammlung schon kennt, und importieren nichts.
 
+Der Zuschnitt von 19b steht seit dem 01.10.2026 (Abschnitt 7.7): Die Antworten
+werden **nicht roh abgelegt** – Rohablage gibt es nur, wo teurer Abruf, komplexe
+Normalisierung und einzige Aufzeichnung zusammentreffen, und das ist allein der
+Sync. Die Erstbefüllung läuft **nachts und auf Knopfdruck** (Portionen, Pause
+dazwischen, Abbruch bei `429`), aber **höchstens einmal am Tag**: 18 355
+Trophäen sind mit Index rund 37 000 geschriebene Zeilen, und D1 erlaubt im Free
+Tier 100 000 am Tag. **Gruppen und Trophäen-Level** gehören dazu – ohne die
+Gruppe zählt „was fehlt mir noch zu Platin" bei Spielen mit DLC falsch, und das
+Level ist die Lücke, die das Dashboard aus 19a ausdrücklich offen gelassen hat.
+Wie die Trophäenliste im Spieldetail **aussieht**, ist noch offen und bekommt
+einen Prototyp, bevor Code entsteht.
+
 **Stufe 18 ist seit dem 22.09.2026 abgenommen:** PWA installiert und offline
 geprüft, nächtliche Läufe am 20., 21. und 22.09. mit je 431 Titeln, in der Nacht
 zum 22.09. zusätzlich 368 aufgefrischte Spiele. Der IGDB-Schritt hatte zwei

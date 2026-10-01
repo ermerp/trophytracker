@@ -137,13 +137,11 @@ IGDB-Client-Secret und Twitch-Token nehmen denselben Weg; seit Stufe 17c auch eB
 
 **Maschinen-Endpunkte tragen keine eigene Token-Prüfung.** `/api/export/*`, `/api/backup/*` und später `/api/imports/feed` laufen über ein Access Service Token; Access steht vor dem ganzen Worker. Kein Bearer-Token im Code — in Stufe 8 entschieden, begründet in Abschnitt 15.3.
 
-### Rohdaten vor Normalisierung
+### Rohablage nur, wo der Abruf die einzige Aufzeichnung ist
 
-PSN-Antworten werden zuerst unverändert in `psn_raw_response` geschrieben, danach normalisiert. Die beiden Schritte bleiben getrennt, damit die Normalisierung ohne PSN-Zugriff wiederholbar ist.
+`psn_raw_response` ist nicht die Regel für alle Fremddaten, sondern für **einen** Abruf: die Trophäenseiten des Syncs. Dort treffen drei Merkmale zusammen — der Abruf ist teuer (fünf Seiten über eine inoffizielle Schnittstelle), die Normalisierung ist komplex (Zähler, Zuordnung, Änderungserkennung), und die Antwort ist die **einzige** Aufzeichnung dessen, was Sony an diesem Tag gesagt hat. Deshalb hat der Sync zwei Phasen (`psn_sync_run.phase`): erst `abruf`, dann `normalisierung`, beide mit begrenzter Arbeit je Aufruf, und `POST /api/sync/normalize` wiederholt die zweite ohne PSN.
 
-Der Sync hat deshalb zwei Phasen (`psn_sync_run.phase`): erst `abruf`, dann `normalisierung`, beide mit begrenzter Arbeit je Aufruf. `POST /api/sync/normalize` setzt `normalized_at` zurück und lässt die Normalisierung erneut laufen — ohne PSN.
-
-Das gilt für die **Trophäenseiten**: teurer Abruf, komplexe Normalisierung, einzige Aufzeichnung. Die beiden Zusatzabrufe aus Stufe 18c (Spielzeit, Kaufliste) sind ausdrücklich ausgenommen (Entscheidung des Nutzers vom 22.09.2026, Abschnitt 7.7) – zusammen rund 17 Anfragen, jederzeit neu abrufbar, Normalisierung ist Feldkopieren plus Titelabgleich. IGDB-Antworten werden **nicht** roh abgelegt — offizielle Schnittstelle, klein, jederzeit neu abrufbar; `igdb_candidate` hält nur die normalisierten Kandidaten und ist deshalb `NICHT_EXPORTIERT`.
+Fehlt eines der drei Merkmale, wird **nicht** roh abgelegt. Die Rohdaten wären dann kein Beweisstück, sondern Ballast, der über `d1 export` in jede wöchentliche Sicherung wandert — genau dafür musste Stufe 18d einen Aufräumschritt bauen. So liegen ohne Rohablage: IGDB (offizielle Schnittstelle, klein, `igdb_candidate` hält nur die normalisierten Kandidaten und ist deshalb `NICHT_EXPORTIERT`), Spielzeit und Kaufliste aus Stufe 18c (zusammen rund 17 Anfragen, Normalisierung ist Feldkopieren plus Titelabgleich) und die Einzeltrophäen aus Stufe 19b (je Liste ein eigener, jederzeit wiederholbarer Abruf — roh grob 9 MB gegen 1,79 MB Datenbank). Wer eine neue Quelle anbindet, prüft die drei Merkmale, statt der Liste einen Namen hinzuzufügen.
 
 ### Titelnormalisierung ist geteilte Logik
 

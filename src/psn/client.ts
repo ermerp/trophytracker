@@ -169,9 +169,10 @@ export function erstellePsnClient(hole: FetchFn = fetch) {
 		 *
 		 * Anders als die Trophaeenseiten wird hier direkt geparst: Die
 		 * Antwort wird NICHT roh abgelegt - klein und jederzeit neu abrufbar,
-		 * dieselbe Begruendung wie bei IGDB (ausdrueckliche Ausnahme von
-		 * "Rohdaten vor Normalisierung", Entscheidung des Nutzers vom
-		 * 22.09.2026).
+		 * dieselbe Begruendung wie bei IGDB. Rohablage gibt es nur, wo
+		 * teurer Abruf, komplexe Normalisierung und einzige Aufzeichnung
+		 * zusammentreffen; das ist allein der Sync (Entscheidung des
+		 * Nutzers vom 22.09.2026, Maßstab geschaerft am 01.10.2026).
 		 */
 		async holeGespielteSeite(
 			accessToken: Geheimnis,
