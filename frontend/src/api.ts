@@ -471,4 +471,10 @@ export type Kennzahlen = {
   }
   listen: { backlog: number; todo: number }
   letztesPlatin: LetztesPlatin | null
+  /**
+   * Das Trophäen-Level von Sony (Stufe 19b). `null`, solange der nächtliche
+   * Schritt es noch nicht geholt hat – dann zeigt die Oberfläche es gar
+   * nicht, statt eine 0 zu erfinden (Abschnitt 3).
+   */
+  level: { level: number; punkte: number; bisNaechstes: number; prozent: number } | null
 }

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { deviationRoutes } from "./api/deviations";
 import { eventRoutes } from "./api/events";
+import { feedRoutes, releaseTrophaeenRoutes } from "./api/feed";
 import { backupRoutes, exportRoutes } from "./api/export";
 import { digitalEntitlementRoutes, physicalCopyRoutes } from "./api/ownership";
 import { igdbRoutes, unmatchedRoutes } from "./api/igdb";
@@ -11,7 +12,7 @@ import { psnRoutes } from "./api/psn";
 import { releaseRoutes } from "./api/releases";
 import { reviewRoutes } from "./api/review";
 import { scanRoutes } from "./api/scan";
-import { statsRoutes } from "./api/stats";
+import { jahreRoutes, statsRoutes } from "./api/stats";
 import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
@@ -64,6 +65,8 @@ export function createApp(
 	app.route("/api/igdb", igdbRoutes);
 	app.route("/api/unmatched", unmatchedRoutes);
 	app.route("/api/trophies", trophyRoutes);
+	app.route("/api/feed", feedRoutes);
+	app.route("/api/releases", releaseTrophaeenRoutes);
 	app.route("/api/zuordnung", zuordnungRoutes);
 	app.route("/api/games", gameRoutes);
 	app.route("/api/releases", releaseRoutes);
@@ -78,6 +81,7 @@ export function createApp(
 	app.route("/api/review", reviewRoutes);
 	app.route("/api/scan", scanRoutes);
 	app.route("/api/stats", statsRoutes);
+	app.route("/api/stats/jahre", jahreRoutes);
 	app.route("/api/export", exportRoutes);
 	app.route("/api/backup", backupRoutes);
 	app.route("/api/physical-copies", physicalCopyRoutes);

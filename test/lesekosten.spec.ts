@@ -788,7 +788,18 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				"GROUP BY t.np_communication_id, tag ORDER BY MAX(t.earned_at) DESC LIMIT 8",
 		);
 
-		console.info({ jeSpiel, auswahlOffen, auswahlLeer, feed, nacht: auswahlLeer * 36 });
+		// Die Jahre laufen bei JEDEM Aufruf des Dashboards mit (Stufe 19b) -
+		// das ist die erste Seite nach jedem Start der App.
+		const jahre = await zeilenGelesen(
+			"SELECT strftime('%Y', earned_at) AS jahr, COUNT(*) AS anzahl FROM trophy " +
+				"WHERE earned = 1 AND earned_at IS NOT NULL GROUP BY jahr ORDER BY jahr",
+		);
+		const jahreIndex = await zeilenGelesen(
+			"SELECT strftime('%Y', earned_at) AS jahr, COUNT(*) AS anzahl FROM trophy INDEXED BY idx_trophy_erspielt " +
+				"WHERE earned = 1 AND earned_at IS NOT NULL GROUP BY jahr ORDER BY jahr",
+		);
+
+		console.info({ jeSpiel, auswahlOffen, auswahlLeer, feed, jahre, jahreIndex, nacht: auswahlLeer * 36 });
 
 		// Je Spiel die Groessenordnung einer Liste, nicht der Tabelle.
 		expect(jeSpiel).toBeLessThan(300);
@@ -799,6 +810,16 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(auswahlLeer * 36).toBeLessThan(20_000);
 		// Der Feed bleibt im Fenster statt im Bestand.
 		expect(feed).toBeLessThan(2_000);
+		/*
+		 * Die Jahre muessen jede erspielte Trophaee ansehen - das ist der Zweck
+		 * der Zahl, und ein Indexhinweis aendert daran nichts (beides gemessen
+		 * am 01.10.2026: 18 060 so wie so). Genau deshalb haengen sie an einer
+		 * EIGENEN Route und werden erst beim Aufklappen geholt: Im Batch des
+		 * Dashboards waeren sie die teuerste Abfrage der ersten Seite nach
+		 * jedem Start (die uebrigen zusammen lesen 6 840).
+		 */
+		expect(jahre).toBeGreaterThan(listen.length * 20);
+		expect(jahreIndex).toBe(jahre);
 	});
 
 	it("misst einen Leerlauf-Aufruf der Automatik (Stufe 18)", async () => {

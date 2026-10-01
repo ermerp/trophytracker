@@ -324,8 +324,22 @@ die Verbindung doch ab, sagt die Seite es und nennt die Zahl, bei der sie
 stehengeblieben ist; ein erneuter Druck macht dort weiter. Danach hält der Nachtlauf
 den Bestand selbst aktuell und holt nur Listen nach, an denen sich etwas
 geändert hat. **Am 01.10.2026 durchgelaufen: 18 355 Trophäen in 431 Listen** – auf die Trophäe
-genau die Summe, die Sonys Zähler nennen. **Die Anzeige folgt als Teil 2**,
-gebaut an diesen Daten.
+genau die Summe, die Sonys Zähler nennen. **Teil 2 (die Anzeige) steht seit dem
+01.10.2026:**
+
+- Im **Spieldetail** klappt unter jedem Release die Trophäenliste auf –
+  Symbol, Name, Beschreibung, Stufe, Seltenheit als Zahl und Wort,
+  Erspiel-Datum und der Fortschrittszähler („15 von 20"). Erspielt ist hell,
+  offen ist dunkel; Platin steht für sich. Versteckte Trophäen sind zugedeckt
+  und lassen sich einzeln per Klick oder für die ganze Liste per Schieberegler
+  aufdecken. Geladen wird erst beim Aufklappen.
+- Auf dem **Dashboard** trägt der Trophäen-Block jetzt das **Trophäen-Level**
+  mit Punkten und Fortschritt zur nächsten Stufe, daneben die vier Stufen als
+  Symbol und Zahl. **„Trophäen je Jahr"** steht hinter einem Klick – die
+  Auswertung liest 18 060 Zeilen gegen 6 840 für das übrige Dashboard und wäre
+  sonst die teuerste Abfrage der Startseite.
+- Der Feed **„Neu"** mischt erspielte Trophäen unter die Ereignisse, verdichtet
+  je Spiel und Tag („3 Trophäen, davon 1 Silber"), Platin als eigene Zeile.
 
 Der Feed „Neu" auf dem Dashboard bekommt damit eine **zweite Quelle**: Eine
 erspielte Trophäe ist kein Änderungsereignis – niemand hat etwas geschrieben –,

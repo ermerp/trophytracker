@@ -1,52 +1,63 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { QUELLETEXT, anfrage, kurzesDatum, type Ereignis, type EreignisSeite } from './api'
+import { QUELLETEXT, anfrage, kurzesDatum } from './api'
 
 /**
- * „Neu" – der Feed des Dashboards (Stufe 19a).
+ * „Neu" – der Feed des Dashboards (Stufe 19a, zwei Quellen seit 19b).
  *
- * Gefüllt aus dem Änderungsprotokoll (`game_event`, Abschnitt 8.5): Jede
- * Zeile trägt ihren Satz schon aus `src/domain/ereignis.ts`, gebildet zur
- * Lesezeit. Es gibt hier also keine eigene Abfrage und keine zweite
- * Satzbildung – nur `GET /api/events` mit kleinem Limit.
+ * Gefüllt aus **zwei** Quellen, die der Worker zur Lesezeit nach Zeit mischt:
+ * dem Änderungsprotokoll (`game_event`) und den erspielten Einzeltrophäen
+ * (`trophy`). Eine erspielte Trophäe ist kein Änderungsereignis – niemand hat
+ * etwas geschrieben –, deshalb steht sie nicht im Protokoll, sondern wird
+ * direkt gelesen und je Spiel und Tag zu einer Zeile verdichtet („12
+ * Trophäen, davon 1 Gold"). Platin steht immer für sich.
  *
- * **Was noch fehlt:** „3 neue Trophäen in Elden Ring" braucht die
- * Einzeltrophäen aus Stufe 19b (7.7). Bis dahin zeigt der Feed, was der
- * Sync ohnehin erkennt und was du selbst erfasst hast. Er steht deshalb an
- * vielen Tagen still – das ist der ehrliche Stand und kein Fehler.
+ * Den Satz bildet weiterhin der Worker (`src/domain/ereignis.ts`), nicht
+ * diese Datei: eine Zeile, ein Text, eine Stelle.
  */
 
-/** Auf dem Handy vier Zeilen, am Desktop füllen mehr die rechte Spalte. */
-const ANZAHL = 8
+/** Eine Zeile des Feeds, wie der Worker sie liefert. */
+type FeedZeile = {
+	id: string
+	/** Dieselben Quellen wie im Protokoll; eine Trophäe kommt von Sony, also `sync`. */
+	quelle: keyof typeof QUELLETEXT
+	art: string
+	zeitpunkt: string
+	titel: string
+	spielId: number | null
+	text: string
+}
+
+type FeedAntwort = { zeilen: FeedZeile[]; trophaeenVollstaendig: boolean }
 
 export function Neu() {
-	const [ereignisse, setEreignisse] = useState<Ereignis[] | null>(null)
+	const [zeilen, setZeilen] = useState<FeedZeile[] | null>(null)
 	const [meldung, setMeldung] = useState('')
 
 	useEffect(() => {
-		anfrage<EreignisSeite>(`/api/events?limit=${ANZAHL}`)
-			.then((s) => setEreignisse(s.ereignisse))
+		anfrage<FeedAntwort>('/api/feed')
+			.then((s) => setZeilen(s.zeilen))
 			.catch((f) => setMeldung(f instanceof Error ? f.message : 'Der Verlauf ließ sich nicht laden.'))
 	}, [])
 
 	if (meldung) return null
-	if (!ereignisse) return null
+	if (!zeilen) return null
 
 	return (
 		<div className="block">
 			<div className="blockname">
 				Neu
-				{ereignisse.length > 0 && (
+				{zeilen.length > 0 && (
 					<span className="rechts">
 						<Link to="/aenderungen">alle</Link>
 					</span>
 				)}
 			</div>
-			{ereignisse.length === 0 ? (
+			{zeilen.length === 0 ? (
 				<p className="ruhig klein">Noch nichts protokolliert.</p>
 			) : (
 				<div className="feed">
-					{ereignisse.map((e) => (
+					{zeilen.map((e) => (
 						<div key={e.id} className="zeile">
 							<span className={`qpille q-${e.quelle}`}>{QUELLETEXT[e.quelle]}</span>
 							<span className="text">

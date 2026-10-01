@@ -32,6 +32,7 @@ import {
 import { IgdbSuche, datumOderUnbekannt } from './IgdbSuche'
 import { Kopfzeile } from './Kopfzeile'
 import { Cover, PlattformChip, TrophaeenStufen, zustandsFarbe } from './SpielTeile'
+import { Trophaeenliste } from './Trophaeenliste'
 import { Zeichen } from './Symbole'
 import { Verlauf } from './Verlauf'
 
@@ -709,6 +710,11 @@ function ReleaseKarte({
       )}
 
       {r.trophaeen && <TrophaeenStufen erspielt={r.trophaeen.erspielt} definiert={r.trophaeen.definiert} />}
+
+      {/* Die einzelnen Trophäen, aufklappbar (Stufe 19b). Erst beim Öffnen
+          geladen: Eine Liste sind rund 91 gelesene Zeilen, und ein Spiel mit
+          drei Releases soll sie nicht alle mitbringen. */}
+      {r.trophaeen && <Trophaeenliste releaseId={r.id} />}
 
       {/* Zwei feste Zeilen statt eines Flusses mit „·": Auf dem Handy brach
           der Text ohnehin um, und der Umbruch lag je nach Datumslänge

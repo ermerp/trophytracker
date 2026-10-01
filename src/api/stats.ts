@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Kennzahlen, LetztesPlatinZeile, PlattformZeile } from "../db/stats";
 import { ERLAUBTE_PLATTFORMEN } from "../domain/titel";
+import { levelStand } from "../sync/trophaeen";
 import type { AppEnv } from "../types";
 
 /**
@@ -88,6 +89,40 @@ function antwort(k: Kennzahlen) {
 	};
 }
 
-export const statsRoutes = new Hono<AppEnv>().get("/", async (c) =>
-	c.json(antwort(await c.var.repos.stats.kennzahlen())),
-);
+export const statsRoutes = new Hono<AppEnv>().get("/", async (c) => {
+	/*
+	 * Zwei Lesungen nebeneinander. Das Level kommt aus app_setting und kostet
+	 * eine Zeile; die Kennzahlen sind ein eigener Batch. Netzwartezeit zaehlt
+	 * nicht gegen die 10 ms (Abschnitt 2).
+	 */
+	const [k, level] = await Promise.all([c.var.repos.stats.kennzahlen(), levelStand(c.var.repos)]);
+
+	return c.json({
+		...antwort(k),
+		/**
+		 * Das Trophaeen-Level von Sony. `null`, solange der naechtliche Schritt
+		 * es noch nicht geholt hat - dann zeigt die Oberflaeche es gar nicht,
+		 * statt eine 0 zu erfinden (Abschnitt 3).
+		 */
+		level,
+	});
+});
+
+/**
+ * Trophaeen je Jahr (Stufe 19b) - eine EIGENE Route, nicht Teil von /api/stats.
+ *
+ * **Weil sie teuer ist, und zwar gemessen:** Die Auswertung muss jede
+ * erspielte Trophaee ansehen, das sind 18 060 gelesene Zeilen bei 430 Listen.
+ * Das Dashboard liest sonst 6 840 - die Zahl waere also die teuerste der
+ * ganzen Seite, auf der ersten Seite nach jedem Start der App (Abschnitt 2).
+ * Ein Indexhinweis aendert daran nichts (ebenfalls gemessen, 01.10.2026).
+ *
+ * Deshalb holt die Oberflaeche sie erst, wenn der Block aufgeklappt wird.
+ * Gespeichert wird die Zahl nicht: Sie ist berechnet (5.2).
+ */
+export const jahreRoutes = new Hono<AppEnv>().get("/", async (c) => {
+	const jahre = await c.var.repos.trophaeen.jahre();
+	// Jahre ohne Trophaee fehlen hier - die Oberflaeche fuellt die Luecken,
+	// weil erst eine durchgehende Achse einen Verlauf zeigt.
+	return c.json({ jahre: jahre.map((j) => ({ jahr: Number(j.jahr), anzahl: j.anzahl })) });
+});
