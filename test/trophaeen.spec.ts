@@ -236,6 +236,22 @@ describe("Fuellschritt", () => {
 		expect((await repos().trophaeen.fuellstand()).gespeichert).toBe(8);
 	});
 
+	/**
+	 * Zwei Grenzen, und die engere ist nicht die offensichtliche.
+	 *
+	 * Ein Worker-Aufruf darf hoechstens 50 Fremdanfragen machen (15.4) - das
+	 * liesse vierzehn Listen zu. Entscheidend ist aber die DAUER: Vierzehn
+	 * Listen sind rund zehn Sekunden in einer Anfrage, und so lange haelt
+	 * eine Mobilfunkverbindung nicht zuverlaessig durch (Befund vom
+	 * 01.10.2026). Vier Listen sind rund drei Sekunden.
+	 */
+	it("bleibt mit einer Portion weit unter den 50 Fremdanfragen je Aufruf", () => {
+		// Drei Abrufe je Liste im schlimmsten Fall, dazu eine Token-Erneuerung.
+		expect(PORTION * 3 + 1).toBeLessThanOrEqual(50);
+		// Und kurz genug fuer eine Anfrage vom Handy: rund 0,3 s je Abruf.
+		expect(PORTION * 3 * 0.3).toBeLessThan(5);
+	});
+
 	it("faehrt eine Portion und meldet, was offen bleibt", async () => {
 		for (let i = 0; i < PORTION + 3; i++) await liste(`NPWR1${String(i).padStart(3, "0")}_00`);
 		const { client } = psn(4, 1);

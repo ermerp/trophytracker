@@ -18,16 +18,23 @@ import type { PsnClient } from "../psn/client";
  */
 
 /**
- * Vierzehn Listen je Aufruf, und die Zahl kommt NICHT aus Bequemlichkeit:
- * **Ein Worker-Aufruf darf hoechstens 50 Fremdanfragen machen** (Free Tier,
- * 15.4). Eine Liste kostet zwei Abrufe, mit DLC-Gruppen drei; vierzehn sind
- * also hoechstens 42, dazu kann eine Token-Erneuerung kommen. Mit sechzehn
- * waeren es 48 plus Token - zu nah an der Wand.
+ * Vier Listen je Aufruf.
  *
- * Die Oberflaeche ruft so lange nach, bis nichts mehr offen ist; 431 Listen
- * sind rund 31 Aufrufe.
+ * **Nicht die Obergrenze, sondern die Dauer entscheidet.** Zuerst standen
+ * hier vierzehn, abgeleitet aus den 50 erlaubten Fremdanfragen je
+ * Worker-Aufruf (15.4). Die Rechnung stimmte, der Zuschnitt nicht: Vierzehn
+ * Listen sind rund dreissig PSN-Abrufe und damit **zehn Sekunden und mehr in
+ * einer einzigen Anfrage**. Auf einem Handy ist das eine Ewigkeit - am
+ * 01.10.2026 blieb der Knopf dreimal stehen, und beim dritten Mal war
+ * nachweisbar, dass die Portion davor sauber durchlief (14 Listen, 401
+ * Trophaeen, keine Meldung) und die naechste Anfrage einfach nie antwortete.
+ *
+ * Vier Listen sind rund neun Abrufe und drei Sekunden. Das sind 108 Anfragen
+ * fuer den ganzen Bestand statt 31 - aber jede einzelne ist kurz genug, um
+ * eine Mobilfunkverbindung zu ueberleben, und der Fortschritt bewegt sich
+ * sichtbar oefter.
  */
-export const PORTION = 14;
+export const PORTION = 4;
 
 /** Der Stand in app_setting: wann zuletzt ein Knopfdurchlauf lief. */
 export const SCHLUESSEL_KNOPF = "trophaeen_knopf_tag";

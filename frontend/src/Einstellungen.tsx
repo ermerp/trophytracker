@@ -572,7 +572,7 @@ export function Einstellungen() {
     }
 
     try {
-      for (let runde = 0; runde < 60; runde++) {
+      for (let runde = 0; runde < 150; runde++) {
         /*
          * Jede Portion in ihrem eigenen try.
          *
@@ -600,6 +600,12 @@ export function Einstellungen() {
 
         listen += daten.listen
         trophaeen += daten.trophaeen
+        // Die Zahl im Block mitziehen, nicht erst am Ende: Sie ist das, was
+        // der Nutzer ansieht, und sie stand bisher bis zum Schluss still
+        // (Rückmeldung vom 01.10.2026: „geht nur hoch, wenn ich neu lade").
+        setTrophaeen((alt) =>
+          alt ? { ...alt, offen: daten.offen, gespeichert: alt.gespeichert + daten.trophaeen } : alt,
+        )
         setTrophText(
           daten.offen > 0
             ? `${listen} von ${daten.gesamt} Listen, ${trophaeen} Trophäen …`
@@ -629,7 +635,7 @@ export function Einstellungen() {
         // Pause zwischen den Portionen: Die Trophäen-API ist inoffiziell, und
         // 940 Anfragen am Stück wären ein Schwall (Entscheidung des Nutzers
         // vom 01.10.2026).
-        await new Promise((fertig) => setTimeout(fertig, 400))
+        await new Promise((fertig) => setTimeout(fertig, 250))
       }
     } finally {
       // Beides gehört hierher und nicht ans Ende des Versuchs: Nach einem
@@ -640,9 +646,23 @@ export function Einstellungen() {
     }
   }
 
-  /** Eine Portion holen; wirft bei Netzfehler und bei einer Fehlerantwort. */
+  /**
+   * Eine Portion holen; wirft bei Netzfehler, Zeitüberschreitung und bei
+   * einer Fehlerantwort.
+   *
+   * **Die Zeitgrenze ist der Kern.** `fetch` wartet von sich aus unbegrenzt,
+   * und ein Wiederholen bei *Fehler* hilft nicht gegen eine Anfrage, die
+   * schlicht nie antwortet. Genau das ist am 01.10.2026 passiert: Die
+   * Portion davor lief sauber durch – der Server hat sie aufgezeichnet –,
+   * die nächste Anfrage kam nie zurück, und die Oberfläche wartete still
+   * weiter. Für den Nutzer sah es aus, als zähle nichts mehr hoch; in
+   * Wahrheit hing die Schleife mitten im Abruf.
+   */
   async function einePortion(): Promise<TrophaeenAntwort> {
-    const antwort = await fetch('/api/sync/trophaeen', { method: 'POST' })
+    const antwort = await fetch('/api/sync/trophaeen', {
+      method: 'POST',
+      signal: AbortSignal.timeout(30_000),
+    })
     const daten = (await antwort.json()) as TrophaeenAntwort
     if (!antwort.ok) throw new Error(daten.meldung ?? 'Der Abruf der Trophäen ist fehlgeschlagen.')
     return daten
