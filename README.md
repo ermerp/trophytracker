@@ -323,7 +323,9 @@ Minute, der Tab wandert in den Hintergrund und verliert seine Abrufe. Reißt
 die Verbindung doch ab, sagt die Seite es und nennt die Zahl, bei der sie
 stehengeblieben ist; ein erneuter Druck macht dort weiter. Danach hält der Nachtlauf
 den Bestand selbst aktuell und holt nur Listen nach, an denen sich etwas
-geändert hat. **Die Anzeige folgt als Teil 2**, gebaut an den echten Daten.
+geändert hat. **Am 01.10.2026 durchgelaufen: 18 355 Trophäen in 431 Listen** – auf die Trophäe
+genau die Summe, die Sonys Zähler nennen. **Die Anzeige folgt als Teil 2**,
+gebaut an diesen Daten.
 
 Der Feed „Neu" auf dem Dashboard bekommt damit eine **zweite Quelle**: Eine
 erspielte Trophäe ist kein Änderungsereignis – niemand hat etwas geschrieben –,
