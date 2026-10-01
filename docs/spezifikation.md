@@ -1299,6 +1299,25 @@ Migration 0004 ergänzt `psn_sync_run.phase` (`abruf` | `normalisierung`) und
 `psn_raw_response.normalized_at`. Migration 0021 (Stufe 18) ergänzt
 `psn_sync_run.started_by` (`nutzer` | `cron`, Standard `nutzer`) – wer den Lauf angestoßen hat.
 
+Migration 0026 (Stufe 19e) ergänzt `psn_credentials.npsso_expires_at` – Sonys `expires_in` beim
+Eintragen – und legt die Zeitreihe der Zugänge an:
+
+```sql
+CREATE TABLE psn_zugang (
+  id                INTEGER PRIMARY KEY,
+  eingetragen_am    TEXT NOT NULL DEFAULT (datetime('now')),
+  angekuendigt_bis  TEXT,     -- aus expires_in; NULL, wenn nur der Wert eingefügt wurde
+  letzter_erfolg_am TEXT,     -- letzter geglückter PSN-Abruf mit diesem Zugang
+  gestorben_am      TEXT,     -- von PSN abgelehnt
+  ersetzt_am        TEXT      -- vom Nutzer früher erneuert
+);
+```
+
+Geschrieben wird ausschließlich in `CredentialsRepository`, jeweils im selben Batch wie die
+Änderung an `psn_credentials`: `npssoSpeichern` schließt den Vorgänger als `ersetzt` und legt die
+neue Zeile an, `statusSetzen('abgelaufen')` stempelt `gestorben_am`, `erfolgVermerken` setzt
+`letzter_erfolg_am`. Warum nur `gestorben_am` eine Messung der Lebensdauer ist, steht in 7.1.
+
 **Der Sync hat zwei Phasen.** Erst werden alle Seiten roh abgelegt, danach normalisiert – beides
 mit begrenzter Arbeit je Aufruf. Ein Zurücksetzen von `normalized_at` lässt die Normalisierung
 erneut laufen, ohne PSN anzusprechen (`POST /api/sync/normalize`). Das ist der praktische Nutzen
@@ -1747,8 +1766,10 @@ POST   /api/sync                      ein Schritt; ein neuer Lauf trägt started
 POST   /api/sync/besitz               eine Seite der Kaufliste, von Hand (Stufe 18e); überspringt die Sieben-Tage-Frist, nicht die Blätterung;
                                       Antwort wie der Cron-Schritt ({ status, geholt, kauf, plus, entfallen, erledigt, weiter, meldung }), 502 bei Fehler
 GET    /api/sync/status               zugang, trophaeen, letzterLauf und letzterAutomatischerLauf (je mit ausloeser; seit Stufe 18),
-                                      cronVerlauf und besitz { fertigAm, fehlerAm, laeuft } (Stufe 18e)
-POST   /api/settings/npsso
+                                      cronVerlauf und besitz { fertigAm, fehlerAm, laeuft } (Stufe 18e);
+                                      zugaenge[] mit eingetragenAm, angekuendigtBis, letzterErfolgAm, ausgang und endeAm (Stufe 19e)
+POST   /api/settings/npsso            nimmt den GANZEN eingefuegten Text (Wert, JSON oder ganze Seite, Stufe 19e);
+                                      400, wenn darin nicht genau ein 64-Zeichen-Wert steht
 
 GET    /api/stats                     Kennzahlen fuers Dashboard (Stufe 19a): { spiele, releases, plattformen[], status, trophaeen, listen, letztesPlatin }
                                       plattformen je PS3/PS4/PS5/PSVITA mit releases, spiele, mitListe, platin, platinMoeglich, disc, digital – immer alle vier, fehlende als 0;
