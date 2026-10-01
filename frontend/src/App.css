@@ -1248,6 +1248,16 @@ textarea {
 }
 
 .balken {
+  /*
+   * `display: block` ist hier nicht selbstverständlich, sondern nötig: In
+   * „Anteil je Stufe" ist der Balken ein `<span>`, und ein Inline-Kasten
+   * nimmt keine Höhe an – die farbigen Verhältnisbalken waren dadurch
+   * unsichtbar, obwohl Breite und Farbe im Markup standen (Rückmeldung des
+   * Nutzers vom 01.10.2026: „es gab mal einen Prototyp mit farbigen Balken,
+   * den hätte ich gerne wieder"). Überall sonst ist der Balken ein `<div>`
+   * und war es ohnehin.
+   */
+  display: block;
   height: 3px;
   background: var(--linie);
   border-radius: 3px;
@@ -2695,7 +2705,19 @@ table.plattformtabelle {
   font-size: 1.6rem;
 }
 
-.stufen {
+/*
+ * Die Trophäenzeichen des Spieldetails (Stufe 19c).
+ *
+ * **Hießen bis zum 01.10.2026 `.stufen` / `.stufe` – und das waren schon die
+ * Namen der Tabellenzeilen auf dem Dashboard.** Die spätere Regel gewann:
+ * `display: inline-flex` machte aus jeder Tabellenzeile einen Inline-Kasten,
+ * „Platin 164 / 338" und „Gold 812 / 1564" liefen in einer Zeile ineinander,
+ * und der Balken mit `flex: 1` fiel auf Breite null zusammen – die farbigen
+ * Verhältnisbalken waren damit schlicht unsichtbar. Gemeldet vom Nutzer mit
+ * Bildschirmfoto; es ist die dritte Klassenkollision dieser Stufe nach
+ * `.deckel` und `.chips`.
+ */
+.stufenzeichen {
   display: flex;
   flex-wrap: wrap;
   gap: var(--a3);
@@ -2703,7 +2725,7 @@ table.plattformtabelle {
   font-size: 0.8rem;
 }
 
-.stufe {
+.stufenzeichen-teil {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -2711,11 +2733,11 @@ table.plattformtabelle {
   font-variant-numeric: tabular-nums;
 }
 
-.stufe b {
+.stufenzeichen-teil b {
   font-weight: 600;
 }
 
-.stufe .von {
+.stufenzeichen-teil .von {
   color: var(--text-still);
 }
 
@@ -3043,7 +3065,7 @@ details.block > div {
 /* Eine Stufe ohne erspielte Trophaee behaelt ihre Metallfarbe, damit Platin
    und Gold unterscheidbar bleiben - die Zahl tritt dafuer zurueck, damit die
    Reihe nicht lauter wird als eine mit Inhalt. */
-.stufe.leer b {
+.stufenzeichen-teil.leer b {
   color: var(--text-still);
   font-weight: 500;
 }
@@ -3720,4 +3742,20 @@ button.jahr.gewaehlt .saeule {
 button.jahr.best:hover .saeule,
 button.jahr.best.gewaehlt .saeule {
   background: var(--gold);
+}
+
+/*
+ * Breite Fenster: Der Inhalt darf die Fläche nehmen.
+ *
+ * `main` ist auf 64 rem gedeckelt – auf einem Handy und am Notebook richtig,
+ * auf einem breiten Bildschirm nicht: Dort endete die Kopfzeile samt ihrer
+ * Linie mitten im Fenster, und die Glocke saß weit vom rechten Rand entfernt,
+ * weil sie am Ende dieser Linie hängt (Rückmeldung des Nutzers vom
+ * 01.10.2026 mit Bildschirmfoto). Ab 80 rem fällt der Deckel; der Abstand zum
+ * Rand kommt weiter aus der Polsterung der Seite.
+ */
+@media (min-width: 80rem) {
+  main {
+    max-width: none;
+  }
 }
