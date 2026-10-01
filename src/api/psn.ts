@@ -6,7 +6,14 @@ import { PsnAuthError } from "../psn/client";
 import { heuteIso } from "../domain/igdb";
 import { besitzLauf, besitzStand } from "../sync/cron";
 import { normalisierungWiederholen, sitzungBesorgen, syncSchritt } from "../sync/run";
-import { knopfStand, levelStand, SCHLUESSEL_KNOPF, trophaeenPortion } from "../sync/trophaeen";
+import {
+	jahreSchritt,
+	knopfStand,
+	levelSchritt,
+	levelStand,
+	SCHLUESSEL_KNOPF,
+	trophaeenPortion,
+} from "../sync/trophaeen";
 import type { AppEnv } from "../types";
 
 /**
@@ -131,12 +138,33 @@ export const psnRoutes = new Hono<AppEnv>()
 	.post("/sync/trophaeen", async (c) => {
 		const heute = heuteIso();
 		const vorher = await c.var.repos.trophaeen.fuellstand();
+
+		/*
+		 * Ist nichts mehr zu fuellen, holt der Knopf das Trophäen-Level und
+		 * rechnet die Jahre durch - statt "nichts offen" zu sagen und den
+		 * Nutzer bis zum naechsten Nachtlauf warten zu lassen. Genau das ist am
+		 * 01.10.2026 passiert: Die Erstbefuellung war durch, das Dashboard
+		 * zeigte aber weder Level noch Fortschrittsbalken, weil beides erst der
+		 * Cron holt (Rueckmeldung des Nutzers).
+		 */
 		if (vorher.offen === 0) {
-			return c.json({ listen: 0, trophaeen: 0, ...vorher, meldung: "Es ist nichts offen." });
+			const { accessToken } = await sitzungBesorgen(c.var.repos, c.var.psn);
+			const level = await levelSchritt(c.var.repos, c.var.psn, accessToken, heute);
+			await jahreSchritt(c.var.repos, heute);
+			return c.json({
+				listen: 0,
+				trophaeen: 0,
+				...vorher,
+				meldung: level
+					? `Trophäen-Level ${level.level} geholt.`
+					: "Alles vollständig – Level ist schon von heute.",
+			});
 		}
 
 		const { accessToken } = await sitzungBesorgen(c.var.repos, c.var.psn);
 		const ergebnis = await trophaeenPortion(c.var.repos, c.var.psn, accessToken);
+		// Ist der Bestand damit vollstaendig, stimmen die Jahre nicht mehr.
+		if (ergebnis.offen === 0) await jahreSchritt(c.var.repos, heute);
 
 		// **Der Ausgang wird aufgeschrieben, nicht nur zurueckgegeben** (Lehre
 		// aus 18e, hier nachgetragen am 01.10.2026). Am ersten Abend blieb der

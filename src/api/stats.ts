@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Kennzahlen, LetztesPlatinZeile, PlattformZeile } from "../db/stats";
 import { ERLAUBTE_PLATTFORMEN } from "../domain/titel";
-import { levelStand } from "../sync/trophaeen";
+import { jahreStand, levelStand } from "../sync/trophaeen";
 import type { AppEnv } from "../types";
 
 /**
@@ -45,11 +45,14 @@ function letztesPlatinAntwort(z: LetztesPlatinZeile | null) {
 		plattform: z.platform,
 		fortschritt: z.progress_pct,
 		/**
-		 * Wann zuletzt GESPIELT, nicht wann das Platin erspielt wurde - das
-		 * weiss die Datenbank bis Stufe 19b nicht (7.7). Die Oberflaeche
-		 * beschriftet es entsprechend.
+		 * Wann das Platin ERSPIELT wurde. Bis Stufe 19b stand hier "zuletzt
+		 * gespielt", weil der Zeitpunkt nirgends stand (7.7); mit
+		 * `trophy.earned_at` gibt es ihn, und die Ueberschrift darf jetzt
+		 * sagen, was sie meint.
 		 */
-		zuletztGespielt: z.last_played_at,
+		erspieltAm: z.erspielt_am,
+		/** Wie die Platin-Trophaee heisst - "Alles erreicht" und so weiter. */
+		platinName: z.platin_name,
 		bronze: z.earned_bronze,
 		silber: z.earned_silver,
 		gold: z.earned_gold,
@@ -121,8 +124,25 @@ export const statsRoutes = new Hono<AppEnv>().get("/", async (c) => {
  * Gespeichert wird die Zahl nicht: Sie ist berechnet (5.2).
  */
 export const jahreRoutes = new Hono<AppEnv>().get("/", async (c) => {
-	const jahre = await c.var.repos.trophaeen.jahre();
+	const jahr = new Date().getUTCFullYear();
+	const stand = await jahreStand(c.var.repos);
+
+	// Vergangene Jahre aus dem Zwischenspeicher, das laufende live: Nur es
+	// kann sich noch aendern (Vorschlag des Nutzers vom 01.10.2026). Fehlt der
+	// Zwischenspeicher, wird einmal alles gerechnet - er ist eine
+	// Beschleunigung, keine Quelle.
+	const vergangene = stand
+		? stand.jahre.filter((j) => j.jahr < jahr)
+		: (await c.var.repos.trophaeen.jahre())
+				.map((j) => ({ jahr: Number(j.jahr), anzahl: j.anzahl }))
+				.filter((j) => j.jahr < jahr);
+
+	const laufend = await c.var.repos.trophaeen.jahrAnzahl(jahr);
+
 	// Jahre ohne Trophaee fehlen hier - die Oberflaeche fuellt die Luecken,
 	// weil erst eine durchgehende Achse einen Verlauf zeigt.
-	return c.json({ jahre: jahre.map((j) => ({ jahr: Number(j.jahr), anzahl: j.anzahl })) });
+	return c.json({
+		jahre: laufend > 0 ? [...vergangene, { jahr, anzahl: laufend }] : vergangene,
+		ausZwischenspeicher: stand !== null,
+	});
 });

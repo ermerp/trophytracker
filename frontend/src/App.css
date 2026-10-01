@@ -3672,3 +3672,9 @@ details.block > div {
 .jahrfuss {
   margin-top: var(--a2);
 }
+
+/* Die Zahl steht vor dem Pfeil, nicht ganz am Rand: „11 von 49 ⌄" liest sich
+   als eine Einheit (Rückmeldung des Nutzers vom 01.10.2026). */
+.trophliste .trophzahl {
+  margin-right: var(--a2);
+}

@@ -50,6 +50,21 @@ async function liste(
 			w.platin, w.erspieltPlatin, werte.zuletzt ?? null, releaseId,
 		)
 		.run();
+
+	/*
+	 * Seit Stufe 19b kommt "letztes Platin" aus `trophy.earned_at`, nicht mehr
+	 * aus `last_played_at` der Liste: Der Zeitpunkt des Platins steht jetzt da,
+	 * und die Ueberschrift darf sagen, was sie meint. Der Zaehler allein genuegt
+	 * dem Test deshalb nicht mehr - es braucht die Zeile.
+	 */
+	if (w.erspieltPlatin > 0) {
+		await env.DB.prepare(
+			"INSERT INTO trophy (np_communication_id, trophy_id, grade, name, earned, earned_at) " +
+				"VALUES (?, 0, 'platin', 'Alles erreicht', 1, ?)",
+		)
+			.bind(`NPWR${releaseId ?? "frei"}`, werte.zuletzt ?? "2026-01-01T00:00:00Z")
+			.run();
+	}
 }
 
 describe("Kennzahlen fuers Dashboard (Stufe 19a)", () => {
@@ -136,7 +151,7 @@ describe("Kennzahlen fuers Dashboard (Stufe 19a)", () => {
 		expect(k.trophaeen.platin_erspielt).toBe(1);
 	});
 
-	it("nennt das zuletzt gespielte Spiel mit Platin", async () => {
+	it("nennt das zuletzt ERSPIELTE Platin, mit seinem Zeitpunkt (Stufe 19b)", async () => {
 		await spiel(1, "PS4");
 		await liste(1, { erspieltPlatin: 1, zuletzt: "2026-01-05T00:00:00Z" });
 		await spiel(2, "PS5");
@@ -146,7 +161,8 @@ describe("Kennzahlen fuers Dashboard (Stufe 19a)", () => {
 
 		const k = await repos().stats.kennzahlen();
 		expect(k.letztesPlatin?.game_id).toBe(2);
-		expect(k.letztesPlatin?.last_played_at).toBe("2026-03-09T00:00:00Z");
+		expect(k.letztesPlatin?.erspielt_am).toBe("2026-03-09T00:00:00Z");
+		expect(k.letztesPlatin?.platin_name).toBe("Alles erreicht");
 	});
 
 	it("kommt mit einer leeren Datenbank aus", async () => {

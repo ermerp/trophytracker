@@ -291,8 +291,10 @@ export class TrophaeenRepository {
 	/**
 	 * Trophaeen je Jahr aus dem Erspiel-Datum (Dashboard, Stufe 19b).
 	 *
-	 * Liest den ganzen Bestand - das ist der Punkt der Zahl. Sie laeuft
-	 * deshalb im Batch von /api/stats und wird dort gemessen.
+	 * **Liest den ganzen Bestand - 18 060 Zeilen bei 430 Listen**, und ein
+	 * Indexhinweis aendert daran nichts (beides gemessen am 01.10.2026). Diese
+	 * Abfrage laeuft deshalb NICHT bei jedem Aufruf des Dashboards, sondern
+	 * einmal je Nacht im Wartungsfenster; das Ergebnis liegt in `app_setting`.
 	 */
 	async jahre(): Promise<JahrZeile[]> {
 		const { results } = await this.db
@@ -302,6 +304,25 @@ export class TrophaeenRepository {
 			)
 			.all<JahrZeile>();
 		return results;
+	}
+
+	/**
+	 * Die Trophaeen EINES Jahres - die einzige Zahl, die sich noch aendern
+	 * kann (Vorschlag des Nutzers vom 01.10.2026).
+	 *
+	 * Vergangene Jahre sind abgeschlossene Tatsachen und stehen im Zwischen-
+	 * speicher; das laufende Jahr wird live gezaehlt. Ueber den Teilindex ist
+	 * das ein Bereich ab dem 1. Januar statt eines Laufs ueber den Bestand.
+	 */
+	async jahrAnzahl(jahr: number): Promise<number> {
+		const zeile = await this.db
+			.prepare(
+				"SELECT COUNT(*) AS n FROM trophy WHERE earned = 1 " +
+					"AND earned_at >= ? AND earned_at < ?",
+			)
+			.bind(`${jahr}-01-01`, `${jahr + 1}-01-01`)
+			.first<{ n: number }>();
+		return zeile?.n ?? 0;
 	}
 
 	/** Die Gruppen eines Release; leer, wo es keine DLC gibt. */

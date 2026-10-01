@@ -397,7 +397,12 @@ function Saeulen({ jahre }: { jahre: Array<{ jahr: number; anzahl: number }> }) 
 function LetztesPlatinBlock({ spiel }: { spiel: LetztesPlatin }) {
 	return (
 		<div className="block nur-desktop b-platin">
-			<div className="blockname">Zuletzt gespielt · mit Platin</div>
+			{/* Seit Stufe 19b das ECHTE letzte Platin: `trophy.earned_at` nennt
+			    den Zeitpunkt. Bis dahin hieß der Block „Zuletzt gespielt · mit
+			    Platin", weil die Datenbank nur das wusste (Frage des Nutzers vom
+			    01.10.2026: „könnte das jetzt nicht einfach ‚letztes Platin‘
+			    sein?" – ja). */}
+			<div className="blockname">Letztes Platin</div>
 			<div className="lp">
 				<Cover bild={spiel.bild} cover={spiel.bild !== null} titel={spiel.titel} ziel={`/spiel/${spiel.spielId}`} breite={92} />
 				<div className="lp-text">
@@ -409,7 +414,7 @@ function LetztesPlatinBlock({ spiel }: { spiel: LetztesPlatin }) {
 						<span style={{ color: 'var(--troph-platin)', display: 'inline-flex' }}>
 							<Zeichen name="pokal" groesse={18} strich={1.6} gefuellt />
 						</span>
-						<span className="lp-platin">Platin</span>
+						<span className="lp-platin">{spiel.platinName}</span>
 					</div>
 					<div className="lp-zahlen">
 						<span style={{ color: 'var(--troph-gold)' }}>{t(spiel.gold)} Gold</span>
@@ -417,8 +422,7 @@ function LetztesPlatinBlock({ spiel }: { spiel: LetztesPlatin }) {
 						<span style={{ color: 'var(--troph-bronze)' }}>{t(spiel.bronze)} Bronze</span>
 					</div>
 					<div className="lp-fuss">
-						{spiel.fortschritt}&thinsp;% der Liste ·{' '}
-						{spiel.zuletztGespielt ? `zuletzt gespielt ${datum(spiel.zuletztGespielt)}` : 'zuletzt gespielt unbekannt'}
+						{spiel.fortschritt}&thinsp;% der Liste · erspielt {datum(spiel.erspieltAm)}
 					</div>
 				</div>
 			</div>

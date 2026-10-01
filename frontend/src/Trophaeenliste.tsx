@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { anfrage } from './api'
+import { Zeichen } from './Symbole'
 
 /**
  * Die Trophäenliste eines Release (Stufe 19b, Abschnitt 13).
@@ -49,7 +50,18 @@ const SELTENTEXT = {
 const tag = (wert: string | null) =>
   wert ? new Date(wert).toLocaleDateString('de-DE') : null
 
-export function Trophaeenliste({ releaseId }: { releaseId: number }) {
+export function Trophaeenliste({
+  releaseId,
+  erspielt: erspieltGesamt,
+  definiert,
+  children,
+}: {
+  releaseId: number
+  erspielt: number
+  definiert: number
+  /** Die Stufenzeile – sie steht zwischen Überschrift und Liste und bleibt beim Aufklappen stehen. */
+  children: React.ReactNode
+}) {
   const [offen, setOffen] = useState(false)
   const [daten, setDaten] = useState<Antwort | null>(null)
   const [meldung, setMeldung] = useState<string | null>(null)
@@ -82,12 +94,25 @@ export function Trophaeenliste({ releaseId }: { releaseId: number }) {
 
   return (
     <div className="trophliste">
+      {/*
+        Die Überschrift steht ÜBER den Zeichen und nennt die Zahl direkt
+        (Rückmeldung des Nutzers vom 01.10.2026) – vorher stand dort
+        „anzeigen", und die Zahl erschien erst nach dem Laden. Der Pfeil ist
+        derselbe wie überall sonst beim Aufklappen; die Zeichen bleiben beim
+        Öffnen stehen, die Liste wächst darunter.
+      */}
       <button type="button" className="knopfname blockname" onClick={umschalten} aria-expanded={offen}>
         Trophäen
-        <span className="rechts zahl">
-          {daten ? `${erspielt} von ${alle.length}` : offen ? '…' : 'anzeigen'}
+        <span className="rechts zahl trophzahl">
+          {erspieltGesamt} von {definiert}
+        </span>
+        {/* Derselbe Winkel wie bei den aufklappbaren Blöcken des Dashboards. */}
+        <span className={offen ? 'pfeil auf' : 'pfeil'}>
+          <Zeichen name="winkel" groesse={14} strich={2.1} />
         </span>
       </button>
+
+      {children}
 
       {offen && meldung && <p className="still">{meldung}</p>}
       {offen && !daten && !meldung && <p className="still">Wird geladen …</p>}
@@ -110,7 +135,7 @@ export function Trophaeenliste({ releaseId }: { releaseId: number }) {
                 </button>
               ))}
             </div>
-            {alle.some((t) => t.versteckt) && (
+            {alle.some((t) => t.versteckt && !t.erspielt) && (
               <label className="regler">
                 <input type="checkbox" checked={alleAuf} onChange={(e) => setAlleAuf(e.target.checked)} />
                 <span className="spur" />
@@ -137,7 +162,14 @@ export function Trophaeenliste({ releaseId }: { releaseId: number }) {
                     <Zeile
                       key={t.id}
                       t={t}
-                      zu={t.versteckt && !alleAuf && !aufgedeckt.includes(t.id)}
+                      /*
+                       * Zugedeckt bleibt nur, was versteckt UND noch nicht
+                       * erspielt ist (Rückmeldung des Nutzers vom 01.10.2026).
+                       * Eine versteckte Trophäe, die man hat, ist kein
+                       * Geheimnis mehr – sie zuzudecken verschweigt dem Nutzer
+                       * seine eigene Leistung.
+                       */
+                      zu={t.versteckt && !t.erspielt && !alleAuf && !aufgedeckt.includes(t.id)}
                       aufdecken={() => setAufgedeckt((a) => [...a, t.id])}
                     />
                   ))}

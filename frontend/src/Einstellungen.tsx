@@ -755,9 +755,9 @@ export function Einstellungen() {
       <button
         type="button"
         onClick={trophaeenHolen}
-        disabled={laeuft || !zugang?.eingerichtet || trophaeen?.offen === 0}
+        disabled={laeuft || !zugang?.eingerichtet}
       >
-        Trophäen jetzt holen
+        {trophaeen?.offen === 0 ? 'Level und Jahre auffrischen' : 'Trophäen jetzt holen'}
       </button>
       {/*
         Fortschritt und Grund stehen HIER, direkt unter ihrem Knopf.

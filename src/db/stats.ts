@@ -108,13 +108,29 @@ export const SPIELE_SQL = `SELECT COUNT(DISTINCT r.game_id) AS n FROM release r 
  * 431 Zeilen ohne Index auf last_played_at sind ein Scan - bei dieser
  * Groessenordnung billiger als ein weiterer Index.
  */
+/**
+ * Das zuletzt erspielte Platin - seit Stufe 19b das ECHTE.
+ *
+ * Bis dahin stand hier "zuletzt gespielt, mit Platin": Wann ein Platin
+ * erspielt wurde, wusste die Datenbank nicht, von 164 Platin-Spielen trug
+ * keines ein Beendet-Datum, und die Ueberschrift sagte deshalb genau das, was
+ * die Zahl hergab (Entscheidung des Nutzers vom 24.09.2026). Mit
+ * `trophy.earned_at` gibt es den Zeitpunkt, und die Frage des Nutzers vom
+ * 01.10.2026 - "koennte das jetzt nicht einfach 'letztes Platin' sein?" -
+ * beantwortet sich mit ja.
+ *
+ * Ueber den Teilindex auf `earned_at`: Die Auswahl ist ein Rueckwaertslauf,
+ * der beim ersten Platin stehenbleibt, kein Lauf ueber den Bestand.
+ */
 export const LETZTES_PLATIN_SQL =
 	"SELECT g.id AS game_id, g.title, g.cover_url, r.platform, " +
-	"t.progress_pct, t.last_played_at, " +
-	"t.earned_bronze, t.earned_silver, t.earned_gold, t.earned_platinum " +
-	"FROM trophy_progress t JOIN release r ON r.id = t.release_id JOIN game g ON g.id = r.game_id " +
-	"WHERE t.earned_platinum > 0 AND t.last_played_at IS NOT NULL " +
-	"ORDER BY t.last_played_at DESC LIMIT 1";
+	"tp.progress_pct, tr.earned_at AS erspielt_am, tr.name AS platin_name, " +
+	"tp.earned_bronze, tp.earned_silver, tp.earned_gold, tp.earned_platinum " +
+	"FROM trophy tr " +
+	"JOIN trophy_progress tp ON tp.np_communication_id = tr.np_communication_id " +
+	"JOIN release r ON r.id = tp.release_id JOIN game g ON g.id = r.game_id " +
+	"WHERE tr.earned = 1 AND tr.grade = 'platin' AND tr.earned_at IS NOT NULL " +
+	"ORDER BY tr.earned_at DESC LIMIT 1";
 
 export type PlattformZeile = {
 	platform: string;
@@ -148,7 +164,10 @@ export type LetztesPlatinZeile = {
 	cover_url: string | null;
 	platform: string;
 	progress_pct: number;
-	last_played_at: string | null;
+	/** Wann das Platin erspielt wurde (Stufe 19b). */
+	erspielt_am: string;
+	/** Wie die Platin-Trophäe heißt. */
+	platin_name: string;
 	earned_bronze: number;
 	earned_silver: number;
 	earned_gold: number;

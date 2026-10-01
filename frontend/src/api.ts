@@ -83,8 +83,20 @@ export const DISCTEXT: Record<DiscFassung, string> = {
   unbekannt: 'Disc-Fassung: unbekannt',
 }
 
-export const datum = (wert: string | null) =>
-  wert ? new Date(wert.includes('T') ? wert : `${wert}T00:00:00`).toLocaleDateString('de-DE') : 'unbekannt'
+/**
+ * Ein Datum, egal in welcher Schreibweise es ankommt.
+ *
+ * Drei Formen treffen hier aufeinander: PSN liefert ISO mit `T` und `Z`,
+ * SQLites `datetime()` schreibt „2026-09-22 12:59:31" mit Leerzeichen, und
+ * manche Spalte hält nur den Tag. Die mittlere fehlte und ergab „Invalid
+ * Date" – gesehen am 01.10.2026 im Block „Letztes Platin".
+ */
+export const datum = (wert: string | null) => {
+  if (!wert) return 'unbekannt'
+  const mitT = wert.includes('T') ? wert : wert.includes(' ') ? wert.replace(' ', 'T') : `${wert}T00:00:00`
+  const d = new Date(mitT)
+  return Number.isNaN(d.getTime()) ? 'unbekannt' : d.toLocaleDateString('de-DE')
+}
 
 export const euro = (cents: number | null) =>
   cents === null ? 'unbekannt' : (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
@@ -448,7 +460,10 @@ export type LetztesPlatin = {
   bild: string | null
   plattform: Plattform
   fortschritt: number
-  zuletztGespielt: string | null
+  /** Wann das Platin erspielt wurde (Stufe 19b – vorher gab es den Zeitpunkt nicht). */
+  erspieltAm: string
+  /** Name der Platin-Trophäe. */
+  platinName: string
   bronze: number
   silber: number
   gold: number
