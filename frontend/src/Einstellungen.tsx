@@ -551,14 +551,51 @@ export function Einstellungen() {
     setFortschritt('Trophäen werden geholt …')
     let listen = 0
     let trophaeen = 0
+
+    /*
+     * Den Bildschirm wach halten, solange es läuft.
+     *
+     * Der Durchlauf dauert rund vier Minuten, und auf dem Handy sperrt der
+     * Bildschirm vorher. Ein Tab im Hintergrund bekommt seine Zeitgeber
+     * gedrosselt und laufende Abrufe abgebrochen – genau daran ist der erste
+     * Durchlauf am 01.10.2026 bei 126 von 431 Listen stehengeblieben.
+     * `wakeLock` gibt es nicht überall; fehlt es, läuft alles wie bisher,
+     * nur eben mit dem Risiko.
+     */
+    let wach: WakeLockSentinel | null = null
+    try {
+      wach = (await navigator.wakeLock?.request('screen')) ?? null
+    } catch {
+      wach = null
+    }
+
     try {
       for (let runde = 0; runde < 60; runde++) {
-        const antwort = await fetch('/api/sync/trophaeen', { method: 'POST' })
-        const daten = (await antwort.json()) as TrophaeenAntwort
-        if (!antwort.ok) {
-          setMeldung(daten.meldung ?? 'Der Abruf der Trophäen ist fehlgeschlagen.')
-          break
+        /*
+         * Jede Portion in ihrem eigenen try.
+         *
+         * Vorher lag nur ein try um die ganze Schleife, und ein
+         * fehlgeschlagener `fetch` sprang heraus: keine Meldung, der
+         * Fortschrittstext fror bei der letzten Zahl ein, und der Block
+         * darüber zeigte weiter den alten Stand. Von außen sah das aus wie
+         * „hängt", obwohl nur die Verbindung weg war (Befund vom 01.10.2026).
+         * Jetzt wird ein Netzfehler einmal wiederholt und danach benannt.
+         */
+        let daten: TrophaeenAntwort
+        try {
+          daten = await einePortion()
+        } catch {
+          await new Promise((fertig) => setTimeout(fertig, 1_500))
+          try {
+            daten = await einePortion()
+          } catch {
+            setMeldung(
+              `Die Verbindung ist bei ${listen} Listen abgerissen. Ein erneuter Druck macht dort weiter.`,
+            )
+            break
+          }
         }
+
         listen += daten.listen
         trophaeen += daten.trophaeen
         setFortschritt(
@@ -566,20 +603,31 @@ export function Einstellungen() {
             ? `${listen} von ${daten.gesamt} Listen, ${trophaeen} Trophäen …`
             : `Fertig: ${listen} Listen, ${trophaeen} Trophäen.`,
         )
-        // Pause zwischen den Portionen: Die Trophäen-API ist inoffiziell, und
-        // 940 Anfragen am Stück wären ein Schwall (Entscheidung des Nutzers
-        // vom 01.10.2026).
         if (daten.meldung) {
-          setMeldung(daten.meldung)
+          setMeldung(`${daten.meldung} Bei ${listen} Listen angehalten – ein erneuter Druck macht dort weiter.`)
           break
         }
         if (daten.offen === 0) break
+        // Pause zwischen den Portionen: Die Trophäen-API ist inoffiziell, und
+        // 940 Anfragen am Stück wären ein Schwall (Entscheidung des Nutzers
+        // vom 01.10.2026).
         await new Promise((fertig) => setTimeout(fertig, 400))
       }
-      await trophaeenStandLaden()
     } finally {
+      // Beides gehört hierher und nicht ans Ende des Versuchs: Nach einem
+      // Abbruch muss der Block erst recht den echten Stand zeigen.
+      await trophaeenStandLaden()
+      void wach?.release()
       setLaeuft(false)
     }
+  }
+
+  /** Eine Portion holen; wirft bei Netzfehler und bei einer Fehlerantwort. */
+  async function einePortion(): Promise<TrophaeenAntwort> {
+    const antwort = await fetch('/api/sync/trophaeen', { method: 'POST' })
+    const daten = (await antwort.json()) as TrophaeenAntwort
+    if (!antwort.ok) throw new Error(daten.meldung ?? 'Der Abruf der Trophäen ist fehlgeschlagen.')
+    return daten
   }
 
   async function synchronisieren() {
