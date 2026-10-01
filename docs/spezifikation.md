@@ -973,6 +973,16 @@ Punkten entschieden am 01.10.2026):
    Vordergrund in Portionen durchläuft, mit Pause zwischen den Portionen und Abbruch bei `429`
    (Entscheidung des Nutzers vom 01.10.2026). **Höchstens ein Durchlauf je Tag** – wegen der
    Schreibgrenze, nicht wegen PSN.
+
+   **Seit der Messung vom 01.10.2026 ist der Knopf der Hauptweg, nicht die Abkürzung** (Frage des
+   Nutzers): Die ganze Erstbefüllung dauert rund vier Minuten, nicht drei Wochen. Ein einziger
+   Aufruf schafft sie trotzdem nicht – 50 Fremdanfragen je Aufruf sind die Grenze, 940 brauchen
+   mindestens 19 –, also treibt die Oberfläche die Portionen, und für den Nutzer sieht es aus wie
+   ein Knopfdruck. Der nächtliche Schritt bleibt, aber als **Netz und Nachführung**, nicht als
+   geplante Dauer: Er fragt „nächste Liste ohne Trophäen" – dieselbe Abfrageform wie „nächste
+   geänderte Liste", die er für den Dauerbetrieb ohnehin braucht. Die Rechnung „rund 19 Nächte"
+   ist damit keine Erwartung mehr, sondern nur noch die Antwort auf „was, wenn der Knopf nie
+   gedrückt wird".
 2. **Danach nur bei Änderung.** Welche Liste sich verändert hat, stellt der Sync seit Stufe 13 ohnehin fest (`neue_trophaeen`, `dlc_erweitert`). Nur diese Titel werden nachgeholt; im Dauerbetrieb sind das wenige Abrufe je Woche.
 3. **Keine Rohablage** (Entscheidung des Nutzers vom 01.10.2026) – die Antworten werden direkt
    normalisiert. Begründung und Maßstab stehen jetzt bei der Regel selbst statt als Ausnahme
@@ -1041,6 +1051,38 @@ bestätigt eine Entscheidung aus 19a.**
   2 348 Silber, 812 Gold, 164 Platin – **11 168, genau die Summe über `trophy_progress` in der
   Datenbank**. Die Entscheidung vom 24.09.2026, die Zähler je Stufe über *alle* Listen zu bilden,
   trifft damit nachweislich Sonys eigene Zahl. Vom Abruf gebraucht wird nur das Level.
+
+**Nachgemessen am 01.10.2026, auf zwei Hinweise des Nutzers hin – beide trafen zu, und einer
+ändert das Schema:**
+
+- **`trophyEarnedRate` ist der Anteil der Spieler des Spiels, die diese Trophäe haben**, und
+  `trophyRare` ist genau dieselbe Zahl in Sonys vier Fächern. Gemessen an 526 Trophäen:
+  `0` reicht von 0,1 % bis 5,0 %, `1` von 5,1 % bis 15,0 %, `2` von 16,1 % bis 49,5 %, `3` von
+  51,4 % bis 90,2 %. Die Schwellen liegen damit bei 5, 15 und 50 Prozent. **Die Unklarheit aus
+  der ersten Messung ist damit erledigt:** Der Wert `trophyRare: 2` bei 42,6 % war kein
+  Widerspruch, sondern Sonys „selten" reicht bis zur Hälfte aller Spieler. Gespeichert wird die
+  **Prozentzahl**, die Beschriftung entsteht zur Lesezeit aus diesen Schwellen (5.2) – so hängt
+  die Oberfläche nicht an einem fremden Stufenwert, trifft aber dieselben vier Fächer wie Sony.
+- **Es gibt den Fortschrittszähler, und er ist PS5-eigen.** `trophyProgressTargetValue` steht an
+  der Definition, `progress`, `progressRate` und `progressedDateTime` am eigenen Stand – beides
+  als **Text**, wie die Seltenheit. Gemessen über **alle 63 PS5-Listen**: 21 Listen mit Zielwert
+  (360 Trophäen), davon 9 mit eigenem Fortschritt (158 Trophäen, 90 mit Zeitpunkt). In 45
+  PS3/PS4/Vita-Listen mit 2 125 Trophäen: **kein einziger** Zielwert. Beispiel aus der Messung:
+  Ziel 20, eigener Stand 15, nicht erspielt – „15 von 20". Eine erspielte Trophäe trägt keinen
+  `progress` mehr, der Zielwert bleibt.
+
+  Daraus vier Spalten an `trophy`, die der erste Entwurf nicht hatte: `progress_target`,
+  `progress_value`, `progress_rate` und `progressed_at`. Sie sind **leer, wo Sony nichts erhebt** –
+  und damit ein Fall der Regel aus Abschnitt 3 und 13: Bei PS3, PS4 und Vita steht dort nicht
+  „unbekannt", sondern **gar nichts**, genau wie bei der Spielzeit. Ohne diesen Hinweis wäre das
+  eine Migration nach der Migration geworden.
+
+- **Eine Platformgrenze, die der Entwurf vom 27.09. nicht kannte: 50 Fremdanfragen je Aufruf.**
+  Gegen Cloudflares Dokumentation geprüft am 01.10.2026 (Free: 50, Paid: 10 000). Eine Wall-Clock-
+  Grenze gibt es dagegen nicht, solange der Client verbunden bleibt. Damit ist die Portionierung
+  **keine Frage der Geduld, sondern eine harte Grenze**: 940 Anfragen brauchen mindestens 19
+  Aufrufe, einer reicht nie. Eine Portion von 16 Listen sind 32 bis 48 Anfragen und bleibt
+  darunter.
 
 ### Was daraus folgt
 
@@ -2183,6 +2225,7 @@ hinein, sondern blocken hart.
 | Dienst | Free-Grenze | Bei Überschreitung |
 |---|---|---|
 | Workers | 100.000 Anfragen/Tag | Fehler 1027 bzw. 429, keine Abrechnung |
+| Workers (Fremdanfragen) | 50 je Aufruf | weitere `fetch` schlagen fehl – gegen die Dokumentation geprüft am 01.10.2026 |
 | Workers Static Assets | im Workers-Kontingent | 429 statt Auslieferung |
 | D1 | 5 GB, 5 Mio. gelesene / 100.000 geschriebene Zeilen pro Tag | Abfragen schlagen fehl, keine Abrechnung |
 | Zero Trust Access | 50 Sitze | Weitere Nutzer werden abgewiesen |
