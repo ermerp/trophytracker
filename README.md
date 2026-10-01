@@ -305,8 +305,21 @@ Trophäen sind mit Index rund 37 000 geschriebene Zeilen, und D1 erlaubt im Free
 Tier 100 000 am Tag. **Gruppen und Trophäen-Level** gehören dazu – ohne die
 Gruppe zählt „was fehlt mir noch zu Platin" bei Spielen mit DLC falsch, und das
 Level ist die Lücke, die das Dashboard aus 19a ausdrücklich offen gelassen hat.
-Wie die Trophäenliste im Spieldetail **aussieht**, ist noch offen und bekommt
-einen Prototyp, bevor Code entsteht.
+Wie die Trophäenliste im Spieldetail **aussieht**, ist am Prototyp entschieden
+(01.10.2026, vier Runden): Symbol, Name, Beschreibung, Stufe, Seltenheit als
+Zahl und Wort, Erspiel-Datum und der Fortschrittszähler. Erspielt ist hell,
+offen ist dunkel – das Symbol trägt den Zustand ohne ein Wort. Platin steht
+für sich. Versteckte Trophäen sind zugedeckt und lassen sich einzeln per
+Klick oder für die ganze Liste per Schieberegler aufdecken.
+
+**Teil 1 ist gebaut (01.10.2026): die Daten.** Migration 0027, die vier
+PSN-Abrufe, der nächtliche Füllschritt und der Knopf **„Trophäen jetzt
+holen"** in den Einstellungen. Der erste Durchlauf dauert rund vier Minuten
+und lässt sich jederzeit abbrechen – der nächste Druck macht dort weiter.
+Mehr als einmal am Tag geht er nicht: 18 355 Trophäen sind rund 29 500
+geschriebene Zeilen, und D1 erlaubt 100 000 am Tag. Danach hält der Nachtlauf
+den Bestand selbst aktuell und holt nur Listen nach, an denen sich etwas
+geändert hat. **Die Anzeige folgt als Teil 2**, gebaut an den echten Daten.
 
 Der Feed „Neu" auf dem Dashboard bekommt damit eine **zweite Quelle**: Eine
 erspielte Trophäe ist kein Änderungsereignis – niemand hat etwas geschrieben –,

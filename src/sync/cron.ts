@@ -11,6 +11,7 @@ import {
 } from "./igdb";
 import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis } from "./besitz";
 import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
+import { eineListe, levelSchritt, type ListenErgebnis } from "./trophaeen";
 
 /**
  * Die naechtliche Automatik (Stufe 18, Abschnitt 10.1).
@@ -101,7 +102,16 @@ const SCHLUESSEL_SPIELZEIT = "psn_spielzeit_stand";
 const SCHLUESSEL_BESITZ = "psn_besitz_stand";
 
 export type CronErgebnis = {
-	getan: "sync" | "spielzeit" | "besitz" | "igdb_auffrischen" | "igdb_physisch" | "aufraeumen" | "nichts";
+	getan:
+		| "sync"
+		| "spielzeit"
+		| "besitz"
+		| "trophaeen"
+		| "level"
+		| "igdb_auffrischen"
+		| "igdb_physisch"
+		| "aufraeumen"
+		| "nichts";
 	/** angekuendigt -> erschienen (8.4), in jedem Aufruf. */
 	erschienen: number;
 	/** Laeufe, die als haengengeblieben auf 'fehler' gesetzt wurden. */
@@ -115,6 +125,8 @@ export type CronErgebnis = {
 	sync?: SyncErgebnis;
 	spielzeit?: SpielzeitErgebnis;
 	besitz?: BesitzErgebnis;
+	trophaeen?: ListenErgebnis;
+	level?: number;
 	auffrischen?: AuffrischErgebnis;
 	physisch?: PhysischErgebnis;
 };
@@ -170,6 +182,23 @@ export async function cronSchritt(
 
 				const besitz = await besitzLauf(repos, psn, heute);
 				if (besitz) return { ...basis, getan: "besitz", besitz };
+
+				// 6. Einzeltrophaeen (7.7, Stufe 19b) - eine Liste je Aufruf.
+				//    Ganz hinten in der PSN-Kette, weil der Portionsknopf der
+				//    Hauptweg ist: Dieser Schritt ist das Netz fuer den Fall,
+				//    dass niemand drueckt, und die Nachfuehrung fuer Listen,
+				//    an denen sich etwas geaendert hat. Beides ist dieselbe
+				//    Auswahl (naechsteZumFuellen).
+				const trophaeen = await trophaeenLauf(repos, psn);
+				if (trophaeen) return { ...basis, getan: "trophaeen", trophaeen };
+
+				// 7. Das Trophaeen-Level, hoechstens einmal am Tag und nur,
+				//    wenn nichts mehr zu fuellen ist: ein einzelner Abruf, der
+				//    niemals einen Aufruf kostet, den die Erstbefuellung
+				//    braucht.
+				const { accessToken } = await sitzungBesorgen(repos, psn);
+				const level = await levelSchritt(repos, psn, accessToken, heute);
+				if (level) return { ...basis, getan: "level", level: level.level };
 			} catch (fehler) {
 				// Ein abgelaufener Zugang oder ein PSN-Ausfall darf die Nacht
 				// nicht beenden - die Wartung laeuft in ihrem eigenen Fenster
@@ -264,6 +293,25 @@ async function spielzeitLauf(repos: Repositories, psn: PsnClient, heute: string)
 		SCHLUESSEL_SPIELZEIT,
 		ergebnis.weiter ? `${heute}:${offset + ergebnis.geholt}` : `${heute}:-1`,
 	);
+	return ergebnis;
+}
+
+/**
+ * Eine Liste Einzeltrophaeen, wenn eine offen ist. `null` heisst "nichts zu
+ * tun" - dann ist der Bestand vollstaendig und nichts hat sich geaendert.
+ *
+ * Kein eigener Fehlversuchszaehler: Anders als bei Sync und Spielzeit haengt
+ * hier kein Offset an einem Lauf, den ein Fehler verlieren koennte. Scheitert
+ * der Abruf, wird nicht gestempelt, und derselbe Aufruf waehlt die Liste in
+ * fuenf Minuten erneut - die Wiederholung ist die Auswahl selbst. Die
+ * Ausnahme faengt `cronSchritt` ab, wie bei Spielzeit und Kaufliste.
+ */
+async function trophaeenLauf(repos: Repositories, psn: PsnClient): Promise<ListenErgebnis | null> {
+	const [liste] = await repos.trophaeen.naechsteZumFuellen(1);
+	if (!liste) return null;
+	const { accessToken } = await sitzungBesorgen(repos, psn);
+	const ergebnis = await eineListe(repos, psn, accessToken, liste);
+	await zugangGeglueckt(repos);
 	return ergebnis;
 }
 
@@ -405,6 +453,17 @@ export function cronLogzeile(e: CronErgebnis): string {
 		if (e.sync.fehlversuche) teile.push(`versuch=${e.sync.fehlversuche}/${FEHLVERSUCHE_HOECHSTENS}`);
 		if (e.sync.meldung) teile.push(`meldung="${e.sync.meldung}"`);
 	}
+	if (e.trophaeen) {
+		// `trophaeen=null` heisst: PSN kennt diese Liste nicht mehr. Die Zeile
+		// sagt das als Wort, damit es sich nicht als "0 Trophaeen geholt"
+		// liest - das waere dieselbe Zahl mit einer ganz anderen Ursache.
+		teile.push(
+			`liste=${e.trophaeen.npCommunicationId}`,
+			e.trophaeen.trophaeen === null ? "trophaeen=unbekannt" : `trophaeen=${e.trophaeen.trophaeen}`,
+		);
+		if (e.trophaeen.gruppen) teile.push(`gruppen=${e.trophaeen.gruppen}`);
+	}
+	if (e.level) teile.push(`level=${e.level}`);
 	if (e.spielzeit) {
 		teile.push(
 			`spielzeit=${e.spielzeit.status}`,

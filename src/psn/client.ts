@@ -1,3 +1,4 @@
+import type { DefinitionRoh, GruppeRoh, StandRoh } from "../domain/trophaee";
 import { Geheimnis } from "../domain/secret";
 
 /**
@@ -27,6 +28,13 @@ const KAUFLISTE_BASIS = "https://web.np.playstation.com/api/graphql/v1/op";
 const KAUFLISTE_HASH = "2c045408b0a4d0264bb5a3edfed4efd49fb4749cf8d216be9043768adff905e2";
 
 const TROPHY_BASIS = "https://m.np.playstation.com/api/trophy/v1";
+
+/**
+ * Eine Liste in einem Zug: Die groesste der Sammlung hat 128 Trophaeen,
+ * `limit=200` liefert sie vollstaendig (gemessen am 01.10.2026). Eine
+ * Blaetterung gibt es deshalb nicht.
+ */
+export const TROPHAEEN_PRO_SEITE = 200;
 
 const CLIENT_ID = "09515159-7237-4370-9b40-3806e67c0891";
 const CLIENT_SECRET = "ucPjka5tntB2KqsP";
@@ -85,6 +93,20 @@ function basicAuth(): string {
 }
 
 export function erstellePsnClient(hole: FetchFn = fetch) {
+	/**
+	 * Ein JSON-Abruf gegen die Trophaeen-API. `null` heisst 404 - "diese
+	 * Liste gibt es dort nicht" ist kein Fehler, sondern eine Antwort.
+	 */
+	async function trophyJson(accessToken: Geheimnis, pfad: string): Promise<unknown | null> {
+		const antwort = await hole(`${TROPHY_BASIS}${pfad}`, {
+			headers: { Authorization: `Bearer ${accessToken.offenlegen()}` },
+		});
+		if (antwort.status === 401) throw new PsnAuthError("PSN hat den Access Token abgelehnt.");
+		if (antwort.status === 404) return null;
+		if (!antwort.ok) throw new PsnAbrufError(`Trophäenabruf antwortete mit ${antwort.status}.`);
+		return antwort.json();
+	}
+
 	async function tokenAnfrage(felder: Record<string, string>): Promise<Sitzung> {
 		const antwort = await hole(`${AUTH_BASIS}/token`, {
 			method: "POST",
@@ -162,6 +184,93 @@ export function erstellePsnClient(hole: FetchFn = fetch) {
 				throw new PsnAbrufError(`Trophäenabruf antwortete mit ${antwort.status}.`);
 			}
 			return { pfad, roh: await antwort.text() };
+		},
+
+		/**
+		 * Die drei Abrufe zu den Einzeltrophaeen einer Liste (7.7, Stufe 19b).
+		 *
+		 * **`npServiceName` ist Pflicht, und zwar bei jedem der drei** - auch
+		 * bei 'trophy', wo er wie ein Vorgabewert aussieht. Ohne ihn antwortet
+		 * PSN mit 404 (gemessen am 01.10.2026). Der Wert steht in
+		 * `trophy_progress.np_service_name` und wird durchgereicht, nie
+		 * geraten.
+		 *
+		 * `limit=200` holt jede Liste in einem Zug: Die groesste Liste der
+		 * Sammlung hat 128 Trophaeen, und `totalItemCount` wird gegen die
+		 * gelieferte Zahl geprueft, damit ein Teilergebnis auffaellt.
+		 *
+		 * Nicht roh abgelegt: Je Liste ein eigener, jederzeit wiederholbarer
+		 * Abruf, und die Normalisierung ist Feldkopieren - damit fehlen alle
+		 * drei Merkmale, die eine Rohablage rechtfertigen (7.1).
+		 *
+		 * **404 ist kein Fehler, sondern "gibt es nicht".** Ein delisteter
+		 * Titel kann aus der Trophaeen-API verschwinden, waehrend er in
+		 * `trophy_progress` steht. Ein Fehler wuerde den Fuellschritt an
+		 * dieser Liste festhalten; `null` laesst ihn sie stempeln und
+		 * weitergehen (Migration 0027).
+		 */
+		async holeTrophaeen(
+			accessToken: Geheimnis,
+			npCommunicationId: string,
+			npServiceName: string,
+		): Promise<{ definitionen: DefinitionRoh[]; gesamt: number; hatGruppen: boolean } | null> {
+			const antwort = await trophyJson(
+				accessToken,
+				`/npCommunicationIds/${npCommunicationId}/trophyGroups/all/trophies` +
+					`?npServiceName=${npServiceName}&limit=${TROPHAEEN_PRO_SEITE}`,
+			);
+			if (antwort === null) return null;
+			const j = antwort as { trophies?: DefinitionRoh[]; totalItemCount?: number; hasTrophyGroups?: boolean };
+			return {
+				definitionen: j.trophies ?? [],
+				gesamt: j.totalItemCount ?? (j.trophies ?? []).length,
+				hatGruppen: j.hasTrophyGroups === true,
+			};
+		},
+
+		async holeTrophaeenStand(
+			accessToken: Geheimnis,
+			npCommunicationId: string,
+			npServiceName: string,
+		): Promise<StandRoh[] | null> {
+			const antwort = await trophyJson(
+				accessToken,
+				`/users/me/npCommunicationIds/${npCommunicationId}/trophyGroups/all/trophies` +
+					`?npServiceName=${npServiceName}&limit=${TROPHAEEN_PRO_SEITE}`,
+			);
+			if (antwort === null) return null;
+			return (antwort as { trophies?: StandRoh[] }).trophies ?? [];
+		},
+
+		/**
+		 * Nur fuer die rund 18 % der Listen, deren Definitionen
+		 * `hasTrophyGroups` sagen - die Zugehoerigkeit jeder Trophaee steht
+		 * schon in den Definitionen und kostet keinen eigenen Abruf.
+		 */
+		async holeTrophaeenGruppen(
+			accessToken: Geheimnis,
+			npCommunicationId: string,
+			npServiceName: string,
+		): Promise<GruppeRoh[] | null> {
+			const antwort = await trophyJson(
+				accessToken,
+				`/npCommunicationIds/${npCommunicationId}/trophyGroups?npServiceName=${npServiceName}`,
+			);
+			if (antwort === null) return null;
+			return (antwort as { trophyGroups?: GruppeRoh[] }).trophyGroups ?? [];
+		},
+
+		/**
+		 * Das Trophaeen-Level des Kontos (7.7, Stufe 19b).
+		 *
+		 * Ein einzelner Abruf je Lauf. Die Zaehler je Stufe kommen NICHT von
+		 * hier, sondern als Summe ueber `trophy_progress` (Entscheidung des
+		 * Nutzers vom 24.09.2026) - gemessen am 01.10.2026 nennen beide
+		 * dieselbe Zahl, 11 168.
+		 */
+		async holeTrophySummary(accessToken: Geheimnis): Promise<TrophySummaryRoh | null> {
+			const antwort = await trophyJson(accessToken, "/users/me/trophySummary");
+			return antwort === null ? null : (antwort as TrophySummaryRoh);
 		},
 
 		/**
@@ -244,4 +353,13 @@ export type KaufRoh = {
 	name?: string;
 	platform?: string;
 	subscriptionService?: string;
+};
+
+/** Was `/users/me/trophySummary` liefert, so weit wir es anfassen. */
+export type TrophySummaryRoh = {
+	trophyLevel?: number;
+	trophyPoint?: number;
+	trophyLevelBasePoint?: number;
+	trophyLevelNextPoint?: number;
+	progress?: number;
 };

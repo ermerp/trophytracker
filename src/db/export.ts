@@ -54,6 +54,13 @@ export const EXPORT_TABELLEN = [
 	// Nur Zeitpunkte, kein Token (Migration 0026). Die Zeitreihe ist der ganze
 	// Zweck der Tabelle und nach einem Verlust nicht wiederherstellbar.
 	"psn_zugang",
+	// Einzeltrophaeen (Migration 0027, Entscheidung des Nutzers vom
+	// 01.10.2026). Fremddatum, aber nicht billig wiederzubeschaffen: Ein
+	// erneutes Fuellen kostet 940 PSN-Anfragen. Der Dump waechst dadurch um
+	// rund 3-4 MB je Woche - gemessen, nicht geschaetzt: 2,32 MB Symboladressen,
+	// 0,91 MB Beschreibungen, 0,32 MB Namen (7.7).
+	"trophy",
+	"trophy_group",
 ] as const;
 
 /** Tabellen, die es gibt und die absichtlich nicht exportiert werden. */
@@ -68,6 +75,24 @@ export const NICHT_EXPORTIERT = [
 ] as const;
 
 export type Exporttabelle = (typeof EXPORT_TABELLEN)[number];
+
+/**
+ * Wonach eine Tabelle im Export sortiert wird. Ohne Eintrag: `rowid`.
+ *
+ * **Nicht jede Tabelle hat eine rowid.** `trophy` und `trophy_group` sind
+ * `WITHOUT ROWID` (Migration 0027, wegen der Schreibgrenze), und dort ist
+ * `ORDER BY rowid` kein leeres Ergebnis, sondern ein Fehler - der ganze
+ * Export antwortete mit 500, bis diese Tabelle hier stand. Gefunden von
+ * `test/export-route.spec.ts`, bevor es irgendwo hinkam.
+ *
+ * Sortiert wird nach dem Primaerschluessel: Er ist bei einer
+ * WITHOUT-ROWID-Tabelle ohnehin die Ablagereihenfolge, der Export liest sie
+ * also der Reihe nach und nicht quer.
+ */
+export const EXPORT_ORDNUNG: Partial<Record<Exporttabelle, string>> = {
+	trophy: "np_communication_id, trophy_id",
+	trophy_group: "np_communication_id, group_id",
+};
 
 export type Vollexport = {
 	exportiertAm: string;
@@ -155,7 +180,7 @@ export class ExportRepository {
 	 */
 	async alleTabellen(): Promise<Vollexport> {
 		const ergebnisse = await this.db.batch(
-			EXPORT_TABELLEN.map((t) => this.db.prepare(`SELECT * FROM ${t} ORDER BY rowid`)),
+			EXPORT_TABELLEN.map((t) => this.db.prepare(`SELECT * FROM ${t} ORDER BY ${EXPORT_ORDNUNG[t] ?? "rowid"}`)),
 		);
 
 		const tabellen: Record<string, Record<string, unknown>[]> = {};

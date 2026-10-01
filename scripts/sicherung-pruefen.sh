@@ -26,7 +26,10 @@ echo "Dump: $(wc -c < "$dump") Byte, $(grep -c 'INSERT INTO' "$dump" || true) IN
 # psn_zugang kam mit Stufe 19e dazu (Migration 0026): Zeitpunkte, keine
 # Geheimnisse - und die Zeitreihe ist nach einem Verlust nicht
 # wiederherstellbar, also gehoert sie in den Abgleich.
-tabellen="trophy_progress game release physical_copy digital_entitlement play_status review_queue plan_entry app_setting psn_zugang"
+# trophy und trophy_group kamen mit Stufe 19b dazu (Migration 0027). Sie sind
+# die mit Abstand groesste Tabelle der Sicherung - rund 18 400 Zeilen -, und
+# eine abgeschnittene Sicherung faellt gerade dort am ehesten auf.
+tabellen="trophy_progress trophy trophy_group game release physical_copy digital_entitlement play_status review_queue plan_entry app_setting psn_zugang"
 
 abfrage=""
 for t in $tabellen; do abfrage="$abfrage (SELECT COUNT(*) FROM $t) AS $t,"; done

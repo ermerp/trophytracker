@@ -13,6 +13,7 @@ import { ReviewRepository } from "./review";
 import { ScanRepository } from "./scan";
 import { StatsRepository } from "./stats";
 import { SyncRepository } from "./sync";
+import { TrophaeenRepository } from "./trophaeen";
 import { TrophiesRepository } from "./trophies";
 import { WishlistImportRepository } from "./wunschliste";
 
@@ -34,6 +35,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		credentials: new CredentialsRepository(db, npssoKey),
 		sync: new SyncRepository(db),
 		trophies: new TrophiesRepository(db, events),
+		trophaeen: new TrophaeenRepository(db),
 		games: new GamesRepository(db, events),
 		gaps: new GapsRepository(db),
 		igdb: new IgdbRepository(db, events),

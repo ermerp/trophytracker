@@ -5,7 +5,8 @@ import { Geheimnis } from "../domain/secret";
 import { PsnAuthError } from "../psn/client";
 import { heuteIso } from "../domain/igdb";
 import { besitzLauf, besitzStand } from "../sync/cron";
-import { normalisierungWiederholen, syncSchritt } from "../sync/run";
+import { normalisierungWiederholen, sitzungBesorgen, syncSchritt } from "../sync/run";
+import { levelStand, SCHLUESSEL_KNOPF, trophaeenPortion } from "../sync/trophaeen";
 import type { AppEnv } from "../types";
 
 /**
@@ -106,6 +107,44 @@ export const psnRoutes = new Hono<AppEnv>()
 		const ergebnis = await besitzLauf(c.var.repos, c.var.psn, heuteIso(), { erzwingen: true });
 		if (!ergebnis) return c.json({ fehler: "Die Kaufliste ist nicht abrufbar." }, 409);
 		return c.json(ergebnis, ergebnis.status === "fehler" ? 502 : 200);
+	})
+
+	/**
+	 * Eine Portion Einzeltrophaeen holen (Stufe 19b, 7.7).
+	 *
+	 * Der Hauptweg zur Erstbefuellung: Die Oberflaeche ruft so lange nach,
+	 * bis `offen` null ist - 431 Listen sind rund 31 Aufrufe und zusammen
+	 * etwa vier Minuten. Ein einzelner Aufruf kann es nicht schaffen, weil
+	 * ein Worker hoechstens 50 Fremdanfragen machen darf (15.4).
+	 *
+	 * **Hoechstens ein Durchlauf je Tag, und zwar wegen der Schreibgrenze,
+	 * nicht wegen PSN** (Entscheidung des Nutzers vom 01.10.2026): 18 355
+	 * Trophaeen sind rund 29 500 geschriebene Zeilen von 100 000 am Tag. Ein
+	 * zweiter vollstaendiger Durchlauf am selben Tag waere die Haelfte des
+	 * Budgets, ein dritter naehme der Anwendung das Schreiben.
+	 *
+	 * Die Sperre gilt dem NEUEN Durchlauf, nicht der Fortsetzung: Wer heute
+	 * begonnen hat und nach einem Abbruch weitermacht, soll das koennen.
+	 * Gezaehlt wird deshalb der Tag, an dem zuletzt gedrueckt wurde, und
+	 * gesperrt wird nur, wenn an diesem Tag schon alles gefuellt war.
+	 */
+	.post("/sync/trophaeen", async (c) => {
+		const heute = heuteIso();
+		const vorher = await c.var.repos.trophaeen.fuellstand();
+		if (vorher.offen === 0) {
+			return c.json({ listen: 0, trophaeen: 0, ...vorher, meldung: "Es ist nichts offen." });
+		}
+
+		const { accessToken } = await sitzungBesorgen(c.var.repos, c.var.psn);
+		const ergebnis = await trophaeenPortion(c.var.repos, c.var.psn, accessToken);
+		await c.var.repos.sync.fortschrittSetzenWert(SCHLUESSEL_KNOPF, heute);
+		return c.json(ergebnis);
+	})
+
+	/** Wie weit die Erstbefuellung ist - fuer den Fortschritt am Knopf. */
+	.get("/sync/trophaeen", async (c) => {
+		const [stand, level] = await Promise.all([c.var.repos.trophaeen.fuellstand(), levelStand(c.var.repos)]);
+		return c.json({ ...stand, level });
 	})
 
 	/**
