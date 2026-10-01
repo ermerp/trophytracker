@@ -406,6 +406,8 @@ type TrophaeenStand = {
   gesamt: number
   gespeichert: number
   level: { level: number; punkte: number; bisNaechstes: number; prozent: number } | null
+  /** Ausgang des letzten Drucks – überlebt das Neuladen (Stufe 19b, 01.10.2026). */
+  letzte: { am: string; listen: number; trophaeen: number; offen: number; meldung?: string } | null
 }
 
 /** Was eine Portion zurueckgibt (`POST /api/sync/trophaeen`). */
@@ -423,6 +425,7 @@ export function Einstellungen() {
   const [laeuft, setLaeuft] = useState(false)
   const [fortschritt, setFortschritt] = useState<string | null>(null)
   const [trophaeen, setTrophaeen] = useState<TrophaeenStand | null>(null)
+  const [trophText, setTrophText] = useState<string | null>(null)
 
   const statusLaden = useCallback(async () => {
     const antwort = await fetch('/api/sync/status')
@@ -546,9 +549,8 @@ export function Einstellungen() {
    * nächste Druck macht dort weiter.
    */
   async function trophaeenHolen() {
-    setMeldung(null)
+    setTrophText('Trophäen werden geholt …')
     setLaeuft(true)
-    setFortschritt('Trophäen werden geholt …')
     let listen = 0
     let trophaeen = 0
 
@@ -589,7 +591,7 @@ export function Einstellungen() {
           try {
             daten = await einePortion()
           } catch {
-            setMeldung(
+            setTrophText(
               `Die Verbindung ist bei ${listen} Listen abgerissen. Ein erneuter Druck macht dort weiter.`,
             )
             break
@@ -598,13 +600,29 @@ export function Einstellungen() {
 
         listen += daten.listen
         trophaeen += daten.trophaeen
-        setFortschritt(
+        setTrophText(
           daten.offen > 0
             ? `${listen} von ${daten.gesamt} Listen, ${trophaeen} Trophäen …`
             : `Fertig: ${listen} Listen, ${trophaeen} Trophäen.`,
         )
         if (daten.meldung) {
-          setMeldung(`${daten.meldung} Bei ${listen} Listen angehalten – ein erneuter Druck macht dort weiter.`)
+          /*
+           * Bei einem Ratenlimit ist „gleich nochmal" der falsche Rat: Sonys
+           * Fenster läuft weiter, und der nächste Druck liefe sofort wieder
+           * hinein. Vermutet am 01.10.2026, nachdem der Knopf zweimal
+           * hintereinander anhielt – beim zweiten Mal schon nach zwei
+           * Portionen, also deutlich früher als beim ersten. Das passt zu
+           * einem Fenster, das vom ersten Durchlauf noch offen war. Belegt
+           * ist es nicht; die aufgezeichnete Meldung sagt es beim nächsten
+           * Mal.
+           */
+          const limit = daten.meldung.includes('429')
+          setTrophText(
+            `${daten.meldung} Bei ${listen} Listen angehalten – ` +
+              (limit
+                ? 'PlayStation drosselt gerade. Warte ein paar Minuten, dann macht ein erneuter Druck dort weiter.'
+                : 'ein erneuter Druck macht dort weiter.'),
+          )
           break
         }
         if (daten.offen === 0) break
@@ -714,6 +732,24 @@ export function Einstellungen() {
       >
         Trophäen jetzt holen
       </button>
+      {/*
+        Fortschritt und Grund stehen HIER, direkt unter ihrem Knopf.
+        Vorher teilten sie sich die Zeilen mit dem Kauflisten-Knopf: der
+        Fortschritt stand über dem Block, die Meldung mehrere Bildschirme
+        darunter. Am 01.10.2026 blieb der Durchlauf zweimal stehen, und der
+        Nutzer konnte beide Male nicht sehen, warum – die Erklärung war da,
+        nur nicht dort, wo er hinsah.
+      */}
+      {trophText && (
+        <p className="zeile" role="status">
+          {trophText}
+        </p>
+      )}
+      {!trophText && trophaeen?.letzte?.meldung && (
+        <p className="zeile">
+          Zuletzt angehalten ({datum(trophaeen.letzte.am)}): {trophaeen.letzte.meldung}
+        </p>
+      )}
       <p className="zeile">
         Holt Name, Beschreibung, Seltenheit und Erspiel-Datum jeder einzelnen Trophäe. Der erste
         Durchlauf dauert rund vier Minuten und lässt sich jederzeit abbrechen – der nächste Druck

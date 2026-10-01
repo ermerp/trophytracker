@@ -162,6 +162,27 @@ export async function levelSchritt(
 	return neu;
 }
 
+/** Was der letzte Druck auf den Portionsknopf ergeben hat. */
+export type KnopfStand = PortionErgebnis & { tag: string; am: string };
+
+/**
+ * Der Ausgang des letzten Drucks - damit ein Abbruch nicht nur im Browser
+ * des Nutzers steht, sondern das Neuladen ueberlebt und von aussen lesbar
+ * ist. Dieselbe Regel wie beim Kauflisten-Schritt seit 18e: Ein Schritt, der
+ * ruht, sagt warum.
+ */
+export async function knopfStand(repos: Repositories): Promise<KnopfStand | null> {
+	const roh = await repos.sync.fortschritt(SCHLUESSEL_KNOPF);
+	if (!roh) return null;
+	try {
+		const wert = JSON.parse(roh) as KnopfStand;
+		return typeof wert?.am === "string" ? wert : null;
+	} catch {
+		// Vor dem 01.10.2026 stand hier nur das Datum als blanker Text.
+		return null;
+	}
+}
+
 export async function levelStand(repos: Repositories): Promise<LevelStand | null> {
 	const roh = await repos.sync.fortschritt(SCHLUESSEL_LEVEL);
 	if (!roh) return null;

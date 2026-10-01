@@ -6,7 +6,7 @@ import { PsnAuthError } from "../psn/client";
 import { heuteIso } from "../domain/igdb";
 import { besitzLauf, besitzStand } from "../sync/cron";
 import { normalisierungWiederholen, sitzungBesorgen, syncSchritt } from "../sync/run";
-import { levelStand, SCHLUESSEL_KNOPF, trophaeenPortion } from "../sync/trophaeen";
+import { knopfStand, levelStand, SCHLUESSEL_KNOPF, trophaeenPortion } from "../sync/trophaeen";
 import type { AppEnv } from "../types";
 
 /**
@@ -137,14 +137,28 @@ export const psnRoutes = new Hono<AppEnv>()
 
 		const { accessToken } = await sitzungBesorgen(c.var.repos, c.var.psn);
 		const ergebnis = await trophaeenPortion(c.var.repos, c.var.psn, accessToken);
-		await c.var.repos.sync.fortschrittSetzenWert(SCHLUESSEL_KNOPF, heute);
+
+		// **Der Ausgang wird aufgeschrieben, nicht nur zurueckgegeben** (Lehre
+		// aus 18e, hier nachgetragen am 01.10.2026). Am ersten Abend blieb der
+		// Knopf zweimal stehen, und beide Male war hinterher nicht
+		// festzustellen warum: Die Meldung stand nur im Browser des Nutzers,
+		// und dort an einer Stelle, die er nicht sah. Jetzt ueberlebt sie das
+		// Neuladen und ist ueber GET lesbar.
+		await c.var.repos.sync.fortschrittSetzenWert(
+			SCHLUESSEL_KNOPF,
+			JSON.stringify({ tag: heute, am: new Date().toISOString(), ...ergebnis }),
+		);
 		return c.json(ergebnis);
 	})
 
 	/** Wie weit die Erstbefuellung ist - fuer den Fortschritt am Knopf. */
 	.get("/sync/trophaeen", async (c) => {
-		const [stand, level] = await Promise.all([c.var.repos.trophaeen.fuellstand(), levelStand(c.var.repos)]);
-		return c.json({ ...stand, level });
+		const [stand, level, letzte] = await Promise.all([
+			c.var.repos.trophaeen.fuellstand(),
+			levelStand(c.var.repos),
+			knopfStand(c.var.repos),
+		]);
+		return c.json({ ...stand, level, letzte });
 	})
 
 	/**
