@@ -3678,3 +3678,46 @@ details.block > div {
 .trophliste .trophzahl {
   margin-right: var(--a2);
 }
+
+/*
+ * Die Chips der Trophäenliste sind KEINE Filterleiste.
+ *
+ * `.chips` ist für die Sammlung gebaut: Sie ragt mit negativen Rändern aus
+ * dem Kasten heraus, scrollt waagerecht und trägt unten eine Linie, die den
+ * Filter vom Inhalt trennt. In der Trophäenliste sitzt die Reihe mitten in
+ * einer Karte – dort ragte die Linie links heraus und hörte rechts mitten im
+ * Kasten auf (Rückmeldung des Nutzers vom 01.10.2026 mit Bildschirmfoto).
+ * Hier wird nur das Aussehen der einzelnen Chips geerbt, nicht das Verhalten
+ * der Leiste.
+ */
+.trophkopf .chips {
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
+  overflow: visible;
+  flex-wrap: wrap;
+}
+
+/* Jede Säule ist ein Knopf: überfahren am Rechner, antippen auf dem Handy
+   (Wunsch des Nutzers vom 01.10.2026). Sie sieht aus wie vorher – der Knopf
+   bringt nur das Verhalten mit, nicht sein Aussehen. */
+button.jahr {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+button.jahr .saeule {
+  transition: background 0.1s;
+}
+
+button.jahr:hover .saeule,
+button.jahr.gewaehlt .saeule {
+  background: var(--text-leise);
+}
+
+button.jahr.best:hover .saeule,
+button.jahr.best.gewaehlt .saeule {
+  background: var(--gold);
+}

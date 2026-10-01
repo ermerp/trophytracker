@@ -308,28 +308,29 @@ function Stufenzeilen({ stufen }: { stufen: Zahlen['trophaeen']['stufen'] }) {
  * sondern eine Aufzählung. Gold trägt nur das beste Jahr – der Akzent bleibt
  * sparsam (13).
  */
+/**
+ * Der Block steht offen, seit die Zahl billig ist (Stufe 19b, Nachbesserung
+ * vom 01.10.2026): Vergangene Jahre werden nachts einmal gerechnet und
+ * abgelegt, nur das laufende wird live gezählt. Vorher kostete die Auswertung
+ * 18 060 gelesene Zeilen und musste deshalb hinter einen Klick.
+ *
+ * Eigene Abfrage statt `/api/stats`: Der Zwischenspeicher kann fehlen, und
+ * dann rechnet die Route einmal alles – das soll die Kennzahlen nicht
+ * aufhalten.
+ */
 function JahreBlock() {
 	const [jahre, setJahre] = useState<Array<{ jahr: number; anzahl: number }> | null>(null)
-	const [offen, setOffen] = useState(false)
 
-	async function umschalten() {
-		if (offen) return setOffen(false)
-		setOffen(true)
-		if (jahre) return
-		try {
-			setJahre((await anfrage<{ jahre: Array<{ jahr: number; anzahl: number }> }>('/api/stats/jahre')).jahre)
-		} catch {
-			setJahre([])
-		}
-	}
+	useEffect(() => {
+		anfrage<{ jahre: Array<{ jahr: number; anzahl: number }> }>('/api/stats/jahre')
+			.then((a) => setJahre(a.jahre))
+			.catch(() => setJahre([]))
+	}, [])
 
 	return (
 		<div className="block b-jahre">
-			<button type="button" className="blockname knopfname" onClick={umschalten} aria-expanded={offen}>
-				Trophäen je Jahr
-				<span className="rechts">{offen ? '' : 'anzeigen'}</span>
-			</button>
-			{offen && (jahre ? <Saeulen jahre={jahre} /> : <p className="ruhig klein">Wird geladen …</p>)}
+			<div className="blockname">Trophäen je Jahr</div>
+			{jahre ? <Saeulen jahre={jahre} /> : <p className="ruhig klein">Wird geladen …</p>}
 		</div>
 	)
 }
@@ -355,6 +356,16 @@ function Saeulen({ jahre }: { jahre: Array<{ jahr: number; anzahl: number }> }) 
 	const summe = alle.reduce((s, j) => s + j.anzahl, 0)
 	const bestes = alle.find((j) => j.anzahl === hoechste)
 
+	/*
+	 * Welches Jahr die Fußzeile nennt. `null` heißt „keins gewählt" – dann
+	 * steht dort das beste. Ein Balken ist ein Knopf: Am Rechner genügt das
+	 * Überfahren, auf dem Handy der Druck (Wunsch des Nutzers vom
+	 * 01.10.2026). Eine Beschriftung an jeder Säule wäre bei sechzehn Jahren
+	 * auf 360 px nicht lesbar.
+	 */
+	const [gewaehlt, setGewaehlt] = useState<number | null>(null)
+	const gezeigt = alle.find((j) => j.jahr === gewaehlt) ?? bestes
+
 	return (
 		<>
 			{/* Das beste Jahr wird nur hervorgehoben, wenn es mehrere gibt: Bei
@@ -362,15 +373,22 @@ function Saeulen({ jahre }: { jahre: Array<{ jahr: number; anzahl: number }> }) 
 			    Fläche über die ganze Breite. */}
 			<div className="jahre">
 				{alle.map((j) => (
-					<div key={j.jahr} className={`jahr${alle.length > 1 && j.anzahl === hoechste ? ' best' : ''}`}>
+					<button
+						type="button"
+						key={j.jahr}
+						className={`jahr${alle.length > 1 && j.anzahl === hoechste ? ' best' : ''}${
+							j.jahr === gewaehlt ? ' gewaehlt' : ''
+						}`}
+						onMouseEnter={() => setGewaehlt(j.jahr)}
+						onMouseLeave={() => setGewaehlt(null)}
+						onClick={() => setGewaehlt(j.jahr === gewaehlt ? null : j.jahr)}
+						aria-label={`${j.jahr}: ${j.anzahl} Trophäen`}
+					>
 						<div
 							className="saeule"
 							style={{ height: `${hoechste ? (100 * j.anzahl) / hoechste : 0}%` }}
 						/>
-						<span className="nur-vorlesen">
-							{j.jahr}: {j.anzahl}
-						</span>
-					</div>
+					</button>
 				))}
 			</div>
 			<div className="jahrnamen">
@@ -378,11 +396,16 @@ function Saeulen({ jahre }: { jahre: Array<{ jahr: number; anzahl: number }> }) 
 					<span key={j.jahr}>{String(j.jahr).slice(2)}</span>
 				))}
 			</div>
+			{/* Eine Zeile, die sich ändert – statt sechzehn Beschriftungen, von
+			    denen auf dem Handy keine zu lesen wäre. Ohne Auswahl nennt sie
+			    das beste Jahr; das ist die Aussage, die ohne Zutun gilt. */}
 			<p className="still jahrfuss">
-				{bestes && alle.length > 1 ? (
+				{gezeigt ? (
 					<>
-						Bestes Jahr: <span className="zahl">{bestes.jahr}</span> mit{' '}
-						<span className="zahl">{t(bestes.anzahl)}</span> Trophäen
+						{gewaehlt === null && alle.length > 1 ? 'Bestes Jahr: ' : ''}
+						<span className="zahl">{gezeigt.jahr}</span> ·{' '}
+						<span className="zahl">{t(gezeigt.anzahl)}</span>{' '}
+						{gezeigt.anzahl === 1 ? 'Trophäe' : 'Trophäen'}
 					</>
 				) : (
 					<>
