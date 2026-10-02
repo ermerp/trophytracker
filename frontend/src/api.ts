@@ -144,6 +144,39 @@ export function marktBefund(rohangebote: number | null, geprueftAm: string | nul
   return `${rohangebote} ${rohangebote === 1 ? 'Angebot' : 'Angebote'} bei eBay, keines eindeutig diesem Spiel zuzuordnen (${wann})`
 }
 
+/**
+ * Sonys Produktname, aber nur wenn er wirklich abweicht.
+ *
+ * Markenzeichen und Groß-/Kleinschreibung zählen nicht als Abweichung –
+ * sonst stünde an fast jedem Preis ein „als …", und der Hinweis verlöre
+ * genau die Bedeutung, für die er da ist: dass dort eine ANDERE Fassung
+ * verkauft wird.
+ */
+export function produktNameAbweichend(name: string | null, titel: string): string | null {
+  if (name === null) return null
+  const sauber = (t: string) => t.replace(/[™®©]/g, '').trim().toLowerCase()
+  return sauber(name) === sauber(titel) ? null : name
+}
+
+/**
+ * Warum es keinen Store-Preis gibt (Stufe 21, Abschnitt 7.4).
+ *
+ * Jeder Befund sagt etwas anderes, und nur zwei davon sind eine Aussage über
+ * das Spiel. Deshalb nicht „keine Daten" für alles – und nie „0".
+ */
+export const STORE_BEFUNDTEXT: Record<string, string> = {
+  ohne_id: 'Digital: unbekannt – zu diesem Spiel ist kein Store-Eintrag bekannt',
+  delistet: 'Digital: nicht mehr im Store',
+  ohne_kauf: 'Digital: im Store, aber nicht käuflich',
+  fremd: 'Digital: keine Fassung für diese Plattform im Store',
+  unlesbar: 'Digital: unbekannt',
+}
+
+export function storeBefundText(befund: string | null, geprueftAm: string | null): string {
+  const text = STORE_BEFUNDTEXT[befund ?? ''] ?? 'Digital: unbekannt'
+  return geprueftAm === null ? text : `${text} (${datum(geprueftAm)})`
+}
+
 export const PLAY_STATUS = [
   'nicht_gespielt',
   'am_spielen',
@@ -309,6 +342,48 @@ export type PlanEintrag = {
   preisUrl: string | null
   /** Disc oder digitale Berechtigung am Release – der Eintrag ist damit eigentlich erfüllt. */
   imBesitz: boolean
+  /** Store-Preis (Stufe 21); null heißt „nicht gefragt oder kein Kaufknopf". */
+  store: StorePreis | null
+}
+
+/**
+ * Der Neupreis der digitalen Fassung (Stufe 21, Abschnitt 7.4).
+ *
+ * Steht **neben** dem Gebrauchtpreis und wird nie mit ihm verrechnet
+ * (Abschnitt 6): „neu digital" und „gebraucht als Disc" sind zwei Aussagen.
+ */
+export type StorePreis = {
+  preisCents: number
+  grundpreisCents: number | null
+  imAngebot: boolean
+  imPlusKatalog: boolean
+  /** Sonys Produktname, nur wenn er vom eigenen Titel abweicht – dann lohnt das Nachsehen. */
+  produktName: string | null
+  produktId: string | null
+}
+
+/** Die Adresse des Angebots im Store. Aus der Produkt-Id gebildet, nicht gespeichert. */
+export const storeUrl = (produktId: string | null) =>
+  produktId === null ? null : `https://store.playstation.com/de-de/product/${produktId}`
+
+/**
+ * Der Store-Preis als Satz (Stufe 21).
+ *
+ * „Digital" ist keine Zierde, sondern die Kanalbezeichnung aus Abschnitt 6 –
+ * ohne sie steht eine Zahl neben einer anderen, und niemand weiß, welche
+ * welche ist. Im Angebot kommt der Grundpreis dazu („statt 69,99 €"), weil
+ * ein Rabatt nur gegen seinen Ausgangswert etwas bedeutet.
+ *
+ * „im PS Plus-Katalog" ist eine **Beschriftung**, kein Zeichen: Ein
+ * gezeichnetes „PS+" wäre ein Monogramm und fiele unter die Markenregel.
+ */
+export function storepreisText(store: StorePreis | null): string {
+  return store === null ? 'unbekannt' : `Digital ${euro(store.preisCents)}`
+}
+
+/** „statt 69,99 €" – nur im Angebot, und bewusst NICHT Teil des Links. */
+export function storeGrundpreisText(store: StorePreis): string | null {
+  return store.imAngebot && store.grundpreisCents !== null ? ` statt ${euro(store.grundpreisCents)}` : null
 }
 
 /** Herkunft eines Eintrags (plan_entry.origin), für die Kaufliste (Stufe 15). */

@@ -3,6 +3,7 @@ import type { EbayClient } from "./ebay/client";
 import type { UpcitemdbClient } from "./ean/upcitemdb";
 import type { IgdbClient } from "./igdb/client";
 import type { PsnClient } from "./psn/client";
+import type { StoreClient } from "./psn/store";
 
 /**
  * Gemeinsamer Hono-Typ fuer alle Route-Module: Bindings aus wrangler.jsonc,
@@ -16,5 +17,6 @@ export type AppEnv = {
 		igdb: IgdbClient;
 		ebay: EbayClient;
 		upc: UpcitemdbClient;
+		store: StoreClient;
 	};
 };

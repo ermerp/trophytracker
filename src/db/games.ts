@@ -164,6 +164,14 @@ export type SpielDetail = {
 		/** Marktdaten aus eBay (Stufe 20): Preis des guenstigsten geprueften Angebots. */
 		markt_geprueft_am: string | null;
 		markt_rohangebote: number | null;
+		/** Store-Preis (Stufe 21) - eigene Spalten, nie mit dem Gebrauchtpreis verrechnet (Abschnitt 6). */
+		store_price_cents: number | null;
+		store_base_price_cents: number | null;
+		store_is_sale: number | null;
+		store_plus: number | null;
+		store_produkt_name: string | null;
+		store_befund: string | null;
+		store_geprueft_am: string | null;
 		preis_cents: number | null;
 		preis_anbieter: string | null;
 		preis_zustand: string | null;
@@ -685,6 +693,8 @@ aeenliste haengt
 			.prepare(
 				"SELECT r.id, r.platform, r.edition, r.region, r.physical_release_status, r.physical_source, " +
 					"r.psn_product_id, r.markt_geprueft_am, r.markt_rohangebote, " +
+					"r.store_price_cents, r.store_base_price_cents, r.store_is_sale, r.store_plus, " +
+					"r.store_produkt_name, r.store_befund, r.store_geprueft_am, " +
 					"t.np_communication_id, t.title_name, t.icon_url, t.progress_pct, " +
 					"t.defined_bronze, t.defined_silver, t.defined_gold, t.defined_platinum, " +
 					"t.earned_bronze, t.earned_silver, t.earned_gold, t.earned_platinum, t.last_played_at, " +

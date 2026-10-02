@@ -432,6 +432,31 @@ type MarktAntwort = {
   fehler?: string
 }
 
+/** Was `GET /api/sync/store` sagt (Stufe 21). */
+type StoreStand = {
+  mitPreis: number
+  imAngebot: number
+  imPlusKatalog: number
+  geprueft: number
+  ohneId: number
+}
+
+/** Was eine Portion zurueckgibt (`POST /api/sync/store`). */
+type StoreAntwort = {
+  status: 'erfolg' | 'fehler'
+  geprueft: number
+  mitPreis: number
+  imAngebot: number
+  imPlusKatalog: number
+  zugeordnet: number
+  ohneTreffer: number
+  nochOffen: number
+  anfragen: number
+  weiter: boolean
+  meldung?: string
+  fehler?: string
+}
+
 /** Was eine Portion zurueckgibt (`POST /api/sync/trophaeen`). */
 type TrophaeenAntwort = {
   listen: number
@@ -450,6 +475,8 @@ export function Einstellungen() {
   const [trophText, setTrophText] = useState<string | null>(null)
   const [markt, setMarkt] = useState<MarktStand | null>(null)
   const [marktText, setMarktText] = useState<string | null>(null)
+  const [store, setStore] = useState<StoreStand | null>(null)
+  const [storeText, setStoreText] = useState<string | null>(null)
 
   const statusLaden = useCallback(async () => {
     const antwort = await fetch('/api/sync/status')
@@ -466,11 +493,17 @@ export function Einstellungen() {
     if (antwort.ok) setMarkt((await antwort.json()) as MarktStand)
   }, [])
 
+  const storeStandLaden = useCallback(async () => {
+    const antwort = await fetch('/api/sync/store')
+    if (antwort.ok) setStore((await antwort.json()) as StoreStand)
+  }, [])
+
   useEffect(() => {
     void statusLaden()
     void trophaeenStandLaden()
     void marktStandLaden()
-  }, [statusLaden, trophaeenStandLaden, marktStandLaden])
+    void storeStandLaden()
+  }, [statusLaden, trophaeenStandLaden, marktStandLaden, storeStandLaden])
 
   /**
    * Normalisierung erneut ausführen – ohne PSN-Zugriff.
@@ -752,6 +785,41 @@ export function Einstellungen() {
     }
   }
 
+  /**
+   * Store-Preise holen (Stufe 21). Zehn Releases je Aufruf, höchstens vierzig
+   * Fremdanfragen – beim ersten Mal kostet ein Release bis zu vier (Concept
+   * und bis zu drei Produktseiten), danach genau eine.
+   *
+   * Zeitgrenze am `fetch` aus demselben Grund wie oben: Eine Anfrage, die nie
+   * antwortet, ließe die Oberfläche still warten.
+   */
+  async function storeHolen() {
+    setMeldung(null)
+    setStoreText('Store-Preise werden geholt …')
+    setLaeuft(true)
+    let geprueft = 0
+    let preise = 0
+    let angebote = 0
+    try {
+      for (;;) {
+        const antwort = await fetch('/api/sync/store', { method: 'POST', signal: AbortSignal.timeout(60_000) })
+        const daten = (await antwort.json()) as StoreAntwort
+        if (!antwort.ok) throw new Error(daten.meldung ?? daten.fehler ?? 'Der Abruf der Store-Preise ist fehlgeschlagen.')
+        geprueft += daten.geprueft
+        preise += daten.mitPreis
+        angebote += daten.imAngebot
+        setStoreText(`${geprueft} Releases geprüft, ${preise} mit Preis, ${angebote} im Angebot …`)
+        if (!daten.weiter || daten.geprueft === 0) break
+      }
+      setStoreText(`Fertig: ${geprueft} Releases geprüft, ${preise} mit Preis, ${angebote} im Angebot.`)
+    } catch (fehler) {
+      setStoreText(`Angehalten nach ${geprueft} Releases: ${fehler instanceof Error ? fehler.message : 'unbekannter Fehler'}`)
+    } finally {
+      setLaeuft(false)
+      await storeStandLaden()
+    }
+  }
+
   const zugang = status?.zugang
 
   return (
@@ -832,6 +900,27 @@ export function Einstellungen() {
         eine Forderung bei einem Anbieter, kein Wert. Findet die Suche in der Plattform-Kategorie gar nichts,
         steht das in der Lückenansicht als Hinweis auf eine reine Download-Fassung; ob es die Disc gibt,
         entscheidest weiter nur du. Der Schritt läuft sonst nachts in der Wartung mit, zehn Releases je Aufruf.
+      </p>
+      <h3>Store-Preise</h3>
+      <p className="zeile">
+        {store === null
+          ? 'Wird geladen …'
+          : `${store.geprueft} Releases gefragt, ${store.mitPreis} mit Preis, ${store.imAngebot} im Angebot, ` +
+            `${store.imPlusKatalog} im PS Plus-Katalog.`}
+      </p>
+      <button type="button" onClick={storeHolen} disabled={laeuft}>
+        Store-Preise jetzt holen
+      </button>
+      {storeText && (
+        <p className="zeile" role="status">
+          {storeText}
+        </p>
+      )}
+      <p className="zeile">
+        Gefragt wird der PlayStation Store, und zwar nur für offene Wünsche, die Kaufliste und Titel ohne
+        Disc-Fassung – nicht für die ganze Sammlung. Genommen wird der Kaufpreis, nie der Preis eines
+        Probespiels oder eines Abos; liegt ein Titel im PS Plus-Katalog, steht das daneben. Zugangsdaten
+        braucht es nicht. Der Schritt läuft sonst nachts im PSN-Fenster mit, zehn Releases je Aufruf.
       </p>
       <h3>Einzeltrophäen</h3>
       <p className="zeile">

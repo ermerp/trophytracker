@@ -17,6 +17,8 @@ import {
   gebrauchtpreisText,
   igdbLink,
   marktBefund,
+  produktNameAbweichend,
+  storeBefundText,
   zeitpunkt,
   type Bewertung,
   type DiscFassung,
@@ -34,6 +36,7 @@ import {
 import { IgdbSuche, datumOderUnbekannt } from './IgdbSuche'
 import { Kopfzeile } from './Kopfzeile'
 import { Cover, PlattformChip, TrophaeenStufen, zustandsFarbe } from './SpielTeile'
+import { StorePreis } from './StorePreis'
 import { Trophaeenliste } from './Trophaeenliste'
 import { Zeichen } from './Symbole'
 import { Verlauf } from './Verlauf'
@@ -119,6 +122,20 @@ type Release = {
     anbieter: string | null
     zustand: string | null
     url: string | null
+  } | null
+  /**
+   * Store-Preis (Stufe 21); null heißt: noch nie gefragt. `befund` sagt,
+   * warum kein Preis da ist, statt ihn als 0 auszugeben (Abschnitt 3).
+   */
+  store: {
+    geprueftAm: string
+    befund: string | null
+    preisCents: number | null
+    grundpreisCents: number | null
+    imAngebot: boolean
+    imPlusKatalog: boolean
+    produktName: string | null
+    produktId: string | null
   } | null
   trophaeen: Trophaeen | null
   bewertung: Bewertung | null
@@ -725,6 +742,30 @@ function ReleaseKarte({
             </>
           ) : (
             (marktBefund(r.markt.rohangebote, r.markt.geprueftAm) ?? 'Gebraucht: unbekannt')
+          )}
+        </p>
+      )}
+
+      {/* Der Store-Preis steht UNTER dem Gebrauchtpreis und unabhängig davon,
+          ob die Disc im Regal liegt: Wer die Disc hat, kann die digitale
+          Fassung trotzdem noch kaufen wollen – und bei einem Titel ohne Disc
+          ist das hier der einzige Preis. Nie mit dem Gebrauchtpreis zu einem
+          Wert verrechnet (Abschnitt 6). */}
+      {r.store && (
+        <p className="still">
+          {r.store.preisCents !== null ? (
+            <StorePreis
+              store={{
+                preisCents: r.store.preisCents,
+                grundpreisCents: r.store.grundpreisCents,
+                imAngebot: r.store.imAngebot,
+                imPlusKatalog: r.store.imPlusKatalog,
+                produktName: produktNameAbweichend(r.store.produktName, spiel.titel),
+                produktId: r.store.produktId,
+              }}
+            />
+          ) : (
+            storeBefundText(r.store.befund, r.store.geprueftAm)
           )}
         </p>
       )}

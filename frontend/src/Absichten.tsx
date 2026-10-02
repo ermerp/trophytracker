@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } 
 import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, gebrauchtpreis, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
 import { Preis } from './Preis'
+import { StorePreis } from './StorePreis'
 import { nachZahl, umgekehrt, type Richtung } from './Sortierung'
 import type { Ansichtsart } from './Ansicht'
 import type { ChipGruppe } from './Chips'
@@ -489,6 +490,16 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
         {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.preisCents !== null && (
           <>
             {' · '}Gebraucht <Preis {...gebrauchtpreis(e.preisCents, e.preisAnbieter, e.preisUrl)} />
+          </>
+        )}
+        {/* Der Store-Preis steht daneben, nicht dazwischen: „Gebraucht 12,77 €"
+            und „Digital 19,99 €" sind zwei Aussagen und werden nie zu einer
+            verrechnet (Abschnitt 6). Auch er nur, wenn es einen gibt – aus
+            demselben Grund wie oben. */}
+        {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.store !== null && (
+          <>
+            {' · '}
+            <StorePreis store={e.store} knapp />
           </>
         )}
         {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.imBesitz && ' · im Besitz'}

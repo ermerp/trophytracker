@@ -134,7 +134,8 @@ Was steht und in Betrieb nachgewiesen ist:
 | Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis seit Stufe 20 aus eBay, als Forderung eines Anbieters, nie als Wert (Migration 0018, 0028). **Stufe 15 abgenommen am 16.09.2026** |
 | Gebrauchtpreise | Zwei eBay-Suchen je Release (Stufe 20): erst rebuy und medimops, dann der breite Gebrauchtmarkt. Angezeigt wird der Händlerpreis zuerst, immer als „ab X € bei …“ – eine Forderung, kein Wert, denn verkaufte Preise gibt eBay nicht mehr heraus. Jeder Treffer muss sechs Bedingungen überstehen: Titelabgleich aus Stufe 17c, keine fremde Plattform im Titel (auch PS2 oder Xbox), überhaupt ein Datenträger (kein Konto, kein Trophäen-Dienst), bei kurzen Titeln unser Wort vorn, keine blanke Ziffer als fremdes Wort (Nachfolger), und höchstens `max(1, n−1)` fremde Worte. Vier davon stammen aus der Durchsicht der ersten 79 Statuswechsel – fünf Fehler, die keine Kennzahl zeigte. Ein geprüfter Treffer setzt die Disc-Fassung von `unbekannt` auf `ja`, ein `nein` nie. Täglich in der Wartung und per Knopf in den Einstellungen. Der Preis steht in Lücken, Kaufliste und am offenen Wunsch, ist ein **Link aufs Angebot** und lässt sich sortieren (ohne Preis ans Ende). Der Verlauf hält beide Kanäle getrennt – die ruhige Händlerkurve und die springende Marktkurve (Migrationen 0028–0030) |
 | Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt der nächtliche Cron nach, außerdem „Metadaten auffrischen" (Stufe 18) |
-| Automatik | Zwei Cron-Fenster (Stufe 18e), je Aufruf ein Schritt. **PSN, 03:00–05:59 UTC:** hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht), Spielzeit, Kaufliste. Eine gescheiterte Seite wird bei Sync und Spielzeit bis zu dreimal erneut geholt (Stufe 18f), bei der Kaufliste erst am nächsten Tag. **Wartung, 06:00–08:59 UTC (36 Aufrufe seit Stufe 20e):** erschienene Titel freigeben, Gebrauchtpreise bei eBay (täglich, zwanzig Releases je Aufruf), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, alte Rohantworten. Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen – gleichartige Arbeit zu einer Zeile verdichtet, Fortschritt als Spanne; Knopf „Kaufliste jetzt abrufen"; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migrationen 0021, 0024) |
+| Store-Preise | Was ein Titel **neu digital** kostet (Stufe 21, Migration 0031), neben dem Gebrauchtpreis und nie mit ihm verrechnet. Quelle ist die gerenderte Produktseite des PlayStation Store – Sonys GraphQL führt eine Allowlist und fällt aus; gelesen wird sie als Strom und nach rund 70 KB abgebrochen, statt 1 MB zu parsen. Die Produkt-Id entsteht aus IGDBs Concept-Id und der Concept-Seite, die die Fassungen je Plattform trennt (Horizon Forbidden West: ein Concept, PS5 59,99 €, PS4 49,99 €); gewählt wird über den Titelschlüssel, dann Sonys Standardprodukt, dann nur ein verwandter Name – eine Demo kommt so nicht durch. Genommen wird der Kaufknopf, nie eine PS-Plus-Werbung; liegt der Titel im Katalog, steht das als Beschriftung daneben. Gefragt wird täglich im PSN-Fenster und per Knopf, nur für offene Absichten und Titel ohne Disc-Fassung, **ohne** dauerhaft gekaufte. Ohne Preis sagt `store_befund`, warum – „nicht mehr im Store", „kein Store-Eintrag bekannt", „keine Fassung für diese Plattform" –, nie „0" |
+| Automatik | Zwei Cron-Fenster (Stufe 18e), je Aufruf ein Schritt. **PSN, 03:00–05:59 UTC:** hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht), Spielzeit, Kaufliste, Einzeltrophäen, Trophäen-Level, Store-Preise (letztere ohne PSN-Zugang – der Store braucht kein Token). Eine gescheiterte Seite wird bei Sync und Spielzeit bis zu dreimal erneut geholt (Stufe 18f), bei der Kaufliste erst am nächsten Tag. **Wartung, 06:00–08:59 UTC (36 Aufrufe seit Stufe 20e):** erschienene Titel freigeben, Gebrauchtpreise bei eBay (täglich, zwanzig Releases je Aufruf), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, alte Rohantworten. Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen – gleichartige Arbeit zu einer Zeile verdichtet, Fortschritt als Spanne; Knopf „Kaufliste jetzt abrufen"; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migrationen 0021, 0024) |
 | App | Installierbar (PWA) mit eigenem Symbol – ein Pokal im Fortschrittsring; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
 | Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
 | Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen, „Verwerfen" wirft eine Fehllesung sofort weg (mit Rückfrage). Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. „Überspringen" geht weiter, ohne etwas zu speichern (seit Stufe 17d – davor „Später" und ein Sammelmodus, beides mit offenen Scans entfallen). Unbekannte Codes löst seit Stufe 17c eBay live auf; ein Treffer aus der Sammlung erscheint als dieselbe Karte wie ein bekannter Code – mit Cover, „im Regal ×n" und „Disc erfassen" (9.2) |
@@ -293,13 +294,30 @@ einem von Hand angelegten Wunsch: „Satisfactory" (PS5) hängt an einem eigens 
 entstandenen Release, `game_id` ist leer, und das Release zählt trotzdem nicht zur
 Sammlung – es trägt weder Besitz noch Fortschritt.
 
-**Stufe 19b ist am 02.10.2026 abgenommen, Stufe 20 am selben Tag gebaut.**
-Offen bleibt 21 (PSN Store-Preise); sie braucht zuerst `release.psn_product_id`,
-das heute bei keinem der 490 Releases gefüllt ist. Danach stehen **fünf finale
-Stufen** an, die in der Spezifikation beschrieben sind: die Sammlung
-finalisieren, Oberfläche und Bedienbarkeit, Refactoring,
-Wiederherstellungsprobe und die Außendarstellung auf GitHub. Die PSN-Stufen ergänzen nur,
-was die Sammlung schon kennt, und importieren nichts.
+**Stufe 19b ist am 02.10.2026 abgenommen, Stufe 20 am selben Tag gebaut,
+Stufe 21 am selben Abend.** Damit sind alle Funktionsstufen durch. Offen
+bleiben nur 20f (Preisverlauf) und 20g (Preisalarm) – beide warten auf
+Messpunkte. Danach stehen **fünf finale Stufen** an, die in der Spezifikation
+beschrieben sind: die Sammlung finalisieren, Oberfläche und Bedienbarkeit,
+Refactoring, Wiederherstellungsprobe und die Außendarstellung auf GitHub. Die
+PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
+
+**Stufe 21** (02.10.2026) bringt den **Store-Preis**: was ein Titel neu
+digital kostet, neben dem Gebrauchtpreis aus Stufe 20. Die angebliche
+Vorbedingung – `release.psn_product_id`, bei 0 von 490 Releases gefüllt – war
+keine. IGDB nennt zu zwei Dritteln der betroffenen Spiele eine Concept-Id des
+Store, und die Concept-Seite listet daraus die Fassungen je Plattform; die
+Produkt-Id entsteht also von selbst und bleibt trotzdem von Hand korrigierbar.
+Sonys GraphQL schied beim Messen aus (es führt eine Allowlist), die
+Produktseite dagegen trägt den Preis im HTML – als Strom gelesen kostet sie 69
+bis 82 KB statt 0,9 bis 1,4 MB. **Drei Fehler fand erst das Lesen der
+79 Zeilen, nicht die Statistik:** Der aktive Knopf einer Seite ist bei
+Abo-Titeln die PS-Plus-Werbung (Baldur's Gate 3 kam mit „0,00 €" heraus statt
+48,99 €), eine Seite trägt zwölf bis vierzehn Blöcke und mehrere davon einen
+Kaufknopf ohne Preis, und ein ungeschützter Rückfall nahm „Kitchen [demo]" für
+0,25 € als Preis von Resident Evil 7. Gefragt wird nur, was auf einer offenen
+Absicht steht oder keine Disc-Fassung hat – und nicht, was dauerhaft gekauft
+ist. Erster Lauf: 57 von 79 mit Preis, 18 davon im Angebot.
 
 **Stufe 20e ist am 02.10.2026 abgenommen.** Sie bringt die Preise in die Listen: an Kaufliste und
 offenen Wunsch, als Link aufs Angebot, sortierbar. Die Sortierung selbst ist
@@ -398,7 +416,8 @@ Nächte geschwiegen – Stufe 18b hat ihn repariert (gebundener Parameter in
 Reihenfolge danach, am
 16.09.2026 entschieden: 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
 Marktdaten, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation). Stufe 20
-holt sie seit dem 02.10.2026 aus eBay statt aus einem AWIN-Händlerfeed. Jeder neue
+holt sie seit dem 02.10.2026 aus eBay statt aus einem AWIN-Händlerfeed, Stufe
+21 den Store-Preis aus der gerenderten Produktseite statt aus Sonys GraphQL. Jeder neue
 Schreiber hängt sich ins Änderungsprotokoll ein (Abschnitt 8.5). Die Messung aus Stufe 17 ist erledigt: upcitemdb
 kennt 35 von 56 Codes, 22 davon führen eindeutig zu einem Spiel der Sammlung.
 

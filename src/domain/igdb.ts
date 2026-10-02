@@ -172,6 +172,51 @@ export const IGDB_FELDER_PHYSISCH = "id,external_games.media,external_games.plat
 
 export const IGDB_MEDIUM_PHYSISCH = 2;
 
+/**
+ * Die Concept-Id des PlayStation Store aus IGDB (7.4, Stufe 21).
+ *
+ * Dieselbe Tabelle wie bei der Disc-Fassung, andere Frage - deshalb eine
+ * eigene Feldliste: `uid` statt `media`. `url` kommt mit, weil sie der
+ * Gegenbeweis ist; eine Quelle 36 ohne Store-Adresse nehmen wir nicht.
+ *
+ * Gemessen am 02.10.2026: Quelle 36 liefert eine Concept-Id fuer 66 von 79
+ * Releases des Zuschnitts, und die Id ist REGIONSUNABHAENGIG - IGDB nennt
+ * die Adresse mit `/en-us/`, dieselbe Id beantwortet `/de-de/` mit Preisen
+ * in Euro. Die alte Spalte `category` ist bei IGDB abgekuendigt und kommt
+ * nicht mehr zurueck; gefragt wird `external_game_source`.
+ */
+export const IGDB_FELDER_STORE = "id,external_games.uid,external_games.external_game_source,external_games.url";
+
+/** IGDBs Quellnummer fuer den PlayStation Store. */
+export const IGDB_QUELLE_PSN_STORE = 36;
+
+export type IgdbStoreRoh = {
+	id: number;
+	external_games?: { uid?: string; external_game_source?: number; url?: string }[];
+};
+
+/**
+ * Die Concept-Id je Spiel. Spiele ohne Store-Eintrag fehlen in der Map -
+ * der Aufrufer stempelt sie trotzdem, sonst fragt er sie jede Nacht erneut.
+ */
+export function storeConceptIds(roh: unknown): Map<number, string> {
+	const ergebnis = new Map<number, string>();
+	if (!Array.isArray(roh)) return ergebnis;
+	for (const r of roh) {
+		const spiel = r as IgdbStoreRoh;
+		if (typeof spiel !== "object" || spiel === null || !Number.isInteger(spiel.id)) continue;
+		const treffer = (spiel.external_games ?? []).find(
+			(e) =>
+				e.external_game_source === IGDB_QUELLE_PSN_STORE &&
+				typeof e.uid === "string" &&
+				e.uid !== "" &&
+				(e.url ?? "").includes("store.playstation.com"),
+		);
+		if (treffer?.uid) ergebnis.set(spiel.id, treffer.uid);
+	}
+	return ergebnis;
+}
+
 export type IgdbExternalRoh = { id?: number; media?: number; platform?: number };
 export type IgdbPhysischRoh = { id: number; external_games?: IgdbExternalRoh[] };
 

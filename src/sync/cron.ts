@@ -13,6 +13,8 @@ import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErg
 import { meldungFuer as ebayMeldung, type EbayClient } from "../ebay/client";
 import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
 import { marktSchritt, type MarktErgebnis } from "./markt";
+import { storeSchritt, type StoreSchrittErgebnis } from "./store";
+import { meldungFuer as storeMeldung, type StoreClient } from "../psn/store";
 import { eineListe, jahreSchritt, levelSchritt, type ListenErgebnis } from "./trophaeen";
 
 /**
@@ -114,6 +116,7 @@ export type CronErgebnis = {
 		| "igdb_auffrischen"
 		| "igdb_physisch"
 		| "markt"
+		| "store"
 		| "aufraeumen"
 		| "nichts";
 	/** angekuendigt -> erschienen (8.4), in jedem Aufruf. */
@@ -133,6 +136,7 @@ export type CronErgebnis = {
 	level?: number;
 	jahre?: number;
 	markt?: MarktErgebnis;
+	store?: StoreSchrittErgebnis;
 	auffrischen?: AuffrischErgebnis;
 	physisch?: PhysischErgebnis;
 };
@@ -146,6 +150,7 @@ export async function cronSchritt(
 	psn: PsnClient,
 	igdb: IgdbClient,
 	ebay: EbayClient,
+	store: StoreClient,
 	optionen: { heute?: string; bereich?: CronBereich } = {},
 ): Promise<CronErgebnis> {
 	const heute = optionen.heute ?? heuteIso();
@@ -212,6 +217,22 @@ export async function cronSchritt(
 				// ohnehin weiter.
 				return { ...basis, getan: "nichts", meldung: "Der PSN-Abruf ist fehlgeschlagen." };
 			}
+		}
+
+		// 8. Store-Preise (7.4, Stufe 21). Im PSN-Fenster, weil es Sonys
+		//    Schnittstelle ist - aber AUSSERHALB der Zugangspruefung: Der
+		//    Store antwortet ohne Token, und ein abgelaufenes NPSSO darf die
+		//    Preise nicht stilllegen. Ganz hinten in der Kette und mit
+		//    eigenem try/catch, aus demselben Grund wie bei IGDB (18b): Der
+		//    Schritt darf keinen Aufruf belegen, den eine schwere Arbeit
+		//    braucht, und sein Ausfall nicht die Nacht kosten.
+		try {
+			const preise = await storeSchritt(repos, store, igdb);
+			if (preise.geprueft > 0 || preise.status === "fehler") {
+				return { ...basis, getan: "store", store: preise };
+			}
+		} catch (fehler) {
+			return { ...basis, getan: "nichts", meldung: storeMeldung(fehler) };
 		}
 	}
 
@@ -509,6 +530,23 @@ export function cronLogzeile(e: CronErgebnis): string {
 			`offen=${e.markt.nochOffen}`,
 		);
 		if (e.markt.meldung) teile.push(`meldung="${e.markt.meldung}"`);
+	}
+	if (e.store) {
+		// Fuenf Zahlen, weil sie fuenf Dinge sagen: `geprueft` ist die Portion,
+		// `preis` was einen Kaufknopf hatte, `angebot` die Rabatte, `plus` die
+		// Katalogtitel und `zugeordnet` die Releases, die erstmals eine
+		// Produkt-Id bekamen. `anfragen` ist die Bilanz gegen die 50 je Aufruf.
+		teile.push(
+			`store=${e.store.status}`,
+			`geprueft=${e.store.geprueft}`,
+			`preis=${e.store.mitPreis}`,
+			`angebot=${e.store.imAngebot}`,
+			`plus=${e.store.imPlusKatalog}`,
+			`zugeordnet=${e.store.zugeordnet}`,
+			`anfragen=${e.store.anfragen}`,
+			`offen=${e.store.nochOffen}`,
+		);
+		if (e.store.meldung) teile.push(`meldung="${e.store.meldung}"`);
 	}
 	if (e.spielzeit) {
 		teile.push(

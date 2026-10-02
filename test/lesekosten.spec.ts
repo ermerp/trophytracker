@@ -675,6 +675,96 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		]);
 	});
 
+	it("misst Auswahl, Schreibpfad und Preisspalte der Store-Preise (Stufe 21)", async () => {
+		// Gemessen wird die ROUTE, nicht die Abfrage: alles, was ein Aufruf
+		// tut, auch den Zaehler fuer die Verlaufszeile (die Lehre vom
+		// 01.10.2026, als der Feed mit 183 Zeilen in der Messung stand und
+		// 18 500 las).
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("DELETE FROM digital_entitlement"),
+			env.DB.prepare("UPDATE release SET store_geprueft_am = NULL, psn_product_id = NULL"),
+		]);
+		// So sieht der Zuschnitt aus: rund 90 offene Absichten, ein Teil davon
+		// schon dauerhaft gekauft und deshalb ausgenommen.
+		const wunsch = env.DB.prepare(
+			"INSERT INTO plan_entry (kind, release_id, origin, status) VALUES ('wunsch', ?, 'manuell', 'offen')",
+		);
+		const gekauft = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source, herkunft) VALUES (?, 'kauf', 'psn')");
+		const vorbereitung: D1PreparedStatement[] = [];
+		for (let i = 1; i <= 90; i++) vorbereitung.push(wunsch.bind(i));
+		for (let i = 1; i <= 20; i++) vorbereitung.push(gekauft.bind(i));
+		await env.DB.batch(vorbereitung);
+
+		const auswahl = await zeilenGelesen(
+			"SELECT r.id AS releaseId, r.game_id AS gameId, g.igdb_id AS igdbId, g.title AS titel, r.platform AS plattform, " +
+				"g.store_concept_id AS conceptId, g.store_concept_am AS conceptAm, r.psn_product_id AS produktId " +
+				"FROM release r JOIN game g ON g.id = r.game_id " +
+				"WHERE (r.store_geprueft_am IS NULL OR r.store_geprueft_am < datetime('now', '-1 days')) " +
+				"AND (EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = r.id AND pe.status = 'offen') " +
+				"OR r.physical_release_status = 'nein') " +
+				"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') " +
+				"ORDER BY r.store_geprueft_am, r.id LIMIT 10",
+		);
+
+		// Der Schreibpfad eines Releases: Protokollzeile, Preis, Verlauf.
+		const protokoll = await zeilenGelesen(
+			"SELECT 'sync', r.game_id, r.id, g.title, 'release_geaendert', 'psn_product_id', r.psn_product_id, ?, 'store' " +
+				"FROM release r JOIN game g ON g.id = r.game_id " +
+				"WHERE r.id = ? AND (r.psn_product_id IS NULL OR r.psn_product_id <> ?)",
+			"EP9000-X",
+			21,
+			"EP9000-X",
+		);
+		const verlaufsschreiben = await zeilenGelesen(
+			"SELECT ?, 'psn_store', 'psn', ?, 0, 'EUR', datetime('now') " +
+				"WHERE NOT EXISTS (SELECT 1 FROM price_snapshot p WHERE p.release_id = ? AND p.channel = 'psn_store' " +
+				"AND p.price_cents = ? AND p.captured_at = " +
+				"(SELECT MAX(q.captured_at) FROM price_snapshot q WHERE q.release_id = ? AND q.channel = 'psn_store'))",
+			21,
+			1999,
+			21,
+			1999,
+			21,
+		);
+		const offen = await zeilenGelesen(
+			"SELECT COUNT(*) AS n FROM release WHERE store_geprueft_am IS NULL AND psn_product_id IS NOT NULL",
+		);
+		const standVoll = await zeilenGelesen(
+			"SELECT SUM(store_price_cents IS NOT NULL) AS mitPreis, SUM(store_is_sale = 1) AS imAngebot, " +
+				"SUM(store_plus = 1) AS imPlusKatalog, SUM(store_geprueft_am IS NOT NULL) AS geprueft, " +
+				"SUM(store_befund = 'ohne_id') AS ohneId FROM release",
+		);
+
+		// Die Listen tragen den Store-Preis als weitere Spalten aus `release r`,
+		// das in PLAN_AUSWAHL schon LEFT JOINed ist - also keine zusaetzliche
+		// gelesene Zeile. Der Test haelt genau das fest.
+		const absichten = await zeilenGelesen(`${PLAN_AUSWAHL}WHERE pe.kind = ? AND pe.status = ?`, "wunsch", "offen");
+
+		const jeAufruf = auswahl + (protokoll + verlaufsschreiben) * 10 + offen;
+		console.info({ auswahl, protokoll, verlaufsschreiben, offen, standVoll, jeAufruf, absichten });
+
+		// Die Auswahl bricht ueber idx_release_store nach LIMIT ab.
+		expect(auswahl).toBeLessThan(400);
+		// Je Release zwei Index-Lookups - nichts, was mit dem Bestand waechst.
+		expect(protokoll).toBeLessThan(20);
+		expect(verlaufsschreiben).toBeLessThan(20);
+		// Ein ganzer Aufruf des Schritts mit zehn Releases. Im Dauerbetrieb
+		// sind das bei 79 Releases im Zuschnitt rund acht Aufrufe je Nacht.
+		expect(jeAufruf).toBeLessThan(1_500);
+		// Die Einstellungen duerfen die fuenf Zaehler haben - ein Tabellenscan
+		// ueber release, selten geoeffnet.
+		expect(standVoll).toBeLessThan(1_000);
+		expect(absichten).toBeLessThan(2_000);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("DELETE FROM digital_entitlement"),
+			env.DB.prepare("DELETE FROM price_snapshot"),
+			env.DB.prepare("UPDATE release SET store_geprueft_am = NULL, psn_product_id = NULL"),
+		]);
+	});
+
 	it("misst Kaufkandidaten, Kaufliste, Erscheint bald und das Erledigen beim Erfassen (Stufe 15)", async () => {
 		// 215 belegte Luecken (gerade Ids), dazu 300 Wuensche wie nach dem
 		// Import, 30 davon schon als Kopie auf der Kaufliste, 20 angekuendigt.
