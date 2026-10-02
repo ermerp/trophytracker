@@ -241,9 +241,9 @@ export async function cronSchritt(
 		// 9. Gebrauchtpreise und Disc-Nachweis aus eBay (7.3, Stufe 20).
 		//    Hier und nicht im PSN-Fenster: Der Schritt fasst Sony nicht an.
 		//    Eigenes try/catch aus demselben Grund wie bei IGDB (18b) - und
-		//    zehn Releases sind zwanzig Fremdanfragen, also weit unter den 50
-		//    je Aufruf. Vor den beiden billigen Schritten, damit die nicht
-		//    einen Aufruf belegen, in dem noch echte Arbeit wartet.
+		//    zwanzig Releases sind vierzig Fremdanfragen, also zehn unter den
+		//    50 je Aufruf (Stufe 20e). Vor den beiden billigen Schritten, damit
+		//    die nicht einen Aufruf belegen, in dem noch echte Arbeit wartet.
 		if (ebay.konfiguriert()) {
 			try {
 				const markt = await marktSchritt(repos, ebay);
@@ -253,18 +253,18 @@ export async function cronSchritt(
 			}
 		}
 
-		// 10. Aufraeumen: Rohantworten, die niemand mehr braucht. Ein einzelnes
-		//    DELETE ueber einen Index - die leichteste Arbeit der Reihenfolge
-		//    und deshalb ganz hinten. Sie belegt einen Aufruf, der sonst
-		//    "nichts" tut, und niemals denselben wie eine schwere Arbeit: Jeder
-		//    Schritt davor kehrt bei Erfolg sofort zurueck (CPU-Grenze, 10.1).
-		// 11. Sonst die Trophäen je Jahr durchrechnen - einmal am Tag, im
+		// 10. Sonst die Trophäen je Jahr durchrechnen - einmal am Tag, im
 		//     billigen Fenster. 18 060 gelesene Zeilen sind für die Startseite
 		//     zu teuer (Abschnitt 2); hier stören sie niemanden, und das
 		//     Dashboard liest danach eine Zeile aus app_setting.
 		const jahre = await jahreSchritt(repos, heute);
 		if (jahre) return { ...basis, getan: "jahre", jahre: jahre.jahre.length };
 
+		// 11. Aufraeumen: Rohantworten, die niemand mehr braucht. Ein einzelnes
+		//     DELETE ueber einen Index - die leichteste Arbeit der Reihenfolge
+		//     und deshalb ganz hinten. Sie belegt einen Aufruf, der sonst
+		//     "nichts" tut, und niemals denselben wie eine schwere Arbeit: Jeder
+		//     Schritt davor kehrt bei Erfolg sofort zurueck (CPU-Grenze, 10.1).
 		const geloescht = await repos.sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE);
 		if (geloescht > 0) return { ...basis, getan: "aufraeumen", geloescht };
 	}
