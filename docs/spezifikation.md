@@ -650,6 +650,8 @@ keiner der beiden Listen: Es ist ein Urteil, keine offene Frage.
 
 **Bis Version 26** stand hier eine Rangformel: Kritikerwertung, Priorität und Favorit mit Gewichten aus `app_setting` zu einem Rang verrechnet, bei der Abfrage berechnet und nie gespeichert. Mit der Priorität ist sie gefallen (Entscheidung des Nutzers vom 15.09.2026, Migration 0013 löscht die vier Gewichte `w_*`); `src/domain/rang.ts`, `GET/PUT /api/settings/weights` und die Gewichte in den Einstellungen gibt es nicht mehr.
 
+**Richtung (Stufe 20e).** Jede Sortierung hat zusätzlich eine Richtung, und „aufsteigend" ist nicht für jedes Kriterium das Erwartete – beim Preis ja (günstigstes zuerst), bei der Kritikerwertung nein (beste zuerst). Jede Liste nennt deshalb je Kriterium seine **natürliche** Richtung; nur eine Abweichung steht als `?richtung=` in der URL, und ein Wechsel des Kriteriums setzt sie zurück. **„Unbekannt" bleibt in beiden Richtungen am Ende** – ein fehlender Wert ist kein hoher Wert, sondern gar keiner. Deshalb wird ein Vergleicher **nicht umgekehrt**, sondern bekommt die Richtung hinein (`nachZahl` in `frontend/src/Sortierung.tsx`); in der Sammlung, die als einzige in SQL sortiert, dreht sich nur `DESC`/`ASC`, während das `IS NULL` vorn stehen bleibt. Der erste Entwurf kehrte um und stellte prompt die Einträge ohne Wert nach vorn. Das Bedienelement ist in allen fünf sortierbaren Listen dasselbe (7.3, „Die Sortierung in der Oberfläche").
+
 Stattdessen **sortieren die Listen nach gespeicherten Bestandteilen**, in der Route, nicht in SQL (`src/api/plans.ts`, `sort=`):
 
 | `sort` | Ordnung |
@@ -2021,7 +2023,8 @@ fünfzehn Kaufliste und – nach einem IGDB-Rückstand – acht Auffrischen sind
 (nachgerechnet am 24.09.2026, siehe „Die Auffrisch-Last kommt in Schüben"). Der Schnitt liegt bei
 „fasst PSN an oder nicht": Die PSN-Kette braucht viele Aufrufe und hängt an einer inoffiziellen
 Schnittstelle, die Wartung ist billig und beliebig verschiebbar. So passen beide Hälften bequem
-(28 von 36 an einer Kaufliste-Nacht, 9 von 24 in der Wartung), und die beiden Lastspitzen liegen
+(28 von 36 an einer Kaufliste-Nacht, in der Wartung seit dem täglichen Preisabruf rund 33 von 36),
+und die beiden Lastspitzen liegen
 nicht mehr in derselben Stunde. Der Ansatz ist der des Nutzers vom 24.09.2026; das eine Nachtfenster
 war seine Entscheidung vom 19.09.2026 und bleibt es für alles, was PSN anfasst.
 
@@ -2088,8 +2091,10 @@ bis 7 gehören dem PSN-Fenster, 8 bis 11 der Wartung:
 8. **Wartung, immer zuerst:** `erschieneneFreigeben` (8.4) – nur SQL, kein CPU, protokolliert selbst; im PSN-Fenster passiert das nicht.
 9. Sonst, mit IGDB-Zugang: `igdbAuffrischSchritt` mit Frist sieben Tage (7.6), wenn etwas fällig ist. Spiele, die IGDB nicht zurückgibt, werden trotzdem gestempelt – sonst wählt der nächste Aufruf dieselben und der Schritt dreht sich im Kreis (Befund vom 21.09.2026). Die Schritte 9 und 10 laufen in `try/catch`: Eine Ausnahme darf nicht den ganzen Aufruf reißen.
 10. Sonst `igdbPhysischSchritt` (30-Tage-Frist in `DISC_OFFEN`), wenn etwas fällig ist.
-11. Sonst **alte Rohantworten aufräumen** (Stufe 18d): `psn_raw_response` behält die Seiten der jüngsten **drei** Läufe, die überhaupt Seiten haben, und **alles noch nicht Normalisierte** – unabhängig vom Alter, denn das ist unerledigte Arbeit, kein Archiv. **Die Lücke dabei ist seit Stufe 18e geschlossen:** Die Seiten eines endgültig gescheiterten Laufs sind keine unerledigte Arbeit mehr – `naechsteUnverarbeitete` filtert auf die Lauf-Id, der nächste Lauf holt alles neu. Sie blieben trotzdem dauerhaft liegen und wanderten in jede Sicherung; in der Nacht zum 27.09.2026 waren es zwei Seiten und 117 KiB aus Lauf 13. Jetzt räumt der Schritt auch sie weg, sobald ihr Lauf aus dem Fenster der jüngsten drei fällt – bis dahin sind sie das Beweisstück zum Fehler, und ein Lauf mit bloßen Fehlversuchen steht ohnehin noch auf `laufend`. Ein einzelnes `DELETE` über den Index auf `sync_run_id`, also die leichteste Arbeit der Reihenfolge; sie steht ganz hinten und belegt einen Aufruf, der sonst „nichts" täte. Kein `game_event`: Es ändert sich kein Spiel und keine Entscheidung, nur Fremddaten, die jederzeit neu abrufbar sind (8.5). **Warum überhaupt:** Der Zweck der Rohablage ist eine ohne PSN wiederholbare Normalisierung (7.1), nicht ein Archiv jeder Nacht. Am 23.09.2026 waren **2,31 von 3,26 MB** der Datenbank Rohantworten – fünf Seiten je Nacht, immer dieselben 431 Titel, 263 KiB täglich –, und nichts löschte sie je. Über `d1 export` wandern sie zusätzlich in jede wöchentliche Sicherung und damit dauerhaft in die Historie des privaten Backup-Repositorys (14.2).
-12. Sonst nichts.
+11. Sonst **Gebrauchtpreise und Disc-Nachweis aus eBay** (7.3, Stufe 20): zwanzig Releases je Aufruf, zwei Suchen je Release – also vierzig von fünfzig erlaubten Fremdanfragen, zehn Reserve für eine Token-Erneuerung mitten in der Portion. Gefragt wird **täglich** (Stufe 20e) und nur, was in der Lückenansicht auftaucht oder auf einer offenen Absicht steht – derselbe Zuschnitt, den 7.4 für die Store-Preise festlegt. Bei 431 Releases sind das rund 22 Aufrufe. **Der Stand steht je Zeile in `release.markt_geprueft_am`, nicht als Marke in `app_setting`:** Damit gibt es den Fehlerfall aus 18e hier nicht – ein abgebrochener Lauf lässt die ungeprüften Releases ungestempelt, und Erfolg und Fehler können keine gemeinsame Marke hinterlassen, weil es keine gibt. Ein Aufruf liest 940 Zeilen.
+12. Sonst die **Trophäen je Jahr** durchrechnen (Stufe 19b) – einmal am Tag, im billigen Fenster. 18 060 gelesene Zeilen sind für die Startseite zu teuer (Abschnitt 2); hier stören sie niemanden, und das Dashboard liest danach eine Zeile aus `app_setting`.
+13. Sonst **alte Rohantworten aufräumen** (Stufe 18d): `psn_raw_response` behält die Seiten der jüngsten **drei** Läufe, die überhaupt Seiten haben, und **alles noch nicht Normalisierte** – unabhängig vom Alter, denn das ist unerledigte Arbeit, kein Archiv. **Die Lücke dabei ist seit Stufe 18e geschlossen:** Die Seiten eines endgültig gescheiterten Laufs sind keine unerledigte Arbeit mehr – `naechsteUnverarbeitete` filtert auf die Lauf-Id, der nächste Lauf holt alles neu. Sie blieben trotzdem dauerhaft liegen und wanderten in jede Sicherung; in der Nacht zum 27.09.2026 waren es zwei Seiten und 117 KiB aus Lauf 13. Jetzt räumt der Schritt auch sie weg, sobald ihr Lauf aus dem Fenster der jüngsten drei fällt – bis dahin sind sie das Beweisstück zum Fehler, und ein Lauf mit bloßen Fehlversuchen steht ohnehin noch auf `laufend`. Ein einzelnes `DELETE` über den Index auf `sync_run_id`, also die leichteste Arbeit der Reihenfolge; sie steht ganz hinten und belegt einen Aufruf, der sonst „nichts" täte. Kein `game_event`: Es ändert sich kein Spiel und keine Entscheidung, nur Fremddaten, die jederzeit neu abrufbar sind (8.5). **Warum überhaupt:** Der Zweck der Rohablage ist eine ohne PSN wiederholbare Normalisierung (7.1), nicht ein Archiv jeder Nacht. Am 23.09.2026 waren **2,31 von 3,26 MB** der Datenbank Rohantworten – fünf Seiten je Nacht, immer dieselben 431 Titel, 263 KiB täglich –, und nichts löschte sie je. Über `d1 export` wandern sie zusätzlich in jede wöchentliche Sicherung und damit dauerhaft in die Historie des privaten Backup-Repositorys (14.2).
+14. Sonst nichts.
 
 Bei 431 Titeln braucht der Sync rund elf Aufrufe (fünf Seiten holen, fünf auswerten, Abschluss);
 danach frischt der Rest der Nacht in Portionen à 50 auf und räumt zuletzt die alten Rohantworten
@@ -2345,7 +2350,8 @@ WHERE (ps.status IN ('durchgespielt','komplettiert') AND COALESCE(t.progress_pct
 ## 12. API-Routen
 
 ```
-GET    /api/games                     Liste mit Filtern
+GET    /api/games                     Liste mit Filtern; sort=titel|zuletzt|spielzeit&richtung=auf|ab –
+                                      die einzige Liste, die in SQL sortiert (Stufe 20e)
 GET    /api/games/:id                 Detail: Releases, Copies, Trophäen, Status, Preise; seit Stufe 10 `plaene` (offene Absichten am Spiel und seinen Releases)
 POST   /api/games                     Body: { titel | igdbId, plattform, trotzdem? } – 409 mit Kandidaten bei gleichem Titelschlüssel;
                                       igdbId legt das Spiel aus dem Treffer an und verknüpft es in einem Zug (Titel, Cover, Wertung aus IGDB, 201 mit igdbVerknuepft);
@@ -2378,7 +2384,9 @@ GET    /api/zuordnung/offen            Gruppenvorschläge, seitenweise
 POST   /api/zuordnung/gruppe           Gruppe bestätigen: ein Spiel, mehrere Releases
 POST   /api/zuordnung/liste/:npCommId  Einzelne Liste einem Release zuordnen
 
-GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=favorit|wertung|titel|release|angelegt|position&favorit=1&plattform=PS4,PS5&suche=
+GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=favorit|wertung|preis|titel|release|angelegt|position&favorit=1&plattform=PS4,PS5&suche=
+                                      `richtung=auf|ab` nur, wenn sie von der natürlichen des Kriteriums
+                                      abweicht (5.2); je Eintrag preisCents, preisAnbieter, preisUrl (Stufe 20e)
                                       { sortierung, plattformen, eintraege[] } (5.2); Standard position bei todo, sonst favorit;
                                       je Eintrag position, eigenerStatus (5.5), seit Stufe 15 aufKaufliste (Id des offenen Kaufeintrags am selben Ziel) und imBesitz
 POST   /api/plans                     Body: { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz?, status?, herkunft? } – genau eine Quelle;
@@ -2434,7 +2442,8 @@ GET    /api/games/:id/events?limit=20&vor=<id> dasselbe für ein Spiel (idx_even
 
 GET    /api/gaps?verworfene=1&unbekannte=1  { anzahl, verworfen, unbekannt, luecken[], moeglich[] } aus v_luecken; verworfene und unbekannte nur mit Parameter
                                       je Zeile seit Stufe 20 gebrauchtpreisAnbieter, marktGeprueftAm und
-                                      marktRohangebote (0 = eBay kennt nichts, null = ungeprueft), je Zeile planId des verworfenen Kaufeintrags
+                                      marktRohangebote (0 = eBay kennt nichts, null = ungeprueft) und
+                                      gebrauchtpreisUrl (Stufe 20e), je Zeile planId des verworfenen Kaufeintrags
 POST   /api/gaps/:releaseId/verwerfen „physisch nicht gewünscht": plan_entry kauf/luecke/verworfen (5.3); 409 bei vorhandenem Kaufeintrag; Rückgängig über DELETE /api/plans/:id
 GET    /api/purchase-candidates       { anzahl, luecken, wuensche, kandidaten[] } aus v_kaufkandidaten: quelle, planId, releaseId, spielId, titel, plattform, bild, kritik, favorit, besterGebrauchtpreisCents (Stufe 15)
 GET    /api/backlog-candidates        { anzahl, abgelehnt, kandidaten[] } aus v_backlog_kandidaten (5.4)

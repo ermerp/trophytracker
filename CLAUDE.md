@@ -70,6 +70,8 @@ Farben, Abstände, Radien und Schriften stehen in `frontend/src/tokens.css` und 
 
 **Ein Klassenname ist eine Zusage über seinen Kontext.** `App.css` hat über 3 600 Zeilen, und in Stufe 19b kollidierten drei neue Namen mit bestehenden: `.deckel` (Cover-Platzhalter mit Seitenverhältnis und 1,6 rem Schrift) machte die zugedeckte Trophäe zu einem leeren Kasten, `.chips` (Filterleiste der Sammlung, ragt mit negativen Rändern heraus) zog eine Linie quer durch eine Karte, und `.stufe` war Tabellenzeile *und* Trophäenzeichen — die spätere Regel gewann und machte die farbigen Verhältnisbalken unsichtbar. **Vor jedem neuen Klassennamen in `App.css` danach greppen**; wer eine bestehende Klasse mitbenutzt, prüft ihre Regeln ganz, nicht nur die Farbe. Gefunden hat alle drei der Nutzer, nicht das Rendern — im Bild sieht man die Wirkung, nicht die Ursache.
 
+**Ein neues Bedienelement ist fast immer schon da.** Bevor ein Steuerelement entsteht, in der Anwendung nach einem gleichartigen suchen: verankertes Menü (`.menueanker` + `.menuetafel`, Spieldetail und Kopfzeile), Chip mit Tafel (`Chips`), Auswahltafel (`ZustandTafel`, `QuellenTafel`). In Stufe 20e war die Sortierung in fünf Listen ein natives `<select>` – das einzige Bedienelement, das die Linie aus Stufe 19 nicht mitmachte, und aufgefallen ist es dem Nutzer, nicht mir. Native Felder bleiben richtig, wo sie ein **Formular** bedienen (Plattform wählen, Disc-Fassung setzen): Dort öffnen sie die Systemauswahl des Geräts.
+
 ### Nur PS3, PS4, PS5 und PS Vita
 
 Spiele anderer Plattformen dürfen nirgends auftauchen – nicht in Suche, Kandidaten, Listen oder Zuordnung. Ein IGDB-Eintrag ist nur ein Treffer, wenn er eine der vier Plattformen **nennt**; fehlende Angabe ist kein „vielleicht" (7.6 – die frühere Ausnahme ließ einen PC-Eintrag als PS4-Wunsch durch, vom Nutzer am 16.09.2026 zweimal angemahnt). Jede neue Datenquelle (Feed, Store, Barcode) bekommt dieselbe Prüfung und wird gegen die echten Verknüpfungen gemessen, bevor sie live geht.
@@ -80,7 +82,7 @@ Spiele anderer Plattformen dürfen nirgends auftauchen – nicht in Suche, Kandi
 
 **Für `nein` gibt es keine Quelle, und das ist kein Mangel an Recherche** (gemessen am 02.10.2026, Stufe 20): Wikidatas Vertriebsformat liegt bei **20 %** der belegten Discs falsch, IGDBs `external_games.media` ist zu 90 % leer, MobyGames kostet. Vor allem aber ist „nur digital" **keine stabile Tatsache** – Limited Run hat über 160 digitale Titel nachträglich auf Disc gebracht, darunter drei aus dieser Sammlung. Was sich bauen lässt, ist eine begründete Abwesenheit: Findet eBay in der Plattform-Kategorie gar kein Angebot, trifft das bei bekannten Discs nur zu 3 % zu – das steht als Hinweis in der Lückenansicht, nicht als Wert in der Spalte.
 
-Das gilt auch in der Oberfläche: fehlende Preise und unbekannte Werte werden als "unbekannt" angezeigt, nie als "0", "–" oder "nicht verfügbar".
+Das gilt auch in der Oberfläche: fehlende Preise und unbekannte Werte werden als "unbekannt" angezeigt, nie als "0", "–" oder "nicht verfügbar". Und beim **Sortieren in beide Richtungen**: Ein Vergleicher, der umgekehrt wird, stellt „unbekannt" nach vorn. Die Richtung gehört deshalb in den Vergleicher hinein, nicht um ihn herum (5.2, gefunden in 20e beim Rendern).
 
 Und für Eingaben: Ein freiwilliges Feld bleibt leer, statt mit einem plausiblen Wert vorbelegt zu werden. **Eine Ausnahme hat der Nutzer am 15.09.2026 ausdrücklich entschieden:** Die Plattform eines Wunsches wird mit der *neuesten* Plattform vorbelegt, die Releases oder IGDB-Eintrag nennen (PS5 > PS4 > PS3 > Vita, `neuestePlattform`), sichtbar in einem Dropdown und vor dem Speichern änderbar (Spezifikation Abschnitt 5). Das ist ein Vorschlag mit Korrekturmöglichkeit, kein stiller Standardwert – und für kein anderes Feld ein Freibrief. Ein Vorschlag steht dabei als **konkreter Wert** im Feld („PS4"), nie als Platzhalter („neueste des Treffers", „automatisch"): Wo Treffer verschiedene Werte hätten, gehört das Feld an den Treffer, nicht darüber – Rückmeldung aus der Abnahme von Stufe 11. **„Ohne Plattform" ist dabei seit dem 27.09.2026 keine Wahl mehr:** Ein Wunsch hängt immer an einem Release, weil erst die Plattform über Lücke, Kauf und Preis entscheidet – im Spieldetail seit Stufe 19c, in Wunschliste, Import und API ab 19d. Dazu gehört, **fehlenden Schlüssel und ausdrückliches `null` auseinanderzuhalten**: Im JSON sind das `undefined` und `null`, und ein `?? "standard"` behandelt beide gleich – es schreibt still einen Wert, wo der Aufrufer ausdrücklich „keiner“ gesagt hat. Je ein Test für beide Fälle (Wunsch des Nutzers vom 28.09.2026, Stufe 19d).
 
@@ -189,6 +191,10 @@ Das Repository ist öffentlich, das Backup-Repository ist privat. Ein Datenbank-
   Branch-Namen nach dem Muster `stufe-<n>-<kurzbeschreibung>`. Merge nach `main` immer
   mit `--no-ff`, damit jede Stufe im Verlauf ein eigener, umkehrbarer Block bleibt und
   `git revert -m 1 <merge>` eine ganze Stufe zurücknimmt.
+  **Nach dem Merge steht man auf `main`** – der nächste Branch wird angelegt, *bevor* die erste
+  Datei angefasst wird, nicht erst vor dem Commit. Nachträge zu einer Stufe beginnen bei `b`
+  (die Stufe selbst besetzt das `a`, wie 17b–17d und 18c–18f) und **gehören in die
+  Spezifikation**, nicht nur in den Branch-Namen.
 - **Dokumentation gehört zur Aufgabe, nicht dahinter.** Es gibt zwei Orte, und beide
   werden im selben Commit aktuell gehalten wie der Code:
   - `docs/spezifikation.md` – die maßgebliche Quelle. Jede Abweichung wird dort
