@@ -292,8 +292,8 @@ einem von Hand angelegten Wunsch: „Satisfactory" (PS5) hängt an einem eigens 
 entstandenen Release, `game_id` ist leer, und das Release zählt trotzdem nicht zur
 Sammlung – es trägt weder Besitz noch Fortschritt.
 
-**Als Nächstes: Stufe 19b** (Einzeltrophäen je Spiel), danach 20 (AWIN-Feed)
-und 21 (PSN Store-Preise). Die PSN-Stufen ergänzen nur, was die
+**Stufe 19b ist am 02.10.2026 abgenommen.** Als Nächstes stehen 20 (AWIN-Feed)
+und 21 (PSN Store-Preise) an. Die PSN-Stufen ergänzen nur, was die
 Sammlung schon kennt, und importieren nichts.
 
 Der Zuschnitt von 19b steht seit dem 01.10.2026 (Abschnitt 7.7): Die Antworten
