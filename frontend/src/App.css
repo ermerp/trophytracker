@@ -2016,6 +2016,13 @@ main {
   cursor: pointer;
 }
 
+/* Die Überschrift des zweiten Lücken-Blocks ist ihr eigener Schalter. */
+.kandidatenkopf {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+}
+
 .pfeil {
   display: inline-flex;
   color: var(--text-still);

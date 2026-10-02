@@ -4,6 +4,7 @@ import { STATUSTEXT, anfrage, gebrauchtpreisText, marktBefund, type DiscFassung,
 import { Reiter } from './Absichten'
 import { Chips, type ChipGruppe } from './Chips'
 import { Kopfzeile } from './Kopfzeile'
+import { Zeichen } from './Symbole'
 import { PlattformChip } from './SpielTeile'
 import { WUNSCH_REITER } from './Wunschliste'
 
@@ -72,7 +73,7 @@ type Eben =
 
 export function Luecken() {
   // Die beiden Umschalter schreibt jetzt die Chip-Leiste in die URL.
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const mitVerworfenen = params.get('verworfene') === '1'
   const moeglichOffen = params.get('unbekannte') === '1'
   const [daten, setDaten] = useState<Antwort | null>(null)
@@ -184,13 +185,40 @@ export function Luecken() {
       )}
 
       <section className="kandidaten">
-        <h2>Disc-Fassung unbekannt{daten && ` (${daten.unbekannt})`}</h2>
-        <p className="ruhig klein">
-          Digital gespielt und nicht im Regal, aber ohne Beleg, dass es eine Disc gibt. „Disc gibt es" macht daraus eine Lücke, „gibt es nicht" nimmt das
-          Release dauerhaft heraus – beides gilt als deine Entscheidung und wird von IGDB nicht mehr überschrieben. „physisch nicht gewünscht" lässt die
-          Frage offen und blendet das Release trotzdem aus: ob es die Disc gibt, ist dir dann egal. Oben stehen die Fälle, zu denen eBay in der
-          Plattform-Kategorie gar kein Angebot kennt – bei bekannten Discs trifft das nur auf 3 % zu, es spricht also für „nur digital".
-        </p>
+        {/*
+          Die Überschrift IST der Schalter. Vorher stand der zweite Block nur
+          hinter dem Chip „Disc-Fassung unbekannt" – und der liegt zwei Ebenen
+          tief hinter der Filter-Pille, während die Überschrift hier erst nach
+          allen 213 Lücken auftaucht. Zugeklappt war der Block damit praktisch
+          unauffindbar (Rückmeldung des Nutzers vom 02.10.2026). Der Chip
+          schreibt denselben Parameter und bleibt gleichwertig.
+        */}
+        <h2>
+          <button
+            type="button"
+            className="knopfname kandidatenkopf"
+            aria-expanded={moeglichOffen}
+            onClick={() => {
+              const neu = new URLSearchParams(params)
+              if (moeglichOffen) neu.delete('unbekannte')
+              else neu.set('unbekannte', '1')
+              setParams(neu, { replace: true })
+            }}
+          >
+            <span>Disc-Fassung unbekannt{daten && ` (${daten.unbekannt})`}</span>
+            <span className={moeglichOffen ? 'pfeil auf' : 'pfeil'}>
+              <Zeichen name="winkel" groesse={18} strich={2.1} />
+            </span>
+          </button>
+        </h2>
+        {moeglichOffen && (
+          <p className="ruhig klein">
+            Digital gespielt und nicht im Regal, aber ohne Beleg, dass es eine Disc gibt. „Disc gibt es" macht daraus eine Lücke, „gibt es nicht" nimmt das
+            Release dauerhaft heraus – beides gilt als deine Entscheidung und wird von IGDB nicht mehr überschrieben. „physisch nicht gewünscht" lässt die
+            Frage offen und blendet das Release trotzdem aus: ob es die Disc gibt, ist dir dann egal. Oben stehen die Fälle, zu denen eBay in der
+            Plattform-Kategorie gar kein Angebot kennt – bei bekannten Discs trifft das nur auf 3 % zu, es spricht also für „nur digital".
+          </p>
+        )}
         {moeglichOffen &&
           (!daten ? (
             <p>wird geladen …</p>
