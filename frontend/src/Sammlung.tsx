@@ -14,6 +14,7 @@ import {
 import { useAnsicht } from './Ansicht'
 import { Chips, type ChipGruppe } from './Chips'
 import { Kopfzeile } from './Kopfzeile'
+import { Sortierleiste, type Richtung } from './Sortierung'
 import { BesitzZeichen, Cover, Fortschritt, PlatinZeichen, PlattformChip, Prozent, ZustandsZeile } from './SpielTeile'
 import { SpielAnlegen } from './SpielAnlegen'
 
@@ -93,6 +94,18 @@ const GRUPPEN: readonly ChipGruppe[] = [
 ]
 
 const SORTIERTEXT = { titel: 'Titel', zuletzt: 'zuletzt gespielt', spielzeit: 'Spielzeit' } as const
+type SammlungSortierung = keyof typeof SORTIERTEXT
+
+/**
+ * Die natürliche Richtung je Kriterium – beim Titel A–Z, bei den beiden
+ * anderen das Gegenteil. Steht gleichlautend im Worker (`src/db/games.ts`),
+ * weil die Sammlung als einzige Liste in SQL sortiert.
+ */
+const SAMMLUNG_NATUERLICH: Record<SammlungSortierung, Richtung> = {
+	titel: 'auf',
+	zuletzt: 'ab',
+	spielzeit: 'ab',
+}
 
 /** Der weiteste Trophäenstand eines Spiels – der Balken am Cover fasst zusammen, die Zeilen darunter nennen jeden einzeln. */
 function weitester(releases: readonly Release[]): Release | null {
@@ -106,6 +119,12 @@ function weitester(releases: readonly Release[]): Release | null {
 
 export function Sammlung() {
 	const [params, setParams] = useSearchParams()
+	const sortierung: SammlungSortierung =
+		(params.get('sort') as SammlungSortierung) in SORTIERTEXT ? (params.get('sort') as SammlungSortierung) : 'titel'
+	const richtung: Richtung =
+		params.get('richtung') === 'ab' || params.get('richtung') === 'auf'
+			? (params.get('richtung') as Richtung)
+			: SAMMLUNG_NATUERLICH[sortierung]
 	const [daten, setDaten] = useState<Antwort | null>(null)
 	const [laedt, setLaedt] = useState(false)
 	const [meldung, setMeldung] = useState<string | null>(null)
@@ -174,16 +193,22 @@ export function Sammlung() {
 							<span>
 								{offset + 1}–{bis} von {daten.gesamt} Spielen{laedt && ' – lädt …'}
 							</span>
-							<label>
-								<span className="nur-vorlesen">Sortierung</span>
-								<select value={params.get('sort') ?? 'titel'} onChange={(e) => setzeParam('sort', e.target.value)}>
-									{Object.entries(SORTIERTEXT).map(([wert, text]) => (
-										<option key={wert} value={wert}>
-											{text}
-										</option>
-									))}
-								</select>
-							</label>
+							<Sortierleiste
+								texte={SORTIERTEXT}
+								natuerlich={SAMMLUNG_NATUERLICH}
+								wert={sortierung}
+								richtung={richtung}
+								waehlen={(w, r) => {
+									const neu = new URLSearchParams(params)
+									if (w === 'titel') neu.delete('sort')
+									else neu.set('sort', w)
+									if (r === SAMMLUNG_NATUERLICH[w]) neu.delete('richtung')
+									else neu.set('richtung', r)
+									// Eine andere Reihenfolge heisst: wieder von vorn.
+									neu.delete('offset')
+									setParams(neu, { replace: true })
+								}}
+							/>
 						</div>
 
 						<ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>

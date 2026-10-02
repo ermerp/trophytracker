@@ -6,6 +6,7 @@ import {
 	JA_NEIN,
 	PLATIN_FILTER,
 	SORTIERUNGEN,
+	SORTIER_NATUERLICH,
 	type ReleaseZeile,
 	type SpieleFilter,
 } from "../db/games";
@@ -172,6 +173,7 @@ export const gameRoutes = new Hono<AppEnv>()
 		// Unbekannte Werte fallen einzeln heraus; bleibt nichts uebrig, gilt
 		// der Filter als nicht gesetzt.
 		const plattformen = (q.platform ?? "").split(",").filter(istErlaubtePlattform);
+		const sortierung = ausWahl(q.sort, SORTIERUNGEN) ?? "titel";
 		const filter: SpieleFilter = {
 			platform: plattformen.length > 0 ? plattformen : undefined,
 			owned: ausWahl(q.owned, BESITZ_FILTER),
@@ -180,7 +182,9 @@ export const gameRoutes = new Hono<AppEnv>()
 			playStatus: istPlayStatus(q.playStatus) ? q.playStatus : undefined,
 			physicalAvailable: ausWahl(q.physicalAvailable, DISC_FILTER),
 			search: q.search ?? "",
-			sort: ausWahl(q.sort, SORTIERUNGEN) ?? "titel",
+			sort: sortierung,
+			// Ohne Angabe die natuerliche Richtung des Kriteriums.
+			richtung: q.richtung === "ab" || q.richtung === "auf" ? q.richtung : SORTIER_NATUERLICH[sortierung],
 			// Hoechstens 100: Die Release-Abfrage bindet eine Id je Spiel, und D1
 			// erlaubt 100 gebundene Werte je Statement (CLAUDE.md). Mit 200 kam
 			// in der Produktion ein D1_ERROR zurueck, sobald so viele Spiele auf

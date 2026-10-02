@@ -299,7 +299,10 @@ das heute bei keinem der 490 Releases gefüllt ist. Die PSN-Stufen ergänzen nur
 was die Sammlung schon kennt, und importieren nichts.
 
 **Stufe 20e** (02.10.2026) bringt die Preise in die Listen: an Kaufliste und
-offenen Wunsch, als Link aufs Angebot, sortierbar. Der obere Block der
+offenen Wunsch, als Link aufs Angebot, sortierbar. Die Sortierung selbst ist
+dabei in allen fünf Listen neu – ein verankertes Menü mit Richtungspfeil statt
+eines nativen Auswahlfelds, und „unbekannt" bleibt in beiden Richtungen am
+Ende. Der obere Block der
 Lückenansicht ist zuklappbar, damit der zweite erreichbar bleibt. Gefragt wird
 **täglich** statt alle 14 Tage – nicht wegen der Preise, sondern weil der
 geplante Preisverlauf (20f) und ein Preisalarm (20g) Punkte brauchen; dafür

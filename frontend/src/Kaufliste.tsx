@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { anfrage, gebrauchtpreis, type KaufKandidat } from './api'
 import { Preis } from './Preis'
-import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERTEXT, usePlanListe } from './Absichten'
+import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
 import { useAnsicht } from './Ansicht'
 import { Chips } from './Chips'
+import { Sortierleiste } from './Sortierung'
 import { Kopfzeile } from './Kopfzeile'
 import { WUNSCH_REITER } from './Wunschliste'
 
@@ -28,7 +29,7 @@ type Kandidaten = { anzahl: number; luecken: number; wuensche: number; kandidate
 
 export function Kaufliste() {
   const liste = usePlanListe('kauf')
-  const { daten, laeuft, nurFavoriten, plattformen, suche, sortierung, setzeParam } = liste
+  const { daten, laeuft, nurFavoriten, plattformen, suche, sortierung, richtung, setzeSortierung } = liste
   const ansicht = useAnsicht('kauf')
   const [kandidaten, setKandidaten] = useState<Kandidaten | null>(null)
 
@@ -151,16 +152,13 @@ export function Kaufliste() {
         <>
           <div className="listenkopf">
             <span>{daten.eintraege.length} Einträge</span>
-            <label>
-              <span className="nur-vorlesen">Sortierung</span>
-              <select value={sortierung} onChange={(e) => setzeParam('sort', e.target.value === 'favorit' ? '' : e.target.value)}>
-                {Object.entries(SORTIERTEXT)
-                  .filter(([wert]) => wert !== 'position')
-                  .map(([wert, text]) => (
-                    <option key={wert} value={wert}>{text}</option>
-                  ))}
-              </select>
-            </label>
+            <Sortierleiste
+                texte={SORTIERBAR}
+                natuerlich={SORTIER_NATUERLICH}
+                wert={sortierung as ListenSortierung}
+                richtung={richtung}
+                waehlen={(w, r) => setzeSortierung(w, r)}
+              />
           </div>
           <ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>
             {daten.eintraege.map((e) => (

@@ -1198,6 +1198,40 @@ textarea {
   width: auto;
 }
 
+/* Die Sortierung ist ein verankertes Menue (Stufe 20e) - dieselbe Tafel wie
+   im Spieldetail, statt eines nativen <select>, das als einziges
+   Bedienelement die Gestaltungslinie aus Stufe 19 nicht mitmachte. */
+.sortierleiste {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.sortierleiste .chip {
+  height: 28px;
+  padding: 0 10px;
+}
+
+/* Der Pfeil zeigt die TATSAECHLICHE Richtung, nicht "Standard oder
+   umgekehrt": aufsteigend nach oben, absteigend nach unten. */
+.richtung {
+  display: inline-flex;
+  color: var(--text-still);
+}
+
+.richtung.ab {
+  transform: rotate(180deg);
+}
+
+.sortierleiste .menuezeile .knopf {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: var(--a3);
+}
+
 .listenkopf label {
   display: inline;
   margin: 0 0 0 auto;

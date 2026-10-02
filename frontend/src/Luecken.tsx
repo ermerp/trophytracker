@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { STATUSTEXT, anfrage, gebrauchtpreis, marktBefund, type DiscFassung, type PlayStatus } from './api'
 import { Preis } from './Preis'
+import { nachZahl, Sortierleiste, umgekehrt, type Richtung } from './Sortierung'
 import { Reiter } from './Absichten'
 import { Chips, type ChipGruppe } from './Chips'
 import { Kopfzeile } from './Kopfzeile'
@@ -84,16 +85,27 @@ const LUECKEN_SORTIERUNG = {
 } as const
 type LueckenSortierung = keyof typeof LUECKEN_SORTIERUNG
 
+/** Was bei welchem Kriterium die natürliche Reihenfolge ist. */
+const LUECKEN_NATUERLICH: Record<LueckenSortierung, Richtung> = {
+  titel: 'auf',
+  preis: 'auf',
+  fortschritt: 'ab',
+}
+
 const nachLueckenTitel = (a: Luecke, b: Luecke) =>
   a.titel.localeCompare(b.titel, 'de') || a.plattform.localeCompare(b.plattform)
 
-const LUECKEN_VERGLEICH: Record<LueckenSortierung, (a: Luecke, b: Luecke) => number> = {
-  titel: nachLueckenTitel,
-  // Günstigstes zuerst; ohne Preis ans Ende – „unbekannt" ist keine 0.
-  preis: (a, b) =>
-    (a.besterGebrauchtpreisCents ?? Infinity) - (b.besterGebrauchtpreisCents ?? Infinity) || nachLueckenTitel(a, b),
-  // Am weitesten gespielt zuerst: Wo viel Zeit drinsteckt, lohnt die Disc eher.
-  fortschritt: (a, b) => b.fortschritt - a.fortschritt || nachLueckenTitel(a, b),
+/**
+ * Der Vergleicher zur Wahl – die Richtung geht hinein, statt das Ergebnis
+ * umzukehren: Ohne Preis bleibt in beiden Richtungen hinten (5.2).
+ */
+function lueckenVergleich(sortierung: LueckenSortierung, richtung: Richtung) {
+  if (sortierung === 'titel') return richtung === 'auf' ? nachLueckenTitel : umgekehrt(nachLueckenTitel)
+  const wert =
+    sortierung === 'preis'
+      ? (l: Luecke) => l.besterGebrauchtpreisCents
+      : (l: Luecke) => l.fortschritt
+  return nachZahl(wert, richtung, nachLueckenTitel)
 }
 
 /** Die beiden Umschalter der Ansicht, als Chips wie überall sonst (Stufe 19). */
@@ -115,6 +127,9 @@ export function Luecken() {
   const moeglichOffen = params.get('unbekannte') === '1'
   const sortierung: LueckenSortierung =
     (params.get('sort') as LueckenSortierung) in LUECKEN_SORTIERUNG ? (params.get('sort') as LueckenSortierung) : 'titel'
+  const richtung: Richtung = params.get('richtung') === 'ab' || params.get('richtung') === 'auf'
+    ? (params.get('richtung') as Richtung)
+    : LUECKEN_NATUERLICH[sortierung]
   // Der obere Block ist zugeklappbar, damit der zweite schnell erreichbar ist
   // (Wunsch des Nutzers vom 02.10.2026). Bewusst KEIN URL-Parameter: Er soll
   // beim Aufruf der Ansicht immer offen sein, das Zuklappen gilt nur für den
@@ -228,28 +243,25 @@ export function Luecken() {
                 </span>
               </button>
             </h2>
-            <label>
-              <span className="nur-vorlesen">Sortierung</span>
-              <select
-                value={sortierung}
-                onChange={(ev) => {
-                  const neu = new URLSearchParams(params)
-                  if (ev.target.value === 'titel') neu.delete('sort')
-                  else neu.set('sort', ev.target.value)
-                  setParams(neu, { replace: true })
-                }}
-              >
-                {Object.entries(LUECKEN_SORTIERUNG).map(([wert, text]) => (
-                  <option key={wert} value={wert}>
-                    {text}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Sortierleiste
+              texte={LUECKEN_SORTIERUNG}
+              natuerlich={LUECKEN_NATUERLICH}
+              wert={sortierung}
+              richtung={richtung}
+              waehlen={(w, r) => {
+                const neu = new URLSearchParams(params)
+                if (w === 'titel') neu.delete('sort')
+                else neu.set('sort', w)
+                // Nur eine Abweichung von der natürlichen Richtung in die URL.
+                if (r === LUECKEN_NATUERLICH[w]) neu.delete('richtung')
+                else neu.set('richtung', r)
+                setParams(neu, { replace: true })
+              }}
+            />
           </div>
           {lueckenOffen && (
           <ul className="kandidatenliste">
-            {[...daten.luecken].sort(LUECKEN_VERGLEICH[sortierung]).map((l) => (
+            {[...daten.luecken].sort(lueckenVergleich(sortierung, richtung)).map((l) => (
               <LueckeZeile key={l.releaseId} l={l}>
                 {l.verworfen ? (
                   <button type="button" className="klein" disabled={laeuft} onClick={() => wiederZeigen(l)}>wieder als Lücke zeigen</button>
