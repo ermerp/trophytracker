@@ -14,7 +14,9 @@ import {
   STATUSTEXT,
   anfrage,
   datum,
+  gebrauchtpreisText,
   igdbLink,
+  marktBefund,
   zeitpunkt,
   type Bewertung,
   type DiscFassung,
@@ -109,6 +111,15 @@ type Release = {
   discFassung: DiscFassung
   discQuelle: string | null
   psnProductId: string | null
+  /** Gebrauchtangebot aus eBay (Stufe 20); null heißt: noch nie gefragt. */
+  markt: {
+    geprueftAm: string
+    rohangebote: number | null
+    preisCents: number | null
+    anbieter: string | null
+    zustand: string | null
+    url: string | null
+  } | null
   trophaeen: Trophaeen | null
   bewertung: Bewertung | null
   exemplare: Exemplar[]
@@ -693,6 +704,30 @@ function ReleaseKarte({
           ändern
         </button>
       </div>
+
+      {/* Der Gebrauchtpreis steht nur da, wenn die Disc NICHT im Regal liegt:
+          Wer sie hat, braucht kein Angebot. „ab" und der Anbietername sind
+          Pflicht – die Zahl ist eine Forderung, kein Wert (Abschnitt 6). */}
+      {!disc && r.markt && (
+        <p className="still">
+          {r.markt.preisCents !== null ? (
+            <>
+              Gebraucht: {gebrauchtpreisText(r.markt.preisCents, r.markt.anbieter)}
+              {r.markt.zustand && ` (${r.markt.zustand})`}
+              {/* Eigene Zeile statt „· Angebot ansehen" hinter dem Preis: Bei
+                  360 px brach die Zeile dort um und begann mit dem Trennpunkt. */}
+              {r.markt.url && (
+                <>
+                  <br />
+                  <a href={r.markt.url} target="_blank" rel="noreferrer noopener">Angebot ansehen</a>
+                </>
+              )}
+            </>
+          ) : (
+            (marktBefund(r.markt.rohangebote, r.markt.geprueftAm) ?? 'Gebraucht: unbekannt')
+          )}
+        </p>
+      )}
 
       {zustand && (
         <ZustandTafel

@@ -36,6 +36,8 @@ export type KaufKandidatZeile = {
 	critic_score: number | null;
 	is_favorite: number;
 	bester_gebrauchtpreis_cents: number | null;
+	/** Wer das Angebot stellt - 'rebuy', 'medimops' oder 'eBay' (Stufe 20). */
+	gebrauchtpreis_anbieter: string | null;
 };
 
 /** Eine Zeile aus v_erscheint_bald (Stufe 15): vorgemerkt, noch nicht erschienen. */
@@ -431,7 +433,7 @@ export class PlanRepository {
 		const { results } = await this.db
 			.prepare(
 				"SELECT quelle, plan_id, release_id, game_id, title, platform, cover_url, critic_score, is_favorite, " +
-					"bester_gebrauchtpreis_cents FROM v_kaufkandidaten ORDER BY quelle, title, platform",
+					"bester_gebrauchtpreis_cents, gebrauchtpreis_anbieter FROM v_kaufkandidaten ORDER BY quelle, title, platform",
 			)
 			.all<KaufKandidatZeile>();
 		return results;

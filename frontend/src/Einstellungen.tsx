@@ -410,6 +410,28 @@ type TrophaeenStand = {
   letzte: { am: string; listen: number; trophaeen: number; offen: number; meldung?: string } | null
 }
 
+/** Was `GET /api/sync/markt` sagt (Stufe 20). */
+type MarktStand = {
+  zugangsdaten: boolean
+  mitPreis: number
+  geprueft: number
+  ohneAngebot: number
+  offen: number
+}
+
+/** Was eine Portion zurueckgibt (`POST /api/sync/markt`). */
+type MarktAntwort = {
+  status: 'erfolg' | 'fehler'
+  geprueft: number
+  mitPreis: number
+  discBelegt: number
+  ohneAngebot: number
+  nochOffen: number
+  weiter: boolean
+  meldung?: string
+  fehler?: string
+}
+
 /** Was eine Portion zurueckgibt (`POST /api/sync/trophaeen`). */
 type TrophaeenAntwort = {
   listen: number
@@ -426,6 +448,8 @@ export function Einstellungen() {
   const [fortschritt, setFortschritt] = useState<string | null>(null)
   const [trophaeen, setTrophaeen] = useState<TrophaeenStand | null>(null)
   const [trophText, setTrophText] = useState<string | null>(null)
+  const [markt, setMarkt] = useState<MarktStand | null>(null)
+  const [marktText, setMarktText] = useState<string | null>(null)
 
   const statusLaden = useCallback(async () => {
     const antwort = await fetch('/api/sync/status')
@@ -437,10 +461,16 @@ export function Einstellungen() {
     if (antwort.ok) setTrophaeen((await antwort.json()) as TrophaeenStand)
   }, [])
 
+  const marktStandLaden = useCallback(async () => {
+    const antwort = await fetch('/api/sync/markt')
+    if (antwort.ok) setMarkt((await antwort.json()) as MarktStand)
+  }, [])
+
   useEffect(() => {
     void statusLaden()
     void trophaeenStandLaden()
-  }, [statusLaden, trophaeenStandLaden])
+    void marktStandLaden()
+  }, [statusLaden, trophaeenStandLaden, marktStandLaden])
 
   /**
    * Normalisierung erneut ausführen – ohne PSN-Zugriff.
@@ -685,6 +715,43 @@ export function Einstellungen() {
     }
   }
 
+  /**
+   * Gebrauchtpreise holen (Stufe 20). Zehn Releases je Aufruf, also zwanzig
+   * Fremdanfragen – ein Aufruf darf fünfzig machen (15.4). Die Schleife ruft
+   * nach, solange `weiter` gesetzt ist; bei rund 370 betroffenen Releases
+   * sind das 37 Durchläufe.
+   *
+   * Die Zeitgrenze steht am `fetch`, nicht nur ein Wiederholen bei Fehler –
+   * dieselbe Lehre wie bei den Trophäen am 01.10.2026: Eine Anfrage, die nie
+   * antwortet, lässt die Oberfläche sonst still warten.
+   */
+  async function marktHolen() {
+    setMeldung(null)
+    setMarktText('Preise werden geholt …')
+    setLaeuft(true)
+    let geprueft = 0
+    let preise = 0
+    let discs = 0
+    try {
+      for (;;) {
+        const antwort = await fetch('/api/sync/markt', { method: 'POST', signal: AbortSignal.timeout(60_000) })
+        const daten = (await antwort.json()) as MarktAntwort
+        if (!antwort.ok) throw new Error(daten.meldung ?? daten.fehler ?? 'Der Abruf der Preise ist fehlgeschlagen.')
+        geprueft += daten.geprueft
+        preise += daten.mitPreis
+        discs += daten.discBelegt
+        setMarktText(`${geprueft} Releases geprüft, ${preise} mit Preis, ${discs} Disc-Fassungen belegt – noch ${daten.nochOffen} offen …`)
+        if (!daten.weiter || daten.geprueft === 0) break
+      }
+      setMarktText(`Fertig: ${geprueft} Releases geprüft, ${preise} mit Preis, ${discs} Disc-Fassungen belegt.`)
+    } catch (fehler) {
+      setMarktText(`Angehalten nach ${geprueft} Releases: ${fehler instanceof Error ? fehler.message : 'unbekannter Fehler'}`)
+    } finally {
+      setLaeuft(false)
+      await marktStandLaden()
+    }
+  }
+
   const zugang = status?.zugang
 
   return (
@@ -719,7 +786,8 @@ export function Einstellungen() {
         Der Worker arbeitet in zwei Fenstern, alle fünf Minuten je ein kleiner Schritt. Zwischen 5 und 8 Uhr
         (03:00–05:59 UTC) alles, was PlayStation anspricht: Trophäen, Spielzeiten und einmal wöchentlich die
         Kaufliste. Zwischen 8 und 10 Uhr (06:00–07:59 UTC) die Wartung – erschienene Titel freigeben,
-        IGDB-Metadaten und Disc-Fassungen auffrischen, alte PSN-Rohantworten wegräumen.
+        IGDB-Metadaten und Disc-Fassungen auffrischen, Gebrauchtpreise bei eBay holen, alte PSN-Rohantworten
+        wegräumen.
       </p>
       <p>
         Eine gescheiterte Seite wird bis zu dreimal erneut geholt, bevor der Lauf aufgegeben wird; danach ist
@@ -742,6 +810,28 @@ export function Einstellungen() {
       <p className="zeile">
         Sonys Kaufliste sagt, was gekauft und was über PS Plus im Katalog ist. Sie läuft sonst einmal
         wöchentlich mit; der Knopf holt sie sofort.
+      </p>
+      <h3>Gebrauchtpreise</h3>
+      <p className="zeile">
+        {markt === null
+          ? 'Wird geladen …'
+          : !markt.zugangsdaten
+            ? 'Keine eBay-Zugangsdaten hinterlegt – Preise bleiben „unbekannt".'
+            : `${markt.geprueft} Releases gefragt, ${markt.mitPreis} mit Preis, ${markt.ohneAngebot} ohne jedes Angebot.`}
+      </p>
+      <button type="button" onClick={marktHolen} disabled={laeuft || !markt?.zugangsdaten}>
+        Preise jetzt holen
+      </button>
+      {marktText && (
+        <p className="zeile" role="status">
+          {marktText}
+        </p>
+      )}
+      <p className="zeile">
+        Gesucht wird bei eBay – zuerst bei rebuy und medimops, dann im breiten Gebrauchtmarkt. Die Zahl ist
+        eine Forderung bei einem Anbieter, kein Wert. Findet die Suche in der Plattform-Kategorie gar nichts,
+        steht das in der Lückenansicht als Hinweis auf eine reine Download-Fassung; ob es die Disc gibt,
+        entscheidest weiter nur du. Der Schritt läuft sonst nachts in der Wartung mit, zehn Releases je Aufruf.
       </p>
       <h3>Einzeltrophäen</h3>
       <p className="zeile">

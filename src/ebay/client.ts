@@ -1,4 +1,13 @@
+import {
+	EBAY_ASPEKT_PLATTFORM,
+	EBAY_KATEGORIE_SPIELE,
+	EBAY_ZUSTAENDE_GEBRAUCHT,
+	HAENDLER_VERKAEUFER,
+	type MarktAngebot,
+	type MarktKanal,
+} from "../domain/markt";
 import { Geheimnis } from "../domain/secret";
+import type { Plattform } from "../domain/titel";
 
 /**
  * Anbindung an die eBay Browse API (Abschnitt 9.2, Stufe 17c).
@@ -32,6 +41,21 @@ const MARKTPLATZ = "EBAY_DE";
  * Mehrheitsregel (`mehrheitstreffer`) und halten die Antwort klein.
  */
 export const ANGEBOTE_JE_CODE = 10;
+
+/**
+ * Wie viele Angebote je Release fuer den Preis gelesen werden (Stufe 20).
+ * Mehr als zehn, weil hier nicht die Mehrheit zaehlt, sondern das
+ * guenstigste GEPRUEFTE Angebot - und die ersten Treffer sind oft die
+ * teuren Neuware-Angebote.
+ */
+export const ANGEBOTE_JE_RELEASE = 20;
+
+/**
+ * Zeitgrenze je Abfrage. Ohne sie kann ein haengender Abruf einen
+ * Cron-Aufruf blockieren - in Stufe 19b genau so passiert, dort beim
+ * PSN-Abruf.
+ */
+const ZEITGRENZE_MS = 10_000;
 
 /** Zugangsdaten fehlen - die Anwendung laeuft ohne eBay weiter. */
 export class EbayKonfigError extends Error {}
@@ -93,6 +117,32 @@ export function erstelleEbayClient(
 		return token.token;
 	}
 
+	/**
+	 * Eine Suche ueber item_summary/search. Die Parameter werden ueber
+	 * URLSearchParams gebaut, und das ist kein Stilfrage: Gemessen am
+	 * 02.10.2026 wird ein `filter` mit unkodierten Klammern von eBay
+	 * STILLSCHWEIGEND ignoriert - gleiche Trefferzahl, kein Eintrag in
+	 * `warnings`. URLSearchParams kodiert `{`, `}`, `|` und `:` korrekt.
+	 */
+	async function suchen(parameter: Record<string, string>, zweiterVersuch = false): Promise<unknown> {
+		const t = await tokenBesorgen(zweiterVersuch);
+		const antwort = await hole(`${API_BASIS}/item_summary/search?${new URLSearchParams(parameter)}`, {
+			headers: {
+				Authorization: `Bearer ${t.offenlegen()}`,
+				"X-EBAY-C-MARKETPLACE-ID": MARKTPLATZ,
+				Accept: "application/json",
+			},
+			signal: AbortSignal.timeout(ZEITGRENZE_MS),
+		});
+		if (antwort.status === 401 && !zweiterVersuch) return suchen(parameter, true);
+		if (antwort.status === 401 || antwort.status === 403) throw new EbayAuthError("eBay hat das Token abgelehnt.");
+		if (antwort.status === 429) throw new EbayRateError("Das eBay-Tageskontingent ist erschöpft.");
+		// 204 heisst: kein Angebot zu dieser Suche.
+		if (antwort.status === 204) return { itemSummaries: [] };
+		if (!antwort.ok) throw new EbayAbrufError(`eBay antwortete mit ${antwort.status}.`);
+		return await antwort.json();
+	}
+
 	return {
 		/** Sind Zugangsdaten hinterlegt? Fuer die Anzeige, nie die Werte. */
 		konfiguriert(): boolean {
@@ -128,6 +178,52 @@ export function erstelleEbayClient(
 			return (daten.itemSummaries ?? [])
 				.map((i) => i.title)
 				.filter((t): t is string => typeof t === "string" && t.trim() !== "");
+		},
+
+		/**
+		 * Gebrauchtangebote zu einem Titel und einer Plattform (Stufe 20).
+		 *
+		 * Die Plattform kommt als STRUKTURIERTER Aspekt, nicht als Suchwort:
+		 * rebuy und medimops nennen sie im Titel gar nicht ("Bloodborne
+		 * [Game Of The Year Edition]"), und der erste Messlauf fand deshalb
+		 * 0 von 90 Haendlerangeboten. Der Aspekt kennt auch "Keine Angabe" -
+		 * ein Angebot ohne Plattformangabe faellt damit heraus (7.6).
+		 *
+		 * Eine leere Liste heisst "eBay kennt dazu nichts" - kein Fehler.
+		 * Genau diese Abwesenheit ist der Hinweis auf eine reine
+		 * Download-Fassung: Gemessen am 02.10.2026 haben nur 8 von 235
+		 * belegten Discs gar kein Angebot, also 3 %.
+		 */
+		async angeboteZuTitel(titel: string, plattform: Plattform, kanal: MarktKanal): Promise<MarktAngebot[]> {
+			const filter = [`conditionIds:{${EBAY_ZUSTAENDE_GEBRAUCHT.join("|")}}`, "buyingOptions:{FIXED_PRICE}"];
+			if (kanal === "haendler") filter.push(`sellers:{${Object.keys(HAENDLER_VERKAEUFER).join("|")}}`);
+			const daten = (await suchen({
+				q: titel,
+				category_ids: EBAY_KATEGORIE_SPIELE,
+				aspect_filter: `categoryId:${EBAY_KATEGORIE_SPIELE},Plattform:{${EBAY_ASPEKT_PLATTFORM[plattform]}}`,
+				filter: filter.join(","),
+				limit: String(ANGEBOTE_JE_RELEASE),
+			})) as { itemSummaries?: Array<Record<string, unknown>> };
+
+			const angebote: MarktAngebot[] = [];
+			for (const eintrag of daten.itemSummaries ?? []) {
+				const titelRoh = eintrag.title;
+				const preis = (eintrag.price ?? {}) as { value?: unknown; currency?: unknown };
+				if (typeof titelRoh !== "string" || titelRoh.trim() === "") continue;
+				// Nur Euro: Ein Angebot in fremder Waehrung waere nicht vergleichbar.
+				if (preis.currency !== "EUR" || typeof preis.value !== "string") continue;
+				const cents = Math.round(Number.parseFloat(preis.value) * 100);
+				if (!Number.isFinite(cents) || cents <= 0) continue;
+				const verkaeufer = (eintrag.seller ?? {}) as { username?: unknown };
+				angebote.push({
+					titel: titelRoh,
+					preisCents: cents,
+					zustand: typeof eintrag.condition === "string" ? eintrag.condition : null,
+					verkaeufer: typeof verkaeufer.username === "string" ? verkaeufer.username : null,
+					url: typeof eintrag.itemWebUrl === "string" ? eintrag.itemWebUrl : null,
+				});
+			}
+			return angebote;
 		},
 	};
 }

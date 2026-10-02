@@ -34,6 +34,11 @@ function lueckeAntwort(z: LueckeZeile) {
 		eigenerStatus: z.eigener_status,
 		/** null heisst unbekannt - nie 0 (Darstellungsregel, Abschnitt 13). */
 		besterGebrauchtpreisCents: z.bester_gebrauchtpreis_cents,
+		/** Wer das Angebot stellt, fuer "ab 12,77 EUR bei rebuy" (Stufe 20). */
+		gebrauchtpreisAnbieter: z.gebrauchtpreis_anbieter,
+		marktGeprueftAm: z.markt_geprueft_am,
+		/** 0 = eBay kennt in der Plattform-Kategorie nichts, null = ungeprueft. */
+		marktRohangebote: z.markt_rohangebote,
 		verworfen: z.verworfen === 1,
 		planId: z.plan_id,
 	};

@@ -101,6 +101,37 @@ export const datum = (wert: string | null) => {
 export const euro = (cents: number | null) =>
   cents === null ? 'unbekannt' : (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
 
+/**
+ * Der Gebrauchtpreis als Satz (Stufe 20).
+ *
+ * „ab" und der Anbietername sind keine Zierde: Die Zahl ist eine
+ * **Forderung** bei genau diesem Anbieter, kein Marktwert. eBays verkaufte
+ * Preise sind für neue Anwendungen nicht zu bekommen, und die Risikozeile in
+ * Abschnitt 17 verlangt genau diese Beschriftung – „Angebot bei Händler X",
+ * nicht „Wert". Fehlt die Zahl, heißt es „unbekannt", nie „0" oder „–".
+ */
+export const gebrauchtpreisText = (cents: number | null, anbieter: string | null) =>
+  cents === null ? 'unbekannt' : `ab ${euro(cents)}${anbieter ? ` bei ${anbieter}` : ''}`
+
+/**
+ * Was die eBay-Suche über eine unbekannte Disc-Fassung sagt (Stufe 20, 5.3).
+ *
+ * Gemessen am 02.10.2026: Von 235 durch IGDB belegten Discs hat eBay bei nur
+ * 8 gar kein Angebot – 3 %. „Kein Angebot" ist deshalb ein belastbarer
+ * Hinweis auf eine reine Download-Fassung. Ein Angebot, das den Titelabgleich
+ * nicht übersteht, ist dagegen ein schwacher Befund und sagt das auch.
+ *
+ * Geschrieben wird `nein` trotzdem nur von dir (Abschnitt 3): „nur digital"
+ * ist keine stabile Tatsache – Limited Run hat über 160 digitale Titel
+ * nachträglich auf Disc gebracht.
+ */
+export function marktBefund(rohangebote: number | null, geprueftAm: string | null): string | null {
+  if (rohangebote === null || geprueftAm === null) return null
+  const wann = datum(geprueftAm)
+  if (rohangebote === 0) return `eBay kennt kein Angebot für diese Plattform (${wann}) – spricht für „nur digital"`
+  return `${rohangebote} ${rohangebote === 1 ? 'Angebot' : 'Angebote'} bei eBay, keines eindeutig diesem Spiel zuzuordnen (${wann})`
+}
+
 export const PLAY_STATUS = [
   'nicht_gespielt',
   'am_spielen',
@@ -286,6 +317,8 @@ export type KaufKandidat = {
   favorit: boolean
   /** null heißt unbekannt – nie 0. */
   besterGebrauchtpreisCents: number | null
+  /** Wer das Angebot stellt – 'rebuy', 'medimops' oder 'eBay' (Stufe 20). */
+  gebrauchtpreisAnbieter: string | null
 }
 
 /** Vorgemerkter, noch nicht erschienener Titel aus v_erscheint_bald (Use Case 11). */

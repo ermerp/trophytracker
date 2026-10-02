@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createRepositories } from "../src/db";
 import { haengerMeldung } from "../src/db/sync";
+import { erstelleEbayClient } from "../src/ebay/client";
 import { Geheimnis } from "../src/domain/secret";
 import { erstellePsnClient } from "../src/psn/client";
 import {
@@ -162,6 +163,8 @@ const psnKaputt = () =>
 	);
 const psnStumm = () => erstellePsnClient(fakeFetch([]).fetch);
 const igdbOhne = () => fakeIgdb([[]], { zugang: null }).client;
+/** Ohne eBay-Zugangsdaten bleibt der Marktschritt stumm (Stufe 20). */
+const ebayOhne = () => erstelleEbayClient(null);
 
 const laeufe = async () =>
 	(await env.DB.prepare("SELECT id, status, phase, started_by, error_message FROM psn_sync_run ORDER BY id").all()).results;
@@ -203,7 +206,7 @@ describe("cronSchritt", () => {
 		await spielMitIgdb(1, 11, null);
 		await env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2020-01-01' WHERE id = 1").run();
 
-		const e = await cronSchritt(repos(), psnStumm(), fakeIgdb([[spielRoh({ id: 11 })]]).client);
+		const e = await cronSchritt(repos(), psnStumm(), fakeIgdb([[spielRoh({ id: 11 })]]).client, ebayOhne());
 
 		expect(e).toMatchObject({ getan: "igdb_auffrischen", erschienen: 1, abgebrochen: 0 });
 		expect(e.auffrischen).toMatchObject({ status: "erfolg", angefragt: 1, aktualisiert: 1 });
@@ -217,7 +220,7 @@ describe("cronSchritt", () => {
 
 		const schritte = [];
 		for (let i = 0; i < 20; i++) {
-			const e = await cronSchritt(repos(), psn, igdbOhne());
+			const e = await cronSchritt(repos(), psn, igdbOhne(), ebayOhne());
 			schritte.push(e);
 			if (e.getan === "nichts" || e.getan === "trophaeen") break;
 		}
@@ -253,16 +256,16 @@ describe("cronSchritt", () => {
 	it("startet je Nacht nur einen eigenen Lauf - am naechsten Tag wieder einen", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
 		const { psn } = psnMit(10);
-		for (let i = 0; i < 5; i++) await cronSchritt(repos(), psn, igdbOhne());
+		for (let i = 0; i < 5; i++) await cronSchritt(repos(), psn, igdbOhne(), ebayOhne());
 		expect(await laeufe()).toHaveLength(1);
 
 		// Kein ZWEITER Lauf heute. Was der Aufruf stattdessen tut, ist offen -
 		// seit Stufe 19b fuellt er Einzeltrophaeen. Geprueft wird deshalb, dass
 		// er keinen Sync startet, nicht dass er nichts tut.
-		expect((await cronSchritt(repos(), psn, igdbOhne(), { heute: HEUTE })).getan).not.toBe("sync");
+		expect((await cronSchritt(repos(), psn, igdbOhne(), ebayOhne(), { heute: HEUTE })).getan).not.toBe("sync");
 		expect(await laeufe()).toHaveLength(1);
 
-		expect((await cronSchritt(repos(), psn, igdbOhne(), { heute: MORGEN })).getan).toBe("sync");
+		expect((await cronSchritt(repos(), psn, igdbOhne(), ebayOhne(), { heute: MORGEN })).getan).toBe("sync");
 		expect(await laeufe()).toHaveLength(2);
 	});
 
@@ -274,9 +277,9 @@ describe("cronSchritt", () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
 		const { psn } = psnMitAussetzer(250, [100]);
 
-		expect((await cronSchritt(repos(), psn, igdbOhne())).sync).toMatchObject({ status: "laufend", offset: 100 });
+		expect((await cronSchritt(repos(), psn, igdbOhne(), ebayOhne())).sync).toMatchObject({ status: "laufend", offset: 100 });
 
-		const e = await cronSchritt(repos(), psn, igdbOhne());
+		const e = await cronSchritt(repos(), psn, igdbOhne(), ebayOhne());
 		expect(e.sync).toMatchObject({
 			status: "laufend",
 			fehlversuche: 1,
@@ -292,7 +295,7 @@ describe("cronSchritt", () => {
 		expect(cronLogzeile(e)).toContain(`versuch=1/${FEHLVERSUCHE_HOECHSTENS}`);
 
 		// Weiter bis zum Erfolg: dieselbe Seite, derselbe Lauf.
-		for (let i = 0; i < 7; i++) await cronSchritt(repos(), psn, igdbOhne());
+		for (let i = 0; i < 7; i++) await cronSchritt(repos(), psn, igdbOhne(), ebayOhne());
 		expect(await laeufe()).toEqual([expect.objectContaining({ status: "erfolg" })]);
 		expect(await repos().trophies.anzahl()).toBe(250);
 		// Und der Fehlerzaehler ist mit dem Fortschritt verschwunden.
@@ -304,7 +307,7 @@ describe("cronSchritt", () => {
 		const psn = psnKaputt();
 
 		for (let versuch = 1; versuch <= FEHLVERSUCHE_HOECHSTENS; versuch++) {
-			const e = await cronSchritt(repos(), psn, igdbOhne());
+			const e = await cronSchritt(repos(), psn, igdbOhne(), ebayOhne());
 			expect(e.sync).toMatchObject({ fehlversuche: versuch });
 			expect(e.sync?.status).toBe(versuch < FEHLVERSUCHE_HOECHSTENS ? "laufend" : "fehler");
 		}
@@ -315,7 +318,7 @@ describe("cronSchritt", () => {
 
 		// Kein zweiter Lauf: Der naechste Aufruf geht weiter in der Reihenfolge
 		// (hier Spielzeit), statt den Sync zu wiederholen.
-		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).not.toBe("sync");
+		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), ebayOhne())).getan).not.toBe("sync");
 		expect(await laeufe()).toHaveLength(1);
 	});
 
@@ -329,7 +332,7 @@ describe("cronSchritt", () => {
 			]).fetch,
 		);
 
-		const e = await cronSchritt(repos(), psn, igdbOhne());
+		const e = await cronSchritt(repos(), psn, igdbOhne(), ebayOhne());
 		expect(e.sync).toMatchObject({ status: "fehler" });
 		expect(e.sync?.fehlversuche).toBeUndefined();
 		expect(await laeufe()).toEqual([expect.objectContaining({ status: "fehler" })]);
@@ -340,12 +343,12 @@ describe("cronSchritt", () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
 		await repos().credentials.statusSetzen("abgelaufen");
 
-		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).toBe("nichts");
+		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), ebayOhne())).getan).toBe("nichts");
 		expect(await laeufe()).toEqual([]);
 
 		// Ein neues NPSSO setzt 'ok' - dann laeuft es wieder.
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-neu"));
-		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).toBe("sync");
+		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), ebayOhne())).getan).toBe("sync");
 	});
 
 	it("ein erfolgreicher Handabruf von heute ersetzt den Nachtlauf, ein fehlgeschlagener nicht", async () => {
@@ -353,10 +356,10 @@ describe("cronSchritt", () => {
 		await env.DB.prepare(
 			"INSERT INTO psn_sync_run (started_at, finished_at, status, next_offset, started_by) VALUES (datetime('now'), datetime('now'), 'erfolg', 0, 'nutzer')",
 		).run();
-		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).not.toBe("sync");
+		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), ebayOhne())).getan).not.toBe("sync");
 
 		await env.DB.prepare("UPDATE psn_sync_run SET status = 'fehler'").run();
-		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne())).getan).toBe("sync");
+		expect((await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), ebayOhne())).getan).toBe("sync");
 		expect(await laeufe()).toEqual([
 			expect.objectContaining({ status: "fehler", started_by: "nutzer" }),
 			expect.objectContaining({ started_by: "cron" }),
@@ -375,7 +378,7 @@ describe("cronSchritt", () => {
 			await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
 			await alterLauf(HAENGT_NACH_STUNDEN + 2);
 
-			const e = await cronSchritt(repos(), psnMit(10).psn, igdbOhne());
+			const e = await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), ebayOhne());
 
 			expect(e).toMatchObject({ getan: "sync", abgebrochen: 1 });
 			const alle = await laeufe();
@@ -392,7 +395,7 @@ describe("cronSchritt", () => {
 				.bind(trophySeite(0, 10))
 				.run();
 
-			const e = await cronSchritt(repos(), psnMit(10).psn, igdbOhne());
+			const e = await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), ebayOhne());
 
 			expect(e).toMatchObject({ getan: "sync", abgebrochen: 0 });
 			expect(await laeufe()).toEqual([expect.objectContaining({ id: 1, started_by: "nutzer" })]);
@@ -409,7 +412,7 @@ describe("cronSchritt", () => {
 				).bind(trophySeite(0, 10)),
 			]);
 
-			const e = await cronSchritt(repos(), psnStumm(), igdbOhne());
+			const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne());
 
 			// Nichts mehr offen: Der Aufruf schliesst den alten Lauf ab.
 			expect(e).toMatchObject({ getan: "sync", abgebrochen: 0 });
@@ -424,7 +427,7 @@ describe("cronSchritt", () => {
 			// ab - die Regel muss in beiden Faellen einen Cron-Lauf zulassen.
 			await alterLauf(HAENGT_NACH_STUNDEN + 1, "nutzer");
 
-			const e = await cronSchritt(repos(), psnMit(10).psn, igdbOhne());
+			const e = await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), ebayOhne());
 			expect(e).toMatchObject({ getan: "sync", abgebrochen: 1 });
 			expect((await laeufe()).at(-1)).toMatchObject({ started_by: "cron", status: "laufend" });
 		});
@@ -436,13 +439,13 @@ describe("cronSchritt", () => {
 		await env.DB.prepare("UPDATE game SET igdb_synced_at = datetime('now') WHERE id = 2").run();
 
 		const { client, aufrufe } = fakeIgdb([[spielRoh({ id: 11 })]]);
-		const e = await cronSchritt(repos(), psnStumm(), client);
+		const e = await cronSchritt(repos(), psnStumm(), client, ebayOhne());
 		expect(e).toMatchObject({ getan: "igdb_auffrischen" });
 		expect(e.auffrischen).toMatchObject({ angefragt: 1, aktualisiert: 1 });
 		expect(String(aufrufe.at(-1)?.init?.body)).toContain("where id = (11)");
 
 		// Beide frisch: nichts faellig, auch die Disc-Fassungen sind gestempelt.
-		expect((await cronSchritt(repos(), psnStumm(), client)).getan).toBe("nichts");
+		expect((await cronSchritt(repos(), psnStumm(), client, ebayOhne())).getan).toBe("nichts");
 		expect(AUFFRISCH_FRIST_TAGE).toBe(7);
 	});
 
@@ -453,7 +456,7 @@ describe("cronSchritt", () => {
 		await spielMitIgdb(2, 12, "2020-01-01 00:00:00");
 
 		// IGDB liefert nur eines der beiden zurueck.
-		const e = await cronSchritt(repos(), psnStumm(), fakeIgdb([[spielRoh({ id: 11 })]]).client);
+		const e = await cronSchritt(repos(), psnStumm(), fakeIgdb([[spielRoh({ id: 11 })]]).client, ebayOhne());
 		expect(e.auffrischen).toMatchObject({ angefragt: 2, aktualisiert: 1, ohneAntwort: 1 });
 
 		// Beide trage jetzt einen frischen Stempel - der naechste Aufruf hat nichts mehr zu tun.
@@ -467,7 +470,7 @@ describe("cronSchritt", () => {
 		await spielMitIgdb(1, 11, null);
 		const kaputt = fakeIgdb([new Response("weg", { status: 500 })]).client;
 
-		const e = await cronSchritt(repos(), psnStumm(), kaputt);
+		const e = await cronSchritt(repos(), psnStumm(), kaputt, ebayOhne());
 
 		// Der Schritt faengt den Fehler selbst; der Aufruf laeuft zu Ende und
 		// sagt in der Logzeile, was los war.
@@ -620,7 +623,7 @@ describe("cronSchritt", () => {
 			await env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2020-01-01' WHERE id = 1").run();
 			for (let i = 0; i < ROHANTWORTEN_LAEUFE + 1; i++) await lauf("erfolg", 5, true);
 
-			const e = await cronSchritt(repos(), psnStumm(), fakeIgdb([[spielRoh({ id: 11 })]]).client, { bereich: "psn" });
+			const e = await cronSchritt(repos(), psnStumm(), fakeIgdb([[spielRoh({ id: 11 })]]).client, ebayOhne(), { bereich: "psn" });
 			expect(e).toMatchObject({ getan: "nichts", erschienen: 0, bereich: "psn" });
 			expect(cronLogzeile(e)).toBe("cron: nichts bereich=psn");
 			// Nichts geloescht, nichts freigegeben, nichts aufgefrischt.
@@ -636,7 +639,7 @@ describe("cronSchritt", () => {
 			await spielMitIgdb(1, 11, null);
 			await env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2020-01-01' WHERE id = 1").run();
 
-			const e = await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), { bereich: "wartung" });
+			const e = await cronSchritt(repos(), psnMit(10).psn, igdbOhne(), ebayOhne(), { bereich: "wartung" });
 			expect(e).toMatchObject({ getan: "nichts", erschienen: 1, bereich: "wartung" });
 			expect(cronLogzeile(e)).toBe("cron: nichts bereich=wartung erschienen=1");
 			// Der Sync ist faellig - aber nicht in diesem Fenster.
@@ -647,7 +650,7 @@ describe("cronSchritt", () => {
 			await spielMitIgdb(1, 11, null);
 			await env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2020-01-01' WHERE id = 1").run();
 
-			const e = await cronSchritt(repos(), psnStumm(), igdbOhne());
+			const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne());
 			expect(e).toMatchObject({ erschienen: 1, bereich: "alles" });
 			// 'alles' steht nicht in der Zeile: Es ist kein Fenster.
 			expect(cronLogzeile(e)).not.toContain("bereich=");
@@ -674,7 +677,7 @@ describe("cronSchritt", () => {
 
 		const nacht = async (bereich: "psn" | "wartung", stunde: number, anzahl: number) => {
 			for (let i = 0; i < anzahl; i++) {
-				const e = await cronSchritt(r, psn, igdbOhne(), { bereich });
+				const e = await cronSchritt(r, psn, igdbOhne(), ebayOhne(), { bereich });
 				const minute = String((i * 5) % 60).padStart(2, "0");
 				const h = String(stunde + Math.floor((i * 5) / 60)).padStart(2, "0");
 				await r.sync.cronAusgangVermerken(`2026-09-28 ${h}:${minute}`, cronLogzeile(e));
@@ -735,16 +738,16 @@ describe("cronSchritt", () => {
 			const heute = "2026-10-01";
 			await syncSchonErledigt(heute);
 
-			const erste = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			const erste = await cronSchritt(repos(), psn, igdbOhne(), ebayOhne(), { heute, bereich: "psn" });
 			expect(erste).toMatchObject({ getan: "spielzeit", spielzeit: { status: "erfolg", geholt: 200 } });
 			expect(await stand()).toBe(`${heute}:200`);
 
-			const gescheitert = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			const gescheitert = await cronSchritt(repos(), psn, igdbOhne(), ebayOhne(), { heute, bereich: "psn" });
 			expect(gescheitert.spielzeit).toMatchObject({ status: "fehler", versuche: 1 });
 			// Der Offset bleibt stehen: Der naechste Aufruf holt dieselbe Seite.
 			expect(await stand()).toBe(`${heute}:200:1`);
 
-			const nachgeholt = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			const nachgeholt = await cronSchritt(repos(), psn, igdbOhne(), ebayOhne(), { heute, bereich: "psn" });
 			expect(nachgeholt.spielzeit).toMatchObject({ status: "erfolg", geholt: 179 });
 			// Fortschritt setzt den Zaehler zurueck; der Tag ist sauber durch.
 			expect(await stand()).toBe(`${heute}:-1`);
@@ -755,10 +758,10 @@ describe("cronSchritt", () => {
 			const heute = "2026-10-01";
 			await syncSchonErledigt(heute);
 
-			await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			await cronSchritt(repos(), psn, igdbOhne(), ebayOhne(), { heute, bereich: "psn" });
 			const versuche: Array<number | undefined> = [];
 			for (let i = 0; i < 5; i++) {
-				const e = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+				const e = await cronSchritt(repos(), psn, igdbOhne(), ebayOhne(), { heute, bereich: "psn" });
 				if (e.getan === "spielzeit") versuche.push(e.spielzeit?.versuche);
 			}
 
@@ -774,7 +777,7 @@ describe("cronSchritt", () => {
 			await repos().sync.fortschrittSetzenWert("psn_spielzeit_stand", `${heute}:-1`);
 			const { psn } = psnMitSpielzeitAussetzer(0);
 
-			const e = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
+			const e = await cronSchritt(repos(), psn, igdbOhne(), ebayOhne(), { heute, bereich: "psn" });
 			expect(e.getan).not.toBe("spielzeit");
 		});
 	});
@@ -901,13 +904,13 @@ describe("cronSchritt", () => {
 	it("der Cron raeumt auf, wenn sonst nichts zu tun ist - und nur dann", async () => {
 		for (let i = 0; i < ROHANTWORTEN_LAEUFE + 1; i++) await lauf("erfolg", 5, true);
 
-		const e = await cronSchritt(repos(), psnStumm(), igdbOhne());
+		const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne());
 		expect(e.getan).toBe("aufraeumen");
 		expect(e.geloescht).toBe(5);
 		expect(cronLogzeile(e)).toContain("geloescht=5");
 
 		// Nichts mehr zu loeschen: Der naechste Aufruf faellt auf "nichts".
-		expect((await cronSchritt(repos(), psnStumm(), igdbOhne())).getan).toBe("nichts");
+		expect((await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne())).getan).toBe("nichts");
 	});
 
 	it("die Logzeile nennt nur Zahlen und feste Texte", () => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { anfrage, euro, type KaufKandidat } from './api'
+import { anfrage, gebrauchtpreisText, type KaufKandidat } from './api'
 import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERTEXT, usePlanListe } from './Absichten'
 import { useAnsicht } from './Ansicht'
 import { Chips } from './Chips'
@@ -19,7 +19,8 @@ import { WUNSCH_REITER } from './Wunschliste'
  * und verworfene", „wieder öffnen" macht ihn zum offenen Kauf. „erledigt"
  * erledigt den Wunsch dazu mit; das Erfassen einer Disc oder Berechtigung
  * erledigt beides von selbst (Abschnitt 5). Angekündigte Titel sind keine
- * Kandidaten (8.4). Gebrauchtpreise kommen mit Stufe 20 – bis dahin
+ * Kandidaten (8.4). Gebrauchtpreise stehen seit Stufe 20 darin, als Forderung
+ * eines Anbieters („ab 12,77 € bei rebuy"), nie als Wert; ohne Angebot steht
  * „unbekannt", nie „0".
  */
 type Kandidaten = { anzahl: number; luecken: number; wuensche: number; kandidaten: KaufKandidat[] }
@@ -103,7 +104,8 @@ export function Kaufliste() {
           {ziel ? <Link to={ziel} className="titel">{k.titel}</Link> : <span className="titel">{k.titel}</span>}
           <div className="ruhig klein">
             {k.plattform ?? 'Plattform fehlt'} · Kritik {k.kritik ?? 'unbekannt'}
-            {k.quelle === 'luecke' && ` · Gebraucht ${k.besterGebrauchtpreisCents === null ? 'unbekannt' : euro(k.besterGebrauchtpreisCents)}`}
+            {k.quelle === 'luecke' &&
+              ` · Gebraucht ${gebrauchtpreisText(k.besterGebrauchtpreisCents, k.gebrauchtpreisAnbieter)}`}
             {k.favorit && ' · ★'}
           </div>
         </div>
