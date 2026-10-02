@@ -1013,6 +1013,10 @@ Meldet die zweite Abfrage `code: 7500`, ist das Limit erreicht. Es wird um
 **Mitternacht UTC** zurückgesetzt; abgewiesene Abfragen werden nicht nachgeholt,
 die gespeicherten Daten bleiben unberührt. Bis dahin ist auch kein Deploy
 möglich, weil die Sicherungsprüfung selbst liest.
+**Ein Deploy kostet rund 250 000 gelesene Zeilen** (gemessen am 01.10.2026):
+`d1 export` liest die ganze Datenbank, und die ist mit den Einzeltrophäen von
+1,79 auf 8,3 MB gewachsen. An einem knappen Tag ist das der größte einzelne
+Posten — vor dem Pushen lohnt der Blick auf `rows_read_24h`.
 
 Vorbeugung ist Sache des Entwurfs: Jeder Fremdschlüssel hat einen Index
 (Migration 0008), und `test/lesekosten.spec.ts` misst die heißen Abfragen gegen
