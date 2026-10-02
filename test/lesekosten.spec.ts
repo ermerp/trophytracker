@@ -146,11 +146,25 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			`SELECT g.id, g.title, ${spielzeit} AS spielzeit_s FROM game g
 			 ORDER BY ${spielzeit} IS NULL, ${spielzeit} DESC, g.sort_title LIMIT 20 OFFSET 0`,
 		);
-		console.info({ sortierungSpielzeit: gelesen });
+		// Die umgekehrte Richtung (Stufe 20e): Nur DESC wird zu ASC, das
+		// `IS NULL` bleibt vorn. Gemessen, weil ein geaenderter ORDER BY den
+		// Abfrageplan kippen kann - genau das war am 13.09.2026 der Fall, als
+		// "zuletzt gespielt" 741 000 Zeilen las.
+		const umgekehrt = await zeilenGelesen(
+			`SELECT g.id, g.title, ${spielzeit} AS spielzeit_s FROM game g
+			 ORDER BY ${spielzeit} IS NULL, ${spielzeit} ASC, g.sort_title LIMIT 20 OFFSET 0`,
+		);
+		const titelAb = await zeilenGelesen(
+			"SELECT g.id, g.title FROM game g ORDER BY g.sort_title DESC LIMIT 20 OFFSET 0",
+		);
+		console.info({ sortierungSpielzeit: gelesen, umgekehrt, titelAb });
 
 		// Zwei Index-Lookups je Ergebniszeile (idx_played_release), keine
 		// Tabellenscans - dieselbe Groessenordnung wie "zuletzt gespielt".
 		expect(gelesen).toBeLessThan(6_000);
+		expect(umgekehrt).toBeLessThan(6_000);
+		// Absteigend nach Titel laeuft rueckwaerts ueber denselben Index.
+		expect(titelAb).toBeLessThan(500);
 
 		await env.DB.prepare("DELETE FROM psn_played_title").run();
 	});

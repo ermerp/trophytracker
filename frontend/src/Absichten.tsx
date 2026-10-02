@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } 
 import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, gebrauchtpreis, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
 import { Preis } from './Preis'
+import { nachZahl, umgekehrt, type Richtung } from './Sortierung'
 import type { Ansichtsart } from './Ansicht'
 import type { ChipGruppe } from './Chips'
 import { Cover, PlattformChip, ZustandsZeile } from './SpielTeile'
@@ -28,15 +29,18 @@ import { Zeichen, type ZeichenName } from './Symbole'
  * Sortierung und Filter liegen in der URL, wie in der Sammlung.
  */
 
-export const SORTIERTEXT = {
+/** Was jede Liste anbietet. To-Do hat zusätzlich die eigene Reihenfolge. */
+export const SORTIERBAR = {
   favorit: 'Favoriten zuerst, dann Wertung',
   wertung: 'Kritikerwertung',
   preis: 'Gebrauchtpreis',
   titel: 'Titel',
   release: 'Erscheinungsdatum',
   angelegt: 'zuletzt angelegt',
-  position: 'eigene Reihenfolge',
 } as const
+export const SORTIERTEXT = { ...SORTIERBAR, position: 'eigene Reihenfolge' } as const
+/** Was alle Listen ausser To-Do anbieten – „eigene Reihenfolge" gibt es nur dort. */
+export type ListenSortierung = keyof typeof SORTIERBAR
 export type Sortierung = keyof typeof SORTIERTEXT
 
 // Seit Stufe 19d ohne 'ohne': Jeder Eintrag hängt an einem Release (Abschnitt 5).
@@ -44,16 +48,47 @@ const PLATTFORM_FILTER = PLATTFORMEN
 
 /** Dieselbe Ordnung wie im Worker, damit eine Änderung die Kachel sofort an ihren Platz rückt. */
 const nachTitel = (a: PlanEintrag, b: PlanEintrag) => a.titel.localeCompare(b.titel, 'de') || a.id - b.id
-const nachWertung = (a: PlanEintrag, b: PlanEintrag) => (b.kritik ?? -1) - (a.kritik ?? -1) || nachTitel(a, b)
-export const VERGLEICH: Record<Sortierung, (a: PlanEintrag, b: PlanEintrag) => number> = {
-  favorit: (a, b) => Number(b.favorit) - Number(a.favorit) || nachWertung(a, b),
-  wertung: nachWertung,
-  titel: nachTitel,
-  release: (a, b) => (a.erscheinungsdatum ?? '9999').localeCompare(b.erscheinungsdatum ?? '9999') || nachTitel(a, b),
-  angelegt: (a, b) => b.angelegtAm.localeCompare(a.angelegtAm) || b.id - a.id,
-  position: (a, b) => (a.position ?? Infinity) - (b.position ?? Infinity) || a.id - b.id,
-  // Günstigstes zuerst; ohne Preis ans Ende – „unbekannt" ist keine 0.
-  preis: (a, b) => (a.preisCents ?? Infinity) - (b.preisCents ?? Infinity) || nachTitel(a, b),
+/** Was bei welchem Kriterium die natürliche Reihenfolge ist (Stufe 20e). */
+export const SORTIER_NATUERLICH: Record<Sortierung, Richtung> = {
+  favorit: 'ab',
+  wertung: 'ab',
+  preis: 'auf',
+  titel: 'auf',
+  release: 'auf',
+  angelegt: 'ab',
+  position: 'auf',
+}
+
+/**
+ * Der Vergleicher zur Wahl. Die Richtung geht hinein, statt das Ergebnis
+ * umzukehren – sonst stünden absteigend die Einträge **ohne** Wert vorn, und
+ * „unbekannt" ist kein hoher Wert, sondern gar keiner (5.2).
+ */
+export function VERGLEICH(sortierung: Sortierung, richtung: Richtung): (a: PlanEintrag, b: PlanEintrag) => number {
+  switch (sortierung) {
+    case 'titel':
+      return richtung === 'auf' ? nachTitel : umgekehrt(nachTitel)
+    case 'wertung':
+      return nachZahl((e: PlanEintrag) => e.kritik, richtung === 'auf' ? 'ab' : 'auf', nachTitel)
+    case 'preis':
+      return nachZahl((e: PlanEintrag) => e.preisCents, richtung, nachTitel)
+    case 'position':
+      return nachZahl((e: PlanEintrag) => e.position, richtung, (a, b) => a.id - b.id)
+    case 'angelegt': {
+      const auf = (a: PlanEintrag, b: PlanEintrag) => a.angelegtAm.localeCompare(b.angelegtAm) || a.id - b.id
+      return richtung === 'auf' ? umgekehrt(auf) : auf
+    }
+    case 'release': {
+      // Ohne Datum ans Ende, in beiden Richtungen.
+      const jahr = (e: PlanEintrag) => (e.erscheinungsdatum ? Number(e.erscheinungsdatum.replaceAll('-', '')) : null)
+      return nachZahl(jahr, richtung, nachTitel)
+    }
+    default: {
+      const auf = (a: PlanEintrag, b: PlanEintrag) =>
+        Number(a.favorit) - Number(b.favorit) || nachZahl((e: PlanEintrag) => e.kritik, 'ab', nachTitel)(a, b)
+      return richtung === 'ab' ? umgekehrt(auf) : auf
+    }
+  }
 }
 
 /** Die Liste im Dativ, für Meldungen und Rückfragen. */
@@ -86,7 +121,15 @@ export function usePlanListe(art: PlanArt) {
   const [hinweis, setHinweis] = useState<string | null>(null)
 
   const standard: Sortierung = art === 'todo' ? 'position' : 'favorit'
-  const sortierung: Sortierung = (params.get('sort') as Sortierung) in SORTIERTEXT ? (params.get('sort') as Sortierung) : standard
+  // „eigene Reihenfolge" gibt es nur auf To-Do. Anderswo ist `?sort=position`
+  // kein gueltiger Wert und faellt auf den Standard zurueck – damit ist der
+  // Wert, den die Sortierleiste bekommt, immer einer, den sie auch anbietet.
+  const erlaubt = art === 'todo' ? SORTIERTEXT : SORTIERBAR
+  const sortierung: Sortierung = (params.get('sort') as Sortierung) in erlaubt ? (params.get('sort') as Sortierung) : standard
+  const richtung: Richtung =
+    params.get('richtung') === 'ab' || params.get('richtung') === 'auf'
+      ? (params.get('richtung') as Richtung)
+      : SORTIER_NATUERLICH[sortierung]
   const nurFavoriten = params.get('favorit') === '1'
   const alle = params.get('status') === 'alle'
   const plattformParam = params.get('plattform') ?? ''
@@ -100,15 +143,29 @@ export function usePlanListe(art: PlanArt) {
       if (alle) abfrage.set('status', 'alle')
       if (plattformParam) abfrage.set('plattform', plattformParam)
       if (suche) abfrage.set('suche', suche)
-      setDaten(await anfrage<Antwort>(`/api/plans?${abfrage}`))
+      const d = await anfrage<Antwort>(`/api/plans?${abfrage}`)
+      // Der Worker sortiert in seiner natürlichen Richtung; die zweite macht
+      // der Browser. Die Listen sind klein (nach dem Import rund 350 Zeilen),
+      // und so braucht die Route keinen zweiten Parameter.
+      setDaten({ ...d, eintraege: [...d.eintraege].sort(VERGLEICH(sortierung, richtung)) })
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Laden fehlgeschlagen.')
     }
-  }, [art, sortierung, nurFavoriten, alle, plattformParam, suche])
+  }, [art, sortierung, richtung, nurFavoriten, alle, plattformParam, suche])
 
   useEffect(() => {
     void laden()
   }, [laden])
+
+  /** Kriterium und Richtung zusammen – nur Abweichungen landen in der URL. */
+  function setzeSortierung(w: Sortierung, r: Richtung) {
+    const neu = new URLSearchParams(params)
+    if (w === standard) neu.delete('sort')
+    else neu.set('sort', w)
+    if (r === SORTIER_NATUERLICH[w]) neu.delete('richtung')
+    else neu.set('richtung', r)
+    setParams(neu, { replace: true })
+  }
 
   function setzeParam(name: string, wert: string) {
     const neu = new URLSearchParams(params)
@@ -135,7 +192,7 @@ export function usePlanListe(art: PlanArt) {
         (!nurFavoriten || e.favorit) &&
         (plattformen.size === 0 || (e.plattform !== null && plattformen.has(e.plattform))) &&
         (suche === '' || e.titel.toLocaleLowerCase('de').includes(suche.toLocaleLowerCase('de')))
-      return { ...d, eintraege: (bleibt ? [...rest, e] : rest).sort(VERGLEICH[sortierung]) }
+      return { ...d, eintraege: (bleibt ? [...rest, e] : rest).sort(VERGLEICH(sortierung, richtung)) }
     })
   }
 
@@ -224,7 +281,7 @@ export function usePlanListe(art: PlanArt) {
 
   return {
     art, daten, setDaten, meldung, setMeldung, hinweis, laeuft, setLaeuft, eben, setEben,
-    sortierung, nurFavoriten, alle, plattformen, suche,
+    sortierung, richtung, setzeSortierung, nurFavoriten, alle, plattformen, suche,
     laden, setzeParam, plattformFilterUmschalten, ersetze, aendern, entfernen, anlegen, rueckgaengig, bewerten, aufKaufliste,
   }
 }

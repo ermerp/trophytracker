@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { anfrage, type BacklogKandidat } from './api'
-import { Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERTEXT, usePlanListe } from './Absichten'
+import { Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
 import { useAnsicht } from './Ansicht'
 import { Chips } from './Chips'
+import { Sortierleiste } from './Sortierung'
 import { Kopfzeile } from './Kopfzeile'
 import { Zeichen } from './Symbole'
 import { TODO_REITER } from './Todo'
@@ -21,7 +22,7 @@ import { TODO_REITER } from './Todo'
  */
 export function Backlog() {
   const liste = usePlanListe('backlog')
-  const { daten, laeuft, nurFavoriten, plattformen, suche, aendern, alle, setzeParam, sortierung } = liste
+  const { daten, laeuft, nurFavoriten, plattformen, suche, aendern, alle, setzeParam, sortierung, richtung, setzeSortierung } = liste
   const ansicht = useAnsicht('backlog')
   const [kandidaten, setKandidaten] = useState<{ kandidaten: BacklogKandidat[]; abgelehnt: number } | null>(null)
 
@@ -67,16 +68,13 @@ export function Backlog() {
         <>
           <div className="listenkopf">
             <span>{daten.eintraege.length} Einträge</span>
-            <label>
-              <span className="nur-vorlesen">Sortierung</span>
-              <select value={sortierung} onChange={(e) => setzeParam('sort', e.target.value === 'favorit' ? '' : e.target.value)}>
-                {Object.entries(SORTIERTEXT)
-                  .filter(([wert]) => wert !== 'position')
-                  .map(([wert, text]) => (
-                    <option key={wert} value={wert}>{text}</option>
-                  ))}
-              </select>
-            </label>
+            <Sortierleiste
+                texte={SORTIERBAR}
+                natuerlich={SORTIER_NATUERLICH}
+                wert={sortierung as ListenSortierung}
+                richtung={richtung}
+                waehlen={(w, r) => setzeSortierung(w, r)}
+              />
           </div>
           <ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>
             {daten.eintraege.map((e) => (

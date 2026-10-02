@@ -65,6 +65,17 @@ export type DiscFassung = (typeof DISC_FILTER)[number];
 export const SORTIERUNGEN = ["titel", "zuletzt", "spielzeit"] as const;
 
 /**
+ * Die natuerliche Richtung je Kriterium (Stufe 20e). Beim Titel ist das A-Z,
+ * bei "zuletzt gespielt" und der Spielzeit das Gegenteil - "aufsteigend" ist
+ * also nicht fuer jedes Kriterium das Erwartete.
+ */
+export const SORTIER_NATUERLICH: Record<(typeof SORTIERUNGEN)[number], "auf" | "ab"> = {
+	titel: "auf",
+	zuletzt: "ab",
+	spielzeit: "ab",
+};
+
+/**
  * Filter auf GET /api/games (Abschnitt 12).
  *
  * Semantik: Ein Spiel erscheint, wenn mindestens ein Release alle
@@ -86,6 +97,8 @@ export type SpieleFilter = {
 	physicalAvailable?: (typeof DISC_FILTER)[number];
 	search?: string;
 	sort: (typeof SORTIERUNGEN)[number];
+	/** Die zweite Richtung (Stufe 20e); 'auf' bzw. 'ab' je Kriterium verschieden. */
+	richtung: "auf" | "ab";
 	limit: number;
 	offset: number;
 };
@@ -605,15 +618,19 @@ aeenliste haengt
 		const spielzeit =
 			"(SELECT SUM(p2.play_duration_s) FROM psn_played_title p2 JOIN release r4 " +
 			"ON r4.id = p2.release_id WHERE r4.game_id = g.id)";
+		// Die natuerliche Richtung ist je Kriterium verschieden: Beim Titel ist
+		// das A-Z, bei "zuletzt gespielt" und der Spielzeit das Gegenteil. Die
+		// Umkehrung dreht deshalb nur DESC/ASC - **das `IS NULL` bleibt vorn**,
+		// damit "ohne Wert" in BEIDEN Richtungen hinten steht. "Unbekannt" ist
+		// kein hoher Wert, sondern gar keiner (Abschnitt 5.2; PS3 und Vita
+		// liefern grundsaetzlich keine Spielzeit).
+		const umgekehrt = filter.richtung === "auf";
 		const sortierung =
 			filter.sort === "zuletzt"
-				? `${zuletzt} IS NULL, ${zuletzt} DESC, g.sort_title`
+				? `${zuletzt} IS NULL, ${zuletzt} ${umgekehrt ? "ASC" : "DESC"}, g.sort_title`
 				: filter.sort === "spielzeit"
-					// Ohne Spielzeit ans Ende: PS3 und Vita liefern grundsaetzlich
-					// keine, und "unbekannt" ist keine Null (Entscheidung des
-					// Nutzers vom 22.09.2026, Abschnitt 5.2).
-					? `${spielzeit} IS NULL, ${spielzeit} DESC, g.sort_title`
-					: "g.sort_title";
+					? `${spielzeit} IS NULL, ${spielzeit} ${umgekehrt ? "ASC" : "DESC"}, g.sort_title`
+					: `g.sort_title${filter.richtung === "ab" ? " DESC" : ""}`;
 
 		const [zaehlung, seite] = await this.db.batch([
 			this.db.prepare(`SELECT COUNT(*) AS n ${woher}${sucheBedingung}`).bind(...werte),
