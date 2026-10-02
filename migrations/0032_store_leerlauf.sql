@@ -1,0 +1,22 @@
+-- Migration 0032: Der Leerlauf des Store-Schritts (Nachtrag zu Stufe 21)
+--
+-- Befund aus der Lesekosten-Messung direkt nach dem Deploy: Die Auswahl des
+-- Store-Schritts las im LEERLAUF 430 Zeilen - einmal je Release -, und sie
+-- laeuft in jedem der 36 Aufrufe des PSN-Fensters. Damit stieg der Leerlauf
+-- dort von 15 auf 445 gelesene Zeilen und die Nacht von rund 54 000 auf
+-- 69 444. Genau die Zahl, die Stufe 18e klein gemacht hatte.
+--
+-- Die Ursache ist nicht der Index auf `store_geprueft_am` - der ordnet
+-- richtig. Es ist die zweite Haelfte der Bedingung: `physical_release_status
+-- = 'nein'` hat keinen Index, also muss jede Zeile angefasst werden, nur um
+-- festzustellen, dass keine passt. Die Spalte ist dafuer denkbar schlecht
+-- geeignet: Sie steht bei 490 von 490 Releases auf 'unbekannt' oder 'ja',
+-- ein 'nein' setzt ausschliesslich der Nutzer von Hand (Abschnitt 3), und
+-- ein normaler Index ueber drei Werte brauchte dieselbe Arbeit.
+--
+-- Ein TEILINDEX passt genau: Er enthaelt nur die Zeilen mit 'nein' - heute
+-- keine einzige - und beantwortet damit "gibt es nur-digitale Releases?"
+-- aus einer leeren Struktur statt aus der ganzen Tabelle. Das ist dieselbe
+-- Regel wie am 01.10.2026 beim Feed: Eine Frage nach "ist etwas offen?"
+-- beantwortet die kleine Menge, nicht die grosse.
+CREATE INDEX idx_release_nur_digital ON release(id) WHERE physical_release_status = 'nein';

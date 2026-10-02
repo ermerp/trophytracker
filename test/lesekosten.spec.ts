@@ -697,12 +697,12 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		await env.DB.batch(vorbereitung);
 
 		const auswahl = await zeilenGelesen(
-			"SELECT r.id AS releaseId, r.game_id AS gameId, g.igdb_id AS igdbId, g.title AS titel, r.platform AS plattform, " +
+			"WITH ziele(id) AS (SELECT pe.release_id FROM plan_entry pe WHERE pe.status = 'offen' AND pe.release_id IS NOT NULL " +
+				"UNION SELECT id FROM release WHERE physical_release_status = 'nein') " +
+				"SELECT r.id AS releaseId, r.game_id AS gameId, g.igdb_id AS igdbId, g.title AS titel, r.platform AS plattform, " +
 				"g.store_concept_id AS conceptId, g.store_concept_am AS conceptAm, r.psn_product_id AS produktId " +
-				"FROM release r JOIN game g ON g.id = r.game_id " +
+				"FROM ziele z JOIN release r ON r.id = z.id JOIN game g ON g.id = r.game_id " +
 				"WHERE (r.store_geprueft_am IS NULL OR r.store_geprueft_am < datetime('now', '-1 days')) " +
-				"AND (EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = r.id AND pe.status = 'offen') " +
-				"OR r.physical_release_status = 'nein') " +
 				"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') " +
 				"ORDER BY r.store_geprueft_am, r.id LIMIT 10",
 		);
@@ -744,7 +744,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const jeAufruf = auswahl + (protokoll + verlaufsschreiben) * 10 + offen;
 		console.info({ auswahl, protokoll, verlaufsschreiben, offen, standVoll, jeAufruf, absichten });
 
-		// Die Auswahl bricht ueber idx_release_store nach LIMIT ab.
+		// Die Zielmenge kommt aus plan_entry und dem Teilindex (0032), nicht
+		// aus einem Scan ueber release - gemessen 341 statt 431 mit `IN`.
 		expect(auswahl).toBeLessThan(400);
 		// Je Release zwei Index-Lookups - nichts, was mit dem Bestand waechst.
 		expect(protokoll).toBeLessThan(20);
@@ -1133,13 +1134,29 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			 AND (normalized_at IS NOT NULL OR sync_run_id IN (SELECT id FROM psn_sync_run WHERE status = 'fehler'))`,
 		);
 
+		// Seit Stufe 21 laeuft im PSN-Fenster als achter Schritt die Auswahl
+		// der Store-Preise mit - auch im Leerlauf, weil sie erst ihre eigene
+		// Abfrage braucht, um "nichts zu tun" festzustellen. Genau hier sass
+		// der Befund aus 21b: Mit `EXISTS(...) OR physical_release_status =
+		// 'nein'` las sie **430** Zeilen, weil die zweite Haelfte keinen
+		// Index hatte - 36-mal je Nacht. Mit der CTE und dem Teilindex aus
+		// Migration 0032 sind es vier.
+		const storeAuswahl = await zeilenGelesen(
+			"WITH ziele(id) AS (SELECT pe.release_id FROM plan_entry pe WHERE pe.status = 'offen' AND pe.release_id IS NOT NULL " +
+				"UNION SELECT id FROM release WHERE physical_release_status = 'nein') " +
+				"SELECT r.id FROM ziele z JOIN release r ON r.id = z.id JOIN game g ON g.id = r.game_id " +
+				"WHERE (r.store_geprueft_am IS NULL OR r.store_geprueft_am < datetime('now', '-1 days')) " +
+				"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') " +
+				"ORDER BY r.store_geprueft_am, r.id LIMIT 10",
+		);
+
 		// Seit Stufe 18e sind es zwei Fenster, und jedes liest nur seine
 		// eigenen Abfragen: das PSN-Fenster 36-mal je Nacht, die Wartung
 		// 24-mal.
-		const leerlaufPsn = haenger + laufend + heutige;
+		const leerlaufPsn = haenger + laufend + heutige + storeAuswahl;
 		const leerlaufWartung = erschienen + auffrischen + disc + aufraeumen;
 		const nacht = leerlaufPsn * 36 + leerlaufWartung * 24;
-		console.info({ erschienen, haenger, laufend, heutige, auffrischen, disc, aufraeumen, leerlaufPsn, leerlaufWartung, nacht });
+		console.info({ erschienen, haenger, laufend, heutige, storeAuswahl, auffrischen, disc, aufraeumen, leerlaufPsn, leerlaufWartung, nacht });
 
 		// Gemessen bis Stufe 18d: 2 241 Zeilen in einem Aufruf, der alles tat -
 		// game zweimal (erschienen, auffrischen), game mit release je Spiel fuer
