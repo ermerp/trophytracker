@@ -1192,6 +1192,12 @@ textarea {
   color: var(--text-still);
 }
 
+/* Die Überschrift ist in der Lückenansicht ein Schalter und darf die
+   Sortierung nicht an den Rand drängen (Stufe 20e). */
+.listenkopf .knopfname {
+  width: auto;
+}
+
 .listenkopf label {
   display: inline;
   margin: 0 0 0 auto;

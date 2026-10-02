@@ -19,9 +19,14 @@ import { WUNSCH_REITER } from './Wunschliste'
  * Darunter „Disc-Fassung unbekannt": digital gespielt, nicht im Regal, aber
  * ohne Beleg für eine Disc (Entscheidung des Nutzers vom 16.09.2026, Block
  * B). Dort entsteht das „nein" von Hand – oder ein „ja", wenn er es besser
- * weiß als IGDB; „physisch nicht gewünscht" gibt es auch hier (Wunsch des
- * Nutzers vom 16.09.2026): Die Frage nach der Disc bleibt offen, die Absicht
- * ist trotzdem entschieden.
+ * weiß als IGDB.
+ *
+ * **„physisch nicht gewünscht" gibt es im zweiten Block nicht mehr**
+ * (Entscheidung des Nutzers vom 02.10.2026, sie kehrt seinen Wunsch vom
+ * 16.09.2026 um). Dort steht eine einzige Frage – gibt es die Disc? –, und
+ * ein dritter Knopf, der die Frage offen lässt und die Zeile trotzdem
+ * ausblendet, gehört nicht in dieselbe Reihe. Die Absicht entscheidet sich
+ * danach in der Lückenliste, wo die Disc-Fassung geklärt ist.
  *
  * Seit Stufe 20 stehen echte Gebrauchtpreise darin – „ab 12,77 € bei rebuy",
  * eine Forderung bei einem Anbieter, kein Wert. Und der zweite Block nennt,
@@ -61,6 +66,36 @@ function nachBefund(zeilen: readonly Luecke[]): Luecke[] {
   return [...zeilen].sort((a, b) => rang(a) - rang(b) || a.titel.localeCompare(b.titel, 'de'))
 }
 
+/**
+ * Sortierung der Lückenliste (Stufe 20e, nachgereicht am 02.10.2026).
+ *
+ * Die Ansicht hatte als einzige Liste gar keine – sie kam aus der Datenbank
+ * nach Titel und blieb so. Für den Gebrauchtpreis ist das zu wenig: „Was
+ * fülle ich als Nächstes auf" ist genau die Frage, die ein Preis beantwortet.
+ *
+ * Gilt nur für die obere Liste. Der zweite Block bleibt nach seinem Befund
+ * geordnet – dort ist „eBay kennt kein Angebot" die Reihenfolge, die ihn
+ * abarbeitbar macht, und ein Preis steht dort ohnehin selten.
+ */
+const LUECKEN_SORTIERUNG = {
+  titel: 'Titel',
+  preis: 'Gebrauchtpreis',
+  fortschritt: 'Fortschritt',
+} as const
+type LueckenSortierung = keyof typeof LUECKEN_SORTIERUNG
+
+const nachLueckenTitel = (a: Luecke, b: Luecke) =>
+  a.titel.localeCompare(b.titel, 'de') || a.plattform.localeCompare(b.plattform)
+
+const LUECKEN_VERGLEICH: Record<LueckenSortierung, (a: Luecke, b: Luecke) => number> = {
+  titel: nachLueckenTitel,
+  // Günstigstes zuerst; ohne Preis ans Ende – „unbekannt" ist keine 0.
+  preis: (a, b) =>
+    (a.besterGebrauchtpreisCents ?? Infinity) - (b.besterGebrauchtpreisCents ?? Infinity) || nachLueckenTitel(a, b),
+  // Am weitesten gespielt zuerst: Wo viel Zeit drinsteckt, lohnt die Disc eher.
+  fortschritt: (a, b) => b.fortschritt - a.fortschritt || nachLueckenTitel(a, b),
+}
+
 /** Die beiden Umschalter der Ansicht, als Chips wie überall sonst (Stufe 19). */
 const LUECKEN_CHIPS: readonly ChipGruppe[] = [
   { param: 'verworfene', titel: 'Verworfene', werte: [['1', 'auch verworfene']] },
@@ -78,6 +113,8 @@ export function Luecken() {
   const [params, setParams] = useSearchParams()
   const mitVerworfenen = params.get('verworfene') === '1'
   const moeglichOffen = params.get('unbekannte') === '1'
+  const sortierung: LueckenSortierung =
+    (params.get('sort') as LueckenSortierung) in LUECKEN_SORTIERUNG ? (params.get('sort') as LueckenSortierung) : 'titel'
   // Der obere Block ist zugeklappbar, damit der zweite schnell erreichbar ist
   // (Wunsch des Nutzers vom 02.10.2026). Bewusst KEIN URL-Parameter: Er soll
   // beim Aufruf der Ansicht immer offen sein, das Zuklappen gilt nur für den
@@ -174,25 +211,45 @@ export function Luecken() {
         </p>
       ) : (
         <>
-          <h2>
-            <button
-              type="button"
-              className="knopfname kandidatenkopf"
-              aria-expanded={lueckenOffen}
-              onClick={() => setLueckenOffen(!lueckenOffen)}
-            >
-              <span>
-                {daten.anzahl} {daten.anzahl === 1 ? 'Lücke' : 'Lücken'}
-                {mitVerworfenen && daten.verworfen > 0 && `, dazu ${daten.verworfen} verworfen`}
-              </span>
-              <span className={lueckenOffen ? 'pfeil auf' : 'pfeil'}>
-                <Zeichen name="winkel" groesse={18} strich={2.1} />
-              </span>
-            </button>
-          </h2>
+          <div className="listenkopf">
+            <h2>
+              <button
+                type="button"
+                className="knopfname kandidatenkopf"
+                aria-expanded={lueckenOffen}
+                onClick={() => setLueckenOffen(!lueckenOffen)}
+              >
+                <span>
+                  {daten.anzahl} {daten.anzahl === 1 ? 'Lücke' : 'Lücken'}
+                  {mitVerworfenen && daten.verworfen > 0 && `, dazu ${daten.verworfen} verworfen`}
+                </span>
+                <span className={lueckenOffen ? 'pfeil auf' : 'pfeil'}>
+                  <Zeichen name="winkel" groesse={18} strich={2.1} />
+                </span>
+              </button>
+            </h2>
+            <label>
+              <span className="nur-vorlesen">Sortierung</span>
+              <select
+                value={sortierung}
+                onChange={(ev) => {
+                  const neu = new URLSearchParams(params)
+                  if (ev.target.value === 'titel') neu.delete('sort')
+                  else neu.set('sort', ev.target.value)
+                  setParams(neu, { replace: true })
+                }}
+              >
+                {Object.entries(LUECKEN_SORTIERUNG).map(([wert, text]) => (
+                  <option key={wert} value={wert}>
+                    {text}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           {lueckenOffen && (
           <ul className="kandidatenliste">
-            {daten.luecken.map((l) => (
+            {[...daten.luecken].sort(LUECKEN_VERGLEICH[sortierung]).map((l) => (
               <LueckeZeile key={l.releaseId} l={l}>
                 {l.verworfen ? (
                   <button type="button" className="klein" disabled={laeuft} onClick={() => wiederZeigen(l)}>wieder als Lücke zeigen</button>
@@ -236,8 +293,8 @@ export function Luecken() {
         {moeglichOffen && (
           <p className="ruhig klein">
             Digital gespielt und nicht im Regal, aber ohne Beleg, dass es eine Disc gibt. „Disc gibt es" macht daraus eine Lücke, „gibt es nicht" nimmt das
-            Release dauerhaft heraus – beides gilt als deine Entscheidung und wird von IGDB nicht mehr überschrieben. „physisch nicht gewünscht" lässt die
-            Frage offen und blendet das Release trotzdem aus: ob es die Disc gibt, ist dir dann egal. Oben stehen die Fälle, zu denen eBay in der
+            Release dauerhaft heraus – beides gilt als deine Entscheidung und wird von IGDB nicht mehr überschrieben. Hier geht es nur um diese eine Frage;
+            ob du die Disc haben willst, entscheidest du danach in der Lückenliste. Oben stehen die Fälle, zu denen eBay in der
             Plattform-Kategorie gar kein Angebot kennt – bei bekannten Discs trifft das nur auf 3 % zu, es spricht also für „nur digital".
           </p>
         )}
@@ -256,7 +313,6 @@ export function Luecken() {
                     <>
                       <button type="button" className="klein" disabled={laeuft} onClick={() => discSetzen(l, 'ja')}>Disc gibt es</button>
                       <button type="button" className="klein" disabled={laeuft} onClick={() => discSetzen(l, 'nein')}>gibt es nicht</button>
-                      <button type="button" className="klein" disabled={laeuft} onClick={() => verwerfen(l)}>physisch nicht gewünscht</button>
                     </>
                   )}
                 </LueckeZeile>
