@@ -16,11 +16,20 @@ import type { Plattform } from "./titel";
  * Bestand gemessen:
  *
  * 1. `sammlungstreffer` findet genau dieses Spiel und ist eindeutig.
- * 2. Der Titel nennt keine ANDERE PlayStation-Plattform. eBays Aspekt
- *    `Plattform` ist verkaeufergepflegt und manchmal falsch - gemessen bei
- *    Borderlands 2 (PS3-Disc als PS4 getaggt) und Cyberpunk 2077.
- * 3. Das Angebot traegt hoechstens `zusatzwortGrenze` Worte, die im eigenen
- *    Titel nicht vorkommen.
+ * 2. Der Titel nennt keine ANDERE Plattform - weder eine der eigenen vier
+ *    (eBays Aspekt `Plattform` ist verkaeufergepflegt und manchmal falsch)
+ *    noch eine fremde wie PS2 oder Xbox.
+ * 3. Das Angebot ist ueberhaupt ein Datentraeger, kein Konto und keine
+ *    Dienstleistung.
+ * 4. Bei ein- und zweiwortigen Titeln steht unser Wort vorn.
+ * 5. Kein fremdes Wort ist eine blanke Ziffer, solange unser Titel keine traegt.
+ * 6. Das Angebot traegt hoechstens `zusatzwortGrenze` fremde Worte.
+ *
+ * Die Bedingungen 2 bis 5 sind am 02.10.2026 an den 79 Releases nachgemessen
+ * worden, die der erste Entwurf automatisch auf `ja` gesetzt haette: Fuenf
+ * davon waren falsch, und diese vier Regeln beseitigen alle fuenf. Sie kosten
+ * dabei genau einen belegten und vier unbekannte Treffer (214 -> 213 und
+ * 79 -> 75).
  */
 
 /**
@@ -72,6 +81,40 @@ const PLATTFORM_IM_TEXT: Record<Plattform, RegExp[]> = {
 };
 
 /**
+ * Plattformen, die wir gar nicht fuehren - sie sind IMMER ein Widerspruch.
+ *
+ * Gemessen am 02.10.2026: "Metal Gear Solid 2" (PS3) bekam ein Angebot
+ * "Metal Gear Solid 3 PlayStation 2 Ps2". Die Pruefung kannte nur die eigenen
+ * vier Plattformen und sah deshalb keinen Widerspruch. Mit dieser Liste faellt
+ * das PS2-Angebot heraus - und darunter liegt die HD Collection fuer PS3, auf
+ * der das Spiel tatsaechlich ist. Aus einem Fehlgriff wird ein Treffer.
+ */
+const FREMDE_PLATTFORM: RegExp[] = [
+	/\bps\s?[12]\b/i,
+	/playstation\s?[12]\b/i,
+	/\bpsp\b/i,
+	/\bxbox\b/i,
+	/\bx360\b/i,
+	/\bswitch\b/i,
+	/\bnintendo\b/i,
+	/\bwii\b/i,
+	/\bgamecube\b/i,
+	/\bdreamcast\b/i,
+	/\bpc\b/i,
+];
+
+/**
+ * Angebote, die in der Videospiel-Kategorie stehen, aber kein Datentraeger
+ * sind. Gemessen am 02.10.2026 unter den 79 automatisch gesetzten
+ * Disc-Fassungen: "Genshin Impact Account" (261 EUR) und "Yakuza Kiwami 2 PS5
+ * Platinum Trophy Service" (226 EUR) - beides keine Disc, beides ein falsches
+ * `ja`. Die Liste kostete in derselben Messung keinen einzigen richtigen
+ * Treffer.
+ */
+const KEIN_DATENTRAEGER =
+	/\b(account|service|boosting|leerh[üu]lle|nur h[üu]lle|ohne spiel|poster|sticker|aufkleber|schl[üu]sselanh[äa]nger|key|download\s?code)\b/i;
+
+/**
  * Nennt der Angebotstitel eine andere PlayStation-Plattform als die gesuchte?
  *
  * Nennt er beide ("PS4 / PS5"), ist es eine Mehrfachangabe und kein
@@ -80,9 +123,53 @@ const PLATTFORM_IM_TEXT: Record<Plattform, RegExp[]> = {
 export function plattformWiderspruch(angebotstitel: string, meine: Plattform): boolean {
 	const eigene = PLATTFORM_IM_TEXT[meine].some((re) => re.test(angebotstitel));
 	if (eigene) return false;
-	return Object.entries(PLATTFORM_IM_TEXT).some(
+	const andereEigene = Object.entries(PLATTFORM_IM_TEXT).some(
 		([p, muster]) => p !== meine && muster.some((re) => re.test(angebotstitel)),
 	);
+	return andereEigene || FREMDE_PLATTFORM.some((re) => re.test(angebotstitel));
+}
+
+/** Ist das Angebot gar keine Disc, sondern ein Konto, eine Dienstleistung oder Beiwerk? */
+export function keinDatentraeger(angebotstitel: string): boolean {
+	return KEIN_DATENTRAEGER.test(angebotstitel);
+}
+
+/**
+ * Bei kurzen Titeln muss das erste Inhaltswort des Angebots unseres sein.
+ *
+ * "Journey" (PS4) bekam sonst "Robinson: The Journey": Unser einziges Wort
+ * steckt darin, und "robinson" ist nur EIN fremdes Wort - genau die Grenze.
+ * Ein Angebot fuer unser Spiel beginnt dagegen mit unserem Titel, sobald der
+ * Ballast weg ist ("PS4 Spiel Journey" wird zu ["journey"]).
+ *
+ * Nur fuer ein- und zweiwortige Titel: Ab drei Worten traegt die Wortmenge
+ * selbst genug, und die Regel wuerde Angebote verwerfen, die mit dem
+ * Herausgeber beginnen ("2K BioShock ...").
+ */
+export const KURZER_TITEL_BIS = 2;
+
+export function beginntMitTitel(angebotstitel: string, meinTitel: string): boolean {
+	const mein = [...worteAus(meinTitel)];
+	if (mein.length === 0 || mein.length > KURZER_TITEL_BIS) return true;
+	const imAngebot = [...worteAus(angebotstitel)];
+	return imAngebot.length > 0 && imAngebot[0] === mein[0];
+}
+
+/**
+ * Eine blanke Ziffer als fremdes Wort heisst Nachfolger.
+ *
+ * "SteamWorld Dig" (PS4) bekam "SteamWorld Dig 2". Traegt unser Titel selbst
+ * eine Zahl ("Borderlands 2", "Far Cry 2"), greift die Regel nicht - dort ist
+ * die Ziffer Teil des Namens, und ein zusaetzlicher Jahrgang im Angebot
+ * ("Sony PlayStation 3, 2009") waere sonst ein Ausschlussgrund.
+ */
+export function nachfolgerZiffer(angebotstitel: string, meinTitel: string): boolean {
+	const mein = worteAus(meinTitel);
+	if ([...mein].some((w) => /^\d+$/.test(w))) return false;
+	for (const wort of worteAus(angebotstitel)) {
+		if (!mein.has(wort) && /^\d+$/.test(wort)) return true;
+	}
+	return false;
 }
 
 /** Worte im Angebotstitel, die im eigenen Titel nicht vorkommen (Ballast zaehlt nicht mit). */
@@ -129,6 +216,9 @@ export function guenstigstesGeprueft<T extends SammlungsSpiel>(
 	let bestes: MarktAngebot | null = null;
 	for (const angebot of angebote) {
 		if (plattformWiderspruch(angebot.titel, release.plattform)) continue;
+		if (keinDatentraeger(angebot.titel)) continue;
+		if (!beginntMitTitel(angebot.titel, release.titel)) continue;
+		if (nachfolgerZiffer(angebot.titel, release.titel)) continue;
 		if (zusatzworte(angebot.titel, release.titel) > grenze) continue;
 		const { treffer, eindeutig } = sammlungstreffer(angebot.titel, sammlung);
 		if (!eindeutig || treffer[0]?.spielId !== release.gameId) continue;
