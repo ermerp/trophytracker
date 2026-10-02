@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19e abgenommen** (19b am 02.10.2026), **Stufe 20 gebaut** (02.10.2026)
+**Stufen bis 20e abgenommen** (20e am 02.10.2026)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -298,7 +298,7 @@ Offen bleibt 21 (PSN Store-Preise); sie braucht zuerst `release.psn_product_id`,
 das heute bei keinem der 490 Releases gefüllt ist. Die PSN-Stufen ergänzen nur,
 was die Sammlung schon kennt, und importieren nichts.
 
-**Stufe 20e** (02.10.2026) bringt die Preise in die Listen: an Kaufliste und
+**Stufe 20e ist am 02.10.2026 abgenommen.** Sie bringt die Preise in die Listen: an Kaufliste und
 offenen Wunsch, als Link aufs Angebot, sortierbar. Die Sortierung selbst ist
 dabei in allen fünf Listen neu – ein verankertes Menü mit Richtungspfeil statt
 eines nativen Auswahlfelds, und „unbekannt" bleibt in beiden Richtungen am
