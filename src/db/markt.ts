@@ -199,6 +199,23 @@ export class MarktRepository {
 			);
 	}
 
+	/**
+	 * Wie viele Releases noch nie gefragt wurden - EINE Abfrage ueber
+	 * idx_release_markt, nicht die vier Zaehler von `stand()`.
+	 *
+	 * Gemessen am 02.10.2026: Ein Cron-Aufruf des Schritts las 2 059 Zeilen,
+	 * davon **1 549 allein fuer `stand()`** - drei Viertel der Kosten fuer
+	 * eine Zahl, die nur in der Verlaufszeile steht. Dieselbe Form wie der
+	 * `COUNT(*)` in der Feed-Route am 01.10.2026, nur kleiner. `stand()`
+	 * bleibt fuer die Einstellungen, wo alle vier Zahlen gebraucht werden.
+	 */
+	async offeneAnzahl(): Promise<number> {
+		const z = await this.db
+			.prepare("SELECT COUNT(*) AS n FROM release WHERE markt_geprueft_am IS NULL")
+			.first<{ n: number }>();
+		return z?.n ?? 0;
+	}
+
 	/** Zaehler fuer die Einstellungen und die Statusanzeige des Schritts. */
 	async stand(): Promise<{ mitPreis: number; geprueft: number; ohneAngebot: number; offen: number }> {
 		const z = await this.db

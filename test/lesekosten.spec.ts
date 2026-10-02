@@ -607,7 +607,24 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now'), markt_rohangebote = 7 WHERE id = 1"),
 		]);
 		const schreibkosten = schreiben.reduce((n, r) => n + (r.meta.rows_read ?? 0), 0);
-		console.info({ luecken, auswahl, schreibkosten });
+
+		// Der GANZE Aufruf, nicht nur seine Hauptabfrage: Der Schritt liest
+		// ausserdem die Sammlung (einmal, fuer den Titelabgleich) und am Ende
+		// seinen Stand. Genau das war der Fehler vom 01.10.2026 - gemessen
+		// wurde die Abfrage, gezahlt hat die Route.
+		const sammlung = await zeilenGelesen("SELECT id AS spielId, title AS titel FROM game");
+		// Der Schritt fragt nur noch den einen Zaehler, den die Verlaufszeile
+		// braucht. Die vier Zaehler von `stand()` kosteten 1 549 Zeilen - drei
+		// Viertel eines ganzen Aufrufs fuer eine Anzeigezahl.
+		const stand = await zeilenGelesen("SELECT COUNT(*) AS n FROM release WHERE markt_geprueft_am IS NULL");
+		const standVoll = await zeilenGelesen(
+			"SELECT (SELECT COUNT(*) FROM market_offer WHERE source = 'ebay' AND in_stock = 1) AS mitPreis, " +
+				"(SELECT COUNT(*) FROM release WHERE markt_geprueft_am IS NOT NULL) AS geprueft, " +
+				"(SELECT COUNT(*) FROM release WHERE markt_rohangebote = 0) AS ohneAngebot, " +
+				"(SELECT COUNT(*) FROM release WHERE markt_geprueft_am IS NULL) AS offen",
+		);
+		const jeAufruf = auswahl + sammlung + schreibkosten * 10 + stand;
+		console.info({ luecken, auswahl, sammlung, stand, standVoll, schreibkosten, jeAufruf });
 
 		// Vor Stufe 20 las dieselbe Abfrage 2 620 Zeilen mit leerer
 		// market_offer; mit den beiden LEFT JOINs sind es dort 2 194 und mit
@@ -618,6 +635,11 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Zehn Releases je Aufruf, also das Zehnfache - und das bleibt weit
 		// unter dem, was eine Nacht vertraegt.
 		expect(schreibkosten).toBeLessThan(200);
+		// Ein ganzer Cron-Aufruf des Schritts. Im Dauerbetrieb sind nach der
+		// 14-Tage-Frist rund drei Aufrufe je Nacht faellig.
+		expect(jeAufruf).toBeLessThan(1_000);
+		// Die Einstellungen duerfen die vier Zaehler haben - sie werden selten geoeffnet.
+		expect(standVoll).toBeLessThan(3_000);
 
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM price_snapshot"),

@@ -76,7 +76,7 @@ export async function marktSchritt(
 			// Ratenlimit oder Zugang: Der Lauf endet sauber, das Geprueffte
 			// bleibt stehen, der Rest ist morgen wieder fällig.
 			if (fehler instanceof EbayRateError || fehler instanceof EbayAuthError) {
-				const { offen } = await repos.markt.stand();
+				const offen = await repos.markt.offeneAnzahl();
 				return { status: "fehler", geprueft, mitPreis, discBelegt, ohneAngebot, nochOffen: offen, weiter: false, meldung: meldungFuer(fehler) };
 			}
 			// Ein einzelner Fehlschlag darf die Portion nicht kosten: Dieses
@@ -91,8 +91,12 @@ export async function marktSchritt(
 		if (rohangebote === 0) ohneAngebot++;
 	}
 
-	const { offen } = await repos.markt.stand();
-	return { status: "erfolg", geprueft, mitPreis, discBelegt, ohneAngebot, nochOffen: offen, weiter: offen > 0 };
+	// `weiter` kommt aus der Portionsgroesse, nicht aus einem Zaehler: Eine
+	// volle Portion heisst, dass wahrscheinlich mehr wartet - eine halbe, dass
+	// der Bestand durch ist. Das kostet nichts, und der naechste Aufruf
+	// korrigiert sich ohnehin selbst.
+	const offen = await repos.markt.offeneAnzahl();
+	return { status: "erfolg", geprueft, mitPreis, discBelegt, ohneAngebot, nochOffen: offen, weiter: ziele.length === n };
 }
 
 function leer(teil: { status: "erfolg" | "fehler"; meldung?: string }): MarktErgebnis {

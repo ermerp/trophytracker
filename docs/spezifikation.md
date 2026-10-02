@@ -1016,6 +1016,8 @@ Was bleibt, ist eine **Forderung** — „so viel verlangt dieser Anbieter gerad
 
 Der Schritt läuft im **Wartungsfenster** (`*/5 6-7`, 24 Aufrufe) — er fasst Sony nicht an. Zehn Releases je Aufruf, also zwanzig Fremdanfragen von erlaubten fünfzig (15.4). Gefragt werden **nicht alle** Releases, sondern dieselbe Menge, die 7.4 für die Store-Preise festlegt: was in der Lückenansicht auftaucht oder auf einer offenen Absicht steht. Ein Release wird nach 14 Tagen erneut gefragt.
 
+**Ein Aufruf liest 940 Zeilen** (gemessen am 02.10.2026 gegen 430 Listen): 30 für die Auswahl, 430 für die einmal zerlegte Sammlung, 50 fürs Schreiben und 430 für den offenen Zähler. Im Dauerbetrieb sind nach der 14-Tage-Frist rund drei Aufrufe je Nacht fällig, also etwa 2 800 Zeilen — gegen 5 Millionen am Tag. Die erste Fassung las 2 059 je Aufruf, davon **1 549 für vier Zähler, die nur in der Verlaufszeile standen**; sie sind durch einen einzigen ersetzt, und `weiter` kommt jetzt aus der Portionsgröße statt aus einem Zähler. Dieselbe Form wie der `COUNT(*)` in der Feed-Route am 01.10.2026, nur kleiner — und derselbe Grund, warum ein Schreibschritt vollständig gemessen gehört und nicht nur in seiner Hauptabfrage.
+
 Der Stand steht je Zeile in `release.markt_geprueft_am`, nicht als Marke in `app_setting`. Damit gibt es den Fehlerfall aus 18e hier nicht: Ein abgebrochener Lauf lässt die ungeprüften Releases ungestempelt, und der nächste Aufruf nimmt sie wieder — Erfolg und Fehler können keine gemeinsame Marke hinterlassen, weil es keine gibt.
 
 **Keine Rohablage** (Regel in CLAUDE.md): Die Antworten sind klein, die Normalisierung ist Feldkopieren plus Titelabgleich, und jeder Abruf ist jederzeit wiederholbar.
