@@ -157,6 +157,7 @@ export function kaufKandidatAntwort(k: KaufKandidatZeile) {
 		favorit: k.is_favorite === 1,
 		/** null heisst unbekannt - nie 0 (Darstellungsregel, Abschnitt 13). */
 		besterGebrauchtpreisCents: k.bester_gebrauchtpreis_cents,
+		gebrauchtpreisAnbieter: k.gebrauchtpreis_anbieter,
 	};
 }
 

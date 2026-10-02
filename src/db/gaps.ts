@@ -22,6 +22,16 @@ export type LueckeZeile = {
 	verworfen: number;
 	plan_id: number | null;
 	bester_gebrauchtpreis_cents: number | null;
+	/** Wer das Angebot stellt - 'rebuy', 'medimops' oder 'eBay' (Stufe 20). */
+	gebrauchtpreis_anbieter: string | null;
+	/** Wann eBay zuletzt gefragt wurde; null heisst: noch nie. */
+	markt_geprueft_am: string | null;
+	/**
+	 * Wie viele Angebote eBay in der Plattform-Kategorie ueberhaupt kennt -
+	 * VOR dem Titelabgleich. 0 ist der Hinweis auf eine reine
+	 * Download-Fassung (gemessen 3 % Fehlrate, 7.3), null heisst ungeprueft.
+	 */
+	markt_rohangebote: number | null;
 };
 
 export class GapsRepository {
@@ -33,6 +43,7 @@ export class GapsRepository {
 				`SELECT l.game_id, l.title, l.cover_url, l.release_id, l.platform,
 				        l.disc_fassung, l.disc_quelle, l.progress_pct, l.hat_platin,
 				        l.eigener_status, l.verworfen, l.bester_gebrauchtpreis_cents,
+				        l.gebrauchtpreis_anbieter, l.markt_geprueft_am, l.markt_rohangebote,
 				        (SELECT pe.id FROM plan_entry pe WHERE pe.release_id = l.release_id
 				           AND pe.kind = 'kauf' AND pe.status = 'verworfen' ORDER BY pe.id LIMIT 1) AS plan_id
 				 FROM v_luecken l

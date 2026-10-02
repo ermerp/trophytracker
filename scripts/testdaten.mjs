@@ -52,8 +52,8 @@ s("-- Erfundene Zeilen, erzeugt von scripts/testdaten.mjs. Nur fuer --local.");
 s("PRAGMA foreign_keys = OFF;");
 for (const tabelle of [
 	"game_event", "plan_entry", "play_status", "physical_copy", "digital_entitlement",
-	"review_queue", "trophy_progress", "psn_played_title", "ean_mapping", "release", "game",
-	"psn_raw_response", "psn_sync_run", "app_setting",
+	"review_queue", "trophy_progress", "psn_played_title", "ean_mapping", "price_snapshot",
+	"market_offer", "release", "game", "psn_raw_response", "psn_sync_run", "app_setting",
 ]) {
 	s(`DELETE FROM ${tabelle};`);
 }
@@ -212,6 +212,58 @@ s(
 		`(datetime('now', '-15 days'), 'igdb', ${R}, NULL, 'Nebelwacht: Zweiter Kreis', ` +
 		"'igdb_verknuepft', NULL, NULL, '112233', NULL);",
 );
+
+// Disc-Fassungen wie nach einem IGDB-Lauf: knapp die Haelfte belegt, der Rest
+// unbekannt (in der Produktion am 02.10.2026 235 von 490). Vorher trug nur ein
+// einziges Release 'ja', und damit war der erste Block der Lueckenansicht
+// lokal gar nicht darstellbar.
+s(
+	"UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb', " +
+		"physical_checked_at = datetime('now', '-3 days') WHERE id % 2 = 0 AND id < 9000;",
+);
+
+// Gebrauchtpreise und die drei Befunde der eBay-Suche (Stufe 20). Sie erzeugen
+// in der Lueckenansicht alle Zustaende, die Block B zeigen kann: Preis vom
+// Haendler, Preis aus dem breiten Markt, "eBay kennt nichts", "Angebote ohne
+// klare Zuordnung" und ungeprueft.
+// Der Zustand kommt aus `zufall()`, nicht aus `i % 5`: Die Titelliste hat 20
+// Eintraege, und 20 ist durch 5 teilbar - ein Modulo haette den Befund an den
+// TITEL gekoppelt, und die alphabetisch sortierte Liste zeigte dann
+// seitenweise denselben Zustand. Im Bild sah das aus wie ein Fehler.
+for (let i = 1; i <= ANZAHL; i++) {
+	const rest = Math.floor(zufall() * 5);
+	if (rest === 4) continue; // ungeprueft: kein Stempel, kein Angebot
+	const roh = rest === 3 ? 0 : rest === 2 ? 3 + (i % 4) : 5 + (i % 9);
+	s(
+		"UPDATE release SET markt_geprueft_am = datetime('now', " +
+			`'-${i % 13} days'), markt_rohangebote = ${roh} WHERE id = ${i};`,
+	);
+	// rest 2 = Angebote vorhanden, aber keines eindeutig; rest 3 = gar keines.
+	if (rest === 2 || rest === 3) continue;
+	const marktCents = 400 + ((i * 137) % 4200);
+	s(
+		"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, " +
+			`condition, price_cents, currency, in_stock, url, imported_at, release_id) VALUES ('ebay', 'markt:${i}', ` +
+			`'eBay', 'markt', 'Spiel ${i}', (SELECT platform FROM release WHERE id = ${i}), 'Gut', ${marktCents}, ` +
+			`'EUR', 1, 'https://example.invalid/${i}', datetime('now'), ${i});`,
+	);
+	// Jedes vierte Release hat zusaetzlich ein Haendlerangebot - teurer als
+	// der Markt, damit im Bild zu sehen ist, dass der Haendler Vorrang hat.
+	if (rest === 0) {
+		s(
+			"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, " +
+				`condition, price_cents, currency, in_stock, url, imported_at, release_id) VALUES ('ebay', 'haendler:${i}', ` +
+				`'${i % 8 === 0 ? "medimops" : "rebuy"}', 'haendler', 'Spiel ${i}', ` +
+				`(SELECT platform FROM release WHERE id = ${i}), 'Sehr gut', ${marktCents + 300 + (i % 700)}, ` +
+				`'EUR', 1, 'https://example.invalid/h${i}', datetime('now'), ${i});`,
+		);
+	}
+	s(
+		"INSERT INTO price_snapshot (release_id, channel, source, condition, price_cents, currency, captured_at) " +
+			`VALUES (${i}, 'gebraucht', 'ebay', 'Gut', ${marktCents + 250}, 'EUR', datetime('now', '-40 days')), ` +
+			`(${i}, 'gebraucht', 'ebay', 'Gut', ${marktCents}, 'EUR', datetime('now', '-2 days'));`,
+	);
+}
 
 s(
 	"INSERT INTO psn_sync_run (started_at, finished_at, status, titles_seen, started_by) VALUES " +

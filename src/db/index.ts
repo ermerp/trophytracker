@@ -5,6 +5,7 @@ import { GamesRepository } from "./games";
 import { GapsRepository } from "./gaps";
 import { IgdbRepository } from "./igdb";
 import { Kopplung } from "./kopplung";
+import { MarktRepository } from "./markt";
 import { BesitzRepository } from "./besitz";
 import { OwnershipRepository } from "./ownership";
 import { PlanRepository } from "./plan";
@@ -39,6 +40,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		games: new GamesRepository(db, events),
 		gaps: new GapsRepository(db),
 		igdb: new IgdbRepository(db, events),
+		markt: new MarktRepository(db, events),
 		ownership: new OwnershipRepository(db, events),
 		besitz: new BesitzRepository(db, events),
 		plan,

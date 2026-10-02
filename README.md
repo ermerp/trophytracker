@@ -14,7 +14,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 
 ## Stand
 
-**Stufen bis 19a und 19c bis 19e abgenommen** (29.09.2026), **Stufe 18f gebaut** (01.10.2026)
+**Stufen bis 19e abgenommen** (19b am 02.10.2026), **Stufe 20 gebaut** (02.10.2026)
 ([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
@@ -129,15 +129,16 @@ Was steht und in Betrieb nachgewiesen ist:
 | Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
 | Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
 | To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert. **Gekoppelt mit der Bewertung** (Entscheidung vom 16.09.2026): To-Do heißt „am Spielen", „ins Backlog" setzt „pausiert", „durchgespielt"/„abgebrochen" auf der Kachel schließen den Eintrag |
-| Lücken | In der Leiste: digital gespielt, Disc-Fassung belegt, nicht im Regal; „physisch nicht gewünscht" ist ein verworfener Kaufeintrag (Rückgängig, „wieder als Lücke zeigen"); darunter zugeklappt „Disc-Fassung unbekannt" mit „Disc gibt es" / „gibt es nicht" / „physisch nicht gewünscht" je Zeile. Disc-Fassung aus IGDB (`external_games`, Knopf „Disc-Fassungen prüfen" in den Einstellungen, 50 Spiele je Anfrage, nur `unbekannt` → `ja`, nach 30 Tagen erneut) oder von Hand im Spieldetail (Dropdown mit Quelle); PSN-Produkt-Id je Release pflegbar |
+| Lücken | In der Leiste: digital gespielt, Disc-Fassung belegt, nicht im Regal; „physisch nicht gewünscht" ist ein verworfener Kaufeintrag (Rückgängig, „wieder als Lücke zeigen"); darunter zugeklappt „Disc-Fassung unbekannt" mit „Disc gibt es" / „gibt es nicht" / „physisch nicht gewünscht" je Zeile. Disc-Fassung aus IGDB (`external_games`, Knopf „Disc-Fassungen prüfen" in den Einstellungen, 50 Spiele je Anfrage, nur `unbekannt` → `ja`, nach 30 Tagen erneut) oder von Hand im Spieldetail (Dropdown mit Quelle); PSN-Produkt-Id je Release pflegbar Seit Stufe 20 steht in jeder Zeile der Gebrauchtpreis („ab 12,77 € bei rebuy“) und im zweiten Block, was die eBay-Suche ergab – „kein Angebot für diese Plattform“ spricht für „nur digital“ und steht oben, damit der Block abarbeitbar ist |
 | Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
-| Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis „unbekannt" bis Stufe 20 (Migration 0018). **Stufe 15 abgenommen am 16.09.2026** |
+| Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis seit Stufe 20 aus eBay, als Forderung eines Anbieters, nie als Wert (Migration 0018, 0028). **Stufe 15 abgenommen am 16.09.2026** |
+| Gebrauchtpreise | Zwei eBay-Suchen je Release (Stufe 20): erst rebuy und medimops, dann der breite Gebrauchtmarkt. Angezeigt wird der Händlerpreis zuerst, immer als „ab X € bei …“ – eine Forderung, kein Wert, denn verkaufte Preise gibt eBay nicht mehr heraus. Jeder Treffer muss den Titelabgleich aus Stufe 17c überstehen, die Plattform kommt aus eBays Aspekt; ein geprüfter Treffer setzt die Disc-Fassung von `unbekannt` auf `ja`, ein `nein` nie. Nachts in der Wartung und per Knopf in den Einstellungen (Migration 0028) |
 | Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt der nächtliche Cron nach, außerdem „Metadaten auffrischen" (Stufe 18) |
-| Automatik | Zwei Cron-Fenster (Stufe 18e), je Aufruf ein Schritt. **PSN, 03:00–05:59 UTC:** hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht), Spielzeit, Kaufliste. Eine gescheiterte Seite wird bei Sync und Spielzeit bis zu dreimal erneut geholt (Stufe 18f), bei der Kaufliste erst am nächsten Tag. **Wartung, 06:00–07:59 UTC:** erschienene Titel freigeben, IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, alte Rohantworten. Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen – gleichartige Arbeit zu einer Zeile verdichtet, Fortschritt als Spanne; Knopf „Kaufliste jetzt abrufen"; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migrationen 0021, 0024) |
+| Automatik | Zwei Cron-Fenster (Stufe 18e), je Aufruf ein Schritt. **PSN, 03:00–05:59 UTC:** hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht), Spielzeit, Kaufliste. Eine gescheiterte Seite wird bei Sync und Spielzeit bis zu dreimal erneut geholt (Stufe 18f), bei der Kaufliste erst am nächsten Tag. **Wartung, 06:00–07:59 UTC:** erschienene Titel freigeben, Gebrauchtpreise bei eBay (zehn Releases je Aufruf, Stufe 20), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, alte Rohantworten. Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen – gleichartige Arbeit zu einer Zeile verdichtet, Fortschritt als Spanne; Knopf „Kaufliste jetzt abrufen"; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migrationen 0021, 0024) |
 | App | Installierbar (PWA) mit eigenem Symbol – ein Pokal im Fortschrittsring; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
 | Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
 | Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen, „Verwerfen" wirft eine Fehllesung sofort weg (mit Rückfrage). Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. „Überspringen" geht weiter, ohne etwas zu speichern (seit Stufe 17d – davor „Später" und ein Sammelmodus, beides mit offenen Scans entfallen). Unbekannte Codes löst seit Stufe 17c eBay live auf; ein Treffer aus der Sammlung erscheint als dieselbe Karte wie ein bekannter Code – mit Cover, „im Regal ×n" und „Disc erfassen" (9.2) |
-| EAN-Auflösung | Kette beim Scannen: eigenes `ean_mapping` (rein lokal, kein Netz) → Händlerfeed → **eBay live** (seit Stufe 17c, Titelvorschlag mit Kandidaten der Sammlung) → Suche/Anlegen von Hand. Ein einmal zugeordneter Code wird nie wieder online nachgeschlagen |
+| EAN-Auflösung | Kette beim Scannen: eigenes `ean_mapping` (rein lokal, kein Netz) → `market_offer` (seit Stufe 20 aus eBay gefüllt) → **eBay live** (seit Stufe 17c, Titelvorschlag mit Kandidaten der Sammlung) → Suche/Anlegen von Hand. Ein einmal zugeordneter Code wird nie wieder online nachgeschlagen |
 | Offene Scans (bis 17d) | Werkzeug in den Einstellungen (`/scans`): Ein täglicher GitHub-Job holt Titel zu gescannten Codes bei upcitemdb (die freie Quelle drosselt nach je sechs Abfragen um 90 Sekunden – deshalb außerhalb des Workers), die Ansicht gleicht sie mit der Sammlung ab und legt sie in Blöcken vor: eindeutig mit „Alle erfassen", ohne eindeutiges Ziel mit Kandidaten und Suche, ohne Titel mit dem Stand des Jobs. Erfassen läuft über dieselbe Route wie der Scanner, Rückgängig stellt den offenen Scan wieder her. Gemessen an 56 PS3-Codes: 35 kannte die Quelle, 22 davon eindeutig (Migration 0020) |
 | Änderungen | Werkzeug in den Einstellungen (`/aenderungen`): wer wann was geschrieben hat, neueste zuerst, nach Quelle filterbar (du, PSN-Sync, IGDB, Import), je Zeile mit Link ins Spiel; „ältere laden". Im Spieldetail derselbe Verlauf als Block. Nur lesend – Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidungen, Vorbelegung und Prüflisten-Einträge werden protokolliert, Cover/Wertung beim Auffrischen und die To-Do-Reihenfolge nicht (Migration 0019) |
 
@@ -207,7 +208,7 @@ ganze Seite sichtbar.
 **Was das Dashboard bewusst nicht zeigt:** das Trophäen-Level von PSN und das
 echte „letztes Platin". Wann ein Platin erspielt wurde, weiß die Datenbank
 nicht – von 164 Spielen mit Platin trägt keines ein Beendet-Datum, und der
-Zeitpunkt je Trophäe kommt erst mit 19b. Der Block heißt deshalb „Zuletzt
+Zeitpunkt je Trophäe kam mit 19b. Der Block hieß deshalb „Zuletzt
 gespielt · mit Platin" und sagt genau das, was die Zahl hergibt.
 
 **Stufe 19c** (27.09.2026) baut das **Spieldetail** neu – die letzte oft
@@ -292,9 +293,31 @@ einem von Hand angelegten Wunsch: „Satisfactory" (PS5) hängt an einem eigens 
 entstandenen Release, `game_id` ist leer, und das Release zählt trotzdem nicht zur
 Sammlung – es trägt weder Besitz noch Fortschritt.
 
-**Stufe 19b ist am 02.10.2026 abgenommen.** Als Nächstes stehen 20 (AWIN-Feed)
-und 21 (PSN Store-Preise) an. Die PSN-Stufen ergänzen nur, was die
-Sammlung schon kennt, und importieren nichts.
+**Stufe 19b ist am 02.10.2026 abgenommen, Stufe 20 am selben Tag gebaut.**
+Offen bleibt 21 (PSN Store-Preise); sie braucht zuerst `release.psn_product_id`,
+das heute bei keinem der 490 Releases gefüllt ist. Die PSN-Stufen ergänzen nur,
+was die Sammlung schon kennt, und importieren nichts.
+
+**Stufe 20** (02.10.2026) bringt **Gebrauchtpreise** – und wechselt dafür die
+Quelle. Geplant war ein Produktdatenfeed von rebuy und medimops über AWIN.
+Der Weg ist verworfen: Das Bewerbungsformular verlangt die URL, auf der
+Affiliate Marketing betrieben wird, jeder Händler gibt seinen Feed einzeln
+frei, und **AWIN schließt ein Publisher-Konto, dem binnen zwei Jahren keine
+Provision gutgeschrieben wurde** – hier wird nie eine gutgeschrieben. Beide
+Händler verkaufen ihren Bestand ohnehin über eBay, dessen API seit Stufe 17c
+im Worker läuft. Zwei Suchen je Release: erst `rebuy-shop`/`medimops_shop`,
+dann der breite Gebrauchtmarkt; die Plattform kommt aus eBays strukturiertem
+Aspekt, nicht aus dem Titel. Jeder Treffer muss den Titelabgleich aus 17c
+überstehen – **ohne ihn wäre der günstigste Treffer in 21 % der Fälle ein
+anderes Spiel** („Blue Prince" → Prince of Persia, „Disc Jam" → Monster Jam).
+Ein geprüfter Treffer setzt die Disc-Fassung von `unbekannt` auf `ja`; ein
+`nein` setzt weiterhin nur der Nutzer. Dafür ist das **Ausbleiben** eines
+Angebots jetzt ein belastbarer Hinweis: Von 235 durch IGDB belegten Discs
+findet eBay 224, und nur 8 haben gar kein Angebot – 3 %. Das steht in Block B
+der Lückenansicht als Begründung und sortiert ihn. Gemessen vor dem Bau
+(980 Abfragen über alle 490 Releases): Preis für 293 statt 0 Releases.
+**Wikidata ist als Quelle für „nur digital" geprüft und verworfen** – es führt
+48 der 235 belegten Discs als rein digital, 20 % Fehlrate (Migration 0028).
 
 Der Zuschnitt von 19b steht seit dem 01.10.2026 (Abschnitt 7.7): Die Antworten
 werden **nicht roh abgelegt** – Rohablage gibt es nur, wo teurer Abruf, komplexe
@@ -358,7 +381,8 @@ Nächte geschwiegen – Stufe 18b hat ihn repariert (gebundener Parameter in
 `datetime('now', ?)` durch Text ersetzt) und zugleich nachprüfbar gemacht.
 Reihenfolge danach, am
 16.09.2026 entschieden: 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
-AWIN-Feed, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation). Jeder neue
+Marktdaten, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation). Stufe 20
+holt sie seit dem 02.10.2026 aus eBay statt aus einem AWIN-Händlerfeed. Jeder neue
 Schreiber hängt sich ins Änderungsprotokoll ein (Abschnitt 8.5). Die Messung aus Stufe 17 ist erledigt: upcitemdb
 kennt 35 von 56 Codes, 22 davon führen eindeutig zu einem Spiel der Sammlung.
 
@@ -531,7 +555,8 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
 
 6. **Geheimnisse für die externen Anbindungen** kommen als Cloudflare Secrets
    dazu, sobald die jeweilige Stufe erreicht ist (NPSSO und PSN-Refresh-Token ab
-   Stufe 2, IGDB/Twitch ab Stufe 9 – siehe oben –, AWIN-Feed-URL ab Stufe 20).
+   Stufe 2, IGDB/Twitch ab Stufe 9 – siehe oben –, eBay ab Stufe 17c; dieselben
+   eBay-Zugangsdaten tragen seit Stufe 20 die Gebrauchtpreise).
    Lokal gehören sie in `.dev.vars`, niemals ins Repository.
 
 ## PlayStation-Anbindung
@@ -865,9 +890,10 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://trophytracker.<subdomain>.work
 
 ### Maschinen-Endpunkte
 
-`GET /api/export/backup.json`, `POST /api/backup/vermerk` und später
-`POST /api/imports/feed` werden von GitHub Actions aufgerufen und können keinen
-Browser-Login durchlaufen.
+`GET /api/export/backup.json` und `POST /api/backup/vermerk` werden von GitHub
+Actions aufgerufen und können keinen Browser-Login durchlaufen. (Ein
+`POST /api/imports/feed` war für den AWIN-Händlerfeed vorgesehen und ist mit
+ihm entfallen – Stufe 20 holt die Marktdaten live über eBay.)
 
 **Entschieden in Stufe 8: Access Service Token.** Der Alternativweg – diese
 Pfade von Access ausnehmen und mit einem eigenen Bearer-Token absichern – ist
@@ -1504,8 +1530,8 @@ erlaubten Triggern je Konto) zählt als Anfragen und liest im Leerlauf rund
 
 ## Was niemals ins Repository gehört
 
-NPSSO und PSN-Refresh-Token, IGDB/Twitch-Zugangsdaten, AWIN-Feed-URLs (sie
-enthalten die Publisher-ID), API-Bearer-Token, der Cloudflare-API-Token – und
+NPSSO und PSN-Refresh-Token, IGDB/Twitch-Zugangsdaten, eBay-Zugangsdaten,
+API-Bearer-Token, der Cloudflare-API-Token – und
 unter keinen Umständen ein Datenbank-Dump. `.dev.vars`, `.wrangler/` und `*.sql`
 stehen in der `.gitignore`; `migrations/*.sql` ist davon ausgenommen, weil die
 Migrationen eingecheckt sein müssen.

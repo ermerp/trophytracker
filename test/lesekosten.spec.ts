@@ -537,6 +537,95 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		]);
 	});
 
+	/**
+	 * Gebrauchtpreise und Disc-Nachweis aus eBay (Stufe 20).
+	 *
+	 * Gemessen wird die ROUTE, nicht nur die Abfrage: `/api/gaps` macht genau
+	 * eine (gaps.liste), und die traegt jetzt zwei zusaetzliche korrelierte
+	 * Unterabfragen je Zeile. Dazu der SCHREIBSCHRITT - bis zum 28.09.2026
+	 * mass diese Datei nur Leseansichten, und ein Sync-Schritt mit einer
+	 * Abfrage je Eintrag lief acht Tage ungemessen.
+	 */
+	it("misst Preisspalte, Auswahl und Schreibpfad der Marktdaten (Stufe 20)", async () => {
+		await env.DB.prepare("DELETE FROM plan_entry").run();
+		await env.DB.prepare("DELETE FROM market_offer").run();
+		await env.DB.batch([
+			env.DB.prepare("UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb' WHERE id % 2 = 0"),
+			env.DB.prepare("UPDATE release SET markt_geprueft_am = NULL, markt_rohangebote = NULL"),
+		]);
+		// Zwei Zeilen je Release fuer vier Fuenftel des Bestands - so sieht es
+		// nach einem vollen Durchlauf aus.
+		const angebot = env.DB.prepare(
+			"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, " +
+				"condition, price_cents, currency, in_stock, imported_at, release_id) " +
+				"VALUES ('ebay', ?, ?, ?, ?, 'PS4', 'Gut', ?, 'EUR', 1, datetime('now'), ?)",
+		);
+		const zeilen: D1PreparedStatement[] = [];
+		for (let i = 1; i <= Math.floor(ANZAHL * 0.8); i++) {
+			zeilen.push(angebot.bind(`haendler:${i}`, "rebuy", "haendler", `Spiel ${i}`, 1200 + i, i));
+			zeilen.push(angebot.bind(`markt:${i}`, "eBay", "markt", `Spiel ${i}`, 900 + i, i));
+		}
+		await env.DB.batch(zeilen);
+
+		const luecken = await zeilenGelesen(
+			`SELECT l.game_id, l.title, l.cover_url, l.release_id, l.platform, l.disc_fassung, l.disc_quelle,
+			        l.progress_pct, l.hat_platin, l.eigener_status, l.verworfen, l.bester_gebrauchtpreis_cents,
+			        l.gebrauchtpreis_anbieter, l.markt_geprueft_am, l.markt_rohangebote,
+			        (SELECT pe.id FROM plan_entry pe WHERE pe.release_id = l.release_id
+			           AND pe.kind = 'kauf' AND pe.status = 'verworfen' ORDER BY pe.id LIMIT 1) AS plan_id
+			 FROM v_luecken l ORDER BY l.title, l.platform`,
+		);
+		// Die Auswahl des Schritts. Erste Fassung las ueber v_luecken 3 424
+		// Zeilen fuer zehn Releases - die View rechnete die Preis-Unterabfragen
+		// fuer alle 430 Zeilen aus, nur um Ids zu liefern. Jetzt ueber
+		// idx_release_markt mit Abbruch nach LIMIT.
+		const auswahl = await zeilenGelesen(
+			"SELECT r.id, r.game_id, g.title, r.platform, r.physical_release_status " +
+				"FROM release r JOIN game g ON g.id = r.game_id " +
+				"WHERE (r.markt_geprueft_am IS NULL OR r.markt_geprueft_am < datetime('now', '-14 days')) " +
+				"AND ((r.physical_release_status IN ('ja', 'unbekannt') " +
+				"AND EXISTS (SELECT 1 FROM trophy_progress t WHERE t.release_id = r.id AND t.progress_pct > 0) " +
+				"AND NOT EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)) " +
+				"OR EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = r.id AND pe.status = 'offen')) " +
+				"ORDER BY r.markt_geprueft_am, r.id LIMIT 10",
+		);
+		// Der Schreibpfad eines Releases: UPSERT je Kanal, Verlauf nur bei
+		// Aenderung, Protokoll und Stempel - alles in einem Batch.
+		const schreiben = await env.DB.batch([
+			env.DB.prepare(
+				"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, condition, " +
+					"price_cents, currency, in_stock, imported_at, release_id) " +
+					"VALUES ('ebay', 'markt:1', 'eBay', 'markt', 'Spiel 1', 'PS4', 'Gut', 777, 'EUR', 1, datetime('now'), 1) " +
+					"ON CONFLICT (source, source_product_id) DO UPDATE SET price_cents = excluded.price_cents",
+			),
+			env.DB.prepare(
+				"INSERT INTO price_snapshot (release_id, channel, source, condition, price_cents, currency, captured_at) " +
+					"SELECT 1, 'gebraucht', 'ebay', 'Gut', 777, 'EUR', datetime('now') WHERE NOT EXISTS " +
+					"(SELECT 1 FROM price_snapshot p WHERE p.release_id = 1 AND p.channel = 'gebraucht' AND p.price_cents = 777 " +
+					"AND p.captured_at = (SELECT MAX(q.captured_at) FROM price_snapshot q WHERE q.release_id = 1 AND q.channel = 'gebraucht'))",
+			),
+			env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now'), markt_rohangebote = 7 WHERE id = 1"),
+		]);
+		const schreibkosten = schreiben.reduce((n, r) => n + (r.meta.rows_read ?? 0), 0);
+		console.info({ luecken, auswahl, schreibkosten });
+
+		// Vor Stufe 20 las dieselbe Abfrage 2 620 Zeilen mit leerer
+		// market_offer; mit den beiden LEFT JOINs sind es dort 2 194 und mit
+		// 688 Angebotszeilen 3 497. Eine Fassung mit korrelierten
+		// Unterabfragen kam auf 5 712 - deshalb die Joins.
+		expect(luecken).toBeLessThan(4_500);
+		expect(auswahl).toBeLessThan(200);
+		// Zehn Releases je Aufruf, also das Zehnfache - und das bleibt weit
+		// unter dem, was eine Nacht vertraegt.
+		expect(schreibkosten).toBeLessThan(200);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM price_snapshot"),
+			env.DB.prepare("DELETE FROM market_offer"),
+			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, markt_geprueft_am = NULL, markt_rohangebote = NULL"),
+		]);
+	});
+
 	it("misst Kaufkandidaten, Kaufliste, Erscheint bald und das Erledigen beim Erfassen (Stufe 15)", async () => {
 		// 215 belegte Luecken (gerade Ids), dazu 300 Wuensche wie nach dem
 		// Import, 30 davon schon als Kopie auf der Kaufliste, 20 angekuendigt.

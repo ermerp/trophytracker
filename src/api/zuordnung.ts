@@ -456,6 +456,23 @@ export const gameRoutes = new Hono<AppEnv>()
 				discFassung: r.physical_release_status,
 				discQuelle: r.physical_source,
 				psnProductId: r.psn_product_id,
+				/**
+				 * Gebrauchtpreis aus eBay (Stufe 20). `null` heisst unbekannt,
+				 * nie 0; `rohangebote: 0` heisst, dass eBay in der
+				 * Plattform-Kategorie gar nichts kennt - der Hinweis auf eine
+				 * reine Download-Fassung (7.3).
+				 */
+				markt:
+					r.markt_geprueft_am === null
+						? null
+						: {
+								geprueftAm: r.markt_geprueft_am,
+								rohangebote: r.markt_rohangebote,
+								preisCents: r.preis_cents,
+								anbieter: r.preis_anbieter,
+								zustand: r.preis_zustand,
+								url: r.preis_url,
+							},
 				trophaeen:
 					r.np_communication_id === null
 						? null

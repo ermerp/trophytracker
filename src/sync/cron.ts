@@ -10,7 +10,9 @@ import {
 	type PhysischErgebnis,
 } from "./igdb";
 import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis } from "./besitz";
+import { meldungFuer as ebayMeldung, type EbayClient } from "../ebay/client";
 import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
+import { marktSchritt, type MarktErgebnis } from "./markt";
 import { eineListe, jahreSchritt, levelSchritt, type ListenErgebnis } from "./trophaeen";
 
 /**
@@ -111,6 +113,7 @@ export type CronErgebnis = {
 		| "jahre"
 		| "igdb_auffrischen"
 		| "igdb_physisch"
+		| "markt"
 		| "aufraeumen"
 		| "nichts";
 	/** angekuendigt -> erschienen (8.4), in jedem Aufruf. */
@@ -129,6 +132,7 @@ export type CronErgebnis = {
 	trophaeen?: ListenErgebnis;
 	level?: number;
 	jahre?: number;
+	markt?: MarktErgebnis;
 	auffrischen?: AuffrischErgebnis;
 	physisch?: PhysischErgebnis;
 };
@@ -141,6 +145,7 @@ export async function cronSchritt(
 	repos: Repositories,
 	psn: PsnClient,
 	igdb: IgdbClient,
+	ebay: EbayClient,
 	optionen: { heute?: string; bereich?: CronBereich } = {},
 ): Promise<CronErgebnis> {
 	const heute = optionen.heute ?? heuteIso();
@@ -233,7 +238,22 @@ export async function cronSchritt(
 			}
 		}
 
-		// 9. Aufraeumen: Rohantworten, die niemand mehr braucht. Ein einzelnes
+		// 9. Gebrauchtpreise und Disc-Nachweis aus eBay (7.3, Stufe 20).
+		//    Hier und nicht im PSN-Fenster: Der Schritt fasst Sony nicht an.
+		//    Eigenes try/catch aus demselben Grund wie bei IGDB (18b) - und
+		//    zehn Releases sind zwanzig Fremdanfragen, also weit unter den 50
+		//    je Aufruf. Vor den beiden billigen Schritten, damit die nicht
+		//    einen Aufruf belegen, in dem noch echte Arbeit wartet.
+		if (ebay.konfiguriert()) {
+			try {
+				const markt = await marktSchritt(repos, ebay);
+				if (markt.geprueft > 0 || markt.status === "fehler") return { ...basis, getan: "markt", markt };
+			} catch (fehler) {
+				return { ...basis, getan: "nichts", meldung: ebayMeldung(fehler) };
+			}
+		}
+
+		// 10. Aufraeumen: Rohantworten, die niemand mehr braucht. Ein einzelnes
 		//    DELETE ueber einen Index - die leichteste Arbeit der Reihenfolge
 		//    und deshalb ganz hinten. Sie belegt einen Aufruf, der sonst
 		//    "nichts" tut, und niemals denselben wie eine schwere Arbeit: Jeder
@@ -474,6 +494,22 @@ export function cronLogzeile(e: CronErgebnis): string {
 	}
 	if (e.level) teile.push(`level=${e.level}`);
 	if (e.jahre) teile.push(`jahre=${e.jahre}`);
+	if (e.markt) {
+		// Vier Zahlen, weil sie vier verschiedene Dinge sagen: `geprueft` ist
+		// die Portion, `preis` was einen Titelabgleich uebderstanden hat,
+		// `disc` die Statuswechsel unbekannt -> ja, und `ohneAngebot` die
+		// Releases, zu denen eBay in der Plattform-Kategorie NICHTS kennt -
+		// der Hinweis auf eine reine Download-Fassung (7.3).
+		teile.push(
+			`markt=${e.markt.status}`,
+			`geprueft=${e.markt.geprueft}`,
+			`preis=${e.markt.mitPreis}`,
+			`disc=${e.markt.discBelegt}`,
+			`ohneAngebot=${e.markt.ohneAngebot}`,
+			`offen=${e.markt.nochOffen}`,
+		);
+		if (e.markt.meldung) teile.push(`meldung="${e.markt.meldung}"`);
+	}
 	if (e.spielzeit) {
 		teile.push(
 			`spielzeit=${e.spielzeit.status}`,

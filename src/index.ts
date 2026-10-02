@@ -7,6 +7,7 @@ import { digitalEntitlementRoutes, physicalCopyRoutes } from "./api/ownership";
 import { igdbRoutes, unmatchedRoutes } from "./api/igdb";
 import { importRoutes } from "./api/imports";
 import { gapRoutes } from "./api/gaps";
+import { marktRoutes } from "./api/markt";
 import { backlogCandidateRoutes, planRoutes, purchaseCandidateRoutes, upcomingRoutes } from "./api/plans";
 import { psnRoutes } from "./api/psn";
 import { releaseRoutes } from "./api/releases";
@@ -75,6 +76,7 @@ export function createApp(
 	app.route("/api/purchase-candidates", purchaseCandidateRoutes);
 	app.route("/api/upcoming", upcomingRoutes);
 	app.route("/api/gaps", gapRoutes);
+	app.route("/api/sync", marktRoutes);
 	app.route("/api/imports/wishlist", importRoutes);
 	app.route("/api/deviations", deviationRoutes);
 	app.route("/api/events", eventRoutes);
@@ -127,6 +129,7 @@ function ebayJeInstanz(): (env: Env) => EbayClient {
 export function createScheduled(
 	psnFactory: () => PsnClient = () => erstellePsnClient(),
 	igdbFactory: (env: Env) => IgdbClient = igdbJeInstanz(),
+	ebayFactory: (env: Env) => EbayClient = ebayJeInstanz(),
 ): ExportedHandlerScheduledHandler<Env> {
 	return async (event, env) => {
 		if (!env.NPSSO_KEY) {
@@ -140,7 +143,7 @@ export function createScheduled(
 			// unbekannter Ausdruck - etwa nach einer Aenderung an
 			// wrangler.jsonc - macht alles, statt still die Haelfte zu lassen.
 			const bereich = bereichFuerAusdruck(event.cron);
-			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env), { bereich });
+			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env), ebayFactory(env), { bereich });
 			const zeile = cronLogzeile(ergebnis);
 			console.log(zeile);
 			// Der Cron ist der einzige Schreiber ohne Zuschauer, und Worker-Logs

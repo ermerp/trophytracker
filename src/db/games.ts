@@ -148,6 +148,13 @@ export type SpielDetail = {
 		physical_release_status: "ja" | "nein" | "unbekannt";
 		physical_source: string | null;
 		psn_product_id: string | null;
+		/** Marktdaten aus eBay (Stufe 20): Preis des guenstigsten geprueften Angebots. */
+		markt_geprueft_am: string | null;
+		markt_rohangebote: number | null;
+		preis_cents: number | null;
+		preis_anbieter: string | null;
+		preis_zustand: string | null;
+		preis_url: string | null;
 		np_communication_id: string | null;
 		title_name: string | null;
 		icon_url: string | null;
@@ -660,10 +667,19 @@ aeenliste haengt
 		const { results: releases } = await this.db
 			.prepare(
 				"SELECT r.id, r.platform, r.edition, r.region, r.physical_release_status, r.physical_source, " +
-					"r.psn_product_id, t.np_communication_id, t.title_name, t.icon_url, t.progress_pct, " +
+					"r.psn_product_id, r.markt_geprueft_am, r.markt_rohangebote, " +
+					"t.np_communication_id, t.title_name, t.icon_url, t.progress_pct, " +
 					"t.defined_bronze, t.defined_silver, t.defined_gold, t.defined_platinum, " +
-					"t.earned_bronze, t.earned_silver, t.earned_gold, t.earned_platinum, t.last_played_at " +
+					"t.earned_bronze, t.earned_silver, t.earned_gold, t.earned_platinum, t.last_played_at, " +
+					// Haendler zuerst, breiter Markt als Rueckfall - dieselbe Regel wie
+					// in v_luecken, und zwei Lookups auf idx_market_offer_kanal.
+					"COALESCE(mh.price_cents, mm.price_cents) AS preis_cents, " +
+					"COALESCE(mh.anbieter, mm.anbieter) AS preis_anbieter, " +
+					"COALESCE(mh.condition, mm.condition) AS preis_zustand, " +
+					"COALESCE(mh.url, mm.url) AS preis_url " +
 					"FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id " +
+					"LEFT JOIN market_offer mh ON mh.release_id = r.id AND mh.kanal = 'haendler' AND mh.in_stock = 1 " +
+					"LEFT JOIN market_offer mm ON mm.release_id = r.id AND mm.kanal = 'markt' AND mm.in_stock = 1 " +
 					"WHERE r.game_id = ? ORDER BY r.platform",
 			)
 			.bind(id)

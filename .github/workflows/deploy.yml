@@ -103,6 +103,9 @@ jobs:
       #   Besitz       (0018): offene Wuensche/Kaeufe an Releases mit Besitz (oder am Spiel davon) erledigt, erwartet 0
       #   Cron-Verlauf (0022): alter Einzeleintrag 'cron_letzter_ausgang' geloescht, erwartet 0
       #   Spielzeit    (0023): neue Tabelle psn_played_title, herkunft an digital_entitlement; erwartet 0 PSN-Zeilen vor dem ersten Lauf
+      #   market_offer (0028): Tabelle neu aufgebaut (CHECK um 'ebay', Spalten kanal/anbieter),
+      #                        Zeilen umkopiert - erwartet 0, weil der AWIN-Feed nie lief (7.3);
+      #                        markt_geprueft_am ist vor dem ersten Marktlauf ueberall NULL
       - name: Datenmigrationen protokollieren
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -139,7 +142,11 @@ jobs:
                     (SELECT COUNT(*) FROM digital_entitlement WHERE herkunft = 'nutzer') AS besitz_hand,
                     (SELECT COUNT(*) FROM digital_entitlement WHERE herkunft = 'psn') AS besitz_psn,
                     (SELECT COUNT(*) FROM psn_zugang) AS zugaenge,
-                    (SELECT COUNT(*) FROM psn_zugang WHERE gestorben_am IS NOT NULL) AS zugaenge_gestorben" \
+                    (SELECT COUNT(*) FROM psn_zugang WHERE gestorben_am IS NOT NULL) AS zugaenge_gestorben,
+                    (SELECT COUNT(*) FROM market_offer) AS angebote,
+                    (SELECT COUNT(*) FROM market_offer WHERE source = 'ebay') AS angebote_ebay,
+                    (SELECT COUNT(*) FROM release WHERE markt_geprueft_am IS NOT NULL) AS markt_geprueft,
+                    (SELECT COUNT(*) FROM release WHERE physical_source = 'ebay') AS disc_aus_ebay" \
             | jq -r '.[0].results[0] |
                 "zugeordnete Listen: \(.zugeordnet)",
                 "play_status: \(.play_status) Zeilen, erwartet mindestens \(.ps_erwartet) (zugeordnete Listen mit Fortschritt)",
@@ -152,7 +159,8 @@ jobs:
                 "Besitz: \(.offen_trotz_besitz) offene Wuensche/Kaeufe an Releases mit Besitz, erwartet 0; \(.erledigte_absichten) erledigte Wuensche/Kaeufe insgesamt (Migration 0018)",
                 "Cron-Verlauf: \(.cron_alt) alte Einzeleintraege, erwartet 0 (Migration 0022)",
                 "Spielzeit/Besitz: \(.gespielte_titel) gespielte Titel, \(.besitz_hand) Berechtigungen von Hand, \(.besitz_psn) von PSN erkannt (Migration 0023, vor dem ersten Lauf 0 und 0)",
-                "Zugaenge: \(.zugaenge) aufgezeichnet, davon \(.zugaenge_gestorben) gestorben - erwartet 1 und 1 beim ersten Lauf nach Migration 0026 (der Zugang vom 04.09., gestorben in der Nacht zum 29.09.)"'
+                "Zugaenge: \(.zugaenge) aufgezeichnet, davon \(.zugaenge_gestorben) gestorben - erwartet 1 und 1 beim ersten Lauf nach Migration 0026 (der Zugang vom 04.09., gestorben in der Nacht zum 29.09.)",
+                "Marktdaten: \(.angebote) Angebote (\(.angebote_ebay) aus eBay), \(.markt_geprueft) Releases gefragt, \(.disc_aus_ebay) Disc-Fassungen aus eBay belegt - erwartet 0/0/0/0 beim ersten Lauf nach Migration 0028"'
 
       - name: Worker und Assets deployen
         uses: cloudflare/wrangler-action@v4
