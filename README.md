@@ -295,7 +295,10 @@ Sammlung – es trägt weder Besitz noch Fortschritt.
 
 **Stufe 19b ist am 02.10.2026 abgenommen, Stufe 20 am selben Tag gebaut.**
 Offen bleibt 21 (PSN Store-Preise); sie braucht zuerst `release.psn_product_id`,
-das heute bei keinem der 490 Releases gefüllt ist. Die PSN-Stufen ergänzen nur,
+das heute bei keinem der 490 Releases gefüllt ist. Danach stehen **fünf finale
+Stufen** an, die in der Spezifikation beschrieben sind: die Sammlung
+finalisieren, Oberfläche und Bedienbarkeit, Refactoring,
+Wiederherstellungsprobe und die Außendarstellung auf GitHub. Die PSN-Stufen ergänzen nur,
 was die Sammlung schon kennt, und importieren nichts.
 
 **Stufe 20e ist am 02.10.2026 abgenommen.** Sie bringt die Preise in die Listen: an Kaufliste und
