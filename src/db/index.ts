@@ -13,6 +13,7 @@ import { PlayStatusRepository } from "./play-status";
 import { ReviewRepository } from "./review";
 import { ScanRepository } from "./scan";
 import { StatsRepository } from "./stats";
+import { StoreRepository } from "./store";
 import { SyncRepository } from "./sync";
 import { TrophaeenRepository } from "./trophaeen";
 import { TrophiesRepository } from "./trophies";
@@ -41,6 +42,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		gaps: new GapsRepository(db),
 		igdb: new IgdbRepository(db, events),
 		markt: new MarktRepository(db, events),
+		store: new StoreRepository(db, events),
 		ownership: new OwnershipRepository(db, events),
 		besitz: new BesitzRepository(db, events),
 		plan,

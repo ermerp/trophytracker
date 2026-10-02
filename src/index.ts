@@ -14,6 +14,7 @@ import { releaseRoutes } from "./api/releases";
 import { reviewRoutes } from "./api/review";
 import { scanRoutes } from "./api/scan";
 import { jahreRoutes, statsRoutes } from "./api/stats";
+import { storeRoutes } from "./api/store";
 import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
@@ -21,6 +22,7 @@ import { erstelleEbayClient, zugangAus as ebayZugangAus, type EbayClient } from 
 import { erstelleUpcitemdbClient, type UpcitemdbClient } from "./ean/upcitemdb";
 import { erstelleIgdbClient, zugangAus, type IgdbClient } from "./igdb/client";
 import { erstellePsnClient, type PsnClient } from "./psn/client";
+import { erstelleStoreClient, type StoreClient } from "./psn/store";
 import { bereichFuerAusdruck, cronLogzeile, cronSchritt } from "./sync/cron";
 import type { AppEnv } from "./types";
 
@@ -38,6 +40,7 @@ export function createApp(
 	igdbFactory: (env: Env) => IgdbClient = igdbJeInstanz(),
 	ebayFactory: (env: Env) => EbayClient = ebayJeInstanz(),
 	upcFactory: () => UpcitemdbClient = () => erstelleUpcitemdbClient(),
+	storeFactory: () => StoreClient = () => erstelleStoreClient(),
 ) {
 	const app = new Hono<AppEnv>();
 
@@ -52,6 +55,7 @@ export function createApp(
 		c.set("igdb", igdbFactory(c.env));
 		c.set("ebay", ebayFactory(c.env));
 		c.set("upc", upcFactory());
+		c.set("store", storeFactory());
 		await next();
 	});
 
@@ -77,6 +81,7 @@ export function createApp(
 	app.route("/api/upcoming", upcomingRoutes);
 	app.route("/api/gaps", gapRoutes);
 	app.route("/api/sync", marktRoutes);
+	app.route("/api/sync", storeRoutes);
 	app.route("/api/imports/wishlist", importRoutes);
 	app.route("/api/deviations", deviationRoutes);
 	app.route("/api/events", eventRoutes);
@@ -130,6 +135,7 @@ export function createScheduled(
 	psnFactory: () => PsnClient = () => erstellePsnClient(),
 	igdbFactory: (env: Env) => IgdbClient = igdbJeInstanz(),
 	ebayFactory: (env: Env) => EbayClient = ebayJeInstanz(),
+	storeFactory: () => StoreClient = () => erstelleStoreClient(),
 ): ExportedHandlerScheduledHandler<Env> {
 	return async (event, env) => {
 		if (!env.NPSSO_KEY) {
@@ -143,7 +149,9 @@ export function createScheduled(
 			// unbekannter Ausdruck - etwa nach einer Aenderung an
 			// wrangler.jsonc - macht alles, statt still die Haelfte zu lassen.
 			const bereich = bereichFuerAusdruck(event.cron);
-			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env), ebayFactory(env), { bereich });
+			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env), ebayFactory(env), storeFactory(), {
+				bereich,
+			});
 			const zeile = cronLogzeile(ergebnis);
 			console.log(zeile);
 			// Der Cron ist der einzige Schreiber ohne Zuschauer, und Worker-Logs

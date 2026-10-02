@@ -477,6 +477,24 @@ export const gameRoutes = new Hono<AppEnv>()
 								zustand: r.preis_zustand,
 								url: r.preis_url,
 							},
+				/**
+				 * Store-Preis (Stufe 21), neben dem Gebrauchtpreis und nie mit
+				 * ihm verrechnet (Abschnitt 6). `befund` sagt, warum kein Preis
+				 * da ist, statt ihn als 0 auszugeben.
+				 */
+				store:
+					r.store_geprueft_am === null
+						? null
+						: {
+								geprueftAm: r.store_geprueft_am,
+								befund: r.store_befund,
+								preisCents: r.store_price_cents,
+								grundpreisCents: r.store_base_price_cents,
+								imAngebot: r.store_is_sale === 1,
+								imPlusKatalog: r.store_plus === 1,
+								produktName: r.store_produkt_name,
+								produktId: r.psn_product_id,
+							},
 				trophaeen:
 					r.np_communication_id === null
 						? null

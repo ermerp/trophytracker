@@ -98,6 +98,17 @@ export type PlanZeile = {
 	preis_cents: number | null;
 	preis_anbieter: string | null;
 	preis_url: string | null;
+	/**
+	 * Store-Preis am Eintrag (Stufe 21). Eigene Spalten, nie mit dem
+	 * Gebrauchtpreis verrechnet (Abschnitt 6) - "neu digital" und "gebraucht
+	 * als Disc" sind zwei Aussagen. `null` heisst unbekannt, nie 0.
+	 */
+	store_price_cents: number | null;
+	store_base_price_cents: number | null;
+	store_is_sale: number | null;
+	store_plus: number | null;
+	store_produkt_name: string | null;
+	psn_product_id: string | null;
 };
 
 /** Die Zeile, wie das Protokoll sie braucht (PlanRepository.kurz). */
@@ -144,7 +155,12 @@ export const PLAN_AUSWAHL =
 	// ueber idx_market_offer_kanal. Ein Eintrag ohne Release bleibt leer.
 	"COALESCE(mh.price_cents, mm.price_cents) AS preis_cents, " +
 	"COALESCE(mh.anbieter, mm.anbieter) AS preis_anbieter, " +
-	"COALESCE(mh.url, mm.url) AS preis_url " +
+	"COALESCE(mh.url, mm.url) AS preis_url, " +
+	// Der Store-Preis kommt aus `release r`, das hier schon LEFT JOINed ist -
+	// also keine zusaetzliche gelesene Zeile (gemessen in
+	// test/lesekosten.spec.ts).
+	"r.store_price_cents, r.store_base_price_cents, r.store_is_sale, r.store_plus, " +
+	"r.store_produkt_name, r.psn_product_id " +
 	"FROM plan_entry pe " +
 	"LEFT JOIN release r ON r.id = pe.release_id " +
 	"LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id) " +

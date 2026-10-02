@@ -1,5 +1,7 @@
 import { createExecutionContext, env } from "cloudflare:test";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { erstelleStoreClient } from "../src/psn/store";
+import { conceptSeite, htmlAntwort, produktSeite } from "./store-fake";
 import { createApp, createScheduled } from "../src/index";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
@@ -72,6 +74,36 @@ function ebayMarkiert() {
 			[/oauth2\/token/, () => jsonAntwort({ access_token: MARKIERUNGEN.ebayToken, expires_in: 7200 })],
 			[/item_summary\/search/, () => jsonAntwort({ itemSummaries: [{ title: "Killzone 3 PS3" }] })],
 		]).fetch,
+	);
+}
+
+/**
+ * Store-Client mit gewoehnlichen Seiten.
+ *
+ * Der Store braucht keine Zugangsdaten, hier gibt es also nichts zu
+ * markieren: Der Produktname IST Anzeigetext und soll durchgereicht werden -
+ * ihn mit einer Markierung zu fuellen hiesse, das Durchreichen selbst als
+ * Leck zu zaehlen. Geprueft wird stattdessen der Erfolgspfad als Ganzes
+ * (nichts aus dem Zugang darf mitkommen); Fremdtext aus FEHLERN deckt
+ * `storeKaputt` ab.
+ */
+function storeMarkiert() {
+	const produktId = "EP9000-CUSA00001_00-X000000000000001";
+	return erstelleStoreClient(
+		fakeFetch([
+			[/\/concept\//, () => htmlAntwort(conceptSeite("1", [{ id: produktId, name: "Bloodborne" }]))],
+			[
+				/\/product\//,
+				() => htmlAntwort(produktSeite(produktId, [{ typ: "ADD_TO_CART", produktId }], { name: "Bloodborne" })),
+			],
+		]).fetch,
+	);
+}
+
+/** Store-Client, der mit einem Fehlertext voller Markierungen antwortet. */
+function storeKaputt() {
+	return erstelleStoreClient(
+		fakeFetch([[/store\.playstation\.com/, () => new Response(`Fehler ${MARKIERUNGEN.refresh}`, { status: 500 })]]).fetch,
 	);
 }
 
@@ -213,7 +245,16 @@ beforeEach(async () => {
 		env.DB.prepare("DELETE FROM wishlist_import"),
 		env.DB.prepare("DELETE FROM plan_entry"),
 		env.DB.prepare("DELETE FROM game"),
-		env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (1, 'Bloodborne', 'bloodborne')"),
+		env.DB.prepare("DELETE FROM release"),
+		env.DB.prepare(
+			"INSERT INTO game (id, title, sort_title, store_concept_id) VALUES (1, 'Bloodborne', 'bloodborne', '1')",
+		),
+		// Ein Release mit offenem Wunsch, damit der Store-Schritt wirklich
+		// laeuft - sonst faehrt die Route ins Leere und prueft nichts.
+		env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (1, 1, 'PS4')"),
+		env.DB.prepare(
+			"INSERT INTO plan_entry (id, kind, release_id, origin, status) VALUES (2, 'wunsch', 1, 'manuell', 'offen')",
+		),
 		env.DB.prepare("INSERT INTO plan_entry (id, kind, title_raw, origin) VALUES (1, 'wunsch', 'Nur Text', 'manuell')"),
 		env.DB.prepare("INSERT INTO wishlist_import (id, form) VALUES (1, 'einfach')"),
 		env.DB.prepare("INSERT INTO wishlist_import_line (id, import_id, position, title, originals) VALUES (1, 1, 1, 'Bloodborne', '[\"Bloodborne\"]')"),
@@ -242,9 +283,12 @@ describe("Dichtheitsprüfung", () => {
 	it("gibt auf keiner Route ein Geheimnis heraus - Erfolgspfad", async () => {
 		const igdb = igdbMarkiert();
 		const ebay = ebayMarkiert();
-		const app = createApp(psnMarkiert, () => igdb, () => ebay);
+		const store = storeMarkiert();
+		const app = createApp(psnMarkiert, () => igdb, () => ebay, undefined, () => store);
 
 		const antworten = [
+			await ruf(app, "/api/sync/store", { method: "POST" }),
+			await ruf(app, "/api/sync/store"),
 			await ruf(app, "/api/settings/npsso", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
@@ -370,6 +414,11 @@ describe("Dichtheitsprüfung", () => {
 			await createScheduled(psnKaputt, igdb)(ereignis, env, ctx);
 			await createScheduled(psnKaputt, igdb)(wartung, env, ctx);
 		}
+
+		// Der Store laeuft im PSN-Fenster und wirft hier einen Fehlertext
+		// voller Markierungen zurueck (Stufe 21). Sein Statuscode darf in die
+		// Meldung, der Koerper nicht.
+		await createScheduled(psnKaputt, () => igdbMarkiert(), undefined, () => storeKaputt())(ereignis, env, ctx);
 
 		// Und der Fall, um den es in 18e geht: Fehlerantworten mit markiertem
 		// Koerper, deren Statuscode jetzt woertlich in Meldung und Verlauf

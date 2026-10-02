@@ -265,6 +265,61 @@ for (let i = 1; i <= ANZAHL; i++) {
 	);
 }
 
+// --- Store-Preise (Stufe 21) -------------------------------------------------
+//
+// Der Zuschnitt sind offene Absichten und Titel ohne Disc-Fassung. Erfunden
+// werden alle fuenf Faelle, die die Oberflaeche unterscheiden muss: Preis,
+// Preis im Angebot, Preis mit PS-Plus-Katalog, ein abweichender Produktname
+// und jeder der Befunde ohne Preis.
+const STORE_BEFUNDE = ["ohne_id", "delistet", "ohne_kauf", "fremd"];
+
+/**
+ * Welche Releases ueberhaupt gefragt wuerden: die mit einer offenen Absicht.
+ * Set-basiert und am Ende des Skripts, weil die Wunsch-Releases (9001+) erst
+ * weiter oben entstehen - erst danach steht fest, was im Zuschnitt liegt.
+ */
+s(
+	"UPDATE release SET store_befund = CASE WHEN id % 7 = 5 THEN 'delistet' ELSE 'preis' END, " +
+		"psn_product_id = CASE WHEN id % 7 = 5 THEN NULL ELSE 'EP9000-CUSA' || substr('0000' || id, -5) || '_00-SPIEL0000000000' END, " +
+		"store_produkt_name = CASE WHEN id % 7 = 5 THEN NULL WHEN id % 7 = 2 THEN 'Spiel ' || id || ' – Game of the Year Edition' ELSE 'Spiel ' || id END, " +
+		"store_base_price_cents = CASE WHEN id % 7 = 5 THEN NULL ELSE 1999 + (id * 311) % 5000 END, " +
+		"store_price_cents = CASE WHEN id % 7 = 5 THEN NULL " +
+		"WHEN id % 7 IN (1, 3) THEN CAST((1999 + (id * 311) % 5000) * 0.35 AS INTEGER) ELSE 1999 + (id * 311) % 5000 END, " +
+		"store_is_sale = CASE WHEN id % 7 IN (1, 3) THEN 1 ELSE 0 END, " +
+		"store_plus = CASE WHEN id % 7 = 4 THEN 1 ELSE 0 END, " +
+		"store_geprueft_am = datetime('now', '-' || (id % 3) || ' days') " +
+		"WHERE EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = release.id AND pe.status = 'offen');",
+);
+
+for (let i = 1; i <= ANZAHL; i += 3) {
+	const rest = i % 7;
+	const produktId = `EP9000-CUSA${String(10000 + i).slice(0, 5)}_00-SPIEL${String(i).padStart(11, "0")}`;
+	if (rest === 5) {
+		// Ohne Preis - jeder Befund kommt vor, damit sein Satz im Bild steht.
+		s(
+			`UPDATE release SET store_befund = '${STORE_BEFUNDE[i % 4]}', ` +
+				`store_geprueft_am = datetime('now', '-${i % 5} days') WHERE id = ${i};`,
+		);
+		continue;
+	}
+	const grund = 1999 + ((i * 311) % 5000);
+	const imAngebot = rest === 1 || rest === 3;
+	const preis = imAngebot ? Math.round(grund * 0.35) : grund;
+	const name = rest === 2 ? `Spiel ${i} – Game of the Year Edition` : `Spiel ${i}`;
+	s(
+		`UPDATE release SET psn_product_id = '${produktId}', store_produkt_name = '${name}', ` +
+			`store_price_cents = ${preis}, store_base_price_cents = ${grund}, ` +
+			`store_is_sale = ${imAngebot ? 1 : 0}, store_plus = ${rest === 4 ? 1 : 0}, ` +
+			`store_befund = 'preis', store_geprueft_am = datetime('now', '-${i % 3} days') WHERE id = ${i};`,
+	);
+	s(
+		"INSERT INTO price_snapshot (release_id, channel, source, price_cents, is_sale, currency, captured_at) " +
+			`VALUES (${i}, 'psn_store', 'psn', ${grund}, 0, 'EUR', datetime('now', '-30 days')), ` +
+			`(${i}, 'psn_store', 'psn', ${preis}, ${imAngebot ? 1 : 0}, 'EUR', datetime('now', '-1 days'));`,
+	);
+	s(`UPDATE game SET store_concept_id = '${200000 + i}', store_concept_am = datetime('now') WHERE id = ${i};`);
+}
+
 s(
 	"INSERT INTO psn_sync_run (started_at, finished_at, status, titles_seen, started_by) VALUES " +
 		`(datetime('now', '-6 hours'), datetime('now', '-5 hours'), 'erfolg', ${ANZAHL}, 'cron');`,

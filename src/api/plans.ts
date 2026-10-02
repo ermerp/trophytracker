@@ -145,6 +145,41 @@ export function eintragAntwort(z: PlanZeile) {
 		preisCents: z.preis_cents,
 		preisAnbieter: z.preis_anbieter,
 		preisUrl: z.preis_url,
+		/**
+		 * Store-Preis (Stufe 21), getrennt vom Gebrauchtpreis - die beiden
+		 * Kanaele werden nie zu einem Wert verrechnet (Abschnitt 6). `null`
+		 * heisst "nicht gefragt oder kein Kaufknopf".
+		 */
+		store: storeAntwort(z),
+	};
+}
+
+/**
+ * Der Store-Preis einer Zeile, oder `null`.
+ *
+ * `produktName` steht nur da, wo Sonys Name vom eigenen Titel abweicht -
+ * genau dort lohnt das Nachsehen, weil es eine andere Fassung sein kann
+ * (gemessen am 02.10.2026: 20 von 57).
+ */
+export function storeAntwort(z: {
+	titel?: string | null;
+	store_price_cents: number | null;
+	store_base_price_cents: number | null;
+	store_is_sale: number | null;
+	store_plus: number | null;
+	store_produkt_name: string | null;
+	psn_product_id: string | null;
+}) {
+	if (z.store_price_cents === null) return null;
+	const name = z.store_produkt_name;
+	const abweichend = name !== null && name.replace(/[™®©]/g, "").toLowerCase() !== (z.titel ?? "").toLowerCase();
+	return {
+		preisCents: z.store_price_cents,
+		grundpreisCents: z.store_base_price_cents,
+		imAngebot: z.store_is_sale === 1,
+		imPlusKatalog: z.store_plus === 1,
+		produktName: abweichend ? name : null,
+		produktId: z.psn_product_id,
 	};
 }
 

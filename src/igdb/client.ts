@@ -1,10 +1,12 @@
 import {
 	IGDB_FELDER,
 	IGDB_FELDER_PHYSISCH,
+	IGDB_FELDER_STORE,
 	IGDB_PLATTFORM_IDS,
 	NIE_EIN_SPIEL,
 	apicalypseText,
 	type IgdbPhysischRoh,
+	type IgdbStoreRoh,
 	type IgdbSpielRoh,
 } from "../domain/igdb";
 import { Geheimnis } from "../domain/secret";
@@ -192,6 +194,20 @@ export function erstelleIgdbClient(
 			if (sauber.length === 0) return [];
 			return abfrage<IgdbPhysischRoh>(
 				`fields ${IGDB_FELDER_PHYSISCH}; where id = (${sauber.join(",")}); limit ${sauber.length};`,
+			);
+		},
+
+		/**
+		 * Die Store-Eintraege (external_games) fuer bis zu 50 Spiele - eine
+		 * Anfrage fuer die Concept-Ids (7.4, Stufe 21). Eigene Feldliste aus
+		 * demselben Grund wie bei der Disc-Fassung: Die Suche soll die
+		 * Haendlerliste nicht bei jedem Treffer mitschleppen.
+		 */
+		async storeNachIds(ids: readonly number[]): Promise<IgdbStoreRoh[]> {
+			const sauber = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 50);
+			if (sauber.length === 0) return [];
+			return abfrage<IgdbStoreRoh>(
+				`fields ${IGDB_FELDER_STORE}; where id = (${sauber.join(",")}); limit ${sauber.length};`,
 			);
 		},
 	};
