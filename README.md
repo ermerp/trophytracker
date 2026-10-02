@@ -319,6 +319,15 @@ Kaufknopf ohne Preis, und ein ungeschützter Rückfall nahm „Kitchen [demo]" f
 Absicht steht oder keine Disc-Fassung hat – und nicht, was dauerhaft gekauft
 ist. Erster Lauf: 57 von 79 mit Preis, 18 davon im Angebot.
 
+**Nachtrag 21b** (Migration 0032): Die Auswahl des Schritts las im Leerlauf
+430 Zeilen und lief in jedem der 36 nächtlichen Aufrufe mit – die Nacht stieg
+von rund 54 000 auf 69 444 gelesene Zeilen. Ursache war eine Bedingung auf
+einer Spalte ohne Index; jetzt bilden zwei Index-Lookups die Zielmenge, und
+ein Teilindex beantwortet „gibt es rein digitale Releases?" aus einer leeren
+Struktur statt aus der ganzen Tabelle. Vier Zeilen statt 430. Gefunden hat es
+die Lesekosten-Messung direkt nach dem Deploy, nachdem sie um den Leerlauf
+erweitert wurde – gemessen war bis dahin nur der Fall **mit** Arbeit.
+
 **Stufe 20e ist am 02.10.2026 abgenommen.** Sie bringt die Preise in die Listen: an Kaufliste und
 offenen Wunsch, als Link aufs Angebot, sortierbar. Die Sortierung selbst ist
 dabei in allen fünf Listen neu – ein verankertes Menü mit Richtungspfeil statt

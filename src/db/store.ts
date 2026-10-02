@@ -69,19 +69,43 @@ export class StoreRepository {
 	 * `MarktRepository.zuPruefen` (0028): Die View rechnet fuer alle Zeilen
 	 * die Preis-Unterabfragen aus, nur um Ids zu liefern.
 	 *
-	 * Die beiden Unterabfragen sind Index-Lookups: `idx_plan_release` und
-	 * der UNIQUE-Index (release_id, source) aus 0001. Zwei getrennte
-	 * `EXISTS` statt eines `OR` ueber zwei Tabellen - die Regel aus Stufe 15.
+	 * **Die Menge kommt als `UNION` zweier Index-Lookups, nicht als `OR`**
+	 * (Nachtrag 21b, Migration 0032). Die erste Fassung schrieb
+	 * `EXISTS(plan_entry …) OR physical_release_status = 'nein'` - und weil
+	 * die zweite Haelfte keinen Index hatte, musste SQLite jede der 430
+	 * Zeilen anfassen, auch wenn keine faellig war. Im Leerlauf las der
+	 * Schritt damit 430 Zeilen, 36-mal je Nacht; die Nacht stieg von rund
+	 * 54 000 auf 69 444. Das ist dieselbe Regel wie in Stufe 15 (kein `OR`
+	 * ueber zwei Spalten) und wie beim Feed am 01.10.2026: Die Frage "ist
+	 * etwas offen?" beantwortet die kleine Menge, nicht die grosse.
+	 *
+	 * Jetzt bildet eine CTE die Zielmenge - `plan_entry` liefert seine
+	 * offenen Eintraege, der Teilindex `idx_release_nur_digital` die rein
+	 * digitalen Releases -, und der Rest sind Lookups ueber den
+	 * Primaerschluessel.
+	 *
+	 * Gemessen gegen 430 Releases mit 90 offenen Absichten:
+	 *
+	 * | Fassung | mit Arbeit | im Leerlauf | je Nacht |
+	 * |---|---|---|---|
+	 * | `OR` (erste) | 90 | 430 | 12 760 |
+	 * | `IN` + `UNION` | 431 | 4 | 3 560 |
+	 * | CTE (diese) | **341** | **4** | **2 840** |
+	 *
+	 * Die erste Fassung war mit Arbeit die billigste und im Leerlauf die
+	 * teuerste - und der Leerlauf ueberwiegt: Der Schritt arbeitet an rund
+	 * acht der 36 Aufrufe einer Nacht, in den uebrigen 28 stellt er nur fest,
+	 * dass nichts zu tun ist.
 	 */
 	async zuPruefen(limit: number): Promise<ZuPruefen[]> {
 		const { results } = await this.db
 			.prepare(
-				"SELECT r.id AS releaseId, r.game_id AS gameId, g.igdb_id AS igdbId, g.title AS titel, r.platform AS plattform, " +
+				"WITH ziele(id) AS (SELECT pe.release_id FROM plan_entry pe WHERE pe.status = 'offen' AND pe.release_id IS NOT NULL " +
+					"UNION SELECT id FROM release WHERE physical_release_status = 'nein') " +
+					"SELECT r.id AS releaseId, r.game_id AS gameId, g.igdb_id AS igdbId, g.title AS titel, r.platform AS plattform, " +
 					"g.store_concept_id AS conceptId, g.store_concept_am AS conceptAm, r.psn_product_id AS produktId " +
-					"FROM release r JOIN game g ON g.id = r.game_id " +
+					"FROM ziele z JOIN release r ON r.id = z.id JOIN game g ON g.id = r.game_id " +
 					`WHERE (r.store_geprueft_am IS NULL OR r.store_geprueft_am < datetime('now', '-${STORE_FRIST_TAGE} days')) ` +
-					"AND (EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = r.id AND pe.status = 'offen') " +
-					"OR r.physical_release_status = 'nein') " +
 					"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') " +
 					"ORDER BY r.store_geprueft_am, r.id LIMIT ?",
 			)
