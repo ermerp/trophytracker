@@ -155,17 +155,9 @@ input[type='search'] {
 /* --- Stufe 5: Layout mit Navigation, Sammlung, Spieldetail --- */
 
 main {
-  /*
-   * 80 rem, nicht 64 (Entscheidung des Nutzers vom 01.10.2026).
-   *
-   * Gemeldet war, dass die Kopfzeile auf einem breiten Bildschirm mitten im
-   * Fenster endet und die Glocke weit vom Rand sitzt – beides, weil die Zeile
-   * mit dem Inhalt endet. Der erste Versuch hob den Deckel ganz auf; das
-   * behob es, zog aber **jede** Ansicht über die volle Bildschirmbreite, und
-   * genau das fiel dem Nutzer am nächsten Tag auf. 80 rem ist der Mittelweg:
-   * breiter als vorher, aber eine Textzeile bleibt lesbar.
-   */
-  max-width: 80rem;
+  /* Kein `max-width` hier: Die Breite setzt die Regel der Gestaltungslinie
+     weiter unten. Zwei Deckel an derselben Auswahl haben am 01.10.2026 einen
+     halben Tag gekostet – geändert wurde dieser, gewirkt hat der andere. */
   padding-bottom: 5rem; /* Platz für die Leiste unten */
 }
 
@@ -969,7 +961,17 @@ button.gefaehrlich {
 /* --- Rahmen ------------------------------------------------------------ */
 
 main {
-  max-width: 64rem;
+  /*
+   * 80 rem, nicht 64 (Entscheidung des Nutzers vom 01.10.2026).
+   *
+   * Gemeldet war, dass die Kopfzeile auf einem breiten Bildschirm mitten im
+   * Fenster endet und die Glocke weit vom Rand sitzt – beides, weil die Zeile
+   * mit dem Inhalt endet. Der erste Versuch hob den Deckel ganz auf; das
+   * behob es, zog aber **jede** Ansicht über die volle Bildschirmbreite. Der
+   * zweite setzte 80 rem – an der falschen der **zwei** `main`-Regeln, und
+   * blieb deshalb wirkungslos. **Dies hier ist die wirksame.**
+   */
+  max-width: 80rem;
   margin: 0 auto;
   /* Waagerecht gepolstert, senkrecht nicht: Kopfzeile und Chipleiste laufen
      bis an den Rand und holen sich die Polsterung mit negativem Rand zurueck. */
