@@ -203,6 +203,19 @@ describe("marktSchritt", () => {
 		expect(gerufen).toHaveLength(0);
 	});
 
+	it("zaehlt im Stand Releases, nicht Angebotszeilen", async () => {
+		await luecke(1, "Bloodborne");
+		// Beide Kanaele treffen - das sind zwei Zeilen zu EINEM Release. Die
+		// erste Fassung zaehlte die Zeilen und meldete nach dem ersten
+		// Durchlauf in der Produktion 323, wo 239 Releases einen Preis hatten.
+		await marktSchritt(
+			repos(),
+			ebayMit({ haendler: [angebot("Bloodborne", "12.77", "rebuy-shop")], markt: [angebot("Bloodborne PS4", "10.99")] }),
+		);
+		expect(await angebote()).toHaveLength(2);
+		expect(await repos().markt.stand()).toMatchObject({ mitPreis: 1, geprueft: 1 });
+	});
+
 	it("bleibt ohne Zugangsdaten stumm, statt zu werfen", async () => {
 		await luecke(1, "Bloodborne");
 		const e = await marktSchritt(repos(), erstelleEbayClient(null));
