@@ -114,6 +114,18 @@ export const gebrauchtpreisText = (cents: number | null, anbieter: string | null
   cents === null ? 'unbekannt' : `ab ${euro(cents)}${anbieter ? ` bei ${anbieter}` : ''}`
 
 /**
+ * Der Gebrauchtpreis als Satz, bei vorhandenem Angebot als Link (Stufe 20e).
+ *
+ * Gibt die Teile zurück statt fertigem JSX, damit jede Liste sie in ihre
+ * eigene Zeile setzen kann. `url` ist null, wenn kein Angebot bekannt ist –
+ * oder wenn das gespeicherte verschwunden ist, bevor die nächste Auffrischung
+ * lief; dann steht der Preis ohne Link da.
+ */
+export function gebrauchtpreis(cents: number | null, anbieter: string | null, url: string | null) {
+  return { text: gebrauchtpreisText(cents, anbieter), url: cents === null ? null : url }
+}
+
+/**
  * Was die eBay-Suche über eine unbekannte Disc-Fassung sagt (Stufe 20, 5.3).
  *
  * Gemessen am 02.10.2026: Von 235 durch IGDB belegten Discs hat eBay bei nur
@@ -290,6 +302,11 @@ export type PlanEintrag = {
   eigenerStatus: PlayStatus | null
   /** Offener Kaufeintrag am selben Ziel (Stufe 15); null, wenn keiner. */
   aufKaufliste: number | null
+  /** Gebrauchtpreis am Eintrag (Stufe 20e); null heißt unbekannt, nie 0. */
+  preisCents: number | null
+  preisAnbieter: string | null
+  /** Link auf das Angebot; kann bis zu einer Auffrischung alt sein. */
+  preisUrl: string | null
   /** Disc oder digitale Berechtigung am Release – der Eintrag ist damit eigentlich erfüllt. */
   imBesitz: boolean
 }
@@ -319,6 +336,7 @@ export type KaufKandidat = {
   besterGebrauchtpreisCents: number | null
   /** Wer das Angebot stellt – 'rebuy', 'medimops' oder 'eBay' (Stufe 20). */
   gebrauchtpreisAnbieter: string | null
+  gebrauchtpreisUrl: string | null
 }
 
 /** Vorgemerkter, noch nicht erschienener Titel aus v_erscheint_bald (Use Case 11). */

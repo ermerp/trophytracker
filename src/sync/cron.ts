@@ -56,7 +56,7 @@ export type CronBereich = "psn" | "wartung" | "alles";
  * fest, dass beide Seiten dasselbe sagen.
  */
 export const CRON_PSN = "*/5 3-5 * * *";
-export const CRON_WARTUNG = "*/5 6-7 * * *";
+export const CRON_WARTUNG = "*/5 6-8 * * *";
 
 /**
  * Bereich zu einem Cron-Ausdruck. Ein unbekannter Ausdruck bekommt `alles`:

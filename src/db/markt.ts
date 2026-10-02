@@ -15,8 +15,17 @@ import type { EventRepository } from "./events";
  * zusammen an oder zusammen nicht.
  */
 
-/** Nach so vielen Tagen wird ein Release erneut gefragt. Als Text im Statement, nie als Bind. */
-export const MARKT_FRIST_TAGE = 14;
+/**
+ * Nach so vielen Tagen wird ein Release erneut gefragt. Als Text im
+ * Statement, nie als Bind.
+ *
+ * Taeglich seit Stufe 20e (Entscheidung des Nutzers vom 02.10.2026). Nicht
+ * wegen der Preise selbst - die bewegen sich langsamer -, sondern wegen des
+ * Verlaufs: Ein gleitender Median braucht Punkte, um gegen den einzelnen
+ * Verkaeufer robust zu sein, der eine Disc fuer drei Euro einstellt. Und ein
+ * Preisalarm (Stufe 20g) kann nur melden, was er gesehen hat.
+ */
+export const MARKT_FRIST_TAGE = 1;
 
 export type ZuPruefen = {
 	releaseId: number;
@@ -98,11 +107,18 @@ export class MarktRepository {
 			anweisungen.push(urteil === null ? this.leerSetzen(ziel, kanal) : this.angebotSetzen(ziel, kanal, urteil));
 		}
 
-		// Der angezeigte Preis: Haendler zuerst, sonst Markt (dieselbe Regel
-		// wie in v_luecken). Nur er kommt in den Verlauf - zwei Verlaeufe je
-		// Release waeren nicht vergleichbar.
+		// BEIDE Kanaele kommen in den Verlauf, jeder als eigene Reihe (Stufe
+		// 20e): Der Haendlerpreis ist ein Katalogpreis und aendert sich
+		// bewusst, der Marktpreis springt mit jedem eingestellten Angebot. In
+		// einer Reihe vermischt waeren beide unbrauchbar.
+		for (const kanal of ["haendler", "markt"] as const) {
+			const urteil = angebote[kanal];
+			if (urteil) anweisungen.push(this.verlaufSchreiben(ziel.releaseId, kanal, urteil));
+		}
+
+		// Der ANGEZEIGTE Preis bleibt Haendler zuerst, sonst Markt - dieselbe
+		// Regel wie in v_luecken.
 		const gezeigt = angebote.haendler ?? angebote.markt ?? null;
-		if (gezeigt) anweisungen.push(this.verlaufSchreiben(ziel.releaseId, gezeigt));
 
 		// Disc-Nachweis: nur unbekannt -> ja, nie ein 'nein' und nie ein
 		// bestehendes 'ja' anfassen (Abschnitt 3). Protokoll mit derselben
@@ -179,23 +195,29 @@ export class MarktRepository {
 	 * Leere, wenn der jüngste Eintrag denselben Preis nennt. Set-basiert, weil
 	 * ein Lesen davor eine zweite Abfrage je Release waere.
 	 */
-	private verlaufSchreiben(releaseId: number, urteil: AngebotUrteil): D1PreparedStatement {
+	private verlaufSchreiben(releaseId: number, kanal: MarktKanal, urteil: AngebotUrteil): D1PreparedStatement {
 		return this.db
 			.prepare(
-				"INSERT INTO price_snapshot (release_id, channel, source, condition, price_cents, currency, captured_at) " +
-					"SELECT ?, 'gebraucht', ?, ?, ?, 'EUR', datetime('now') " +
+				"INSERT INTO price_snapshot (release_id, channel, kanal, source, condition, price_cents, currency, captured_at) " +
+					"SELECT ?, 'gebraucht', ?, ?, ?, ?, 'EUR', datetime('now') " +
 					"WHERE NOT EXISTS (SELECT 1 FROM price_snapshot p WHERE p.release_id = ? AND p.channel = 'gebraucht' " +
-					"AND p.price_cents = ? AND p.captured_at = " +
-					"(SELECT MAX(q.captured_at) FROM price_snapshot q WHERE q.release_id = ? AND q.channel = 'gebraucht'))",
+					"AND p.kanal = ? AND p.price_cents = ? AND p.captured_at = " +
+					"(SELECT MAX(q.captured_at) FROM price_snapshot q WHERE q.release_id = ? AND q.channel = 'gebraucht' " +
+					"AND q.kanal = ?))",
 			)
 			.bind(
 				releaseId,
+				kanal,
+				// Wer das Angebot stellt - er kann innerhalb eines Kanals
+				// wechseln und taugt deshalb nicht als Schluessel der Reihe.
 				urteil.anbieter.toLowerCase(),
 				urteil.angebot.zustand,
 				urteil.angebot.preisCents,
 				releaseId,
+				kanal,
 				urteil.angebot.preisCents,
 				releaseId,
+				kanal,
 			);
 	}
 

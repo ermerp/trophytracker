@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router-dom'
-import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
+import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, gebrauchtpreis, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
+import { Preis } from './Preis'
 import type { Ansichtsart } from './Ansicht'
 import type { ChipGruppe } from './Chips'
 import { Cover, PlattformChip, ZustandsZeile } from './SpielTeile'
@@ -30,6 +31,7 @@ import { Zeichen, type ZeichenName } from './Symbole'
 export const SORTIERTEXT = {
   favorit: 'Favoriten zuerst, dann Wertung',
   wertung: 'Kritikerwertung',
+  preis: 'Gebrauchtpreis',
   titel: 'Titel',
   release: 'Erscheinungsdatum',
   angelegt: 'zuletzt angelegt',
@@ -50,6 +52,8 @@ export const VERGLEICH: Record<Sortierung, (a: PlanEintrag, b: PlanEintrag) => n
   release: (a, b) => (a.erscheinungsdatum ?? '9999').localeCompare(b.erscheinungsdatum ?? '9999') || nachTitel(a, b),
   angelegt: (a, b) => b.angelegtAm.localeCompare(a.angelegtAm) || b.id - a.id,
   position: (a, b) => (a.position ?? Infinity) - (b.position ?? Infinity) || a.id - b.id,
+  // Günstigstes zuerst; ohne Preis ans Ende – „unbekannt" ist keine 0.
+  preis: (a, b) => (a.preisCents ?? Infinity) - (b.preisCents ?? Infinity) || nachTitel(a, b),
 }
 
 /** Die Liste im Dativ, für Meldungen und Rückfragen. */
@@ -417,6 +421,19 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
         {e.releaseStatus === 'angekuendigt' && ` · erscheint ${e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'}`}
         {e.releaseStatus !== 'angekuendigt' && e.erscheinungsdatum && ` · ${e.erscheinungsdatum.slice(0, 4)}`}
         {e.art === 'kauf' && e.herkunft && ` · ${HERKUNFTTEXT[e.herkunft] ?? e.herkunft}`}
+        {/* Der Preis nur dort, wo er eine Entscheidung trägt: auf der
+            Kaufliste und am offenen Wunsch. Im Backlog oder auf To-Do steht
+            das Spiel schon im Regal (Stufe 20e).
+
+            Und nur, wenn es einen gibt. „Gebraucht unbekannt" an jedem der
+            rund 350 Wünsche wäre Lärm – die Kachelzeile lässt auch sonst weg,
+            was leer ist (Herkunft, Jahr). Wo der Preis eine Spalte ist, in
+            der Lückenansicht, steht „unbekannt" weiterhin ausgeschrieben. */}
+        {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.preisCents !== null && (
+          <>
+            {' · '}Gebraucht <Preis {...gebrauchtpreis(e.preisCents, e.preisAnbieter, e.preisUrl)} />
+          </>
+        )}
         {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.imBesitz && ' · im Besitz'}
         {e.status !== 'offen' && ` · ${PLAN_STATUSTEXT[e.status]}`}
       </span>

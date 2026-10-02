@@ -2,6 +2,8 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createRepositories } from "../src/db";
 import { haengerMeldung } from "../src/db/sync";
+// Als Text eingebettet: Der Workers-Test-Runtime hat kein Dateisystem.
+import wranglerRoh from "../wrangler.jsonc?raw";
 import { erstelleEbayClient } from "../src/ebay/client";
 import { Geheimnis } from "../src/domain/secret";
 import { erstellePsnClient } from "../src/psn/client";
@@ -606,12 +608,17 @@ describe("cronSchritt", () => {
 
 	describe("zwei Fenster (Stufe 18e)", () => {
 		it("die Ausdruecke im Code und in wrangler.jsonc sagen dasselbe", () => {
-			// wrangler.jsonc laesst sich hier nicht importieren (Kommentare im
-			// JSON), deshalb stehen die Werte woertlich da. Ein Auseinanderlaufen
-			// ist nicht still: Ein unbekannter Ausdruck bekommt 'alles' und tut
-			// zu viel, statt eine Haelfte der Automatik ausfallen zu lassen.
-			expect(CRON_PSN).toBe("*/5 3-5 * * *");
-			expect(CRON_WARTUNG).toBe("*/5 6-7 * * *");
+			// Vorher standen die Werte hier woertlich - der Test haette eine
+			// Aenderung an wrangler.jsonc ALLEIN also gar nicht bemerkt, und
+			// genau das ist beim Umstellen auf drei Stunden fast passiert
+			// (02.10.2026). Jetzt liest er die Datei. Nicht als JSON: Sie
+			// traegt Kommentare. Die Liste reicht als Muster.
+			const liste = /"crons"\s*:\s*\[([^\]]*)\]/.exec(wranglerRoh)?.[1] ?? "";
+			const ausdruecke = [...liste.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+			expect(ausdruecke).toEqual([CRON_PSN, CRON_WARTUNG]);
+			// Ein Auseinanderlaufen ist nicht still: Ein unbekannter Ausdruck
+			// bekommt 'alles' und tut zu viel, statt eine Haelfte der Automatik
+			// ausfallen zu lassen.
 			expect(bereichFuerAusdruck(CRON_PSN)).toBe("psn");
 			expect(bereichFuerAusdruck(CRON_WARTUNG)).toBe("wartung");
 			expect(bereichFuerAusdruck("*/5 * * * *")).toBe("alles");

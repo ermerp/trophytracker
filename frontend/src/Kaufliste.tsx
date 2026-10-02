@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { anfrage, gebrauchtpreisText, type KaufKandidat } from './api'
+import { anfrage, gebrauchtpreis, type KaufKandidat } from './api'
+import { Preis } from './Preis'
 import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERTEXT, usePlanListe } from './Absichten'
 import { useAnsicht } from './Ansicht'
 import { Chips } from './Chips'
@@ -104,8 +105,11 @@ export function Kaufliste() {
           {ziel ? <Link to={ziel} className="titel">{k.titel}</Link> : <span className="titel">{k.titel}</span>}
           <div className="ruhig klein">
             {k.plattform ?? 'Plattform fehlt'} · Kritik {k.kritik ?? 'unbekannt'}
-            {k.quelle === 'luecke' &&
-              ` · Gebraucht ${gebrauchtpreisText(k.besterGebrauchtpreisCents, k.gebrauchtpreisAnbieter)}`}
+            {k.quelle === 'luecke' && (
+              <>
+                {' · '}Gebraucht <Preis {...gebrauchtpreis(k.besterGebrauchtpreisCents, k.gebrauchtpreisAnbieter, k.gebrauchtpreisUrl)} />
+              </>
+            )}
             {k.favorit && ' · ★'}
           </div>
         </div>

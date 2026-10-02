@@ -39,7 +39,7 @@ import { liesJson } from "./validierung";
  * des Nutzers vom 15.09.2026).
  */
 
-const SORTIERUNGEN = ["favorit", "wertung", "titel", "angelegt", "release", "position"] as const;
+const SORTIERUNGEN = ["favorit", "wertung", "titel", "angelegt", "release", "position", "preis"] as const;
 type Sortierung = (typeof SORTIERUNGEN)[number];
 
 /** Herkunft, die die Oberflaeche beim Anlegen eines Kaufeintrags nennen darf (Kandidaten, Stufe 15). */
@@ -141,6 +141,10 @@ export function eintragAntwort(z: PlanZeile) {
 		aufKaufliste: z.kauf_id,
 		/** Disc oder digitale Berechtigung am Release - der Eintrag ist damit eigentlich erfuellt. */
 		imBesitz: z.im_besitz === 1,
+		/** Gebrauchtpreis am Eintrag (Stufe 20e); null heisst unbekannt, nie 0. */
+		preisCents: z.preis_cents,
+		preisAnbieter: z.preis_anbieter,
+		preisUrl: z.preis_url,
 	};
 }
 
@@ -158,6 +162,7 @@ export function kaufKandidatAntwort(k: KaufKandidatZeile) {
 		/** null heisst unbekannt - nie 0 (Darstellungsregel, Abschnitt 13). */
 		besterGebrauchtpreisCents: k.bester_gebrauchtpreis_cents,
 		gebrauchtpreisAnbieter: k.gebrauchtpreis_anbieter,
+		gebrauchtpreisUrl: k.gebrauchtpreis_url,
 	};
 }
 
@@ -202,6 +207,9 @@ const vergleicher: Record<Sortierung, (a: Eintrag, b: Eintrag) => number> = {
 	release: (a, b) => (a.erscheinungsdatum ?? "9999").localeCompare(b.erscheinungsdatum ?? "9999") || nachTitel(a, b),
 	// Manuelle Reihenfolge (To-Do); ohne Position ans Ende, dort nach Id.
 	position: (a, b) => (a.position ?? Infinity) - (b.position ?? Infinity) || a.id - b.id,
+	// Guenstigstes zuerst; OHNE Preis ans Ende - "unbekannt" ist keine 0
+	// (Abschnitt 3, dieselbe Regel wie bei der Kritikerwertung in 5.2).
+	preis: (a, b) => (a.preisCents ?? Infinity) - (b.preisCents ?? Infinity) || nachTitel(a, b),
 };
 
 /** Plattformfilter aus `plattform=PS4,PS5`; leer heisst alle. */

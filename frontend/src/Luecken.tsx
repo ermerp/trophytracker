@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { STATUSTEXT, anfrage, gebrauchtpreisText, marktBefund, type DiscFassung, type PlayStatus } from './api'
+import { STATUSTEXT, anfrage, gebrauchtpreis, marktBefund, type DiscFassung, type PlayStatus } from './api'
+import { Preis } from './Preis'
 import { Reiter } from './Absichten'
 import { Chips, type ChipGruppe } from './Chips'
 import { Kopfzeile } from './Kopfzeile'
@@ -43,6 +44,7 @@ type Luecke = {
   eigenerStatus: PlayStatus | null
   besterGebrauchtpreisCents: number | null
   gebrauchtpreisAnbieter: string | null
+  gebrauchtpreisUrl: string | null
   marktGeprueftAm: string | null
   marktRohangebote: number | null
   verworfen: boolean
@@ -76,6 +78,12 @@ export function Luecken() {
   const [params, setParams] = useSearchParams()
   const mitVerworfenen = params.get('verworfene') === '1'
   const moeglichOffen = params.get('unbekannte') === '1'
+  // Der obere Block ist zugeklappbar, damit der zweite schnell erreichbar ist
+  // (Wunsch des Nutzers vom 02.10.2026). Bewusst KEIN URL-Parameter: Er soll
+  // beim Aufruf der Ansicht immer offen sein, das Zuklappen gilt nur für den
+  // Moment. Der zweite Block steht dagegen in der URL - dort ist "geöffnet"
+  // eine Arbeitsentscheidung, die ein Neuladen überstehen soll.
+  const [lueckenOffen, setLueckenOffen] = useState(true)
   const [daten, setDaten] = useState<Antwort | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [meldung, setMeldung] = useState<string | null>(null)
@@ -166,10 +174,23 @@ export function Luecken() {
         </p>
       ) : (
         <>
-          <p>
-            {daten.anzahl} {daten.anzahl === 1 ? 'Lücke' : 'Lücken'}
-            {mitVerworfenen && daten.verworfen > 0 && `, dazu ${daten.verworfen} verworfen`}
-          </p>
+          <h2>
+            <button
+              type="button"
+              className="knopfname kandidatenkopf"
+              aria-expanded={lueckenOffen}
+              onClick={() => setLueckenOffen(!lueckenOffen)}
+            >
+              <span>
+                {daten.anzahl} {daten.anzahl === 1 ? 'Lücke' : 'Lücken'}
+                {mitVerworfenen && daten.verworfen > 0 && `, dazu ${daten.verworfen} verworfen`}
+              </span>
+              <span className={lueckenOffen ? 'pfeil auf' : 'pfeil'}>
+                <Zeichen name="winkel" groesse={18} strich={2.1} />
+              </span>
+            </button>
+          </h2>
+          {lueckenOffen && (
           <ul className="kandidatenliste">
             {daten.luecken.map((l) => (
               <LueckeZeile key={l.releaseId} l={l}>
@@ -181,6 +202,7 @@ export function Luecken() {
               </LueckeZeile>
             ))}
           </ul>
+          )}
         </>
       )}
 
@@ -261,7 +283,7 @@ function LueckeZeile({ l, children }: { l: Luecke; children: ReactNode }) {
         <div className="ruhig klein">
           <PlattformChip plattform={l.plattform} /> {l.fortschritt} %{l.platin && ' · Platin'}
           {l.eigenerStatus && ` · ${STATUSTEXT[l.eigenerStatus]}`}
-          {' · '}Gebraucht: {gebrauchtpreisText(l.besterGebrauchtpreisCents, l.gebrauchtpreisAnbieter)}
+          {' · '}Gebraucht: <Preis {...gebrauchtpreis(l.besterGebrauchtpreisCents, l.gebrauchtpreisAnbieter, l.gebrauchtpreisUrl)} />
           {l.verworfen && ' · verworfen'}
         </div>
         {befund && <div className="ruhig klein">{befund}</div>}
