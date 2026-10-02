@@ -81,9 +81,16 @@ const angebote = async () =>
 const fristAbgelaufen = async () =>
 	await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-30 days')").run();
 
-const verlauf = async (releaseId: number) =>
-	(await env.DB.prepare("SELECT source, price_cents FROM price_snapshot WHERE release_id = ? ORDER BY id").bind(releaseId).all())
-		.results;
+const verlauf = async (releaseId: number, kanal?: string) =>
+	(
+		await env.DB.prepare(
+			"SELECT kanal, source, price_cents FROM price_snapshot WHERE release_id = ?" +
+				(kanal ? " AND kanal = ?" : "") +
+				" ORDER BY id",
+		)
+			.bind(...(kanal ? [releaseId, kanal] : [releaseId]))
+			.all()
+	).results;
 
 describe("marktSchritt", () => {
 	beforeEach(async () => {
@@ -120,8 +127,13 @@ describe("marktSchritt", () => {
 			"SELECT bester_gebrauchtpreis_cents AS p, gebrauchtpreis_anbieter AS a FROM v_luecken WHERE release_id = 1",
 		).first<{ p: number; a: string }>();
 		expect(z).toMatchObject({ p: 1277, a: "rebuy" });
-		// Nur der angezeigte Preis kommt in den Verlauf.
-		expect(await verlauf(1)).toMatchObject([{ source: "rebuy", price_cents: 1277 }]);
+		// BEIDE Kanaele kommen in den Verlauf, als getrennte Reihen (Stufe 20e):
+		// Die Haendlerkurve ist ruhig, die Marktkurve springt - vermischt waeren
+		// beide unbrauchbar.
+		expect(await verlauf(1)).toMatchObject([
+			{ kanal: "haendler", source: "rebuy", price_cents: 1277 },
+			{ kanal: "markt", source: "ebay", price_cents: 1099 },
+		]);
 	});
 
 	it("haeuft keine Zeilen an - ein zweiter Lauf trifft dieselbe Zeile", async () => {
@@ -134,15 +146,25 @@ describe("marktSchritt", () => {
 		expect(zeilen[0]).toMatchObject({ kanal: "markt", price_cents: 950, source_product_id: "markt:1" });
 	});
 
-	it("schreibt den Verlauf nur bei geaendertem Preis", async () => {
+	it("schreibt den Verlauf nur bei geaendertem Preis, je Kanal getrennt", async () => {
 		await luecke(1, "Bloodborne");
 		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
 		await fristAbgelaufen();
 		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
-		expect(await verlauf(1)).toHaveLength(1);
+		expect(await verlauf(1, "markt")).toHaveLength(1);
 		await fristAbgelaufen();
 		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "8.00")] }));
-		expect(await verlauf(1)).toMatchObject([{ price_cents: 1099 }, { price_cents: 800 }]);
+		expect(await verlauf(1, "markt")).toMatchObject([{ price_cents: 1099 }, { price_cents: 800 }]);
+
+		// Ein unveraenderter Haendlerpreis darf die Marktreihe nicht am
+		// Schreiben hindern und umgekehrt: Die Pruefung laeuft je Kanal.
+		await fristAbgelaufen();
+		await marktSchritt(
+			repos(),
+			ebayMit({ haendler: [angebot("Bloodborne", "12.77", "rebuy-shop")], markt: [angebot("Bloodborne PS4", "8.00")] }),
+		);
+		expect(await verlauf(1, "markt")).toHaveLength(2);
+		expect(await verlauf(1, "haendler")).toMatchObject([{ price_cents: 1277 }]);
 	});
 
 	it("setzt unbekannt auf ja und protokolliert es mit Quelle feed und Detail ebay", async () => {

@@ -38,6 +38,8 @@ export type KaufKandidatZeile = {
 	bester_gebrauchtpreis_cents: number | null;
 	/** Wer das Angebot stellt - 'rebuy', 'medimops' oder 'eBay' (Stufe 20). */
 	gebrauchtpreis_anbieter: string | null;
+	/** Link auf das Angebot; kann bis zu einer Auffrischung alt sein (Stufe 20e). */
+	gebrauchtpreis_url: string | null;
 };
 
 /** Eine Zeile aus v_erscheint_bald (Stufe 15): vorgemerkt, noch nicht erschienen. */
@@ -92,6 +94,10 @@ export type PlanZeile = {
 	kauf_id: number | null;
 	/** Disc oder digitale Berechtigung am Release (1/0); am Spiel oder bei Freitext 0. */
 	im_besitz: number;
+	/** Gebrauchtpreis am Eintrag (Stufe 20e); null heisst unbekannt, nie 0. */
+	preis_cents: number | null;
+	preis_anbieter: string | null;
+	preis_url: string | null;
 };
 
 /** Die Zeile, wie das Protokoll sie braucht (PlanRepository.kurz). */
@@ -132,11 +138,19 @@ export const PLAN_AUSWAHL =
 	"  (SELECT k.id FROM plan_entry k WHERE k.game_id = pe.game_id AND k.kind = 'kauf' " +
 	"   AND k.status = 'offen' AND k.id <> pe.id ORDER BY k.id LIMIT 1)) AS kauf_id, " +
 	"(pe.release_id IS NOT NULL AND (EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = pe.release_id) " +
-	"   OR EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = pe.release_id))) AS im_besitz " +
+	"   OR EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = pe.release_id))) AS im_besitz, " +
+	// Gebrauchtpreis am Eintrag (Stufe 20e): Haendler zuerst, Markt als
+	// Rueckfall - dieselbe Regel wie in v_luecken, und dieselben zwei Joins
+	// ueber idx_market_offer_kanal. Ein Eintrag ohne Release bleibt leer.
+	"COALESCE(mh.price_cents, mm.price_cents) AS preis_cents, " +
+	"COALESCE(mh.anbieter, mm.anbieter) AS preis_anbieter, " +
+	"COALESCE(mh.url, mm.url) AS preis_url " +
 	"FROM plan_entry pe " +
 	"LEFT JOIN release r ON r.id = pe.release_id " +
 	"LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id) " +
-	"LEFT JOIN play_status ps ON ps.release_id = pe.release_id ";
+	"LEFT JOIN play_status ps ON ps.release_id = pe.release_id " +
+	"LEFT JOIN market_offer mh ON mh.release_id = pe.release_id AND mh.kanal = 'haendler' AND mh.in_stock = 1 " +
+	"LEFT JOIN market_offer mm ON mm.release_id = pe.release_id AND mm.kanal = 'markt' AND mm.in_stock = 1 ";
 
 /**
  * Naechste freie Position am Ende der offenen To-Do-Liste (Stufe 12). Nur
@@ -433,7 +447,8 @@ export class PlanRepository {
 		const { results } = await this.db
 			.prepare(
 				"SELECT quelle, plan_id, release_id, game_id, title, platform, cover_url, critic_score, is_favorite, " +
-					"bester_gebrauchtpreis_cents, gebrauchtpreis_anbieter FROM v_kaufkandidaten ORDER BY quelle, title, platform",
+					"bester_gebrauchtpreis_cents, gebrauchtpreis_anbieter, gebrauchtpreis_url " +
+					"FROM v_kaufkandidaten ORDER BY quelle, title, platform",
 			)
 			.all<KaufKandidatZeile>();
 		return results;

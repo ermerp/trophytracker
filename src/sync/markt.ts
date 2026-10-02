@@ -23,8 +23,15 @@ import { vorbereiten } from "../domain/scan-titel";
  * weil es keine gibt.
  */
 
-/** Releases je Aufruf. Zwei Fremdanfragen je Release (Haendler, Markt). */
-export const RELEASES_JE_AUFRUF = 10;
+/**
+ * Releases je Aufruf. Zwei Fremdanfragen je Release (Haendler, Markt).
+ *
+ * Zwanzig, nicht vierundzwanzig: Vierzig von fuenfzig erlaubten Fremdanfragen
+ * lassen zehn Reserve. Laeuft das eBay-Token mitten in der Portion ab, kommen
+ * eine Token-Anfrage und ein zweiter Versuch dazu - mit vierundzwanzig
+ * Releases waeren das einundfuenfzig und damit eine zu viel.
+ */
+export const RELEASES_JE_AUFRUF = 20;
 
 export type MarktErgebnis = {
 	status: "erfolg" | "fehler";

@@ -229,6 +229,7 @@ describe("GET /api/gaps und verwerfen", () => {
 				eigenerStatus: null,
 				besterGebrauchtpreisCents: null,
 				gebrauchtpreisAnbieter: null,
+				gebrauchtpreisUrl: null,
 				marktGeprueftAm: null,
 				marktRohangebote: null,
 				verworfen: false,

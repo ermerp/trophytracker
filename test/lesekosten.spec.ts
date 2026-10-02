@@ -623,8 +623,18 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				"(SELECT COUNT(*) FROM release WHERE markt_rohangebote = 0) AS ohneAngebot, " +
 				"(SELECT COUNT(*) FROM release WHERE markt_geprueft_am IS NULL) AS offen",
 		);
+		// Die Absichten tragen seit Stufe 20e denselben Preis-Join. Gemessen
+		// wird er HIER, mit gefuellter market_offer - im Stufe-15-Block ist die
+		// Tabelle leer, und die Joins kosteten dort nichts.
+		const kauf = env.DB.prepare(
+			"INSERT INTO plan_entry (kind, release_id, origin, status) VALUES ('kauf', ?, 'luecke', 'offen')",
+		);
+		await env.DB.batch(Array.from({ length: 60 }, (_, i) => kauf.bind(i + 1)));
+		const absichtenMitPreis = await zeilenGelesen(`${PLAN_AUSWAHL}WHERE pe.kind = ? AND pe.status = ?`, "kauf", "offen");
+		await env.DB.prepare("DELETE FROM plan_entry").run();
+
 		const jeAufruf = auswahl + sammlung + schreibkosten * 10 + stand;
-		console.info({ luecken, auswahl, sammlung, stand, standVoll, schreibkosten, jeAufruf });
+		console.info({ luecken, auswahl, sammlung, stand, standVoll, schreibkosten, jeAufruf, absichtenMitPreis });
 
 		// Vor Stufe 20 las dieselbe Abfrage 2 620 Zeilen mit leerer
 		// market_offer; mit den beiden LEFT JOINs sind es dort 2 194 und mit
@@ -640,6 +650,9 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(jeAufruf).toBeLessThan(1_000);
 		// Die Einstellungen duerfen die vier Zaehler haben - sie werden selten geoeffnet.
 		expect(standVoll).toBeLessThan(3_000);
+		// 60 offene Kaufeintraege mit Preis-Join. Zwei Index-Lookups je Zeile
+		// ueber idx_market_offer_kanal, dieselbe Form wie in v_luecken.
+		expect(absichtenMitPreis).toBeLessThan(1_500);
 
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM price_snapshot"),

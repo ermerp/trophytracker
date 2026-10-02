@@ -1,0 +1,21 @@
+-- Migration 0030: Der Preisverlauf bekommt seinen Kanal (Stufe 20e)
+--
+-- Bis hierher schrieb der Marktschritt nur den ANGEZEIGTEN Preis in den
+-- Verlauf - Haendler zuerst, sonst Markt. Fuer ein Diagramm (Stufe 20f) ist
+-- das zu wenig: Die beiden Reihen verhalten sich verschieden.
+--
+-- Ein Haendlerpreis bei rebuy oder medimops ist ein Katalogpreis und aendert
+-- sich bewusst und langsam. Der Marktpreis ist das Minimum ueber die gerade
+-- eingestellten Angebote und springt, sobald ein einzelner Verkaeufer eine
+-- Disc einstellt oder jemand sie kauft. In einer Reihe vermischt waeren beide
+-- unbrauchbar; getrennt ist die eine ruhig und die andere glaettbar.
+--
+-- `source` sagt weiterhin, WER das Angebot stellt ('rebuy', 'medimops',
+-- 'ebay') - der kann innerhalb eines Kanals wechseln und taugt deshalb nicht
+-- als Schluessel der Reihe. Dafuer ist `kanal` da.
+--
+-- Keine View liest price_snapshot, ein ADD COLUMN genuegt. Alte Zeilen
+-- bleiben ohne Kanal: Sie stammen vom 02.10.2026 aus dem ersten Durchlauf und
+-- sind der angezeigte Preis - das Diagramm behandelt NULL als 'markt' nicht,
+-- sondern laesst sie weg, statt eine Herkunft zu erfinden (Abschnitt 3).
+ALTER TABLE price_snapshot ADD COLUMN kanal TEXT;

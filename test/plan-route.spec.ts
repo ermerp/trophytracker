@@ -696,8 +696,8 @@ describe("Kaufliste (Stufe 15)", () => {
 			luecken: 1,
 			wuensche: 1,
 			kandidaten: [
-				{ quelle: "luecke", planId: null, releaseId: ps4, spielId: 1, titel: "Persona 5", plattform: "PS4", bild: "p5.jpg", kritik: 93, favorit: false, besterGebrauchtpreisCents: null, gebrauchtpreisAnbieter: null },
-				{ quelle: "wunsch", planId: w, releaseId: null, spielId: 3, titel: "Wunsch", plattform: null, bild: null, kritik: null, favorit: true, besterGebrauchtpreisCents: null, gebrauchtpreisAnbieter: null },
+				{ quelle: "luecke", planId: null, releaseId: ps4, spielId: 1, titel: "Persona 5", plattform: "PS4", bild: "p5.jpg", kritik: 93, favorit: false, besterGebrauchtpreisCents: null, gebrauchtpreisAnbieter: null, gebrauchtpreisUrl: null },
+				{ quelle: "wunsch", planId: w, releaseId: null, spielId: 3, titel: "Wunsch", plattform: null, bild: null, kritik: null, favorit: true, besterGebrauchtpreisCents: null, gebrauchtpreisAnbieter: null, gebrauchtpreisUrl: null },
 			],
 		});
 

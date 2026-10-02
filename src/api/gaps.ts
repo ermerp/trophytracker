@@ -36,6 +36,7 @@ function lueckeAntwort(z: LueckeZeile) {
 		besterGebrauchtpreisCents: z.bester_gebrauchtpreis_cents,
 		/** Wer das Angebot stellt, fuer "ab 12,77 EUR bei rebuy" (Stufe 20). */
 		gebrauchtpreisAnbieter: z.gebrauchtpreis_anbieter,
+		gebrauchtpreisUrl: z.gebrauchtpreis_url,
 		marktGeprueftAm: z.markt_geprueft_am,
 		/** 0 = eBay kennt in der Plattform-Kategorie nichts, null = ungeprueft. */
 		marktRohangebote: z.markt_rohangebote,
