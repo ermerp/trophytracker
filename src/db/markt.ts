@@ -216,11 +216,18 @@ export class MarktRepository {
 		return z?.n ?? 0;
 	}
 
-	/** Zaehler fuer die Einstellungen und die Statusanzeige des Schritts. */
+	/**
+	 * Zaehler fuer die Einstellungen.
+	 *
+	 * `mitPreis` zaehlt RELEASES, nicht Angebotszeilen: Trifft sowohl der
+	 * Haendler- als auch der Marktkanal, stehen zwei Zeilen zu einem Release.
+	 * Die erste Fassung zaehlte die Zeilen und meldete nach dem ersten
+	 * Durchlauf 323, wo 239 Releases einen Preis hatten.
+	 */
 	async stand(): Promise<{ mitPreis: number; geprueft: number; ohneAngebot: number; offen: number }> {
 		const z = await this.db
 			.prepare(
-				"SELECT (SELECT COUNT(*) FROM market_offer WHERE source = 'ebay' AND in_stock = 1) AS mitPreis, " +
+				"SELECT (SELECT COUNT(DISTINCT release_id) FROM market_offer WHERE source = 'ebay' AND in_stock = 1) AS mitPreis, " +
 					"(SELECT COUNT(*) FROM release WHERE markt_geprueft_am IS NOT NULL) AS geprueft, " +
 					"(SELECT COUNT(*) FROM release WHERE markt_rohangebote = 0) AS ohneAngebot, " +
 					"(SELECT COUNT(*) FROM release WHERE markt_geprueft_am IS NULL) AS offen",
