@@ -319,6 +319,17 @@ Kaufknopf ohne Preis, und ein ungeschützter Rückfall nahm „Kitchen [demo]" f
 Absicht steht oder keine Disc-Fassung hat – und nicht, was dauerhaft gekauft
 ist. Erster Lauf: 57 von 79 mit Preis, 18 davon im Angebot.
 
+**Nachtrag 21c**: Zwei Befunde aus der ersten Durchsicht der Nachtläufe.
+Bei *Outcast: Second Contact* nahm die Auswahl die **Deluxe Edition** für
+49,99 € statt des Basisspiels für 14,99 € – beide Produkte tragen denselben
+Titelschlüssel, weil „deluxe edition" weggekürzt wird, und innerhalb dieser
+Gruppe stand Sonys Standardprodukt vorn. Jetzt gewinnt dort der kürzeste Name;
+wo der Titel *nicht* passt, bleibt Sonys Wahl die beste Auskunft. Einer von 57
+Fällen. Und *Assassin's Creed III Remastered* fehlt nicht im Store, sondern
+bei IGDB: sechzehn Händlereinträge, keiner davon der PlayStation Store. Der
+deutsche Store führt es für 9,99 statt 39,99 € – einzutragen über das Feld
+„PSN-Produkt-Id" im Punktmenü des Spieldetails.
+
 **Nachtrag 21b** (Migration 0032): Die Auswahl des Schritts las im Leerlauf
 430 Zeilen und lief in jedem der 36 nächtlichen Aufrufe mit – die Nacht stieg
 von rund 54 000 auf 69 444 gelesene Zeilen. Ursache war eine Bedingung auf

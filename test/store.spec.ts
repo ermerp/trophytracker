@@ -153,6 +153,32 @@ describe("Die Wahl des Produkts auf einer Concept-Seite", () => {
 		expect(reihe(produkte, "SnowRunner", "PS5", "EP4133-PPSA04929_00-SNOWRUNNER5YEARE")[0]).toContain("SNOWRUNNERGAME01");
 	});
 
+	it("nimmt das Basisspiel, auch wenn Sony die Deluxe Edition vorschlaegt", () => {
+		// Der Fall aus der Abnahme am 03.10.2026: Beide Produkte reduzieren auf
+		// denselben Titelschluessel, weil `titelSchluessel` "deluxe edition"
+		// wegtraegt - und Sonys Standardprodukt ist die teure Fassung.
+		// Gekostet hat das den Faktor 3,3: 49,99 statt 14,99 EUR.
+		const basis = "EP4008-CUSA07582_00-OUTCAST000000000";
+		const deluxe = "EP4008-CUSA07582_00-SIEE600000000000";
+		const produkte = [
+			{ id: basis, name: "Outcast - Second Contact" },
+			{ id: deluxe, name: "Outcast – Second Contact Deluxe Edition" },
+		];
+		expect(reihe(produkte, "Outcast: Second Contact", "PS4", deluxe)[0]).toBe(basis);
+	});
+
+	it("laesst Sonys Standardprodukt vorn, wo der Name NICHT passt", () => {
+		// Ausserhalb der Treffergruppe gibt es keinen Titelbeleg - dort bleibt
+		// Sonys Wahl die beste Auskunft, auch wenn ein kuerzerer Name danebensteht.
+		const kurz = "EP1018-CUSA04402_00-KURZ000000000000";
+		const std = "EP1018-CUSA04402_00-KRAKENEDIT0STAND";
+		const produkte = [
+			{ id: kurz, name: "Mittelerde" },
+			{ id: std, name: "Mittelerde: Schatten des Krieges" },
+		];
+		expect(reihe(produkte, "Middle-earth: Shadow of War", "PS4", std)[0]).toBe(std);
+	});
+
 	it("nimmt Sonys Standardprodukt, wenn der Name uebersetzt ist", () => {
 		const produkte = [{ id: "EP1018-CUSA04402_00-KRAKENEDIT0STAND", name: "Mittelerde: Schatten des Krieges" }];
 		expect(reihe(produkte, "Middle-earth: Shadow of War", "PS4", "EP1018-CUSA04402_00-KRAKENEDIT0STAND")).toHaveLength(1);

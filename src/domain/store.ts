@@ -180,6 +180,22 @@ export type ProduktRoh = { id: string; name: string | null };
  *
  * Alles andere bleibt ungefragt. Lieber "unbekannt" als der Preis eines
  * fremden Produkts - dieselbe Linie wie beim Titelabgleich in 7.3.
+ *
+ * **Innerhalb der Treffergruppe gewinnt der KUERZESTE Name, nicht Sonys
+ * Standardprodukt** (Nachtrag 21c). Das war im ersten Entwurf umgekehrt und
+ * kostete bei *Outcast: Second Contact* den Faktor 3,3: Das Concept fuehrt
+ * "Outcast - Second Contact" fuer 14,99 EUR und "Outcast - Second Contact
+ * Deluxe Edition" fuer 49,99 EUR, Sonys Standard ist die Deluxe - und weil
+ * `titelSchluessel` "deluxe edition" wegtraegt, haben BEIDE denselben
+ * Schluessel. Wer schon weiss, dass alle Kandidaten dasselbe Spiel sind,
+ * braucht Sonys Vorschlag nicht mehr: Dann ist der schlichteste Name das
+ * Basisspiel. Umgekehrt bleibt der Standard die beste Auskunft, wo der Name
+ * NICHT passt - dort gibt es keinen Titelbeleg.
+ *
+ * Der Fall faellt nur auf, wenn der Zusatz in der Abkuerzungsliste von
+ * `titelSchluessel` steht: "SnowRunner - 5-Year Anniversary Edition" wird zu
+ * "snowrunner 5 year anniversary" und landet gar nicht erst in der Gruppe.
+ * Gemessen am 03.10.2026 ueber alle 57 Treffer: genau ein Fall.
  */
 export function produktReihe(
 	produkte: readonly ProduktRoh[],
@@ -197,9 +213,16 @@ export function produktReihe(
 		return k !== "" && (k.includes(schluessel) || schluessel.includes(k));
 	};
 	const rest = kandidaten.filter((p) => !gleich.includes(p) && (p.id === standardId || verwandt(p)));
-	const vorn = (a: ProduktRoh, b: ProduktRoh) =>
-		a.id === standardId ? -1 : b.id === standardId ? 1 : (a.name?.length ?? 0) - (b.name?.length ?? 0);
-	return [...gleich].sort(vorn).concat([...rest].sort(vorn));
+	const laenge = (p: ProduktRoh) => p.name?.length ?? 0;
+	const standardZuerst = (p: ProduktRoh) => (p.id === standardId ? -1 : 0);
+	// In der Treffergruppe ist der schlichteste Name das Basisspiel; Sonys
+	// Standardprodukt entscheidet dort nur bei gleicher Laenge.
+	const kuerzesterZuerst = (a: ProduktRoh, b: ProduktRoh) =>
+		laenge(a) - laenge(b) || standardZuerst(a) - standardZuerst(b);
+	// Ausserhalb gibt es keinen Titelbeleg - dort ist Sonys Wahl die beste.
+	const standardVorn = (a: ProduktRoh, b: ProduktRoh) =>
+		standardZuerst(a) - standardZuerst(b) || laenge(a) - laenge(b);
+	return [...gleich].sort(kuerzesterZuerst).concat([...rest].sort(standardVorn));
 }
 
 /** Die Produktliste eines Concept-Blocks, mit den Namen aus demselben Cache. */
