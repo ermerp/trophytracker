@@ -40,6 +40,7 @@ export function useOffenePosten(): OffeneDaten {
 	const [importOffen, setImportOffen] = useState<{ id: number; offen: number } | null>(null)
 	const [freitext, setFreitext] = useState(0)
 	const [kandidaten, setKandidaten] = useState(0)
+	const [storeOffen, setStoreOffen] = useState(0)
 	const [sync, setSync] = useState<StatusAntwort | null>(null)
 
 	useEffect(() => {
@@ -53,6 +54,9 @@ export function useOffenePosten(): OffeneDaten {
 			.catch(() => {})
 		anfrage<Sicherungsstand>('/api/backup/status').then(setSicherung).catch(() => {})
 		anfrage<IgdbStatus>('/api/igdb/status').then(setIgdb).catch(() => {})
+		anfrage<{ eintraege: unknown[] }>('/api/sync/store/offen')
+			.then((a) => setStoreOffen(a.eintraege.length))
+			.catch(() => {})
 		anfrage<{ laeufe: ImportLauf[] }>('/api/imports/wishlist')
 			.then((a) => {
 				const offen = a.laeufe
@@ -135,6 +139,22 @@ export function useOffenePosten(): OffeneDaten {
 				<>
 					<strong>{review.offen}</strong> Spiele warten auf deine erste Durchsicht.{' '}
 					<Link to="/pruefliste">Prüfliste</Link>
+				</>
+			),
+		})
+	}
+	// Store-Zuordnung (Stufe 21d): Information, keine Warnung - es steht
+	// nichts still, es wartet Arbeit. Die Luecke sitzt bei IGDB und laesst
+	// sich nicht verhindern; was geht, ist sie nicht still zu lassen. Sie
+	// verschwindet von selbst, sobald IGDB den Eintrag nachliefert (30-Tage-
+	// Nachfrage) oder du die Adresse einfuegst.
+	if (storeOffen > 0) {
+		posten.push({
+			key: 'store',
+			inhalt: (
+				<>
+					<strong>{storeOffen}</strong> {storeOffen === 1 ? 'Eintrag hat' : 'Einträge haben'} keinen Store-Eintrag.{' '}
+					<Link to="/einstellungen">Nachtragen</Link>
 				</>
 			),
 		})

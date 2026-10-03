@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	OHNE_WEBSTORE,
 	ctasAus,
 	imPlusKatalog,
 	istConceptBlock,
@@ -9,6 +10,7 @@ import {
 	produktReihe,
 	produkteAus,
 	standardProdukt,
+	storeAdresse,
 } from "../src/domain/store";
 import { conceptSeite, fakeStore, htmlAntwort, produktSeite } from "./store-fake";
 
@@ -209,6 +211,51 @@ describe("Die Wahl des Produkts auf einer Concept-Seite", () => {
 			return;
 		}
 		throw new Error("kein Concept-Block gefunden");
+	});
+});
+
+describe("Eine eingefuegte Store-Adresse", () => {
+	const PRODUKT = "EP0001-CUSA11560_00-AC3GAMEPS4000001";
+
+	it("liest die Produkt-Id aus einer kopierten Adresse", () => {
+		expect(storeAdresse(`https://store.playstation.com/de-de/product/${PRODUKT}`)).toEqual({
+			art: "produkt",
+			id: PRODUKT,
+		});
+	});
+
+	it("nimmt jede Sprachfassung und stoert sich nicht an Anhaengseln", () => {
+		expect(storeAdresse(`  https://store.playstation.com/en-us/product/${PRODUKT}/?smcid=x#top  `)).toEqual({
+			art: "produkt",
+			id: PRODUKT,
+		});
+	});
+
+	it("erkennt eine Concept-Adresse - die haengt am Spiel, nicht am Release", () => {
+		expect(storeAdresse("https://store.playstation.com/de-de/concept/231856")).toEqual({ art: "concept", id: "231856" });
+	});
+
+	it("nimmt auch die blosse Id, beide Formen", () => {
+		expect(storeAdresse(PRODUKT)).toEqual({ art: "produkt", id: PRODUKT });
+		expect(storeAdresse("231856")).toEqual({ art: "concept", id: "231856" });
+	});
+
+	it("verwirft, was keine Store-Adresse ist", () => {
+		// Lieber nichts als eine geratene Id: Daran haengt der Preis.
+		for (const murks of ["", "   ", "Assassin's Creed", "https://example.invalid/product/X", "EP0001-CUSA11560_00"]) {
+			expect(storeAdresse(murks), murks).toBeNull();
+		}
+	});
+
+	it("verwirft eine Concept-Adresse ohne Zahl und eine Produktadresse mit falschem Muster", () => {
+		expect(storeAdresse("https://store.playstation.com/de-de/concept/abc")).toBeNull();
+		expect(storeAdresse("https://store.playstation.com/de-de/product/kaputt")).toBeNull();
+	});
+});
+
+describe("Plattformen ohne Web-Store", () => {
+	it("nennt PS3 und Vita - dort fragt der Schritt gar nicht erst", () => {
+		expect([...OHNE_WEBSTORE].sort()).toEqual(["PS3", "PSVITA"]);
 	});
 });
 

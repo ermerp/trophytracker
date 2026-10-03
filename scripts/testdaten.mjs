@@ -279,11 +279,17 @@ const STORE_BEFUNDE = ["ohne_id", "delistet", "ohne_kauf", "fremd"];
  * weiter oben entstehen - erst danach steht fest, was im Zuschnitt liegt.
  */
 s(
-	"UPDATE release SET store_befund = CASE WHEN id % 7 = 5 THEN 'delistet' ELSE 'preis' END, " +
-		"psn_product_id = CASE WHEN id % 7 = 5 THEN NULL ELSE 'EP9000-CUSA' || substr('0000' || id, -5) || '_00-SPIEL0000000000' END, " +
-		"store_produkt_name = CASE WHEN id % 7 = 5 THEN NULL WHEN id % 7 = 2 THEN 'Spiel ' || id || ' – Game of the Year Edition' ELSE 'Spiel ' || id END, " +
-		"store_base_price_cents = CASE WHEN id % 7 = 5 THEN NULL ELSE 1999 + (id * 311) % 5000 END, " +
-		"store_price_cents = CASE WHEN id % 7 = 5 THEN NULL " +
+	// Fuenf Befunde, damit die Oberflaeche jeden davon einmal zeigt: Preis,
+	// delistet, 'ohne_id' (die Nachpflegeliste und die Zeile an der Glocke)
+	// und 'plattform' fuer PS3/Vita, die gar nicht erst gefragt werden.
+	"UPDATE release SET store_befund = CASE WHEN platform IN ('PS3','PSVITA') THEN 'plattform' " +
+		"WHEN id % 7 = 5 THEN 'delistet' WHEN id % 11 = 3 THEN 'ohne_id' ELSE 'preis' END, " +
+		"psn_product_id = CASE WHEN platform IN ('PS3','PSVITA') OR id % 7 = 5 OR id % 11 = 3 THEN NULL " +
+		"ELSE 'EP9000-CUSA' || substr('0000' || id, -5) || '_00-SPIEL0000000000' END, " +
+		"store_produkt_name = CASE WHEN platform IN ('PS3','PSVITA') OR id % 7 = 5 OR id % 11 = 3 THEN NULL " +
+		"WHEN id % 7 = 2 THEN 'Spiel ' || id || ' – Game of the Year Edition' ELSE 'Spiel ' || id END, " +
+		"store_base_price_cents = CASE WHEN platform IN ('PS3','PSVITA') OR id % 7 = 5 OR id % 11 = 3 THEN NULL ELSE 1999 + (id * 311) % 5000 END, " +
+		"store_price_cents = CASE WHEN platform IN ('PS3','PSVITA') OR id % 7 = 5 OR id % 11 = 3 THEN NULL " +
 		"WHEN id % 7 IN (1, 3) THEN CAST((1999 + (id * 311) % 5000) * 0.35 AS INTEGER) ELSE 1999 + (id * 311) % 5000 END, " +
 		"store_is_sale = CASE WHEN id % 7 IN (1, 3) THEN 1 ELSE 0 END, " +
 		"store_plus = CASE WHEN id % 7 = 4 THEN 1 ELSE 0 END, " +
@@ -294,6 +300,9 @@ s(
 for (let i = 1; i <= ANZAHL; i += 3) {
 	const rest = i % 7;
 	const produktId = `EP9000-CUSA${String(10000 + i).slice(0, 5)}_00-SPIEL${String(i).padStart(11, "0")}`;
+	// PS3 und Vita bleiben beim Befund aus dem set-basierten Block: Fuer sie
+	// fragt der Schritt gar nicht erst (21d).
+	if (i % 4 === 0 || i % 4 === 3) continue;
 	if (rest === 5) {
 		// Ohne Preis - jeder Befund kommt vor, damit sein Satz im Bild steht.
 		s(

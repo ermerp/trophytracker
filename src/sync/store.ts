@@ -1,7 +1,7 @@
 import type { Repositories } from "../db";
 import type { ZuPruefen } from "../db/store";
 import { storeConceptIds } from "../domain/igdb";
-import { produktReihe, type StoreBefund } from "../domain/store";
+import { OHNE_WEBSTORE, produktReihe, type StoreBefund } from "../domain/store";
 import type { IgdbClient } from "../igdb/client";
 import { StoreAbrufError, type StoreClient } from "../psn/store";
 
@@ -61,14 +61,53 @@ export async function storeSchritt(
 	igdb: IgdbClient,
 	n = RELEASES_JE_AUFRUF,
 ): Promise<StoreSchrittErgebnis> {
-	const ziele = await repos.store.zuPruefen(n);
+	return portion(repos, store, igdb, await repos.store.zuPruefen(n), n);
+}
+
+/**
+ * EIN Release jetzt pruefen - ohne Frist, ohne Zuschnitt (Nachtrag 21d).
+ *
+ * Derselbe Weg wie im Nachtlauf, nur mit einer einelementigen Portion: Wer
+ * von Hand eine Adresse eintraegt, soll den Preis sofort sehen. Zwei Eingaenge
+ * auf dieselbe Maschinerie - damit kann die Auswahlregel nicht auseinander
+ * laufen.
+ *
+ * `null` heisst: Dieses Release gibt es nicht.
+ */
+export async function einesPruefen(
+	repos: Repositories,
+	store: StoreClient,
+	igdb: IgdbClient,
+	releaseId: number,
+): Promise<StoreSchrittErgebnis | null> {
+	const ziel = await repos.store.eines(releaseId);
+	if (ziel === null) return null;
+	return portion(repos, store, igdb, [ziel], 1);
+}
+
+async function portion(
+	repos: Repositories,
+	store: StoreClient,
+	igdb: IgdbClient,
+	ziele: ZuPruefen[],
+	n: number,
+): Promise<StoreSchrittErgebnis> {
 	if (ziele.length === 0) return leer({ status: "erfolg" });
 
 	let anfragen = 0;
 
 	// Die Concept-Ids fuer die ganze Portion in EINER IGDB-Anfrage, nicht je
 	// Release. Ohne IGDB-Zugang laeuft der Schritt mit dem, was schon da ist.
-	const offen = repos.store.nochOhneConcept(ziele);
+	// PS3 und Vita bleiben aussen vor - fuer sie fuehrt der Web-Store nichts,
+	// also waere schon die IGDB-Frage vergebliche Arbeit (21d).
+	// Wer schon eine Produkt-Id hat, braucht keine Concept-Id - die ist nur
+	// der Weg dorthin. Gefragt wird deshalb nur, wenn mindestens ein Ziel
+	// wirklich eine braucht: Beim Einzelabruf mit eingefuegter Produktadresse
+	// spart das die halbe Wartezeit, im Nachtlauf aendert es nichts, weil dort
+	// ohnehin fast immer eines ohne Id dabei ist.
+	const offen = repos.store
+		.nochOhneConcept(ziele)
+		.filter((z) => !OHNE_WEBSTORE.includes(z.plattform) && z.produktId === null);
 	if (offen.length > 0 && igdb.konfiguriert()) {
 		try {
 			const roh = await igdb.storeNachIds(offen.map((z) => z.igdbId).filter((id): id is number => id !== null));
@@ -103,6 +142,18 @@ export async function storeSchritt(
 	let ohneTreffer = 0;
 
 	for (const ziel of ziele) {
+		// PS3 und Vita: Befund ohne einen einzigen Abruf (21d). Der Web-Store
+		// fuehrt fuer sie keine Produktseiten mehr - dreifach gemessen am
+		// 03.10.2026 (OHNE_WEBSTORE). Hier zu fragen waere Verkehr fuer eine
+		// Antwort, die feststeht. Steht vor der Budgetpruefung, weil dieser
+		// Fall nichts kostet.
+		if (OHNE_WEBSTORE.includes(ziel.plattform)) {
+			await repos.store.befundSchreiben(ziel.releaseId, "plattform");
+			geprueft++;
+			ohneTreffer++;
+			continue;
+		}
+
 		// Aufhoeren, bevor die naechste Runde das Budget ueberzieht. Die
 		// uebrigen Releases bleiben ungestempelt und kommen beim naechsten
 		// Aufruf wieder.

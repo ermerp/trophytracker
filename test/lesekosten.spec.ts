@@ -730,6 +730,15 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const offen = await zeilenGelesen(
 			"SELECT COUNT(*) AS n FROM release WHERE store_geprueft_am IS NULL AND psn_product_id IS NOT NULL",
 		);
+		// Die Nachpflegeliste haengt an der Glocke und wird damit bei JEDEM
+		// Oeffnen des Dashboards geholt (Stufe 21d) - sie gehoert deshalb
+		// gemessen, nicht nur der Nachtschritt. Ein Tabellenscan ueber
+		// `release`; ein eigener Index dafuer lohnt bei 430 Zeilen nicht,
+		// aber die Zahl soll sichtbar bleiben.
+		const nachpflege = await zeilenGelesen(
+			"SELECT r.id, g.title, r.platform FROM release r JOIN game g ON g.id = r.game_id " +
+				"WHERE r.store_befund = 'ohne_id' ORDER BY g.title, r.platform",
+		);
 		const standVoll = await zeilenGelesen(
 			"SELECT SUM(store_price_cents IS NOT NULL) AS mitPreis, SUM(store_is_sale = 1) AS imAngebot, " +
 				"SUM(store_plus = 1) AS imPlusKatalog, SUM(store_geprueft_am IS NOT NULL) AS geprueft, " +
@@ -742,7 +751,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const absichten = await zeilenGelesen(`${PLAN_AUSWAHL}WHERE pe.kind = ? AND pe.status = ?`, "wunsch", "offen");
 
 		const jeAufruf = auswahl + (protokoll + verlaufsschreiben) * 10 + offen;
-		console.info({ auswahl, protokoll, verlaufsschreiben, offen, standVoll, jeAufruf, absichten });
+		console.info({ auswahl, protokoll, verlaufsschreiben, offen, nachpflege, standVoll, jeAufruf, absichten });
 
 		// Die Zielmenge kommt aus plan_entry und dem Teilindex (0032), nicht
 		// aus einem Scan ueber release - gemessen 341 statt 431 mit `IN`.
@@ -756,6 +765,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Die Einstellungen duerfen die fuenf Zaehler haben - ein Tabellenscan
 		// ueber release, selten geoeffnet.
 		expect(standVoll).toBeLessThan(1_000);
+		// Beim Oeffnen des Dashboards, also oft - daher die eigene Grenze.
+		expect(nachpflege).toBeLessThan(1_000);
 		expect(absichten).toBeLessThan(2_000);
 
 		await env.DB.batch([
