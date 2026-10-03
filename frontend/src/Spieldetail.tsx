@@ -1052,14 +1052,24 @@ function ReleaseMenue({
         {r.discQuelle && <span className="still"> {DISCQUELLE[r.discQuelle] ?? r.discQuelle}</span>}
       </p>
 
-      <div className="tafelname">PSN-Produkt-Id</div>
+      <div className="tafelname">Store-Adresse</div>
       <PsnProduktId
         key={r.psnProductId ?? ''}
         release={r}
         laeuft={laeuft}
         onSpeichern={(wert) => {
           schliessen()
-          void tue(() => anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { psnProductId: wert } }), 'PSN-Produkt-Id gespeichert.')
+          // Leeren geht weiterhin über die Release-Route; eine Adresse geht
+          // über den Store-Weg, der sie auswertet UND den Preis gleich holt
+          // (Stufe 21d) – sonst stünde die Zeile bis zum nächsten Morgen still.
+          if (wert === null) {
+            void tue(() => anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { psnProductId: null } }), 'Entfernt.')
+            return
+          }
+          void tue(
+            () => anfrage(`/api/sync/store/${r.id}`, { methode: 'POST', koerper: { adresse: wert } }),
+            'Eingetragen, Preis geholt.',
+          )
         }}
       />
 
@@ -1233,7 +1243,14 @@ function SpielMenue({
   )
 }
 
-/** Die PSN-Produkt-Id – für die Store-Preise ab Stufe 21, sonst nirgends gebraucht. */
+/**
+ * Die Store-Zuordnung eines Releases (Stufe 21, Feld seit 21d toleranter).
+ *
+ * Gebraucht wird sie, wenn IGDB den PlayStation-Store-Eintrag nicht kennt –
+ * gemessen am 03.10.2026 bei 9 von 79 Releases. Eingefügt wird die aus dem
+ * Browser kopierte Adresse; eine Produktseite gilt für dieses Release, eine
+ * Concept-Seite für beide Plattformen des Spiels.
+ */
 function PsnProduktId({
   release: r,
   laeuft,
@@ -1248,11 +1265,11 @@ function PsnProduktId({
   return (
     <p className="menuezeile">
       <label>
-        <span className="nur-vorlesen">PSN-Produkt-Id</span>
+        <span className="nur-vorlesen">Store-Adresse oder Produkt-Id</span>
         <input
           type="text"
           value={wert}
-          placeholder="unbekannt"
+          placeholder="Store-Adresse einfügen"
           disabled={laeuft}
           onChange={(e) => setWert(e.target.value)}
         />

@@ -439,7 +439,11 @@ type StoreStand = {
   imPlusKatalog: number
   geprueft: number
   ohneId: number
+  ohneWebstore: number
 }
+
+/** Ein Eintrag der Nachpflegeliste (`GET /api/sync/store/offen`, Stufe 21d). */
+type StoreOffen = { releaseId: number; gameId: number; titel: string; plattform: string }
 
 /** Was eine Portion zurueckgibt (`POST /api/sync/store`). */
 type StoreAntwort = {
@@ -477,6 +481,7 @@ export function Einstellungen() {
   const [marktText, setMarktText] = useState<string | null>(null)
   const [store, setStore] = useState<StoreStand | null>(null)
   const [storeText, setStoreText] = useState<string | null>(null)
+  const [storeOffen, setStoreOffen] = useState<StoreOffen[] | null>(null)
 
   const statusLaden = useCallback(async () => {
     const antwort = await fetch('/api/sync/status')
@@ -496,6 +501,8 @@ export function Einstellungen() {
   const storeStandLaden = useCallback(async () => {
     const antwort = await fetch('/api/sync/store')
     if (antwort.ok) setStore((await antwort.json()) as StoreStand)
+    const offen = await fetch('/api/sync/store/offen')
+    if (offen.ok) setStoreOffen(((await offen.json()) as { eintraege: StoreOffen[] }).eintraege)
   }, [])
 
   useEffect(() => {
@@ -922,6 +929,15 @@ export function Einstellungen() {
         Probespiels oder eines Abos; liegt ein Titel im PS Plus-Katalog, steht das daneben. Zugangsdaten
         braucht es nicht. Der Schritt läuft sonst nachts im PSN-Fenster mit, zehn Releases je Aufruf.
       </p>
+      {storeOffen !== null && storeOffen.length > 0 && (
+        <StoreNachpflege eintraege={storeOffen} laeuft={laeuft} onFertig={storeStandLaden} />
+      )}
+      {store !== null && store.ohneWebstore > 0 && (
+        <p className="zeile still">
+          Dazu {store.ohneWebstore} PS3- und Vita-Releases, für die der Web-Store keine Seiten mehr führt – sie werden gar
+          nicht erst gefragt.
+        </p>
+      )}
       <h3>Einzeltrophäen</h3>
       <p className="zeile">
         {trophaeen === null
@@ -979,5 +995,99 @@ export function Einstellungen() {
 
       {meldung && <p role="status">{meldung}</p>}
     </section>
+  )
+}
+
+
+/**
+ * Nachpflege fehlender Store-Zuordnungen (Stufe 21d).
+ *
+ * Warum es diese Liste gibt: Die Store-Id kommt von IGDB, und für manche
+ * Spiele hat dort niemand den PlayStation-Store-Eintrag hinterlegt – gemessen
+ * am 03.10.2026 für 9 von 79 Releases. Verhindern lässt sich das nicht, die
+ * Lücke sitzt in fremden Daten. Was sich bauen lässt, ist, dass sie nicht
+ * still bleibt: Der Zähler steht an der Glocke, und hier steht die Arbeit.
+ *
+ * Eingefügt wird die aus dem Browser kopierte Adresse. Eine **Produkt**-Adresse
+ * gilt für dieses Release, eine **Concept**-Adresse für das ganze Spiel – bei
+ * einem Cross-Gen-Titel also für beide Fassungen auf einmal.
+ *
+ * Gespeichert wird und der Preis kommt im selben Aufruf: Ohne das stünde die
+ * Zeile bis zum nächsten Morgen stumm da, weil die Tagesfrist greift.
+ */
+function StoreNachpflege({
+  eintraege,
+  laeuft,
+  onFertig,
+}: {
+  eintraege: StoreOffen[]
+  laeuft: boolean
+  onFertig: () => Promise<void>
+}) {
+  const [werte, setWerte] = useState<Record<number, string>>({})
+  const [aktiv, setAktiv] = useState<number | null>(null)
+  const [meldungen, setMeldungen] = useState<Record<number, string>>({})
+
+  async function eintragen(e: StoreOffen) {
+    const adresse = (werte[e.releaseId] ?? '').trim()
+    if (adresse === '') return
+    setAktiv(e.releaseId)
+    try {
+      const antwort = await fetch(`/api/sync/store/${e.releaseId}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ adresse }),
+        signal: AbortSignal.timeout(30_000),
+      })
+      const daten = (await antwort.json()) as StoreAntwort & { fehler?: string }
+      if (!antwort.ok) throw new Error(daten.fehler ?? 'Das hat nicht geklappt.')
+      setMeldungen((m) => ({
+        ...m,
+        [e.releaseId]: daten.mitPreis > 0 ? 'Preis geholt.' : 'Gespeichert, aber der Store nennt dazu keinen Kaufpreis.',
+      }))
+      if (daten.mitPreis > 0) await onFertig()
+    } catch (fehler) {
+      setMeldungen((m) => ({ ...m, [e.releaseId]: fehler instanceof Error ? fehler.message : 'Unbekannter Fehler' }))
+    } finally {
+      setAktiv(null)
+    }
+  }
+
+  return (
+    <div className="nachpflege">
+      <p className="zeile">
+        <strong>{eintraege.length}</strong> {eintraege.length === 1 ? 'Eintrag hat' : 'Einträge haben'} keinen
+        Store-Eintrag bei IGDB. Öffne das Spiel im PlayStation Store, kopiere die Adresse aus der Adresszeile und füge
+        sie hier ein – eine Produktseite gilt für dieses Release, eine Concept-Seite für beide Plattformen.
+      </p>
+      {eintraege.map((e) => (
+        <div key={e.releaseId} className="nachpflegezeile">
+          <span className="nachpflegetitel">
+            {e.titel} <span className="still">· {e.plattform}</span>
+          </span>
+          <input
+            type="url"
+            inputMode="url"
+            placeholder="Store-Adresse einfügen"
+            value={werte[e.releaseId] ?? ''}
+            onChange={(ev) => setWerte((w) => ({ ...w, [e.releaseId]: ev.target.value }))}
+            disabled={laeuft || aktiv !== null}
+            aria-label={`Store-Adresse für ${e.titel}`}
+          />
+          <button
+            type="button"
+            onClick={() => void eintragen(e)}
+            disabled={laeuft || aktiv !== null || (werte[e.releaseId] ?? '').trim() === ''}
+          >
+            {aktiv === e.releaseId ? 'läuft …' : 'eintragen'}
+          </button>
+          {meldungen[e.releaseId] && (
+            <span className="zeile still" role="status">
+              {meldungen[e.releaseId]}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }

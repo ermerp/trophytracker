@@ -41,7 +41,7 @@ export type StoreErgebnis = StorePreis & {
  * - "IGDB kennt das Spiel nicht" und "Sony verkauft es nicht mehr" sind
  * verschiedene Befunde, und nur der zweite ist eine Aussage ueber den Titel.
  */
-export const STORE_BEFUNDE = ["preis", "ohne_id", "delistet", "ohne_kauf", "fremd", "unlesbar"] as const;
+export const STORE_BEFUNDE = ["preis", "ohne_id", "delistet", "ohne_kauf", "fremd", "unlesbar", "plattform"] as const;
 export type StoreBefund = (typeof STORE_BEFUNDE)[number];
 
 /**
@@ -280,6 +280,65 @@ export function kaufpreisAus(ctas: readonly CtaRoh[]): StorePreis | null {
 		waehrung: kauf.price.currencyCode ?? "EUR",
 		istSale: preisCents < grundpreisCents,
 	};
+}
+
+/**
+ * Plattformen, fuer die der Web-Store keine Produktseiten mehr fuehrt
+ * (Nachtrag 21d, gemessen am 03.10.2026).
+ *
+ * PS3 und Vita sind nur noch an der Konsole erreichbar. Gemessen auf drei
+ * Wegen, alle mit demselben Ergebnis:
+ *
+ * - Von 30 reinen PS3-Spielen der Sammlung haben **2** ueberhaupt eine
+ *   Concept-Id bei IGDB, und **keine** der beiden Concept-Seiten fuehrt ein
+ *   Produkt mit PS3-Praefix - nur PS4- und PS5-Fassungen.
+ * - Bei Vita dasselbe: 2 von 20 mit Concept-Id, **0** mit Vita-Produkt.
+ * - Drei echte, dokumentierte PS3-Produkt-Ids direkt abgerufen
+ *   (`EP9000-NPEA00412_00-MOVEFITBUND00001` und zwei weitere): **alle 302**,
+ *   in `de-de` wie in `en-us`.
+ *
+ * Fuer diese Plattformen fragt der Schritt deshalb gar nicht erst - weder
+ * IGDB noch den Store. Der Preis bleibt "unbekannt", und das ist hier keine
+ * Luecke, sondern die Auskunft (Abschnitt 3).
+ */
+export const OHNE_WEBSTORE: readonly Plattform[] = ["PS3", "PSVITA"];
+
+/**
+ * Eine eingefuegte Store-Adresse auswerten (Nachtrag 21d).
+ *
+ * Erlaubt ist, was beim Nachtragen von Hand tatsaechlich anfaellt: die aus
+ * dem Browser kopierte Adresse einer Produkt- oder Concept-Seite, in jeder
+ * Sprachfassung, oder die blosse Id. Mehr nicht - wer hier raet, traegt den
+ * Preis eines fremden Spiels ein.
+ *
+ * Die beiden Formen tun Verschiedenes: Eine **Produkt**-Id haengt am Release
+ * und gilt fuer genau eine Plattform. Eine **Concept**-Id haengt am Spiel,
+ * und der normale Weg loest daraus die Fassungen je Plattform auf - bei
+ * einem Cross-Gen-Titel genuegt also ein Eintrag fuer beide Releases.
+ */
+export type StoreAdresse = { art: "produkt"; id: string } | { art: "concept"; id: string };
+
+/** Produkt-Ids sehen aus wie EP9000-CUSA13323_00-GHOSTSHIP0000000. */
+const PRODUKT_ID = /^[A-Z]{2}\d{4}-[A-Z]{4}\d{5}_\d{2}-[A-Za-z0-9_]{16}$/;
+
+export function storeAdresse(eingabe: string): StoreAdresse | null {
+	const text = eingabe.trim();
+	if (text === "") return null;
+
+	// Aus einer Adresse den letzten Pfadteil nehmen - Sprachfassung, Fragezeichen
+	// und Anker sind egal.
+	const ausUrl = /store\.playstation\.com\/[^/]+\/(product|concept)\/([^/?#]+)/i.exec(text);
+	if (ausUrl) {
+		const art = ausUrl[1].toLowerCase() === "concept" ? "concept" : "produkt";
+		const id = decodeURIComponent(ausUrl[2]);
+		if (art === "concept") return /^\d+$/.test(id) ? { art, id } : null;
+		return PRODUKT_ID.test(id) ? { art: "produkt", id } : null;
+	}
+
+	// Blosse Id: Ziffern sind ein Concept, das lange Muster ein Produkt.
+	if (/^\d+$/.test(text)) return { art: "concept", id: text };
+	if (PRODUKT_ID.test(text)) return { art: "produkt", id: text };
+	return null;
 }
 
 /**

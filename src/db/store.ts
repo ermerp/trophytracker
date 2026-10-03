@@ -1,4 +1,4 @@
-import type { StoreBefund, StoreErgebnis } from "../domain/store";
+import { OHNE_WEBSTORE, type StoreBefund, type StoreErgebnis } from "../domain/store";
 import type { Plattform } from "../domain/titel";
 import type { EventRepository } from "./events";
 
@@ -154,6 +154,71 @@ export class StoreRepository {
 	}
 
 	/**
+	 * EIN Release, ohne Frist und ohne Zuschnitt (Nachtrag 21d).
+	 *
+	 * Der Weg fuer "jetzt sofort": Wer von Hand eine Adresse eintraegt, will
+	 * den Preis sehen und nicht bis morgen warten - und ohne das waere die
+	 * Nachpflegeliste unbrauchbar. Dieselbe Luecke war am 03.10.2026 schon
+	 * einmal spuerbar, als sich der falsche Outcast-Preis nach der Korrektur
+	 * nicht erneuern liess.
+	 */
+	async eines(releaseId: number): Promise<ZuPruefen | null> {
+		return this.db
+			.prepare(
+				"SELECT r.id AS releaseId, r.game_id AS gameId, g.igdb_id AS igdbId, g.title AS titel, r.platform AS plattform, " +
+					"g.store_concept_id AS conceptId, g.store_concept_am AS conceptAm, r.psn_product_id AS produktId " +
+					"FROM release r JOIN game g ON g.id = r.game_id WHERE r.id = ?",
+			)
+			.bind(releaseId)
+			.first<ZuPruefen>();
+	}
+
+	/**
+	 * Eine von Hand eingetragene Concept-Id (Nachtrag 21d).
+	 *
+	 * Sie haengt am Spiel, nicht am Release - damit loest der normale Weg
+	 * beide Fassungen eines Cross-Gen-Titels auf einmal auf. Der Stempel geht
+	 * mit, sonst ueberschriebe die naechste IGDB-Runde den Handeintrag mit
+	 * ihrem `null`.
+	 *
+	 * Kein Ereignis: Die Concept-Id ist ein Nachschlagewert wie `cover_url`,
+	 * und was daraus entsteht - die Produkt-Id am Release - wird protokolliert.
+	 */
+	async conceptVonHand(gameId: number, conceptId: string): Promise<void> {
+		await this.db
+			.prepare("UPDATE game SET store_concept_id = ?, store_concept_am = datetime('now') WHERE id = ?")
+			.bind(conceptId, gameId)
+			.run();
+	}
+
+	/**
+	 * Die Eintraege, bei denen Nachpflege ueberhaupt etwas bringt.
+	 *
+	 * Nur `ohne_id`: Dort fehlt die Zuordnung, und genau die laesst sich mit
+	 * einer eingefuegten Adresse nachtragen. `delistet` und `plattform` sind
+	 * Auskuenfte ueber das Spiel - da gibt es nichts einzufuegen -, und bei
+	 * `fremd` fuehrt der Store fuer diese Plattform wirklich nichts. Eine
+	 * Arbeitsliste mit unerledigbaren Posten wird nach zwei Wochen ignoriert;
+	 * das war die Lehre aus den offenen Scans (Stufe 17d).
+	 *
+	 * **PS3 und Vita bleiben auch dann draussen, wenn an ihnen noch ein altes
+	 * `ohne_id` steht.** Der Befund stammt dann aus einem Lauf vor 21d und
+	 * wird beim naechsten korrigiert - bis dahin stuenden vier unloesbare
+	 * Posten in der Liste. Die Plattform entscheidet, nicht der Stempel.
+	 */
+	async ohneZuordnung(): Promise<Array<{ releaseId: number; gameId: number; titel: string; plattform: Plattform }>> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform " +
+					"FROM release r JOIN game g ON g.id = r.game_id " +
+					`WHERE r.store_befund = 'ohne_id' AND r.platform NOT IN (${OHNE_WEBSTORE.map((p) => `'${p}'`).join(", ")}) ` +
+					"ORDER BY g.title, r.platform",
+			)
+			.all<{ releaseId: number; gameId: number; titel: string; plattform: Plattform }>();
+		return results ?? [];
+	}
+
+	/**
 	 * Ein gefundener Preis. EIN Batch: Protokoll, Preis, Verlauf, Stempel.
 	 *
 	 * Die Protokollzeile steht VOR dem UPDATE und traegt dieselbe Bedingung
@@ -263,23 +328,39 @@ export class StoreRepository {
 	}
 
 	/** Zaehler fuer die Einstellungen. Zaehlt RELEASES, nicht Verlaufszeilen (der Fehler aus 20c). */
-	async stand(): Promise<{ mitPreis: number; imAngebot: number; imPlusKatalog: number; geprueft: number; ohneId: number }> {
+	async stand(): Promise<{
+		mitPreis: number;
+		imAngebot: number;
+		imPlusKatalog: number;
+		geprueft: number;
+		ohneId: number;
+		ohneWebstore: number;
+	}> {
 		const z = await this.db
 			.prepare(
 				"SELECT SUM(store_price_cents IS NOT NULL) AS mitPreis, " +
 					"SUM(store_is_sale = 1) AS imAngebot, " +
 					"SUM(store_plus = 1) AS imPlusKatalog, " +
 					"SUM(store_geprueft_am IS NOT NULL) AS geprueft, " +
-					"SUM(store_befund = 'ohne_id') AS ohneId " +
+					"SUM(store_befund = 'ohne_id') AS ohneId, " +
+					"SUM(store_befund = 'plattform') AS ohneWebstore " +
 					"FROM release",
 			)
-			.first<{ mitPreis: number; imAngebot: number; imPlusKatalog: number; geprueft: number; ohneId: number }>();
+			.first<{
+				mitPreis: number;
+				imAngebot: number;
+				imPlusKatalog: number;
+				geprueft: number;
+				ohneId: number;
+				ohneWebstore: number;
+			}>();
 		return {
 			mitPreis: z?.mitPreis ?? 0,
 			imAngebot: z?.imAngebot ?? 0,
 			imPlusKatalog: z?.imPlusKatalog ?? 0,
 			geprueft: z?.geprueft ?? 0,
 			ohneId: z?.ohneId ?? 0,
+			ohneWebstore: z?.ohneWebstore ?? 0,
 		};
 	}
 }

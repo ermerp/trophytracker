@@ -289,6 +289,12 @@ describe("Dichtheitsprüfung", () => {
 		const antworten = [
 			await ruf(app, "/api/sync/store", { method: "POST" }),
 			await ruf(app, "/api/sync/store"),
+			await ruf(app, "/api/sync/store/offen"),
+			await ruf(app, "/api/sync/store/1", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ adresse: "https://store.playstation.com/de-de/concept/1" }),
+			}),
 			await ruf(app, "/api/settings/npsso", {
 				method: "POST",
 				headers: { "content-type": "application/json" },

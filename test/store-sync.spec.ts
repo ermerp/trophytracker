@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createRepositories } from "../src/db";
 import { titelSchluessel } from "../src/domain/titel";
 import { erstelleIgdbClient } from "../src/igdb/client";
-import { FREMDANFRAGEN_HOECHSTENS, storeSchritt } from "../src/sync/store";
+import { FREMDANFRAGEN_HOECHSTENS, einesPruefen, storeSchritt } from "../src/sync/store";
 import { conceptSeite, fakeStore, htmlAntwort, produktSeite } from "./store-fake";
 
 /**
@@ -311,6 +311,65 @@ describe("storeSchritt", () => {
 		const e = await storeSchritt(repos(), client, igdbOhne());
 		expect(e).toMatchObject({ mitPreis: 0, ohneTreffer: 1 });
 		expect(await stand(1)).toMatchObject({ befund: "fremd", preis: null });
+	});
+
+	it("fragt fuer PS3 und Vita gar nicht erst - der Web-Store fuehrt sie nicht", async () => {
+		// Dreifach gemessen am 03.10.2026: keine PS3-/Vita-Produkte auf den
+		// Concept-Seiten, und echte PS3-Produkt-Ids antworten mit 302.
+		await spiel(1, "Dragon's Dogma", { plattform: "PS3", conceptId: "235227", igdbId: 77 });
+		await spiel(2, "Uncharted: Golden Abyss", { plattform: "PSVITA", igdbId: 78 });
+		await absicht(1);
+		await absicht(2);
+		const { client, aufrufe } = storeMit(1999);
+		const e = await storeSchritt(repos(), client, igdbMit({ 77: "235227", 78: "235227" }));
+
+		expect(e).toMatchObject({ geprueft: 2, mitPreis: 0, ohneTreffer: 2, anfragen: 0 });
+		// Kein einziger Abruf - weder Store noch IGDB.
+		expect(aufrufe).toHaveLength(0);
+		expect(await stand(1)).toMatchObject({ befund: "plattform", preis: null });
+		expect(await stand(2)).toMatchObject({ befund: "plattform", preis: null });
+		// Auch die Concept-Frage bleibt aus: kein Stempel am Spiel.
+		const g = await env.DB.prepare("SELECT store_concept_am AS am FROM game WHERE id = 2").first<{ am: string | null }>();
+		expect(g?.am).toBeNull();
+	});
+
+	it("prueft ein einzelnes Release sofort, ohne auf die Frist zu warten", async () => {
+		await spiel(1, "Ghost of Tsushima", { conceptId: "235227" });
+		await absicht(1);
+		await storeSchritt(repos(), storeMit(1999).client, igdbOhne());
+		// Die Portion sieht es jetzt nicht mehr - die Tagesfrist laeuft.
+		expect(await repos().store.zuPruefen(10)).toEqual([]);
+
+		const e = await einesPruefen(repos(), storeMit(1499, { grundCents: 1999 }).client, igdbOhne(), 1);
+		expect(e).toMatchObject({ geprueft: 1, mitPreis: 1, imAngebot: 1 });
+		expect(await stand(1)).toMatchObject({ preis: 1499, sale: 1 });
+	});
+
+	it("meldet null fuer ein Release, das es nicht gibt", async () => {
+		await expect(einesPruefen(repos(), storeMit(1999).client, igdbOhne(), 999)).resolves.toBeNull();
+	});
+
+	it("fuehrt nur die nachpflegbaren Faelle in der Arbeitsliste", async () => {
+		// `ohne_id` laesst sich mit einer Adresse loesen - die anderen nicht.
+		await spiel(1, "Ohne Store-Eintrag");
+		await spiel(2, "Delistet");
+		await spiel(3, "PS3-Titel", { plattform: "PS3" });
+		for (const [id, befund] of [[1, "ohne_id"], [2, "delistet"], [3, "plattform"]] as const) {
+			await repos().store.befundSchreiben(id, befund);
+		}
+		const liste = await repos().store.ohneZuordnung();
+		expect(liste.map((e) => e.titel)).toEqual(["Ohne Store-Eintrag"]);
+	});
+
+	it("laesst PS3 und Vita auch mit altem 'ohne_id' aus der Arbeitsliste", async () => {
+		// Nach einem Lauf von vor 21d steht an den PS3-Titeln noch 'ohne_id'.
+		// In der Liste waeren das unloesbare Posten - und eine Liste, an der
+		// man nicht arbeiten kann, wird ignoriert (Lehre aus 17d).
+		await spiel(1, "Alter PS3-Titel", { plattform: "PS3" });
+		await spiel(2, "Alter Vita-Titel", { plattform: "PSVITA" });
+		await spiel(3, "PS4-Titel");
+		for (const id of [1, 2, 3]) await repos().store.befundSchreiben(id, "ohne_id");
+		expect((await repos().store.ohneZuordnung()).map((e) => e.titel)).toEqual(["PS4-Titel"]);
 	});
 
 	it("holt dieselbe Concept-Seite nicht zweimal", async () => {

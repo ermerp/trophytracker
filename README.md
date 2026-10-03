@@ -319,6 +319,19 @@ Kaufknopf ohne Preis, und ein ungeschützter Rückfall nahm „Kitchen [demo]" f
 Absicht steht oder keine Disc-Fassung hat – und nicht, was dauerhaft gekauft
 ist. Erster Lauf: 57 von 79 mit Preis, 18 davon im Angebot.
 
+**Nachtrag 21d**: PS3 und Vita werden gar nicht erst gefragt – der Web-Store
+führt für sie keine Produktseiten mehr (dreifach gemessen: keine PS3-/Vita-
+Produkte auf den Concept-Seiten, und drei echte PS3-Produkt-Ids antworten mit
+302). Der Befund wird lokal gesetzt, ohne einen einzigen Abruf. Für die
+übrigen Lücken gilt: Verhindern lässt sich das nicht, sie sitzen bei IGDB –
+drei mögliche Ersatzquellen sind gemessen und verworfen, darunter Sonys eigene
+Spielseiten (1 von 13). Was hilft, ist Sichtbarkeit: An der Glocke steht
+„n Einträge haben keinen Store-Eintrag", dahinter eine Nachpflegeliste in den
+Einstellungen, in die man die aus dem Browser kopierte Store-Adresse einfügt –
+Produktseite für ein Release, Concept-Seite für beide Plattformen. Gespeichert
+wird und der Preis kommt im selben Aufruf; ohne das bliebe die Zeile wegen der
+Tagesfrist bis zum nächsten Morgen stumm.
+
 **Nachtrag 21c**: Zwei Befunde aus der ersten Durchsicht der Nachtläufe.
 Bei *Outcast: Second Contact* nahm die Auswahl die **Deluxe Edition** für
 49,99 € statt des Basisspiels für 14,99 € – beide Produkte tragen denselben
