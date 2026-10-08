@@ -14,480 +14,60 @@ Die vollständige Spezifikation steht in [`docs/spec/`](docs/spec/README.md).
 
 ## Stand
 
-**Stufen bis 20e abgenommen** (20e am 02.10.2026)
-([Umsetzungsreihenfolge](docs/spec/16-umsetzung.md)).
-Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
-den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
-erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
-Die Prüfliste führt einmal durch den ganzen Bestand (Use Case 8, zunächst nur
-`erstimport`). **Die Ersteinrichtung ist am 14.09.2026 durchlaufen:** alle 431
-Trophäenlisten sind bewertet, die Warteschlange ist leer. Damit steht der
-Datenbestand – und ab hier steckt darin Arbeit, die PlayStation nicht
-zurückliefert. Stufe 8 sichert ihn wöchentlich ins private Repository und
-liefert den CSV-Export (Use Case 13). Stufe 9 holt Cover, Kritikerwertung und
-Erscheinungsdatum von IGDB; Stufe 10 baut darauf die Wunschliste mit Favoriten
-(Use Case 4) – die erste der vier Absichts-Listen, deren
-Routen und Repository auch To-Do, Backlog und Kaufliste tragen werden. Stufe 11
-holt die alten Wunschlisten aus Textdateien herein (Use Case 9) und sammelt
-alles ohne IGDB-Eintrag in einer Ansicht zum Nachziehen (Use Case 12).
-**Abgenommen am 15.09.2026**, die ersten drei Listen sind importiert. Stufe 12
-bringt To-Do in eigener Reihenfolge und das Backlog mit Kandidaten aus dem
-Besitz (Use Cases 5a und 5b); nach der ersten Durchsicht am 16.09.2026 sind
-beide Listen mit der Bewertung gekoppelt (To-Do = am Spielen, Backlog =
-pausiert, Migration 0015), IGDB-Einträge ohne PlayStation-Plattform sind
-nirgends mehr ein Treffer, und die Listen haben ein Suchfeld.
-**Abgenommen am 16.09.2026.** Stufe 13 macht Use Case 8 vollständig: Der Sync
-vergleicht jede Liste mit dem Stempel ihrer letzten Durchsicht und legt in der
-Prüfliste vor, was sich seither geändert hat – „Du hast weitergespielt"
-(`neue_trophaeen`, nicht bei `am_spielen`) und „Neue DLC-Trophäen erschienen"
-(`dlc_erweitert`), mit Vorher-Nachher in Prozent (Migration 0016). Der Sync
-ändert dabei nie einen Status. **Abgenommen am 16.09.2026** – am Abnahmetag
-gab es keine Änderung zu melden, der erste echte Eintrag steht noch aus.
-Stufe 14 bringt die Lücken (Use Case 3): Die Disc-Fassung je Release kommt aus
-IGDBs Händlereinträgen (199 von 481 Releases, Rest `unbekannt`), von Hand nur
-ein `nein` oder eine Korrektur; die Ansicht `/luecken` zeigt, was digital
-gespielt ist, als Disc existiert und nicht im Regal steht, und lässt eine Lücke
-als „physisch nicht gewünscht" verwerfen (Migration 0017). **Abgenommen am
-16.09.2026**: 197 Releases aus IGDB belegt, 165 Lücken; die 249 mit
-unbekannter Disc-Fassung bleiben offen, bis der Händlerfeed (Stufe 20)
-nachfüllt – IGDB kennt Discs nur positiv (Amazon-Einträge). Stufe 15 bringt
-die Kaufliste (Use Cases 6 und 10) mit Kandidaten aus Lücken und Wünschen und
-„Erscheint bald" (Use Case 11). Drei Entscheidungen vom 16.09.2026 prägen sie:
-Ein Wunsch kommt als **Kopie** auf die Kaufliste und bleibt, bis der Kauf
-erledigt ist; „erledigt" am Kauf erledigt den Wunsch mit; und wer eine Disc
-oder Berechtigung erfasst, hat gekauft – Kauf- und Wunscheintrag verschwinden
-von selbst (Migration 0018 gleicht den Bestand an, eine Zeile).
-**Abgenommen am 16.09.2026.** Stufe 16 bringt das Änderungsprotokoll: Jede
-Zeile in `game_event` (Migration 0019) sagt, wer wann was geschrieben hat – du,
-der PSN-Sync, IGDB oder der Import –, geschrieben ausschließlich in der
-Repository-Schicht, im selben Batch wie die Änderung. Der Sync protokolliert
-nur Erkanntes, IGDB nur Entscheidungen und Statuswechsel, der Verlauf beginnt
-mit dem Deploy und wird unbegrenzt aufbewahrt und mitgesichert (vier
-Entscheidungen vom 16.09.2026). Sichtbar als Block „Verlauf" im Spieldetail
-und als Ansicht „Änderungen" mit Quellenfilter. **Abgenommen am 16.09.2026.**
-Stufe 17 bringt den Barcode-Scan (Abschnitt 9): `/scannen` in der Leiste, mit
-der Handy-Kamera und der Laptop-Webcam, ohne externe EAN-Quelle – ein Code wird
-beim ersten Mal aus der eigenen Sammlung gewählt (oder das Spiel angelegt) und
-ist danach bekannt. Zuordnen legt Disc und Mapping an, erledigt Kauf- und
-Wunscheinträge und steht im Verlauf als „per Barcode". Keine Migration.
-Stufe 17b holt zu liegen gebliebenen Codes den Titel per täglichem Job und legt
-sie in `/scans` zur Entscheidung vor (Migration 0020). **Beide abgenommen am
-19.09.2026**: PS3-Regal gescannt, 34 Discs per Barcode erfasst; 22 Codes, die
-die Quelle nicht kennt, bleiben offen, bis eBay als zweite Quelle freigegeben ist.
-Stufe 17c löst die offene Frage aus 17b ein: Seit der eBay-Entwicklerzugang da
-ist, holt der Scanner den Titel zu einem unbekannten Code **live beim Scannen**
-statt erst nachts – ein Code, den die Sammlung nicht kennt, fällt auf, solange
-die Hülle in der Hand liegt. Der Abgleich bekam dabei zwei gemessene
-Korrekturen (Mehrheit über mehrere Angebote, Ballast vor Ziffern); gemessen
-gegen die echten Codes: 37 von 37 richtig, kein Fehlgriff, 16 von 22 offenen
-mit Vorschlag. Stufe 18 bringt die [Automatik](#automatik) – ein Cron Trigger holt die Trophäen
-nachts von allein, gibt erschienene Titel frei und frischt IGDB-Metadaten auf,
-je Aufruf ein Schritt (Migration 0021) – und macht das Frontend zur
-[installierbaren App](#als-app-installieren) mit Offline-Lesezugriff. Die
-Abnahme steht aus: Der erste Nachtlauf ist am Folgemorgen zu prüfen.
+**Alle Funktionsstufen sind durch; Stufe 21 ist am 08.10.2026 abgenommen.** Offen
+sind nur noch zwei Nachträge zu den Preisen (20f Preisverlauf als Diagramm, 20g
+Preisalarm – beide warten auf eine Entscheidung) und die fünf finalen Stufen:
+Sammlung finalisieren, Oberfläche und Bedienbarkeit, Refactoring,
+Wiederherstellungsprobe, Außendarstellung. Die Einzelheiten stehen in
+[Abschnitt 16](docs/spec/16-umsetzung.md), die Fassungsgeschichte in
+[`docs/changelog.md`](docs/changelog.md).
 
-> **Beide Abnahmen sind am 14.09.2026 erfolgt.** Im Dump steht kein NPSSO im
-> Klartext (drei Schichten, siehe [Sicherung](#sicherung)), und die
-> [Wiederherstellung](#wiederherstellung) ist einmal durchgespielt — sie hat
-> dabei einen echten Fehler gefunden: Der Dump liess sich nicht unverändert
-> einspielen. Behoben, geprüft, dokumentiert.
+In Betrieb nachgewiesen: 431 Trophäenlisten, 478 Spiele, 490 Releases, 53
+erfasste Discs, nächtliche Läufe seit dem 20.09.2026.
 
-Was steht und in Betrieb nachgewiesen ist:
-
-| | |
-|---|---|
-| Deployment | Push auf `main` baut, sichert, migriert und deployt |
-| Sicherung vor Migration | `d1 export --remote` läuft als erster Schritt jedes Deploys |
-| Frontend und API | ein Worker, eine Origin, kein CORS |
-| Zugriffsschutz | Access-Richtlinie am Worker, Option *Cloudflare account* |
-| Login | über das Cloudflare-Konto, auch mobil erprobt |
-| Schema | 21 Tabellen, 7 Views, siebzehn Migrationen |
-| Datenzugriff | Repository-Schicht in `src/db/` |
-| PSN-Anbindung | NPSSO-Eingabe, Rohabruf der Trophäenliste, Refresh-Token-Erneuerung |
-| Normalisierung | zweite Sync-Phase, ohne PSN wiederholbar |
-| Ansicht | Trophäenliste mit Sortierung, Platin-Filter und Blätterung |
-| Zuordnung | Gruppenvorschläge nach Titel, ein Spiel mit mehreren Releases |
-| Sammlung | Kacheln oder Zeilen (umschaltbar, je Liste gemerkt), Filter als Chips (Plattform mehrfach, Besitz, Status, Platin, Disc-Fassung), Suche hinter der Lupe. Besitz ist Anzeige – erfasst wird über Scanner und Spieldetail |
-| Spieldetail | Exemplare mit Zustand, Kaufdatum, Preis, EAN; digitale Quellen (Kauf, PS Plus, Testversion); Releases anlegen und löschen |
-| Besitz | Spiele ohne Trophäenliste von Hand anlegen, Dublettenwarnung über den Titelschlüssel |
-| Navigation | `react-router-dom`, Leiste unten (Handy) bzw. seitlich (Desktop), Filter in der URL |
-| Bewertung | Status, Bewertung 1–10, Begonnen/Beendet, Notiz je Release; Vorbelegung beim ersten Auftreten einer Trophäenliste, danach nie mehr automatisch angefasst |
-| Abweichungen | Trophäenstand und Bewertung passen nicht zusammen – zur Durchsicht in den Einstellungen |
-| Prüfliste | Ein Spiel pro Bildschirm, sechs Aktionen (Tasten 1–6; „Spiele gerade" ging mit der Kopplung in „Auf To-Do" auf), „noch n von m", jederzeit verlassen; Einreihung am Ende jedes Syncs und nach jeder Zuordnung. 100 % wird nicht vorgelegt, sondern still gestempelt. Drei Gründe: `erstimport`, `neue_trophaeen` („40 % → 55 %, 3 neue Trophäen erspielt"), `dlc_erweitert` („100 % → 78 %, Liste um 12 Trophäen gewachsen") – der Vergleich läuft gegen den Stempel der letzten Durchsicht, Migration 0016 |
-| Datenbestand | 431 Trophäenlisten, 420 Spiele; bewertet: 167 komplettiert, 119 abgebrochen, 118 durchgespielt, 25 pausiert, 2 am Spielen |
-| Offene Posten | Hinweisblock in der Sammlung: Prüfliste, `unentschieden`, nicht zugeordnete Listen, überfällige Sicherung – bis es das Dashboard gibt |
-| Sicherung geprüft | Der Export wird vor der Migration gegen die Zeilenzahlen der Datenbank gehalten; Datenmigrationen protokollieren ihre Wirkung |
-| Lesekosten | Indizes auf allen Fremdschlüsseln; `test/lesekosten.spec.ts` misst die heißen Abfragen gegen 430 Listen (D1 Free Tier: 5 Mio. gelesene Zeilen/Tag) |
-| Sicherung ausserhalb von Cloudflare | Wöchentliche GitHub Action legt `backup.sql` und `backup.json` im privaten Repo `trophytracker-backup` ab; Datum der letzten Sicherung in den Einstellungen, Warnung ab acht Tagen |
-| Export | Sieben CSV-Listen und die JSON-Vollsicherung, verlinkt in den Einstellungen |
-| Maschinen-Endpunkte | Access Service Token statt Bearer-Token – kein zweites Geheimnis im Worker |
-| IGDB | Abgleich in Schritten à acht Spiele; nur eindeutige Treffer automatisch (gegen die 420 echten Titel gemessen: 372 eindeutig, keine Fehlzuordnung); Prüfansicht mit Kandidaten; Cover im Hochformat in der Sammlung; Kritikerwertung und Erscheinungsdatum im Spieldetail; jede Verknüpfung lösbar. **Abgenommen am 14.09.2026: 419 von 420 verknüpft**, eines bewusst abgelehnt (Vita-Wecker-App, IGDB kennt sie nicht) |
-| Wiederherstellung | am 14.09.2026 vollständig durchgespielt, alle 17 Tabellen, 7 Views und 18 Indizes stimmen überein, `foreign_key_check` ohne Treffer (Stand vor Migration 0011; seit Migration 0012 sind es 21 Tabellen und 25 Indizes) |
-| Nur PlayStation | PS3, PS4, PS5, Vita – sonst nichts: IGDB-Einträge ohne genannte PlayStation-Plattform sind nirgends ein Treffer (auch nicht ohne Plattformangabe, seit 16.09.2026), jede IGDB-Abfrage filtert, `release.platform` erlaubt nur die vier Werte |
-| IGDB-Titel | Ein von Hand oder aus einem Wunsch angelegtes Spiel übernimmt beim Verknüpfen den IGDB-Namen als Titel (nicht beim Auffrischen, nie bei Spielen mit Trophäenliste); änderbar im Spieldetail – die Überschrift ist ein Eingabefeld |
-| Wunschliste | Eigene Ansicht in der Leiste: Favoriten zuerst, dann Kritikerwertung (auch Wertung, Titel, Erscheinungsdatum, zuletzt angelegt); Filter Favoriten und Plattformen; Favorit-Stern, Plattform-Dropdown je Eintrag, Notiz, erledigt/verworfen; neue Wünsche über die IGDB-Suche (nur PlayStation-Einträge), Plattform-Dropdown an jedem Treffer, vorbelegt mit dessen neuester – **eine der vier ist seit Stufe 19d Pflicht**, das Release entsteht dabei und erscheint erst mit Besitz oder Fortschritt in der Sammlung; Freitext nur ausdrücklich. Ein Wunsch am Spiel und einer am Release sind zwei Aussagen, nur dasselbe Ziel ist ein Duplikat. **Abgenommen am 15.09.2026**; Priorität und Rang danach auf Wunsch des Nutzers entfernt (Migration 0013) |
-| Wunschlisten-Import | Textdatei oder Textfeld, Jahreslisten mit Monatsüberschriften (auch mit Tippfehlern), Plattform-Abschnitte, die bereinigte Tabellenform; Lauf in der Datenbank, Abgleich in Schritten à acht Zeilen (erst Sammlung, dann IGDB, Jahr aus der Liste entscheidet Gleichnamige); Eindeutige und Sammlungstreffer mit einem Knopf, der Rest als Liste mit Kandidaten, Suche, „Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen, überspringen – jede Entscheidung sofort gespeichert, Rückgängig |
-| Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, mit Suche zum Nachziehen; abgelehnte hinter einem Umschalter |
-| To-Do | In der Leiste, Backlog als Reiter daneben: eine Spalte in eigener Reihenfolge, Ziehen am Griff (Maus, Finger, Tastatur) oder Pfeilknöpfe, sofort gespeichert. **Gekoppelt mit der Bewertung** (Entscheidung vom 16.09.2026): To-Do heißt „am Spielen", „ins Backlog" setzt „pausiert", „durchgespielt"/„abgebrochen" auf der Kachel schließen den Eintrag |
-| Lücken | In der Leiste: digital gespielt, Disc-Fassung belegt, nicht im Regal; „physisch nicht gewünscht" ist ein verworfener Kaufeintrag (Rückgängig, „wieder als Lücke zeigen"); darunter zugeklappt „Disc-Fassung unbekannt" mit „Disc gibt es" / „gibt es nicht" / „physisch nicht gewünscht" je Zeile. Disc-Fassung aus IGDB (`external_games`, Knopf „Disc-Fassungen prüfen" in den Einstellungen, 50 Spiele je Anfrage, nur `unbekannt` → `ja`, nach 30 Tagen erneut) oder von Hand im Spieldetail (Dropdown mit Quelle); PSN-Produkt-Id je Release pflegbar Seit Stufe 20 steht in jeder Zeile der Gebrauchtpreis („ab 12,77 € bei rebuy“) und im zweiten Block, was die eBay-Suche ergab – „kein Angebot für diese Plattform“ spricht für „nur digital“ und steht oben, damit der Block abarbeitbar ist |
-| Backlog | Sortiert und gefiltert wie die Wunschliste, „auf To-Do" hängt ans Ende und setzt „am Spielen"; Backlog heißt „pausiert", nie gestartete bleiben „nicht gespielt". Kandidaten aus dem Besitz (Disc oder digitale Berechtigung, kein Fortschritt, keine Liste) mit „ins Backlog", „auf To-Do", „nicht vorgesehen" (gespeicherte Ablehnung, Migration 0014); im Spieldetail „Auf To-Do" / „Ins Backlog" je Release. Beim Entfernen eines Eintrags gehen Release und Spiel mit, wenn sonst nichts daran hängt. **Stufe 12 abgenommen am 16.09.2026** |
-| Kaufliste | In der Leiste, sortiert und gefiltert wie die Wunschliste, jede Kachel mit Herkunft. Kandidaten in zwei Blöcken: belegte Lücken („auf die Kaufliste", „physisch nicht gewünscht") und offene Wünsche („auf die Kaufliste" als Kopie, auch auf der Wunsch-Kachel); Angekündigte fehlen. „erledigt" am Kauf erledigt den Wunsch mit; Disc oder Berechtigung erfassen erledigt beide automatisch, mit „ins Backlog übernehmen" und Rückgängig. Im Spieldetail „Auf die Kaufliste" je Release. Gebrauchtpreis seit Stufe 20 aus eBay, als Forderung eines Anbieters, nie als Wert (Migration 0018, 0028). **Stufe 15 abgenommen am 16.09.2026** |
-| Gebrauchtpreise | Zwei eBay-Suchen je Release (Stufe 20): erst rebuy und medimops, dann der breite Gebrauchtmarkt. Angezeigt wird der Händlerpreis zuerst, immer als „ab X € bei …“ – eine Forderung, kein Wert, denn verkaufte Preise gibt eBay nicht mehr heraus. Jeder Treffer muss sechs Bedingungen überstehen: Titelabgleich aus Stufe 17c, keine fremde Plattform im Titel (auch PS2 oder Xbox), überhaupt ein Datenträger (kein Konto, kein Trophäen-Dienst), bei kurzen Titeln unser Wort vorn, keine blanke Ziffer als fremdes Wort (Nachfolger), und höchstens `max(1, n−1)` fremde Worte. Vier davon stammen aus der Durchsicht der ersten 79 Statuswechsel – fünf Fehler, die keine Kennzahl zeigte. Ein geprüfter Treffer setzt die Disc-Fassung von `unbekannt` auf `ja`, ein `nein` nie. Täglich in der Wartung und per Knopf in den Einstellungen. Der Preis steht in Lücken, Kaufliste und am offenen Wunsch, ist ein **Link aufs Angebot** und lässt sich sortieren (ohne Preis ans Ende). Der Verlauf hält beide Kanäle getrennt – die ruhige Händlerkurve und die springende Marktkurve (Migrationen 0028–0030) |
-| Erscheint bald | Werkzeug in den Einstellungen, verlinkt von Wunsch- und Kaufliste, sobald ein vorgemerkter Titel noch nicht erschienen ist; ein verstrichenes Datum macht ihn zum Kaufkandidaten, den Status hebt der nächtliche Cron nach, außerdem „Metadaten auffrischen" (Stufe 18) |
-| Store-Preise | Was ein Titel **neu digital** kostet (Stufe 21, Migration 0031), neben dem Gebrauchtpreis und nie mit ihm verrechnet. Quelle ist die gerenderte Produktseite des PlayStation Store – Sonys GraphQL führt eine Allowlist und fällt aus; gelesen wird sie als Strom und nach rund 70 KB abgebrochen, statt 1 MB zu parsen. Die Produkt-Id entsteht aus IGDBs Concept-Id und der Concept-Seite, die die Fassungen je Plattform trennt (Horizon Forbidden West: ein Concept, PS5 59,99 €, PS4 49,99 €); gewählt wird über den Titelschlüssel, dann Sonys Standardprodukt, dann nur ein verwandter Name – eine Demo kommt so nicht durch. Genommen wird der Kaufknopf, nie eine PS-Plus-Werbung; liegt der Titel im Katalog, steht das als Beschriftung daneben. Gefragt wird täglich im PSN-Fenster und per Knopf, nur für offene Absichten und Titel ohne Disc-Fassung, **ohne** dauerhaft gekaufte. Ohne Preis sagt `store_befund`, warum – „nicht mehr im Store", „kein Store-Eintrag bekannt", „keine Fassung für diese Plattform" –, nie „0" |
-| Automatik | Zwei Cron-Fenster (Stufe 18e), je Aufruf ein Schritt. **PSN, 03:00–05:59 UTC:** hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht), Spielzeit, Kaufliste, Einzeltrophäen, Trophäen-Level, Store-Preise (letztere ohne PSN-Zugang – der Store braucht kein Token). Eine gescheiterte Seite wird bei Sync und Spielzeit bis zu dreimal erneut geholt (Stufe 18f), bei der Kaufliste erst am nächsten Tag. **Wartung, 06:00–08:59 UTC (36 Aufrufe seit Stufe 20e):** erschienene Titel freigeben, Gebrauchtpreise bei eBay (täglich, zwanzig Releases je Aufruf), IGDB-Auffrischen (Frist 7 Tage), Disc-Fassungen, alte Rohantworten. Block „Automatik" in den Einstellungen mit den letzten zwanzig Aufrufen – gleichartige Arbeit zu einer Zeile verdichtet, Fortschritt als Spanne; Knopf „Kaufliste jetzt abrufen"; Hinweisblock bei Fehler oder abgelaufenem Zugang (Migrationen 0021, 0024) |
-| App | Installierbar (PWA) mit eigenem Symbol – ein Pokal im Fortschrittsring; offline alle Leseansichten aus dem letzten Stand, Balken „Offline"; Seite und API Network-First, damit die Access-Anmeldung weiter greift |
-| Spiel anlegen | In Sammlung und Scanner ein Formular: Plattform wählen, Titel suchen, IGDB-Treffer antippen – das Spiel entsteht verknüpft, mit Cover und Wertung (die Plattform steht am Treffer, vorbelegt mit dessen neuester). „Ohne IGDB-Eintrag anlegen" für Titel, die IGDB nicht kennt; die bekommen im Spieldetail „Gibt es bei IGDB nicht" |
-| Scannen | In der Leiste (`/scannen`): Kamera (Rückkamera am Handy, „Kamera wechseln" am Laptop), Standard-API `BarcodeDetector` mit dem Polyfill `barcode-detector` als Fallback (ZXing-WASM, vom eigenen Worker ausgeliefert, Pille „Fallback"), Textfeld als Notnagel mit Prüfziffer; ein Code gilt erst nach zwei übereinstimmenden Lesungen (die Prüfziffer allein fängt nicht jeden Fehlgriff – gemessen am 17.09.2026). Kette: bekannter Code → Karte mit „Weiteres Exemplar"; sonst Suche in der Sammlung (Knopf je Release, „andere Plattform") oder „Spiel anlegen" wie in der Sammlung; „Später" lässt den Code als offenen Scan in den Einstellungen, „Verwerfen" wirft eine Fehllesung sofort weg (mit Rückfrage). Zuordnen = Disc mit EAN + Mapping + erledigte Kauf-/Wunscheinträge, mit Rückgängig; die Erkennung läuft in Serie weiter. „Überspringen" geht weiter, ohne etwas zu speichern (seit Stufe 17d – davor „Später" und ein Sammelmodus, beides mit offenen Scans entfallen). Unbekannte Codes löst seit Stufe 17c eBay live auf; ein Treffer aus der Sammlung erscheint als dieselbe Karte wie ein bekannter Code – mit Cover, „im Regal ×n" und „Disc erfassen" (9.2) |
-| EAN-Auflösung | Kette beim Scannen: eigenes `ean_mapping` (rein lokal, kein Netz) → `market_offer` (seit Stufe 20 aus eBay gefüllt) → **eBay live** (seit Stufe 17c, Titelvorschlag mit Kandidaten der Sammlung) → Suche/Anlegen von Hand. Ein einmal zugeordneter Code wird nie wieder online nachgeschlagen |
-| Offene Scans (bis 17d) | Werkzeug in den Einstellungen (`/scans`): Ein täglicher GitHub-Job holt Titel zu gescannten Codes bei upcitemdb (die freie Quelle drosselt nach je sechs Abfragen um 90 Sekunden – deshalb außerhalb des Workers), die Ansicht gleicht sie mit der Sammlung ab und legt sie in Blöcken vor: eindeutig mit „Alle erfassen", ohne eindeutiges Ziel mit Kandidaten und Suche, ohne Titel mit dem Stand des Jobs. Erfassen läuft über dieselbe Route wie der Scanner, Rückgängig stellt den offenen Scan wieder her. Gemessen an 56 PS3-Codes: 35 kannte die Quelle, 22 davon eindeutig (Migration 0020) |
-| Änderungen | Werkzeug in den Einstellungen (`/aenderungen`): wer wann was geschrieben hat, neueste zuerst, nach Quelle filterbar (du, PSN-Sync, IGDB, Import), je Zeile mit Link ins Spiel; „ältere laden". Im Spieldetail derselbe Verlauf als Block. Nur lesend – Bewertung, Listen, Besitz, Zuordnung, IGDB-Entscheidungen, Vorbelegung und Prüflisten-Einträge werden protokolliert, Cover/Wertung beim Auffrischen und die To-Do-Reihenfolge nicht (Migration 0019) |
-
-Ohne Anmeldung antworten `/`, `/api/health` und beliebige SPA-Pfade mit `302` auf
-den Login unter `trophytracker.cloudflareaccess.com`.
-
-**Stufe 18c ist abgenommen** (22.09.2026): Der Cron holt nachts Spielzeit
-(`playDuration`, `playCount`) und den digitalen Besitz samt der Unterscheidung
-gekauft/PS+ – ohne dass etwas von Hand einzutragen wäre. Die Spielzeit steht im
-Spieldetail und ist Sortierkriterium der Sammlung; digitale Berechtigungen
-erscheinen als Pillen an der Kachel wie bisher, nur eben von allein. Gemessen am
-echten Konto: 236 Releases bekommen Spielzeit, 56 Kauf- und 160 PS+-Einträge
-sollten entstehen. Vier Tage lang stand
-davon **nur die Spielzeit** in der Produktion: Der erste Kauflisten-Lauf scheiterte
-am 23.09. auf seiner ersten Seite, und weil ein Fehler damals dieselbe Marke
-hinterließ wie ein fertiger Lauf, ruhte der Schritt danach sieben Tage – sichtbar
-wurde es erst, als niemand eine Zeile mit `herkunft='psn'` fand. Stufe 18e trennt
-die beiden Marken, lässt den Statuscode durch und gibt den Schritt als Knopf in die
-Einstellungen; **am 27.09.2026 nachgeholt**: 54 Kauf- und 156 PS+-Einträge. Was die
-eine Nacht zum Scheitern brachte, ist unerklärt geblieben – derselbe Worker erreicht
-denselben Endpunkt problemlos.
-**Stufe 18d** (23.09.2026) kam aus einer Analyse der Nachtläufe: Die Nächte liefen
-sauber, nur sah man es nicht. Der Verlauf zeigte fünfmal „nichts" aus dem Leerlauf
-nach 05:36, während Sync, Spielzeit, Besitz und 49 aufgefrischte Spiele darunter
-verschwanden – seitdem zwanzig Einträge mit verdichteten Leerläufen. Dazu wuchs
-die Rohablage ungebremst: 2,31 von 3,26 MB der Datenbank und 263 KiB je Nacht,
-mit jedem `d1 export` erneut in die Sicherung. Ein neunter Cron-Schritt räumt sie
-jetzt weg. Dieselbe Analyse einen Tag später – die erste Nacht, die von Anfang
-bis Ende lesbar war – fand zwei Zahlen, die nichts aussagten: ein `offset=0`,
-das in der Normalisierung fünfmal gleich lautete, und eine Spielzeit-Zeile ohne
-den Stand nach dem Plattformfilter. Beides betrifft nur `cronLogzeile`.
-
-**Stufe 19** (24.09.2026) hat die Oberfläche aufgeräumt. Die Linie heißt
-**„Vitrine"**: ein dunkler Schaukasten, in dem die Cover die einzigen bunten
-Flächen sind – Farbe ist sonst ausschließlich Information. Alle Werte stehen
-als Tokens in `frontend/src/tokens.css`, die Anwendung ist nur noch dunkel.
-Die untere Leiste trägt **vier Symbole ohne Text** statt sieben Einträge bei
-0,6 rem: Kaufliste und Lücken sind Reiter der Wunschliste, Scannen ist eine
-Aktion in der Kopfzeile der Sammlung, die Einstellungen sind das Zahnrad; am
-Desktop stehen die Reiter als Unterpunkte in der Seitenleiste. Die Suche
-klappt erst auf Tippen auf die Lupe auf, Filter sind Chips, und Kacheln oder
-Zeilen lassen sich je Liste getrennt umschalten (die Wahl liegt im Gerät, nicht
-am Konto). Die Filter stehen in zwei Ebenen: sichtbar ist nur, was gesetzt ist,
-alles Weitere hinter einem Knopf „Filter“.
-Farben, Abstände und Schriften stehen an einer Stelle: `frontend/src/tokens.css`. Der Hinweisblock hat mit `/start` einen eigenen Ort bekommen.
-
-**Stufe 19a** (abgenommen am 27.09.2026) macht daraus das **Dashboard**. `/start` zeigt jetzt
-den Trophäen-Anteil in Prozent, die Zahl der Spiele, Backlog und To-Do, dann
-Kacheln je Plattform, die Statusverteilung als Kreis mit Legende, die vier
-Trophäenstufen als Pokale in Metalltönen und zuletzt „Neu" – die jüngsten
-Zeilen aus dem Änderungsprotokoll. Auf dem Handy klappen hinter „Je Plattform"
-und „Trophäen" zwei Tabellen auf (Bestand je Plattform mit Disc und Download,
-Anteil je Stufe); am Desktop stehen sie fest, dazu „Zuletzt gespielt · mit
-Platin" mit Cover und der Feed als eigene Spalte. Alles kommt aus einer Route,
-`GET /api/stats`, mit fünf Abfragen in einem Batch – **kein PSN-Abruf**: Die
-Zähler je Stufe sind eine Summe über `trophy_progress`, auch über die noch
-nicht zugeordneten Listen, damit die Summe der Zahl bei PSN entspricht.
-
-**Warnung und Information sind dabei getrennt worden.** Ein gelber Block trägt
-nur noch, was stillsteht – abgelaufener Zugang, fehlgeschlagener Nachtlauf,
-überfällige Sicherung. Alles Zählende liegt hinter der **Glocke** in der
-Kopfzeile: Ohne Warnung ist sie gelb und nennt die offenen Posten, mit Warnung
-wird sie rot und nennt deren Zahl, und ein gelber Punkt sagt, dass außerdem
-Posten warten. Weil die Kopfzeile oben klebt, bleibt das Alarmzeichen über die
-ganze Seite sichtbar.
-
-**Was das Dashboard bewusst nicht zeigt:** das Trophäen-Level von PSN und das
-echte „letztes Platin". Wann ein Platin erspielt wurde, weiß die Datenbank
-nicht – von 164 Spielen mit Platin trägt keines ein Beendet-Datum, und der
-Zeitpunkt je Trophäe kam mit 19b. Der Block hieß deshalb „Zuletzt
-gespielt · mit Platin" und sagt genau das, was die Zahl hergibt.
-
-**Stufe 19c** (27.09.2026) baut das **Spieldetail** neu – die letzte oft
-besuchte Ansicht, die Stufe 19 nicht angefasst hatte. Sie trug keine
-Kopfzeile, kein Zeichen aus `SpielTeile.tsx` und ein Titelfeld, das auf dem
-Handy über den rechten Rand lief. Vor allem gab sie den meisten Platz an
-Felder, die **in keinem einzigen Fall je ausgefüllt waren**: Note, Notiz,
-Begonnen und Beendet stehen bei 0 von 431 Zeilen, Zustand, Kaufdatum und
-Kaufpreis bei 0 von 53, Edition, Region und PSN-Produkt-Id bei 0 von 489.
-Alle neun sind aus der Oberfläche verschwunden; Schema, API und Export
-bleiben unberührt.
-
-Geblieben ist, was eine Quelle füllt oder der Nutzer wirklich entscheidet: je
-Release **zwei grosse Besitzknöpfe** (gesetzt hell, fehlend gestrichelt mit
-„erfassen" und Rückfrage; von PSN Erkanntes ist Anzeige und kein Knopf), der
-Prozentwert in der Zustandsfarbe mit Balken, **der eigene Zustand dazwischen**
-und die vier Trophäenstufen absteigend in ihren Metalltönen. Alles Seltene –
-Disc-Fassung von Hand, PSN-Produkt-Id, der Rohtitel von Sony, das Entfernen
-von Besitz, die IGDB-Aktionen und beide Löschwege – liegt in zwei
-**Punktmenüs**. Am Desktop stehen die Release-Karten nebeneinander; bei nur
-einem Release, dem Fall von 421 der 431 Spiele, rückt der Verlauf daneben.
-
-Zwei Regeln sind dabei entstanden: **Trophäenstufen stehen immer absteigend**
-(Platin, Gold, Silber, Bronze) und kommen aus einer gemeinsamen Komponente –
-Prüfliste und Trophäenliste zählten bis dahin aufwärts, das Dashboard abwärts.
-Und **was eine Quelle für eine Plattform gar nicht erhebt, steht gar nicht da**
-statt „unbekannt": Spielzeit fehlt auf PS3- und Vita-Karten, weil Sony dort
-nie welche geliefert hat – das ist nicht dasselbe wie ein PS4-Release ohne
-Spielzeitzeile.
-
-**Die Abnahme von 19c lief über sechs Runden am Gerät des Nutzers** und brachte
-mehr als Feinschliff. Sechs Befunde, von denen keiner beim Lesen des Codes zu
-sehen war: der doppelte Titel in der Kopfzeile, das Cover ohne Abstand zur
-klebenden Leiste, zu enge Besitzknöpfe (der Wortspalte blieben bei 390 px genau
-49 px – so viel, wie „erfassen" braucht), eine Fußzeile, die je nach Datumslänge
-anders umbrach, zwei ununterscheidbar graue Stufenzähler bei einem Spiel ohne
-erspieltes Gold, und ein stiller Standardwert beim digitalen Besitz – derselbe
-Fehler, der in der Produktion schon acht falsche Einträge erzeugt hatte.
-
-Der letzte Befund betraf die ganze Anwendung: **`min-height: 100dvh` auf `body`**
-machte mit `viewport-fit=cover` jede Seite um die sicheren Bereiche zu hoch – auf
-dem Gerät des Nutzers 854 statt 800 px, also 54 px, die sich schieben ließen,
-obwohl aller Inhalt zu sehen war. Auf einem Entwicklungsrechner sind alle
-sicheren Bereiche null; der Fehler existiert dort nicht. Gefunden wurde er über
-den neuen Block **„Anzeige"** in den Einstellungen, der Fenster, Bildschirm,
-sichere Bereiche und Überhang dort ausliest, wo sie gelten – und über das
-Nachstellen dieser Geometrie im Testbrowser mit festen Pixelwerten.
-
-**Der erste Nachtlauf mit zwei Cron-Fenstern (28.09.2026) hat 18e bestätigt** und einen
-fremden Fehler mitgebracht. Bestätigt: 13 von 36 Aufrufen im PSN-Fenster (5 Abruf, 5
-Normalisierung, 1 Abschluss, 2 Spielzeit), 1 von 24 in der Wartung, genau **sieben**
-Verlaufszeilen für die Nacht – die Zahl, die die Stufe vorhergesagt hatte –, Fortschritt als
-Spanne (`offset=100→400`, `offen=4→0`), keine Verdichtung über die Fenstergrenze, und der
-Zugang sprang von `fehler` auf `ok`, weil das Wegräumen jetzt am Schritt hängt. Die
-Wiederholung nach einem Abrufsfehler hatte nichts zu tun: Keine Seite ist gescheitert, dieser
-Teil von 18e hat also weiter nur den Test als Beleg.
-
-**Der Fehler daneben:** `game.sort_title` trug keinen Index. Die Abfrage, mit der jeder
-Titelabgleich sein Release sucht, war damit ein Tabellenscan – gemessen **480 gelesene Zeilen
-je einzelnem Abgleich**, und der Spielzeit-Schritt ruft sie 303-mal je Nacht auf, die Kaufliste
-730-mal je Durchlauf. Aufgefallen ist es an `rows_read_24h = 1 335 628` ohne jeden Import.
-**Migration 0025** legt den Index an (vier Zeilen je Abgleich statt 480). Zwei Sätze der
-Spezifikation waren dabei zu eng beziehungsweise falsch und sind korrigiert: Die Indexregel
-nannte nur Fremdschlüssel – jetzt gilt sie für jede Spalte, über die in einer Schleife gesucht
-wird –, und die „Nacht rund 54 000 Zeilen“ waren nur die **Leerlauf**-Aufrufe; die arbeitenden
-waren nie gemessen, es waren gut 200 000. `test/lesekosten.spec.ts` misst den Titelabgleich
-seither mit, denn es hat bis dahin nur Leseansichten geprüft, keinen Schreibschritt.
-
-**Stufe 19d** (28.09.2026) nimmt „ohne Plattform" aus Wunschliste, Import, API und Filter –
-**in allen vier Listen**, nicht nur bei Wünschen: Gemessen hängen alle 94 Einträge der
-Produktion an einem Release, keiner am Spiel, keiner als Freitext. Ein **fehlender**
-Plattform-Schlüssel heißt weiter „die neueste" (die entschiedene Ausnahme vom 15.09.2026),
-ein ausdrückliches `null` oder ein leerer Text bekommt `400`. Beides auseinanderzuhalten war
-der eigentliche Punkt: Im JSON sind das `undefined` und `null`, und ein `?? 'auto'` würde
-still einen Wert schreiben, wo der Aufrufer „ohne" gesagt hat. Dabei fiel ein Pfad auf, der
-die Regel ausgehebelt hätte: Fand „auto" keine Plattform – ein Spiel ohne Releases und ohne
-IGDB-Eintrag –, entstand stillschweigend ein Eintrag am Spiel. Das ist jetzt auch `400`.
-**Freitext** bleibt die eine Stelle ohne Plattform und trägt in der Liste das Kennzeichen
-„Freitext" statt „ohne Plattform". Keine Migration; der Umbau lief über den Typ, der `null`
-verlor, worauf der Compiler alle sieben Stellen zeigte. **Abgenommen am 28.09.2026** an
-einem von Hand angelegten Wunsch: „Satisfactory" (PS5) hängt an einem eigens dafür
-entstandenen Release, `game_id` ist leer, und das Release zählt trotzdem nicht zur
-Sammlung – es trägt weder Besitz noch Fortschritt.
-
-**Stufe 21 ist am 08.10.2026 abgenommen** – nach sechs Nachträgen (b–g), deren
-Befunde allesamt aus der Durchsicht der Nachtläufe oder vom Nutzer kamen.
-Damit sind alle Funktionsstufen durch. Offen bleiben nur 20f (Preisverlauf)
-und 20g (Preisalarm); beide haben seit dem 04.10. genügend Messpunkte.
-Vorgemerkt für „Die Sammlung finalisieren": die Frage nach den
-**Schnittfassungen** – sie lohnt erst bei vollständigem Bestand, weil das
-einzige verwertbare Signal gerade bei PS3 und Vita blind ist. Danach stehen **fünf finale Stufen** an, die in der Spezifikation
-beschrieben sind: die Sammlung finalisieren, Oberfläche und Bedienbarkeit,
-Refactoring, Wiederherstellungsprobe und die Außendarstellung auf GitHub. Die
-PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
-
-**Stufe 21** (02.10.2026) bringt den **Store-Preis**: was ein Titel neu
-digital kostet, neben dem Gebrauchtpreis aus Stufe 20. Die angebliche
-Vorbedingung – `release.psn_product_id`, bei 0 von 490 Releases gefüllt – war
-keine. IGDB nennt zu zwei Dritteln der betroffenen Spiele eine Concept-Id des
-Store, und die Concept-Seite listet daraus die Fassungen je Plattform; die
-Produkt-Id entsteht also von selbst und bleibt trotzdem von Hand korrigierbar.
-Sonys GraphQL schied beim Messen aus (es führt eine Allowlist), die
-Produktseite dagegen trägt den Preis im HTML – als Strom gelesen kostet sie 69
-bis 82 KB statt 0,9 bis 1,4 MB. **Drei Fehler fand erst das Lesen der
-79 Zeilen, nicht die Statistik:** Der aktive Knopf einer Seite ist bei
-Abo-Titeln die PS-Plus-Werbung (Baldur's Gate 3 kam mit „0,00 €" heraus statt
-48,99 €), eine Seite trägt zwölf bis vierzehn Blöcke und mehrere davon einen
-Kaufknopf ohne Preis, und ein ungeschützter Rückfall nahm „Kitchen [demo]" für
-0,25 € als Preis von Resident Evil 7. Gefragt wird nur, was auf einer offenen
-Absicht steht oder keine Disc-Fassung hat – und nicht, was dauerhaft gekauft
-ist. Erster Lauf: 57 von 79 mit Preis, 18 davon im Angebot.
-
-**Nachtrag 21g**: Eine Quelle für „geschnitten oder ungeschnitten" ist geprüft
-und verworfen. schnittberichte.com – die kanonische deutsche Datenbank –
-sperrt `ClaudeBot` und `anthropic-ai` ausdrücklich in der `robots.txt`;
-dieselbe Linie wie bei rebuy. Die USK bewertet nur die eingereichte Fassung
-und sagt nichts über Kürzungen. Was bleibt, ist das Store-Signal aus 21f, und
-über die ganze Sammlung gemessen trägt es genau einen Fall: von 319 Spielen
-mit Store-Id sind 315 im deutschen Store erreichbar, 4 nirgends und eines nur
-anderswo. Die Grenze gehört dazu – das Signal gilt nur für PS4 und PS5, und
-gerade bei PS3 und Vita waren deutsche Schnittfassungen am häufigsten.
-
-**Nachtrag 21f**: Ein `302` auf die Store-Seite kann an der **Region** liegen,
-nicht am Spiel. Der Schritt fragt deshalb einmal im britischen Store nach;
-kennt der den Titel, heißt der Befund `regional`. Gemessen an *Dying Light*:
-302 in de-de und at-de, 200 mit drei Produkten in en-gb, en-us und fr-fr –
-die deutschsprachigen Stores führen ihn nicht. Das ist eine eigene Kategorie,
-weil es nichts nachzutragen gibt (gehört also nicht in die Arbeitsliste) und
-weil es für jemanden, der ungeschnittene Fassungen sucht, die interessante
-Auskunft ist. Das Spieldetail verlinkt die britische Seite – ohne deren Preis,
-der steht in Pfund.
-
-**Nachtrag 21e**: Zwei Befunde aus fünf Nachtläufen. Eine **Weiterleitung ist
-eine Antwort, kein Fehlschlag** – `302` und „Seite nicht lesbar" ergaben
-denselben Befund, und weil der absichtlich nicht stempelt, versuchte der
-Nachtlauf es bei *Dying Light* fünf Nächte vergeblich (IGDBs Concept-Id
-antwortet im deutschen Store mit 302). Jetzt ist das ein endgültiger Befund
-und landet in der Nachpflegeliste. Und **„im PS Plus-Katalog" überlebt einen
-fehlenden Kaufknopf**: *Shadow of the Tomb Raider* wird einzeln nicht mehr
-verkauft, liegt aber im Katalog – das ist für die Kaufentscheidung mehr wert
-als der fehlende Preis. Dazu: Eine gespeicherte Produkt-Id wird nicht erneut
-aufgelöst, eine Regeländerung erreicht also nur frisch Aufgelöstes; das Feld
-im Spieldetail leert und löst seither im selben Zug neu auf.
-
-**Nachtrag 21d**: PS3 und Vita werden gar nicht erst gefragt – der Web-Store
-führt für sie keine Produktseiten mehr (dreifach gemessen: keine PS3-/Vita-
-Produkte auf den Concept-Seiten, und drei echte PS3-Produkt-Ids antworten mit
-302). Der Befund wird lokal gesetzt, ohne einen einzigen Abruf. Für die
-übrigen Lücken gilt: Verhindern lässt sich das nicht, sie sitzen bei IGDB –
-drei mögliche Ersatzquellen sind gemessen und verworfen, darunter Sonys eigene
-Spielseiten (1 von 13). Was hilft, ist Sichtbarkeit: An der Glocke steht
-„n Einträge haben keinen Store-Eintrag", dahinter eine Nachpflegeliste in den
-Einstellungen, in die man die aus dem Browser kopierte Store-Adresse einfügt –
-Produktseite für ein Release, Concept-Seite für beide Plattformen. Gespeichert
-wird und der Preis kommt im selben Aufruf; ohne das bliebe die Zeile wegen der
-Tagesfrist bis zum nächsten Morgen stumm.
-
-**Nachtrag 21c**: Zwei Befunde aus der ersten Durchsicht der Nachtläufe.
-Bei *Outcast: Second Contact* nahm die Auswahl die **Deluxe Edition** für
-49,99 € statt des Basisspiels für 14,99 € – beide Produkte tragen denselben
-Titelschlüssel, weil „deluxe edition" weggekürzt wird, und innerhalb dieser
-Gruppe stand Sonys Standardprodukt vorn. Jetzt gewinnt dort der kürzeste Name;
-wo der Titel *nicht* passt, bleibt Sonys Wahl die beste Auskunft. Einer von 57
-Fällen. Und *Assassin's Creed III Remastered* fehlt nicht im Store, sondern
-bei IGDB: sechzehn Händlereinträge, keiner davon der PlayStation Store. Der
-deutsche Store führt es für 9,99 statt 39,99 € – einzutragen über das Feld
-„PSN-Produkt-Id" im Punktmenü des Spieldetails.
-
-**Nachtrag 21b** (Migration 0032): Die Auswahl des Schritts las im Leerlauf
-430 Zeilen und lief in jedem der 36 nächtlichen Aufrufe mit – die Nacht stieg
-von rund 54 000 auf 69 444 gelesene Zeilen. Ursache war eine Bedingung auf
-einer Spalte ohne Index; jetzt bilden zwei Index-Lookups die Zielmenge, und
-ein Teilindex beantwortet „gibt es rein digitale Releases?" aus einer leeren
-Struktur statt aus der ganzen Tabelle. Vier Zeilen statt 430. Gefunden hat es
-die Lesekosten-Messung direkt nach dem Deploy, nachdem sie um den Leerlauf
-erweitert wurde – gemessen war bis dahin nur der Fall **mit** Arbeit.
-
-**Stufe 20e ist am 02.10.2026 abgenommen.** Sie bringt die Preise in die Listen: an Kaufliste und
-offenen Wunsch, als Link aufs Angebot, sortierbar. Die Sortierung selbst ist
-dabei in allen fünf Listen neu – ein verankertes Menü mit Richtungspfeil statt
-eines nativen Auswahlfelds, und „unbekannt" bleibt in beiden Richtungen am
-Ende. Der obere Block der
-Lückenansicht ist zuklappbar, damit der zweite erreichbar bleibt. Gefragt wird
-**täglich** statt alle 14 Tage – nicht wegen der Preise, sondern weil der
-geplante Preisverlauf (20f) und ein Preisalarm (20g) Punkte brauchen; dafür
-ist das Wartungsfenster auf drei Stunden verlängert. Der Verlauf hält seither
-beide Kanäle getrennt. **20f und 20g sind angelegt und ausdrücklich offen** –
-Verdichtung, Speicherverbrauch, Fensterauslastung und die Alarmregel sind noch
-zu entscheiden.
-
-**Stufe 20** (02.10.2026) bringt **Gebrauchtpreise** – und wechselt dafür die
-Quelle. Geplant war ein Produktdatenfeed von rebuy und medimops über AWIN.
-Der Weg ist verworfen: Das Bewerbungsformular verlangt die URL, auf der
-Affiliate Marketing betrieben wird, jeder Händler gibt seinen Feed einzeln
-frei, und **AWIN schließt ein Publisher-Konto, dem binnen zwei Jahren keine
-Provision gutgeschrieben wurde** – hier wird nie eine gutgeschrieben. Beide
-Händler verkaufen ihren Bestand ohnehin über eBay, dessen API seit Stufe 17c
-im Worker läuft. Zwei Suchen je Release: erst `rebuy-shop`/`medimops_shop`,
-dann der breite Gebrauchtmarkt; die Plattform kommt aus eBays strukturiertem
-Aspekt, nicht aus dem Titel. Jeder Treffer muss den Titelabgleich aus 17c
-überstehen – **ohne ihn wäre der günstigste Treffer in 21 % der Fälle ein
-anderes Spiel** („Blue Prince" → Prince of Persia, „Disc Jam" → Monster Jam).
-Ein geprüfter Treffer setzt die Disc-Fassung von `unbekannt` auf `ja`; ein
-`nein` setzt weiterhin nur der Nutzer. Dafür ist das **Ausbleiben** eines
-Angebots jetzt ein belastbarer Hinweis: Von 235 durch IGDB belegten Discs
-findet eBay 224, und nur 8 haben gar kein Angebot – 3 %. Das steht in Block B
-der Lückenansicht als Begründung und sortiert ihn. Gemessen vor dem Bau
-(980 Abfragen über alle 490 Releases): Preis für 293 statt 0 Releases.
-**Wikidata ist als Quelle für „nur digital" geprüft und verworfen** – es führt
-48 der 235 belegten Discs als rein digital, 20 % Fehlrate (Migration 0028).
-
-Der Zuschnitt von 19b steht seit dem 01.10.2026 (Abschnitt 7.7): Die Antworten
-werden **nicht roh abgelegt** – Rohablage gibt es nur, wo teurer Abruf, komplexe
-Normalisierung und einzige Aufzeichnung zusammentreffen, und das ist allein der
-Sync. Die Erstbefüllung läuft **nachts und auf Knopfdruck** (Portionen, Pause
-dazwischen, Abbruch bei `429`), aber **höchstens einmal am Tag**: 18 355
-Trophäen sind mit Index rund 37 000 geschriebene Zeilen, und D1 erlaubt im Free
-Tier 100 000 am Tag. **Gruppen und Trophäen-Level** gehören dazu – ohne die
-Gruppe zählt „was fehlt mir noch zu Platin" bei Spielen mit DLC falsch, und das
-Level ist die Lücke, die das Dashboard aus 19a ausdrücklich offen gelassen hat.
-Wie die Trophäenliste im Spieldetail **aussieht**, ist am Prototyp entschieden
-(01.10.2026, vier Runden): Symbol, Name, Beschreibung, Stufe, Seltenheit als
-Zahl und Wort, Erspiel-Datum und der Fortschrittszähler. Erspielt ist hell,
-offen ist dunkel – das Symbol trägt den Zustand ohne ein Wort. Platin steht
-für sich. Versteckte Trophäen sind zugedeckt und lassen sich einzeln per
-Klick oder für die ganze Liste per Schieberegler aufdecken.
-
-**Teil 1 ist gebaut (01.10.2026): die Daten.** Migration 0027, die vier
-PSN-Abrufe, der nächtliche Füllschritt und der Knopf **„Trophäen jetzt
-holen"** in den Einstellungen. Der erste Durchlauf dauert rund vier Minuten
-und lässt sich jederzeit abbrechen – der nächste Druck macht dort weiter.
-Mehr als einmal am Tag geht er nicht: 18 355 Trophäen sind rund 29 500
-geschriebene Zeilen, und D1 erlaubt 100 000 am Tag. Der Durchlauf hält den
-Bildschirm wach, solange er läuft – sonst sperrt das Handy nach gut einer
-Minute, der Tab wandert in den Hintergrund und verliert seine Abrufe. Reißt
-die Verbindung doch ab, sagt die Seite es und nennt die Zahl, bei der sie
-stehengeblieben ist; ein erneuter Druck macht dort weiter. Danach hält der Nachtlauf
-den Bestand selbst aktuell und holt nur Listen nach, an denen sich etwas
-geändert hat. **Am 01.10.2026 durchgelaufen: 18 355 Trophäen in 431 Listen** – auf die Trophäe
-genau die Summe, die Sonys Zähler nennen. **Teil 2 (die Anzeige) steht seit dem
-01.10.2026:**
-
-- Im **Spieldetail** klappt unter jedem Release die Trophäenliste auf –
-  Symbol, Name, Beschreibung, Stufe, Seltenheit als Zahl und Wort,
-  Erspiel-Datum und der Fortschrittszähler („15 von 20"). Erspielt ist hell,
-  offen ist dunkel; Platin steht für sich. Versteckte Trophäen sind zugedeckt
-  und lassen sich einzeln per Klick oder für die ganze Liste per Schieberegler
-  aufdecken. Geladen wird erst beim Aufklappen.
-- Auf dem **Dashboard** trägt der Trophäen-Block jetzt das **Trophäen-Level**
-  mit Punkten und Fortschritt zur nächsten Stufe, daneben die vier Stufen als
-  Symbol und Zahl. **„Trophäen je Jahr"** steht hinter einem Klick – die
-  Auswertung liest 18 060 Zeilen gegen 6 840 für das übrige Dashboard und wäre
-  sonst die teuerste Abfrage der Startseite.
-- Der Feed **„Neu"** mischt erspielte Trophäen unter die Ereignisse, verdichtet
-  je Spiel und Tag („3 Trophäen, davon 1 Silber"), Platin als eigene Zeile.
-
-Der Feed „Neu" auf dem Dashboard bekommt damit eine **zweite Quelle**: Eine
-erspielte Trophäe ist kein Änderungsereignis – niemand hat etwas geschrieben –,
-also liest der Feed sie direkt aus `trophy` und mischt sie nach dem echten
-Erspielt-Datum unter die Ereignisse, verdichtet je Spiel und Tag („12 Trophäen,
-davon 1 Gold"), Platin immer als eigene Zeile. Das Änderungsprotokoll unter
-`/aenderungen` bleibt dagegen bei seiner einen Quelle. Damit die Erstbefüllung
-den Feed nicht flutet, zählt dessen Zeitfenster das Erspielt-Datum statt des
-Abrufzeitpunkts, **und** der Feed zeigt Trophäenzeilen erst, wenn die
-Erstbefüllung durch ist.
-
-**Stufe 18 ist seit dem 22.09.2026 abgenommen:** PWA installiert und offline
-geprüft, nächtliche Läufe am 20., 21. und 22.09. mit je 431 Titeln, in der Nacht
-zum 22.09. zusätzlich 368 aufgefrischte Spiele. Der IGDB-Schritt hatte zwei
-Nächte geschwiegen – Stufe 18b hat ihn repariert (gebundener Parameter in
-`datetime('now', ?)` durch Text ersetzt) und zugleich nachprüfbar gemacht.
-Reihenfolge danach, am
-16.09.2026 entschieden: 19 Oberfläche (Dashboard, Kacheln, Handy-Layout), 20
-Marktdaten, 21 PSN Store-Preise (Abschnitt 16 der Spezifikation). Stufe 20
-holt sie seit dem 02.10.2026 aus eBay statt aus einem AWIN-Händlerfeed, Stufe
-21 den Store-Preis aus der gerenderten Produktseite statt aus Sonys GraphQL. Jeder neue
-Schreiber hängt sich ins Änderungsprotokoll ein (Abschnitt 8.5). Die Messung aus Stufe 17 ist erledigt: upcitemdb
-kennt 35 von 56 Codes, 22 davon führen eindeutig zu einem Spiel der Sammlung.
+| Funktion | Stand | Abschnitt |
+|---|---|---|
+| Deployment | GitHub Action baut und deployt bei Push auf `main`, Migrationen davor | [15.2](docs/spec/15-repository-deployment.md) |
+| Sicherung vor Migration | Dump gegen die Zeilenzahlen der Datenbank, Abbruch bei Abweichung; Datenmigrationen protokollieren ihre Wirkung | [14.2](docs/spec/14-backup-export.md) |
+| Zugriffsschutz | Cloudflare Access vor dem ganzen Worker, ein Access Service Token für Maschinen-Endpunkte | [15.3](docs/spec/15-repository-deployment.md) |
+| Schema | 26 Tabellen, 32 Migrationen, sieben Views; Zugriff nur über `src/db/` | [3](docs/spec/03-sammlung.md), [11](docs/spec/11-sichten.md) |
+| PSN-Anbindung | NPSSO einfügen, Token-Kette mit Rückfall, Zustand dreistufig mit Frühwarnung ab 18 Tagen | [7.1](docs/spec/07-1-psn-trophaeen.md) |
+| Trophäen-Sync | Zwei Phasen (Abruf, Normalisierung), begrenzte Arbeit je Aufruf, Rohantworten der jüngsten drei Läufe | [10](docs/spec/10-sync-protokoll.md) |
+| Zuordnung | Trophäenlisten als Gruppenvorschläge, einzeln korrigierbar, auftrennbar | [7.2](docs/spec/07-2-matching.md) |
+| Sammlung | Kacheln oder Zeilen (je Liste gemerkt), Chip-Filter, Suche hinter der Lupe, Seiten à 100 | [13](docs/spec/13-1-ansichten.md) |
+| Spieldetail | Heldenblock, eine Karte je Release, Besitz als zwei Knöpfe, Trophäenliste, Verlauf | [13](docs/spec/13-1-ansichten.md) |
+| Besitz | Disc **je Release genau eine** oder digitale Berechtigung mit Quelle; Erfassen erledigt Kauf und Wunsch | [3](docs/spec/03-sammlung.md), [5](docs/spec/05-absichten.md) |
+| Navigation | Vier Symbole in der Leiste unten (Handy) bzw. Seitenleiste mit Text (Desktop), Filter in der URL | [13](docs/spec/13-2-darstellungsregeln.md) |
+| Bewertung | Fünf Werte, nie vom Sync überschrieben; zieht To-Do und Backlog nach | [4.2](docs/spec/04-fortschritt.md), [5.5](docs/spec/05-4-todo-und-kopplung.md) |
+| Abweichungen | Wo Trophäenstand und eigene Bewertung auseinandergehen, mit Link ins Spiel | [11](docs/spec/11-sichten.md) |
+| Prüfliste | Ein Spiel pro Bildschirm, sechs Aktionen mit Tastenkürzeln; Einträge für Erstimport, neue Trophäen, DLC | [8.1](docs/spec/08-1-pruefliste.md) |
+| Nur PlayStation | PS3, PS4, PS5, Vita – sonst nichts. Ein IGDB-Eintrag ohne genannte Plattform ist nirgends ein Treffer | [7.6](docs/spec/07-6-igdb.md) |
+| IGDB | Cover, Kritikerwertung, Erscheinungsdatum, Disc-Nachweis; nächtliches Auffrischen mit 7-Tage-Frist | [7.6](docs/spec/07-6-igdb.md) |
+| IGDB-Titel | Ein Spiel ohne Trophäenliste übernimmt beim Verknüpfen den IGDB-Namen, änderbar im Spieldetail | [7.6](docs/spec/07-6-igdb.md) |
+| Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, abgelehnte hinter einem Umschalter | [8.3](docs/spec/08-3-metadaten.md) |
+| Wunschliste | Favoriten zuerst, dann Kritikerwertung; Filter, Notiz, erledigt/verworfen. Jeder Wunsch hängt an einem Release | [5](docs/spec/05-absichten.md) |
+| Wunschlisten-Import | Datei oder Textfeld, Jahres- und Plattformlisten, Abgleich in Schritten, Durchsicht je Zeile | [8.2](docs/spec/08-2-wunschlisten-import.md) |
+| To-Do | Eigene Reihenfolge, die **ganze Karte** zieht (Finger, Maus, Tastatur), sofort gespeichert; heißt „am Spielen" | [5.4](docs/spec/05-4-todo-und-kopplung.md) |
+| Backlog | Sortiert und gefiltert wie die Wunschliste, Kandidaten aus dem Besitz; heißt „pausiert" | [5.4](docs/spec/05-4-todo-und-kopplung.md) |
+| Lücken | Digital gespielt, Disc belegt. Block A mit drei Knöpfen, darunter zuklappbar „Disc-Fassung unbekannt" mit **zwei** | [5.3](docs/spec/05-3-luecke-verwerfen.md) |
+| Kaufliste | Kandidaten aus belegten Lücken und offenen Wünschen; ein Wunsch kommt als **Kopie**, der Wunsch bleibt offen | [5](docs/spec/05-absichten.md) |
+| Erscheint bald | Unveröffentlichte Titel, `angekuendigt → erschienen` täglich im Cron | [8.4](docs/spec/08-4-unveroeffentlicht.md) |
+| Gebrauchtpreise | Zwei eBay-Suchen je Release (Händler, Markt), Titelabgleich Pflicht, als Link aufs Angebot, sortierbar | [7.3](docs/spec/07-3-ebay.md) |
+| Store-Preise | Neupreis der digitalen Fassung aus der gerenderten Produktseite, „im PS-Plus-Katalog", Angebote mit Grundpreis | [7.4](docs/spec/07-4-store-preise.md) |
+| Spielzeit und digitaler Besitz | Aus PSN ergänzt, nie importiert; `kauf` schlägt `plus`, PS+ ist eine Momentaufnahme | [7.7](docs/spec/07-7-psn-weitere-daten.md) |
+| Einzeltrophäen | 18 355 Trophäen mit Seltenheit, Stufe und Fortschrittszähler; Liste je Release, Level und Jahre im Dashboard | [7.7](docs/spec/07-7-einzeltrophaeen.md) |
+| Dashboard | Kennzahlen je Plattform, Trophäen je Stufe, Feed aus zwei Quellen; Warnung gelb, Zählendes an der Glocke | [13](docs/spec/13-1-ansichten.md) |
+| Spiel anlegen | Aus der Sammlung oder beim Scannen, mit IGDB-Suche oder ohne IGDB-Eintrag | [9.2](docs/spec/09-barcode.md) |
+| Scannen | Kamera (Handy, Webcam), EAN-13/UPC-A/EAN-8, zwei Lesungen zur Bestätigung (UPC-A drei); „Überspringen" speichert nichts | [9](docs/spec/09-barcode.md) |
+| EAN-Auflösung | `ean_mapping` → `market_offer` → **eBay live** → upcitemdb als Rückfall, alles im Moment des Scannens | [9.2](docs/spec/09-barcode.md) |
+| Änderungen | `/aenderungen`: wer wann was geschrieben hat, nach Quelle filterbar, Keyset-Blätterung; im Spieldetail als Block | [8.5](docs/spec/08-5-aenderungsprotokoll.md) |
+| Automatik | Zwei Cron-Fenster à 36 Aufrufe (PSN 03–05 UTC, Wartung 06–08 UTC), je Aufruf **ein** Schritt, Verlauf verdichtet | [10.1](docs/spec/10-1-cron.md) |
+| App | Installierbar (PWA) mit eigenem Pokal-Symbol; offline alle Leseansichten, Balken „Offline" | [13](docs/spec/13-3-gestaltung-und-pwa.md) |
+| Gestaltung | Linie „Vitrine", nur dunkel, alle Werte aus `frontend/src/tokens.css`, Saira, eigener Zeichensatz | [13](docs/spec/13-3-gestaltung-und-pwa.md) |
+| Lesekosten | `test/lesekosten.spec.ts` misst die heißen Abfragen gegen Produktionsgröße, Leseansichten und Schreibschritte | [2](docs/spec/02-stack.md) |
+| Sicherung | Wöchentliche GitHub Action ins private Repo, zwei Formate, Warnung ab acht Tagen Alter | [14.2](docs/spec/14-backup-export.md) |
+| Wiederherstellung | Geprobt am 14.09.2026 – der Dump wird vorher sortiert (`scripts/dump-ordnen.mjs`), sonst scheitert er | [14.3](docs/spec/14-backup-export.md) |
+| Export | CSV je Liste und `backup.json` mit 19 Fachtabellen, beides über den Access Service Token | [14.4](docs/spec/14-backup-export.md) |
 
 ## Architektur in einem Absatz
 
@@ -707,229 +287,92 @@ nicht gekürzt. Durchgesetzt über die Hülle `Geheimnis` in
 **Abruf.** Ein Aufruf von `POST /api/sync` holt **eine** Seite à 100 Titel und
 merkt sich den nächsten Offset – der Free Tier erlaubt 10 ms CPU je Aufruf, und
 Cron Trigger haben dieselbe Grenze. Die Oberfläche ruft so lange erneut auf, bis
-der Durchlauf fertig ist.
-
-Die Seitenzahl je Aufruf ist gemessen, nicht geschätzt. Werte je Aufruf, gegen
-die echte Sammlung von 431 Titeln:
-
-| Aufruf | CPU |
-|---|---|
-| Abruf einer Seite | 3 ms |
-| Normalisierung einer Seite | 5–7 ms |
-| Übrige Routen | 0–3 ms |
-
-Von 10 ms erlaubten. Die Arbeit je Aufruf ist konstant – 100 Titel je Seite,
-unabhängig von der Größe der Sammlung –, der Wert wächst also nicht mit.
-Steigt er bei einer späteren Messung über 8 ms, wird eine Seite in zwei
-Hälften verarbeitet.
-
-Nachmessen: GraphQL-Analytics (`workersInvocationsAdaptive`) für Quantile,
-Workers-Observability (`telemetry/query`) für die Zuordnung je Route – nur
-letztere zeigt, *welcher* Aufruf teuer ist. Die Antworten werden **unverändert** abgelegt; die
-Normalisierung ist ein eigener Schritt in Stufe 3 und braucht keinen
-PSN-Zugriff.
-
-**Zwei Phasen.** Ein Lauf holt zuerst alle Seiten roh, danach normalisiert er
-sie zu `trophy_progress` – beides mit begrenzter Arbeit je Aufruf. Die
-Normalisierung fasst PSN nicht an und lässt sich jederzeit wiederholen:
+der Durchlauf fertig ist. Ein Lauf hat **zwei Phasen**: erst alle Seiten roh
+holen, dann zu `trophy_progress` normalisieren. Die Normalisierung fasst PSN
+nicht an und lässt sich jederzeit wiederholen:
 
 ```
 POST /api/sync/normalize     # setzt zurück, danach normalisiert POST /api/sync erneut
 ```
 
 Das ist der praktische Nutzen der Trennung: Ist die Abbildung falsch, wird sie
-korrigiert und erneut ausgeführt, statt die Daten neu von Sony zu holen.
+korrigiert und erneut ausgeführt, statt die Daten neu von Sony zu holen. Die
+gemessenen CPU-Werte je Aufruf, die Portionierung und was am Ende jeder
+Normalisierung in die Prüfliste eingereiht wird, stehen in
+[Abschnitt 10](docs/spec/10-sync-protokoll.md) und
+[8.1](docs/spec/08-1-pruefliste.md).
 
-**Am Ende jeder Normalisierung** (und nach jeder Zuordnung) läuft ein Batch
-`ReviewRepository.einreihen`: 100-%-Titel werden still gestempelt, nie
-durchgesehene Listen als `erstimport` eingereiht, und gestempelte Listen mit
-dem Stempel ihrer letzten Durchsicht verglichen – mehr erspielt (außer bei
-`am_spielen`) heißt `neue_trophaeen`, eine gewachsene Liste `dlc_erweitert`
-(Abschnitt 8.1). Das Sync-Ergebnis meldet die neuen Einträge je Grund
-(`eingereihtNachGrund`). Der Sync schreibt nur in die Warteschlange, nie
-einen Status.
+**CPU nachmessen:** GraphQL-Analytics (`workersInvocationsAdaptive`) für
+Quantile, Workers-Observability (`telemetry/query`) für die Zuordnung je Route –
+nur letztere zeigt, *welcher* Aufruf teuer ist.
 
 Läuft das NPSSO ab, ist das kein Fehlerfall, sondern ein regulärer Zustand:
 `status` wird `abgelaufen`, vorhandene Daten bleiben stehen, und in den
-Einstellungen lässt sich ein neues NPSSO eintragen. Seit Stufe 18 steht das
-auch im Hinweisblock der Sammlung – „der nächtliche Abruf steht still".
+Einstellungen lässt sich ein neues eintragen. Das steht auch im Hinweisblock der Sammlung – „der nächtliche Abruf steht still".
 
 ## Automatik
 
-Seit Stufe 18 läuft ein Cron Trigger, seit **Stufe 18e zwei** (`wrangler.jsonc`).
-Der Free Tier gibt einem Cron-Aufruf dieselben 10 ms CPU wie einer Anfrage;
-deshalb tut jeder Aufruf genau **eine** Sache und merkt sich den Stand in der
-Datenbank ([Abschnitt 10.1](docs/spec/10-1-cron.md)).
+Nachts laufen zwei Cron-Fenster, je Aufruf **genau ein** Schritt – die 10 ms CPU
+des Free Tier tragen nicht mehr. Welche Schritte es sind, in welcher Reihenfolge
+und mit welchen Fristen, steht in [Abschnitt 10.1](docs/spec/10-1-cron.md).
 
-**Fenster 1 – PSN (`*/5 3-5 * * *`, 36 Aufrufe):** alle fünf Minuten zwischen
-03:00 und 05:59 UTC, also 5–8 Uhr Sommerzeit beziehungsweise 4–7 Uhr Winterzeit.
+| Fenster | Ausdruck | Aufrufe | Was dort läuft |
+|---|---|---|---|
+| PSN | `*/5 3-5 * * *` | 36 | hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht), Spielzeit, Kaufliste, Einzeltrophäen, Trophäen-Level, Store-Preise |
+| Wartung | `*/5 6-8 * * *` | 36 | erschienene Titel freigeben, IGDB auffrischen, Disc-Fassungen, Gebrauchtpreise, Trophäen je Jahr, Rohantworten aufräumen |
 
-1. einen seit über drei Stunden hängenden Sync-Lauf auf `fehler` setzen
-2. läuft ein Sync, einen Schritt davon (eine Seite holen oder auswerten)
-3. sonst, wenn heute noch kein Cron-Lauf war und kein Handabruf erfolgreich: einen
-   Sync starten – **ein Lauf je Nacht**
-4. sonst Spielzeit (täglich, zwei Aufrufe)
-5. sonst die Kaufliste (wöchentlich, rund 15 Aufrufe) – seitenweise, ergänzt nur
-   und importiert nichts
+**Nachsehen, ob die Nacht gelaufen ist:** Einstellungen → „Automatik". Dort
+stehen beide Fenster, der letzte automatische Abruf und der **Verlauf der letzten
+zwanzig Aufrufe**; gleichartige Arbeit ist zu einer Zeile verdichtet, der
+Fortschritt als Spanne (`sync ×5 offset=100→400`). Eine ganze Nacht sind
+normalerweise sieben Zeilen. Ein abgelaufener PSN-Zugang und ein
+fehlgeschlagener Nachtlauf jünger als 24 Stunden erscheinen im Hinweisblock der
+Startseite.
 
-**Fenster 2 – Wartung (`*/5 6-8 * * *`, 36 Aufrufe):** 06:00–08:59 UTC, also
-8–10 Uhr Sommerzeit. Nichts davon spricht PlayStation an.
+**Von Hand anstoßen** geht für jeden Schritt: „Jetzt synchronisieren",
+„Kaufliste jetzt abrufen", „Trophäen holen" (Portionsknopf), „Marktpreise
+jetzt abrufen", „Store-Preise jetzt abrufen". Das überspringt die Frist, nicht
+die Portionierung.
 
-6. erschienene Titel freigeben (`angekuendigt → erschienen`, nur SQL)
-7. sonst IGDB-Metadaten auffrischen – 50 Spiele, deren Stand älter als sieben Tage ist
-8. sonst Disc-Fassungen aus IGDB prüfen (30-Tage-Frist)
-9. sonst alte PSN-Rohantworten löschen (seit Stufe 18d) – die Seiten der jüngsten
-   drei Läufe und alles noch nicht Normalisierte bleiben; seit 18e auch die Waisen
-   endgültig gescheiterter Läufe
+**Örtlich prüfen:**
 
-**Warum zwei Fenster:** In einem gingen 37 Aufrufe Bedarf auf 36 Slots – elf Sync,
-zwei Spielzeit, fünfzehn Kaufliste, acht IGDB nach einem Rückstand, einer
-Aufräumen. Der Schnitt liegt bei „spricht PSN an oder nicht": Die PSN-Kette
-braucht die vielen Aufrufe, die Wartung ist billig und verschiebbar. Welches
-Fenster gefeuert hat, steht in `event.cron`; ein unbekannter Ausdruck lässt den
-Worker beides tun, damit eine Änderung an `wrangler.jsonc` nicht die halbe
-Automatik still abschaltet.
-
-Ein voller Sync braucht bei 431 Titeln rund elf Aufrufe. **Scheitert eine Seite**,
-gilt der Lauf seit Stufe 18e nicht mehr als verloren: Der nächste Aufruf holt sie
-fünf Minuten später erneut, nach drei Fehlversuchen ohne Fortschritt ist Schluss.
-In der Nacht zum 27.09.2026 hatte ein einziger Fehler um 03:10 den ganzen Sync
-gekostet, während 29 Aufrufe leer liefen – dieselbe Seite antwortete um 03:16
-wieder. Ein abgelehnter Token bekommt keinen zweiten Anlauf; ist der Zugang
-`abgelaufen`, legt der Cron gar keinen Lauf an, und ein neues NPSSO in den
-Einstellungen genügt, dann geht es in der nächsten Nacht von allein weiter.
-
-Was der Cron tut, steht an vier Stellen: in den Einstellungen unter **Automatik**
-(letzter automatischer Abruf **und** der Ausgang des letzten Cron-Aufrufs), im
-Hinweisblock der Sammlung, wenn der Nachtlauf fehlgeschlagen ist, in
-`GET /api/sync/status` als `cronVerlauf` und als Zeile `cron: …` in den
-Worker-Logs (Cloudflare-Dashboard → Worker → Logs) – nur Zahlen und feste Texte.
-Der Eintrag in der Datenbank ist seit Stufe 18b dabei, weil Worker-Logs nur live
-einsehbar sind: Ohne ihn lässt sich am Morgen nicht sagen, ob ein Schritt
-scheiterte oder schlicht nichts zu tun fand. Aufgehoben werden **die letzten
-zwanzig** Aufrufe, und seit Stufe 18e stehen aufeinanderfolgende Aufrufe
-**derselben Arbeit** als eine Zeile da, mit dem Fortschritt als Spanne:
-
-```
-2026-09-28 06:00–07:55 cron: nichts ×24 bereich=wartung
-2026-09-28 03:25–03:45 cron: sync ×5 bereich=psn sync=laufend/normalisierung offen=4→0
+```bash
+npx wrangler dev --test-scheduled
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"   # PSN-Fenster
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+6-8+*+*+*"   # Wartung
+curl "http://localhost:8787/cdn-cgi/handler/scheduled"                      # beides
 ```
 
-Eine Nacht sind damit sieben Zeilen statt einunddreißig (gemessen in `test/cron.spec.ts`,
-das sechzig Aufrufe durchspielt) – zwanzig Einträge
-fassten eine Kaufliste-Nacht vorher nicht, und weg fielen gerade die
-Sync-Zeilen. Verdichtet wird nur bei gleicher Feldfolge, und eine Zeile mit
-`meldung=` nie: Ein Fehler bleibt stehen. Bewegt sich eine Zahl bei `×3` nicht,
-ist der Schritt hängengeblieben – vorher war das nicht zu unterscheiden. Mit fünf
-Einträgen ohne Verdichtung sah man ausschließlich das leere Ende der Nacht
-(Befund vom 23.09.2026, Stufe 18d).
-
-Beim Lesen der Zeile lohnen zwei Zahlen (nachgebessert am 24.09.2026): In der
-**Normalisierung** steht dort `offen=` – die noch unverarbeiteten Rohantworten,
-die von Aufruf zu Aufruf kleiner werden. Der `offset` ist in dieser Phase fest 0
-und taugte nicht als Fortschritt: Fünf gleichlautende Zeilen konnten einen
-gesunden Lauf nicht von einer Seite unterscheiden, die immer wieder scheitert.
-Die **Spielzeit**-Zeile nennt drei Zahlen, und zwar in dieser Reihenfolge:
-`geholt` ist die Seite, wie Sony sie liefert, `geschrieben` was davon PS4 oder
-PS5 ist (Streaming-Apps fallen weg), `zugeordnet` was an einem Release hängt.
-Wer die mittlere überspringt, hält die Streaming-Apps für nicht zugeordnete
-Spiele.
-`GET /api/sync/status` nennt `letzterAutomatischerLauf`, jeder Lauf trägt
-`ausloeser` (`nutzer` oder `cron`).
-
-Der Cron benutzt dieselben Pfade wie der Knopf „Jetzt abrufen". Ein Klick, während
-nachts ein Lauf offen ist, setzt denselben Lauf fort; die Schritte vertragen das.
+Der Pfad `/cdn-cgi/` läuft am Asset-Fallback vorbei, `/__scheduled` nicht.
 
 ## IGDB-Anbindung
 
-Cover, Kritikerwertung (`aggregated_rating`) und Erscheinungsdatum kommen von
-[IGDB](https://www.igdb.com), einer offiziellen, kostenlosen Schnittstelle
-([Spezifikation 7.6](docs/spec/07-6-igdb.md)).
+Cover, Kritikerwertungen, Erscheinungsdaten und der Disc-Nachweis kommen von
+IGDB. Wie gesucht und zugeordnet wird, welche Rückfälle es gibt und warum ein
+Eintrag ohne genannte PlayStation-Plattform nie ein Treffer ist, steht in
+[Abschnitt 7.6](docs/spec/07-6-igdb.md).
 
 **Zugang einrichten.** IGDB läuft über eine Twitch-Anwendung:
 
 1. Unter https://dev.twitch.tv/console/apps eine Anwendung anlegen (Kategorie
-   „Application Integration", OAuth-Redirect `http://localhost`; er wird nicht
-   benutzt)
+   „Application Integration", OAuth-Redirect `http://localhost`)
 2. Client-ID und ein Client-Secret erzeugen
-3. Beide als Cloudflare Secrets setzen (siehe [Einrichtung](#einrichtung-eines-eigenen-kontos))
-   und lokal in `.dev.vars` eintragen
+3. Beide als Cloudflare Secrets setzen (siehe [Einrichtung](#einrichtung-eines-eigenen-kontos)):
+   `IGDB_CLIENT_ID` und `IGDB_CLIENT_SECRET`, lokal dieselben Namen in `.dev.vars`
 
-Das App-Token (rund 60 Tage gültig) holt sich der Worker selbst per
-Client-Credentials und hält es im Speicher der Instanz; bei Ablauf oder einem
-401 von IGDB erneuert er es. Es steht nirgends in der Datenbank. IGDB erlaubt
-vier Anfragen je Sekunde – der Client hält 260 ms Abstand.
+Ohne die beiden Werte antworten **nur** die IGDB-Routen mit `503`; die übrige
+Anwendung läuft weiter. Das Twitch-Token holt der Worker selbst und hält es im
+Speicher, nie in der Datenbank.
 
-**Abgleich.** In den Einstellungen unter „IGDB" stehen die Zähler und der Knopf
-„Abgleich starten". Ein Aufruf sucht für acht Spiele; die Oberfläche ruft
-weiter, bis nichts mehr offen ist – 420 Spiele dauern rund zwei Minuten.
-Automatisch verknüpft wird nur ein **eindeutiger** Treffer: genau ein
-Kandidat mit demselben Titelschlüssel, Editionen und Bundles zählen nicht
-gegen das Hauptspiel, Plattformen müssen sich decken. Alles andere landet mit
-seinen Kandidaten in der **IGDB-Zuordnung** (Werkzeug in den Einstellungen):
-Kandidat antippen, anders suchen oder „Gibt es bei IGDB nicht" – jede
-Entscheidung ist sofort gespeichert. Der Hinweisblock in der Sammlung zeigt,
-wie viele Spiele noch warten.
-
-Die Kandidaten stehen sortiert: Schlüsseltreffer zuerst, dann Hauptspiele,
-Remakes und Remaster vor DLC und Paketen, dann die Plattform des Spiels. Bleibt
-die Suche leer, greifen Rückfälle (gekürzter Begriff, ohne Plattformfilter,
-Teilstringsuche) – Details in [Spezifikation 7.6](docs/spec/07-6-igdb.md).
-„Offene erneut suchen" schickt alle Spiele zur Prüfung noch einmal durch die
-Suche, wenn die Regel besser geworden ist.
-
-Gegen die echten 420 Titel gemessen, bevor die Regel gebaut wurde: 372
-eindeutig, 5 echt mehrdeutig, 32 mit passenden Kandidaten, 11 ohne Treffer,
-keine Fehlzuordnung in der Stichprobe. Sonys Schreibweisen („Velocity2X") und
-deine Jahreszusätze („God of War (2018)") werden nur für die Suche bereinigt;
-die Unterscheidung gleichnamiger Spiele übernimmt der Plattformabgleich.
-
-**Korrigieren.** Im Spieldetail zeigt der Block „IGDB" Wertung, Datum und
-Herkunft der Verknüpfung mit Link zu igdb.com. „Anderen Eintrag wählen" öffnet
-die Suche, „Verknüpfung lösen" entfernt alles, was von IGDB kam. Eine von
-Hand gesetzte Kritikerwertung (`critic_source = 'manuell'`, ab einer späteren
-Stufe) überschreibt IGDB nie.
-
-**Auffrischen.** „Metadaten auffrischen" holt für die 50 am längsten nicht
-aktualisierten Spiele Wertung, Cover und Datum in einer Anfrage erneut.
-Kritikerwertungen ändern sich mit jeder Rezension; seit Stufe 18 macht das der
-nächtliche Cron mit einer Frist von sieben Tagen je Spiel – der Knopf bleibt
-für sofort.
-
-**Disc-Fassungen prüfen (Stufe 14).** IGDB führt je Spiel Händlereinträge
-(`external_games`) mit Medium und Plattform. Der Knopf fragt sie für 50
-verknüpfte Spiele je Aufruf ab und setzt `Disc-Fassung: ja` (Quelle `igdb`)
-für jedes Release, dessen Plattform ein physischer Eintrag nennt – nur von
-`unbekannt` aus; ein `nein` und ein bestehendes `ja` bleiben. Geprüfte Spiele
-kommen nach 30 Tagen wieder dran, weil IGDB nachträgt. Gemessen am 16.09.2026
-gegen 469 verknüpfte Spiele: 226 mit physischem Eintrag, alle 2 020 Einträge
-mit Plattform, 199 von 481 Releases bekommen ein `ja`. Was IGDB nicht kennt,
-bleibt `unbekannt` – nie `nein`; das setzt du im Spieldetail oder in der
-Lückenansicht unter „Disc-Fassung unbekannt". Details in
-[Spezifikation 7.6](docs/spec/07-6-igdb.md) und
-[Abschnitt 3](docs/spec/03-sammlung.md).
-
-```
-GET  /api/igdb/status            Zähler und ob Zugangsdaten hinterlegt sind
-POST /api/igdb/abgleich          ein Schritt, { weiter } solange etwas offen ist
-POST /api/igdb/auffrischen       50 Spiele in einer IGDB-Anfrage
-POST /api/igdb/physisch          Disc-Fassung aus external_games, 50 Spiele je Aufruf, { weiter }
-GET  /api/igdb/offen             Prüfansicht mit Kandidaten
-POST /api/igdb/erneut-suchen     offene Spiele zurück in den Abgleich
-GET  /api/igdb/search?q=&plattformen=  Suche mit Rückfällen, auch für Import und Nachpflege
-GET  /api/unmatched?abgelehnte=1 alles ohne IGDB-Eintrag (v_ohne_igdb), abgelehnte nur mit Parameter
-POST /api/unmatched/plan_wunsch/:id/link  Freitext-Eintrag einem IGDB-Treffer zuordnen (auch plan_todo, plan_backlog, plan_kauf)
-```
+**Bedienen.** In den Einstellungen unter „IGDB" stehen die Zähler (verknüpft, zur
+Prüfung, nicht gesucht, abgelehnt) und drei Knöpfe: „Abgleich starten" (acht
+Spiele je Schritt, mit Fortschritt), „Metadaten auffrischen" (50 Spiele je
+Anfrage) und „Offene erneut suchen". Mehrdeutiges geht nach `/igdb`, Spiele ohne
+Eintrag nach `/ohne-zuordnung`. Im Spieldetail zeigt das Punktmenü der Kopfzeile
+„Anderen Eintrag wählen", „Verknüpfung lösen" und „Gibt es bei IGDB nicht".
 
 **Alte Wunschlisten** gehören als Textdateien in `wunschlisten/` (lokal,
-per `.gitignore` ausgeschlossen). Sie sind am 14.09.2026 gegen Sammlung und
-IGDB gemessen worden – 332 Zeilen, 20 schon in der Sammlung, 199 eindeutig,
-76 mit Kandidaten, 37 ohne Treffer. Daraus ist `wunschlisten/wunschliste-bereinigt.txt`
-entstanden (tabulatorgetrennt: Datum, Titel, Plattform, Status, Original,
-Hinweis); der Import nimmt die rohen Jahresdateien und diese Form, siehe
-[Wunschlisten-Import](#wunschlisten-import). Alles sind Wünsche, auch schon
-Gespieltes – Folgerungen in
-[Spezifikation 8.2](docs/spec/08-2-wunschlisten-import.md).
+`.gitignore`) und werden über `/import` eingelesen.
 
 ## Zugriffsschutz
 
@@ -1240,11 +683,14 @@ Titel zu Barcodes kommen aus zwei Quellen, in dieser Reihenfolge:
 | Quelle | Wo | Kontingent | Wofür |
 |---|---|---|---|
 | **eBay Browse API** | im Worker, live beim Scannen | 5 000/Tag, keine Drosselung | der Normalfall seit Stufe 17c |
-| **upcitemdb** | nächtlicher GitHub-Job | 100/Tag, 90 s Pause nach je 6 | Rückfall für Codes, die eBay nicht kennt |
+| **upcitemdb** | im Worker, als Rückfall | 100/Tag, 90 s Pause nach je 6 | für Codes, die eBay nicht kennt; braucht keine Zugangsdaten |
+
+Beide laufen **live im Worker, im Moment des Scannens** – upcitemdb drosselt hart,
+wird aber nur selten gefragt, und ein Fehler dort heißt schlicht „kein Titel".
 
 Die eBay-Zugangsdaten (App ID und Cert ID aus einem **Production**-Keyset unter
-https://developer.ebay.com/my/keys) liegen an drei voneinander getrennten Orten –
-jeder Ort ist eine eigene Ablage, dieselben zwei Werte:
+https://developer.ebay.com/my/keys) liegen an zwei getrennten Orten – dieselben
+zwei Werte, zwei eigene Ablagen:
 
 ```bash
 # 1. lokal, für `wrangler dev` – in .dev.vars, niemals ins Repository
@@ -1255,10 +701,6 @@ EBAY_CLIENT_SECRET=…
 npx wrangler secret put EBAY_CLIENT_ID
 npx wrangler secret put EBAY_CLIENT_SECRET
 ```
-
-3. Für den nächtlichen Job als **GitHub-Secrets**: Repository → Settings →
-Secrets and variables → Actions → New repository secret, Namen `EBAY_CLIENT_ID`
-und `EBAY_CLIENT_SECRET`.
 
 Fehlen sie, antwortet nur `GET /api/scan/:ean/online` mit `503`; Scanner und
 Anwendung laufen unverändert weiter. Beim Anlegen des Keysets verlangt eBay
@@ -1283,138 +725,24 @@ bräuchte zwei Deployments und hat keine Eile.
 
 ## Wunschliste und Absichten
 
-Wunschliste, To-Do, Backlog und Kaufliste liegen in einer Tabelle `plan_entry`
-([Abschnitt 5](docs/spec/05-absichten.md));
-Stufe 10 bedient die Wunschliste, Stufe 12 To-Do und Backlog, Stufe 15 die
-Kaufliste – die Routen kennen alle vier Arten:
+Vier Listen auf zwei Achsen – *haben wollen* (Wunsch, Kauf) und *spielen wollen*
+(To-Do, Backlog) –, dazu die Lückenansicht. Das Modell, die Übergänge zwischen
+den Listen, die Kopplung mit der eigenen Bewertung und der Wunschlisten-Import
+stehen in [Abschnitt 5](docs/spec/05-absichten.md) und
+[8.2](docs/spec/08-2-wunschlisten-import.md).
 
-```
-GET    /api/plans?kind=wunsch|todo|backlog|kauf&status=offen|alle&sort=favorit|wertung|titel|release|angelegt|position&favorit=1&plattform=PS4,PS5,ohne&suche=
-POST   /api/plans        { art, spielId | releaseId | igdbId | titel, plattform?, favorit?, notiz?, status?, herkunft? }
-PATCH  /api/plans/:id    Teilmenge von { favorit, notiz, status, art, plattform }; kauf erledigt → wuenscheErledigt
-PUT    /api/plans/reorder  { art, orderedIds } – To-Do-Reihenfolge
-DELETE /api/plans/:id    räumt Release und Spiel ab, wenn sonst nichts daran hängt
-GET    /api/backlog-candidates   { anzahl, abgelehnt, kandidaten[] }
-GET    /api/purchase-candidates  { anzahl, luecken, wuensche, kandidaten[] } – aus v_kaufkandidaten
-GET    /api/upcoming             { anzahl, eintraege[] } – aus v_erscheint_bald
-PATCH  /api/releases/:id/play-status  { status } – nur der Status; koppelt wie PUT
-```
+Für den Betrieb reicht:
 
-**Kaufliste** (Stufe 15, Entscheidungen vom 16.09.2026): Ein Wunsch kommt als
-**Kopie** auf die Kaufliste (`herkunft: 'wunsch'`, Favorit kommt mit) und
-bleibt offen, bis der Kauf erledigt ist – das ist die eine Stelle, an der ein
-Übergang kein Feld-Update ist. `v_kaufkandidaten` nennt belegte Lücken ohne
-Kaufeintrag und offene Wünsche, die noch nicht kopiert wurden, und lässt
-Angekündigte weg. „erledigt" am Kaufeintrag erledigt den offenen Wunsch am
-selben Ziel mit (am Release und am Spiel); `verworfen` nicht. Wer eine Disc
-oder eine digitale Berechtigung erfasst (`POST /api/physical-copies`,
-`POST /api/digital-entitlements`), hat gekauft: Der Worker erledigt offene
-Kauf- und Wunscheinträge am Release und am Spiel von selbst und nennt sie in
-der Antwort (`absichtenErledigt`, dazu `aufListe`); die Oberfläche bietet
-„ins Backlog übernehmen" an und öffnet die Einträge beim Rückgängig wieder.
-Migration 0018 hat den Bestand einmal angeglichen; der Deploy-Job zählt
-seither offene Wünsche und Käufe an Releases mit Besitz (erwartet 0).
-
-**To-Do und Backlog sind mit der Bewertung gekoppelt** (Abschnitt 5.5,
-Entscheidung vom 16.09.2026): Was auf To-Do steht, ist `am_spielen`, was im
-Backlog steht, `pausiert` – nur ein nie gestartetes Spiel bleibt
-`nicht_gespielt`. Jeder Schreibpfad hält beides zusammen: Listenknöpfe
-setzen den Status, eine Bewertung legt den Eintrag an, hängt ihn um oder
-schließt ihn (`durchgespielt`, `komplettiert`, `abgebrochen`). Der Sync
-koppelt nie. Migration 0015 hat den Bestand angeglichen; der Deploy-Job
-zählt seither die Abweichungen (erwartet 0).
-
-**To-Do** ist die einzige Liste mit eigener Reihenfolge (`position`): Neues
-hängt ans Ende, `PUT /api/plans/reorder` schreibt die ganze Liste neu, im
-Browser per Drag-and-drop (`@dnd-kit`, auch Finger und Tastatur) oder
-Pfeilknöpfen. Migration 0014 gibt den To-Do-Einträgen aus der Triage eine
-Position; der Deploy-Job protokolliert, wie viele ohne Position bleiben
-(erwartet 0). **Backlog-Kandidaten** sind Releases im Besitz ohne
-Trophäenfortschritt, die auf keiner Liste stehen; „nicht vorgesehen" legt einen
-verworfenen Backlog-Eintrag an, den die View ausblendet – die Liste bleibt so
-frei von Titeln, die nie gespielt werden sollen. Wird die Bewertung eines
-Releases `durchgespielt`, `komplettiert` oder `abgebrochen`, schließt der
-Worker den Eintrag (Kopplung, siehe oben).
-
-Sortiert wird bei der Abfrage aus gespeicherten Bestandteilen – Favoriten
-zuerst, dann Kritikerwertung; eine Rangformel mit Gewichten gab es bis
-Migration 0013 (Priorität entfernt, Entscheidung vom 15.09.2026). Die
-Plattform wird mit der **neuesten** vorbelegt, die Releases oder IGDB-Eintrag
-nennen (`plattform` fehlt oder `'auto'`), und ist vor dem Speichern und
-später per `PATCH` änderbar. **Seit Stufe 19d ist eine der vier Pflicht:** Ein
-ausdrückliches `null` oder ein leerer Text antwortet mit `400`, und auch ein
-`'auto'`, das keine Plattform findet – ein Eintrag ohne Release wäre keine
-brauchbare Absicht. Das Release entsteht dabei und zählt **nicht zur Sammlung,
-solange es nur den Wunsch trägt** – ein Wunsch ist kein Besitz. Im Spieldetail
-ist das Spiel immer sichtbar. Ein Wunsch am Spiel und einer an einem
-seiner Releases sind zwei verschiedene Aussagen und blockieren sich nicht; nur
-dasselbe Ziel derselben Art antwortet mit `409`.
-
-### Wunschlisten-Import
-
-Seit Stufe 11 unter `/import` (Werkzeug in den Einstellungen, Link auf der
-Wunschliste). Eine Datei oder eingefügter Text, ein Titel pro Zeile. Erkannt
-werden Jahreslisten mit Überschriften `-Januar` … `-Dezember` (auch mit
-Tippfehlern), Listen mit Abschnitten `PS4` / `PS3`, die bereinigte Tabellenform
-(Datum, Titel, Plattform; die übrigen Spalten werden ignoriert) und einfache
-Listen. UTF-8 mit oder ohne BOM, sonst Windows-1252; das Jahr kommt aus dem
-Dateinamen und ist vor dem Einlesen korrigierbar.
-
-Der Import ist ein **Lauf in der Datenbank** (`wishlist_import*`, nicht in der
-Sicherung – die Quelldateien liegen bei dir, das Ergebnis in `plan_entry`):
-
-```
-POST   /api/imports/wishlist                     { text, dateiname?, jahr? } → Lauf mit Zeilen
-GET    /api/imports/wishlist[/:id][?gruppe=klar|unklar|uebersprungen|uebernommen]
-POST   /api/imports/wishlist/:id/abgleich        ein Schritt, acht Zeilen, { weiter }
-POST   /api/imports/wishlist/:id/uebernehmen     ein Schritt, 25 klare Zeilen
-POST   /api/imports/wishlist/:id/zeilen/:z/entscheiden   { aktion: igdb|freitext|ueberspringen|zuruecknehmen }
-PATCH  /api/imports/wishlist/:id/zeilen/:z       { titel } – umbenennen, neu suchen
-POST   /api/imports/wishlist/:id/zeilen/:z/aufteilen     { titel: [...] }
-DELETE /api/imports/wishlist/:id
-```
-
-Der Abgleich läuft in Schritten wie der IGDB-Abgleich – erst gegen die
-Sammlung über den Titelschlüssel, dann gegen IGDB; das Jahr aus der Liste
-entscheidet Gleichnamige („Layers of Fear" 2016 oder 2023) und wird sonst
-nicht gespeichert. Jede klare Zeile bekommt die neueste Plattform des Treffers
-vorgeschlagen (oder die aus dem Abschnitt der Liste), änderbar im Dropdown vor
-der Übernahme; bei Zeilen zur Durchsicht steht das Dropdown an jedem Treffer. Eindeutige Treffer, Sammlungstreffer und schon angelegte
-Spiele sind **ein Block mit einem Knopf**; ein digital gespieltes Spiel bleibt
-ein Wunsch – „physisch besitzen wollen". Mehrdeutige und Zeilen ohne Treffer
-stehen als Liste zur Einzelentscheidung: Kandidat übernehmen, anders suchen,
-„Ohne IGDB-Eintrag übernehmen", umbenennen, aufteilen („Mass Effect 1+2+3"),
-überspringen. Jede Entscheidung ist sofort gespeichert und überlebt ein
-Neuladen; Rückgängig löscht den angelegten Wunsch wieder. Der Wunsch hängt am
-Release der gewählten Plattform, das bei Bedarf entsteht; seit Stufe 19d lässt
-sich die Plattform einer Zeile nicht mehr leeren. Hängt am Ziel schon ein offener Wunsch, wird die Zeile als
-„schon auf der Wunschliste" ausgelassen – ein zweiter Import derselben Datei
-erzeugt keine Dubletten.
-
-### Lücken
-
-`/luecken` (Use Case 3, [Abschnitt 5.3](docs/spec/05-3-luecke-verwerfen.md)):
-digital gespielt, Disc-Fassung belegt, nicht im Regal – aus `v_luecken`.
-„Physisch nicht gewünscht" legt einen Kaufeintrag mit `origin = 'luecke'` und
-`status = 'verworfen'` an; die Lücke bleibt in den Daten und wird nur
-ausgeblendet („auch verworfene zeigen"). Rückgängig und „wieder als Lücke
-zeigen" löschen den Eintrag. Darunter zugeklappt „Disc-Fassung unbekannt":
-dieselben Releases ohne Beleg für eine Disc, mit „Disc gibt es" / „gibt es
-nicht" – beides gilt als deine Entscheidung (Quelle `manuell`) – und „physisch
-nicht gewünscht", das die Frage offen lässt und das Release trotzdem ausblendet.
-
-```
-GET  /api/gaps?verworfene=1&unbekannte=1   { anzahl, verworfen, unbekannt, luecken[], moeglich[] }
-POST /api/gaps/:releaseId/verwerfen        physisch nicht gewünscht; 409 bei vorhandenem Kaufeintrag
-PATCH /api/releases/:id                    { discFassung: ja|nein|unbekannt, psnProductId }
-```
-
-### Ohne Zuordnung
-
-`/ohne-zuordnung` sammelt alles ohne IGDB-Eintrag: Freitext-Einträge aus allen
-vier Listen, Spiele in der IGDB-Zuordnung, noch nicht gesuchte Spiele – mit
-demselben Suchfeld zum Nachziehen. Abgelehnte („gibt es bei IGDB nicht")
-stehen hinter „auch abgelehnte zeigen" mit „Doch suchen".
+- **Jeder Eintrag hängt an einem Release**, also an einer Plattform – „ohne
+  Plattform" gibt es nicht. Einzige Ausnahme ist ein Freitext-Eintrag, und der
+  trägt in der Liste das Kennzeichen „Freitext".
+- **Besitz erfassen erledigt Kauf und Wunsch** ohne Rückfrage; die Antwort nennt,
+  was dabei geschlossen wurde.
+- **Ein Wunsch auf der Kaufliste ist eine Kopie** – der Wunsch bleibt offen.
+- **To-Do heißt „am Spielen", Backlog „pausiert".** Wer die Bewertung ändert,
+  ändert damit die Liste, und umgekehrt.
+- Eine Liste importieren geht über `/import` (Datei oder Textfeld); Zeilen ohne
+  Treffer gehen in die IGDB-Suche, nie in einen Freitext-Eintrag.
 
 ## Export
 
@@ -1582,54 +910,21 @@ npm test
 
 ## Zuordnung von Trophäenlisten
 
-Aus einer Trophäenliste wird ein `release`, aus mehreren Listen desselben
-Spiels **ein** `game` mit mehreren Releases — GTA V erscheint einmal in der
-Sammlung, mit drei Plattformen.
-
-Die Gruppierung schlägt vor, sie entscheidet nicht. Nichts wird ohne
-Bestätigung geschrieben (Abschnitt 7.2). Zwei Sonderfälle:
-
-- **Geteilte Listen** (`PS3,PSVITA,PS4`) gelten bei Sony für mehrere
-  Plattformen und teilen den Fortschritt. Daraus entsteht ein Release, dessen
-  Plattform du wählst — vorausgewählt ist die neueste.
-- **Gleiche Plattform zweimal** in einer Gruppe deutet auf verschiedene Spiele
-  hin. Sie werden getrennt vorgeschlagen, mit Hinweis.
-
-Ab dem zweiten Sync ordnet die Automatik neue Listen zu, wenn es **genau
-einen** passenden Kandidaten gibt. Alles andere bleibt offen.
-
-**Die Trophäenstruktur verrät Remakes.** Ein portiertes Spiel behält seine
-Liste, ein Remake bekommt eine neue — Shadow of the Colossus hat auf PS3
-18/6/6/1 und auf PS4 25/7/5/1. Weichen die Strukturen innerhalb einer Gruppe
-ab, erscheint ein Hinweis. Kein Automatismus: GTA V weicht ebenfalls ab und ist
-trotzdem ein Spiel.
-
-**Korrigieren.** Die Ansicht „Sammlung prüfen" zeigt alle Zuordnungen als
-Tabelle, eine Zeile je Release, mit Filter auf Auffälligkeiten. Titel lassen
-sich direkt ändern, und ein Release lässt sich als eigenes Spiel abtrennen.
-
-Ändert sich die Titelnormalisierung, veralten die Sortierschlüssel: Die
-automatische Zuordnung sucht darüber und findet dann falsche oder gar keine
-Kandidaten. Die Ansicht markiert veraltete Schlüssel und bietet den Knopf zum
-Neuberechnen.
+Warum Trophäenlisten nicht automatisch zugeordnet werden, wie Gruppen entstehen
+und wie sich eine Zuordnung zurücknehmen lässt, steht in
+[Abschnitt 7.2](docs/spec/07-2-matching.md). Bedient wird das über `/zuordnung`
+(Gruppenvorschläge) und `/pruefen` (Sammlung prüfen).
 
 ## Kosten
 
-Der gesamte Stack liegt im Free-Tier. Wichtiger als die Grenzen ist, wie
-Cloudflare mit dem Überschreiten umgeht: Die Free-Pläne **blocken**, statt in
-eine Überziehung hineinzurechnen.
-
-| Dienst | Free-Grenze | Bei Überschreitung |
-|---|---|---|
-| Workers (inkl. Static Assets) | 100.000 Anfragen/Tag | Fehler 1027 bzw. 429, keine Abrechnung |
-| D1 | 5 GB, 5 Mio. gelesene / 100.000 geschriebene Zeilen pro Tag | Abfragen schlagen fehl, keine Abrechnung |
-| Zero Trust Access | 50 Sitze | weitere Nutzer werden abgewiesen |
-
-Der Wechsel in einen Bezahlmodus ist deshalb immer eine ausdrückliche Handlung,
-kein Nebeneffekt von Nutzung. Für einen einzelnen Nutzer sind die Grenzen um
-Größenordnungen entfernt. Der Cron (36 Aufrufe je Nacht, einer von fünf
-erlaubten Triggern je Konto) zählt als Anfragen und liest im Leerlauf rund
-80 000 Zeilen je Nacht.
+Alles läuft im **Free Tier**: Worker-Anfragen, D1-Speicher und die gelesenen
+Zeilen liegen Größenordnungen unter den Grenzen. Die **72 Cron-Aufrufe je Nacht**
+(zwei Einträge von fünf erlaubten) zählen als Anfragen und lesen im Leerlauf
+rund 80 800 Zeilen; eine Nacht mit Arbeit liegt bei gut 200 000 von fünf
+Millionen. **Die engere Grenze ist das Schreiben** – 100 000 Zeilen am Tag,
+sobald eine Stufe den Bestand einmal durchschreibt. Ein Zahlungsmittel ist nicht
+hinterlegt; Cloudflare kann den Free Tier nicht automatisch verlassen.
+Einzelheiten und Messwerte: [Abschnitt 15.4](docs/spec/15-repository-deployment.md).
 
 ## Was niemals ins Repository gehört
 
