@@ -319,6 +319,18 @@ Kaufknopf ohne Preis, und ein ungeschützter Rückfall nahm „Kitchen [demo]" f
 Absicht steht oder keine Disc-Fassung hat – und nicht, was dauerhaft gekauft
 ist. Erster Lauf: 57 von 79 mit Preis, 18 davon im Angebot.
 
+**Nachtrag 21e**: Zwei Befunde aus fünf Nachtläufen. Eine **Weiterleitung ist
+eine Antwort, kein Fehlschlag** – `302` und „Seite nicht lesbar" ergaben
+denselben Befund, und weil der absichtlich nicht stempelt, versuchte der
+Nachtlauf es bei *Dying Light* fünf Nächte vergeblich (IGDBs Concept-Id
+antwortet im deutschen Store mit 302). Jetzt ist das ein endgültiger Befund
+und landet in der Nachpflegeliste. Und **„im PS Plus-Katalog" überlebt einen
+fehlenden Kaufknopf**: *Shadow of the Tomb Raider* wird einzeln nicht mehr
+verkauft, liegt aber im Katalog – das ist für die Kaufentscheidung mehr wert
+als der fehlende Preis. Dazu: Eine gespeicherte Produkt-Id wird nicht erneut
+aufgelöst, eine Regeländerung erreicht also nur frisch Aufgelöstes; das Feld
+im Spieldetail leert und löst seither im selben Zug neu auf.
+
 **Nachtrag 21d**: PS3 und Vita werden gar nicht erst gefragt – der Web-Store
 führt für sie keine Produktseiten mehr (dreifach gemessen: keine PS3-/Vita-
 Produkte auf den Concept-Seiten, und drei echte PS3-Produkt-Ids antworten mit

@@ -765,7 +765,7 @@ function ReleaseKarte({
               }}
             />
           ) : (
-            storeBefundText(r.store.befund, r.store.geprueftAm)
+            storeBefundText(r.store.befund, r.store.geprueftAm, r.store.imPlusKatalog)
           )}
         </p>
       )}
@@ -1059,11 +1059,15 @@ function ReleaseMenue({
         laeuft={laeuft}
         onSpeichern={(wert) => {
           schliessen()
-          // Leeren geht weiterhin über die Release-Route; eine Adresse geht
-          // über den Store-Weg, der sie auswertet UND den Preis gleich holt
-          // (Stufe 21d) – sonst stünde die Zeile bis zum nächsten Morgen still.
+          // Leeren setzt die Zuordnung zurück – und löst danach sofort neu
+          // auf (Stufe 21e). Ohne den zweiten Schritt bliebe die Zeile wegen
+          // der Tagesfrist bis zum nächsten Morgen stumm, und genau das ist
+          // der Weg, mit dem man eine falsche Zuordnung loswird.
           if (wert === null) {
-            void tue(() => anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { psnProductId: null } }), 'Entfernt.')
+            void tue(async () => {
+              await anfrage(`/api/releases/${r.id}`, { methode: 'PATCH', koerper: { psnProductId: null } })
+              return anfrage(`/api/sync/store/${r.id}`, { methode: 'POST', koerper: {} })
+            }, 'Zurückgesetzt und neu aufgelöst.')
             return
           }
           void tue(

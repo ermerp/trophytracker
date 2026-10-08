@@ -70,7 +70,10 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 	 * Ein 302 kostet nichts: Er wird am Status erkannt, ohne den Koerper
 	 * anzufassen.
 	 */
-	async function ersterBlock<T>(pfad: string, pruefen: (daten: unknown) => T | null): Promise<T | null> {
+	async function ersterBlock<T>(
+		pfad: string,
+		pruefen: (daten: unknown) => T | null,
+	): Promise<{ art: "treffer"; wert: T } | { art: "fehlt" } | { art: "unlesbar" }> {
 		let antwort: Response;
 		try {
 			antwort = await hole(`${BASIS}${pfad}`, {
@@ -84,9 +87,12 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 			throw new StoreAbrufError("Der Store war nicht erreichbar.");
 		}
 		// 301/302 heisst "diese Seite gibt es nicht" - kein Fehler, eine Antwort.
-		if (antwort.status >= 300 && antwort.status < 400) return null;
+		// Und ausdruecklich etwas ANDERES als eine Seite, die wir nicht lesen
+		// konnten: Das eine ist endgueltig, das andere einen Versuch wert
+		// (Nachtrag 21e).
+		if (antwort.status >= 300 && antwort.status < 400) return { art: "fehlt" };
 		if (!antwort.ok) throw new StoreAbrufError(`Der Store antwortete mit ${antwort.status}.`);
-		if (!antwort.body) return null;
+		if (!antwort.body) return { art: "unlesbar" };
 
 		const leser = antwort.body.getReader();
 		const zerleger = new TextDecoder();
@@ -105,10 +111,10 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 					if (!block) break;
 					ab = block.ende;
 					const treffer = pruefen(block.daten);
-					if (treffer !== null) return treffer;
+					if (treffer !== null) return { art: "treffer", wert: treffer };
 				}
-				if (done) return null;
-				if (gelesen > HOECHSTENS_BYTES) return null;
+				if (done) return { art: "unlesbar" };
+				if (gelesen > HOECHSTENS_BYTES) return { art: "unlesbar" };
 			}
 		} finally {
 			// Der Rest der Seite interessiert nicht mehr - das ist der ganze Sinn.
@@ -127,8 +133,8 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 		 * leer, die Seite schreibt "Angekuendigt") und eine Seite, die wir
 		 * nicht lesen konnten. Nur der erste ist eine Aussage ueber das Spiel.
 		 */
-		async holeConcept(conceptId: string): Promise<ConceptStand | null> {
-			return ersterBlock(`/concept/${encodeURIComponent(conceptId)}`, (daten) => {
+		async holeConcept(conceptId: string): Promise<ConceptStand | "fehlt" | null> {
+			const aus = await ersterBlock(`/concept/${encodeURIComponent(conceptId)}`, (daten) => {
 				const block = istConceptBlock(daten);
 				if (!block) return null;
 				const produkte = produkteAus(block.cache, block.concept);
@@ -138,6 +144,7 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 					ohneProdukt: produkte.length === 0,
 				} satisfies ConceptStand;
 			});
+			return aus.art === "treffer" ? aus.wert : aus.art === "fehlt" ? "fehlt" : null;
 		},
 
 		/**
@@ -145,16 +152,25 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 		 * Produkt existiert, ist aber nicht kaeuflich (`UNAVAILABLE`), oder
 		 * die Id stimmt nicht mehr.
 		 */
-		async holePreis(produktId: string): Promise<StoreErgebnis | null> {
-			return ersterBlock(`/product/${encodeURIComponent(produktId)}`, (daten) => {
-				const cache = istPreisBlock(daten, produktId);
-				if (!cache) return null;
-				const ctas = ctasAus(cache, produktId);
-				const preis = kaufpreisAus(ctas);
-				if (!preis) return null;
-				const name = (cache[`Product:${produktId}`] as { name?: string } | undefined)?.name ?? null;
-				return { ...preis, produktId, produktName: name, imPlusKatalog: imPlusKatalog(ctas) } satisfies StoreErgebnis;
-			});
+		async holePreis(produktId: string): Promise<StoreErgebnis | "nur_katalog" | null> {
+			const aus = await ersterBlock<StoreErgebnis | "nur_katalog">(
+				`/product/${encodeURIComponent(produktId)}`,
+				(daten) => {
+					const cache = istPreisBlock(daten, produktId);
+					if (!cache) return null;
+					const ctas = ctasAus(cache, produktId);
+					const preis = kaufpreisAus(ctas);
+					// Kein Kaufknopf, aber ein Katalog-Knopf: Das Spiel ist nicht
+					// einzeln zu kaufen, liegt aber im PS-Plus-Katalog - und das
+					// ist fuer die Kaufentscheidung die wichtigere Auskunft als
+					// "kein Preis" (Nachtrag 21e, gesehen an Shadow of the Tomb
+					// Raider). Ohne diesen Zweig fiel sie unter den Tisch.
+					if (!preis) return imPlusKatalog(ctas) ? "nur_katalog" : null;
+					const name = (cache[`Product:${produktId}`] as { name?: string } | undefined)?.name ?? null;
+					return { ...preis, produktId, produktName: name, imPlusKatalog: imPlusKatalog(ctas) } satisfies StoreErgebnis;
+				},
+			);
+			return aus.art === "treffer" ? aus.wert : null;
 		},
 	};
 }
