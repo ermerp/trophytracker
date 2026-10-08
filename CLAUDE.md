@@ -2,7 +2,7 @@
 
 Single-User-Webanwendung zur Verwaltung einer PlayStation-Spielesammlung (PS3, PS4, PS5, PS Vita).
 
-**Die vollständige Spezifikation steht in `docs/spezifikation.md`. Sie ist die maßgebliche Quelle.**
+**Die vollständige Spezifikation steht in `docs/spec/`. Sie ist die maßgebliche Quelle.**
 Lies den relevanten Abschnitt, bevor du an einem Feature arbeitest. Diese Datei enthält nur das, was in jeder Sitzung gilt.
 
 ---
@@ -199,7 +199,7 @@ Das Repository ist öffentlich, das Backup-Repository ist privat. Ein Datenbank-
   Spezifikation**, nicht nur in den Branch-Namen.
 - **Dokumentation gehört zur Aufgabe, nicht dahinter.** Es gibt zwei Orte, und beide
   werden im selben Commit aktuell gehalten wie der Code:
-  - `docs/spezifikation.md` – die maßgebliche Quelle. Jede Abweichung wird dort
+  - `docs/spec/` – die maßgebliche Quelle. Jede Abweichung wird dort
     nachgezogen, an *allen* betroffenen Stellen, mit Versionsnummer in der Kopfzeile.
   - `README.md` – Einrichtung, Secrets, Deployment, Wiederherstellung, aktueller Stand.
     Was ein Aussenstehender braucht, um das Projekt zu betreiben.

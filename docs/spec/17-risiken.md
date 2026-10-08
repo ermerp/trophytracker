@@ -1,0 +1,57 @@
+← [Inhaltsverzeichnis](README.md)
+
+## 17. Bekannte Risiken
+
+| Risiko | Auswirkung | Umgang |
+|---|---|---|
+| PSN-API ist inoffiziell | Sony kann Endpunkte ändern | Rohdaten speichern, Sync-Fehler brechen die App nicht |
+| NPSSO läuft ab | Sync schlägt fehl, und **der Refresh-Token stirbt mit** – am 29.09.2026 gemessen: nach **25 Tagen**, und zwar beide zugleich, obwohl der Refresh-Token noch acht Tage Frist hatte | Als regulärer Zustand modelliert, UI-Hinweis plus Eingabefeld; der Cron legt bei `abgelaufen` gar keinen Lauf mehr an. **Seit Stufe 19e gibt es die Frühwarnung nach Alter auch für den Zugang** (ab 18 Tagen, `psn_zugang` zeichnet die Lebensdauer auf) – vorher fiel es erst nach einer gescheiterten Nacht auf |
+| Trophäen-Matching unsauber | Falsche Zuordnungen | Manuelle Zuordnung ist verbindlich, nie automatisch überschreiben |
+| Sync überschreibt eigene Bewertung | Datenverlust bei `play_status` | Automatik greift nur bei fehlender Zeile oder `nicht_gespielt`; die Kopplung (5.5) schreibt nur auf Nutzeraktion, nie im Sync |
+| Liste und Bewertung laufen auseinander | To-Do zeigt Pausiertes, `am_spielen` fehlt auf To-Do | Ein Modul (`src/db/kopplung.ts`) in jedem Schreibpfad; Migration 0015 gleicht an; der Deploy-Job zählt Abweichungen (erwartet 0) |
+| Triage bricht in der Mitte ab | Halber Datenbestand | Jede Entscheidung wird sofort gespeichert, `unentschieden` hält Zweifelsfälle auffindbar |
+| Wunschlisten-Import trifft falsch | Datenmüll in der Liste | Keine automatische Übernahme, kein Freitext-Fallback, IGDB-Suche für Zeilen ohne Treffer |
+| Prüfliste läuft voll | Wird ignoriert und damit nutzlos | Aktiv gespielte Titel erzeugen keine Einträge, "unverändert lassen" setzt den Referenzpunkt neu |
+| Backlog-Kandidaten laufen voll | Ungewollte Titel stehen bei jedem Aufruf wieder da | „nicht vorgesehen" als verworfener Eintrag, die View blendet ihn aus (5.4) |
+| Eintrag entfernt, Spiel weg | Von Hand angelegter Titel verschwindet | Nur ohne Besitz, Fortschritt, Bewertung, Physisch-Status und jeden anderen Eintrag; Antwort nennt `spielGeloescht`, Spieldetail kehrt zur Sammlung zurück (Abschnitt 5) |
+| Cloudflare-Konto weg | Totalverlust | Wöchentlicher Export in ein privates GitHub-Repository, ausserhalb von Cloudflare |
+| Backup landet im öffentlichen Repo | Sammlung öffentlich lesbar | Getrennte Repos, Fine-grained Token nur auf das private, `*.sql` in `.gitignore` (Ausnahme `!migrations/*.sql`), Dump nie als Workflow-Artifact |
+| Bearer-Token geleakt | Fremdzugriff auf die Daten | Access-Richtlinie am Worker davor; kein Bearer-Token im Worker – Maschinen-Endpunkte laufen über ein Access Service Token (15.3) |
+| Zugangsdaten im Backup-Repo | NPSSO im Git-Verlauf, dauerhaft | Verschlüsselt in D1; `scripts/dump-pruefen.sh` in Backup- und Deploy-Job, Test über alle Tabellen, menschliche Gegenprobe (14.5) |
+| Service Token oder PAT laufen ab | Sicherung bleibt unbemerkt aus | Altersanzeige in den Einstellungen und Warnung im Hinweisblock ab acht Tagen (14.2); Ablaufdaten in 15.1 |
+| Fehlerhafte Migration | Datenverlust | Export als erster Schritt jedes Deploy-Jobs, Migrationen abwärtskompatibel halten |
+| D1-Tageslimit für gelesene Zeilen erreicht | Anwendung bis Mitternacht UTC tot | Indizes auf allen Fremdschlüsseln **und auf jeder Spalte, über die in einer Schleife gesucht wird** (Migration 0025 holte `game.sort_title` nach), `test/lesekosten.spec.ts` als Wächter – auch für die **Schreibschritte**, nicht nur die Leseansichten –, `rows_read_24h` in `wrangler d1 info` beobachten (Abschnitt 2) |
+| Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht in den Einstellungen, Warnung im Hinweisblock ab acht Tagen; GitHub schaltet den Zeitplan nach 60 Tagen ohne Repo-Aktivität ab (14.2) |
+| Wiederherstellung nie geprobt | Backup unbrauchbar | Probe am 14.09.2026 durchgeführt – sie fand einen echten Fehler (14.3). Ablauf und Ergebnis in der README |
+| Dump nicht einspielbar nach Tabellen-Neuaufbau | Backup nur scheinbar brauchbar | `scripts/dump-ordnen.mjs` ordnet Schema vor Daten, `PRAGMA foreign_key_check` prüft danach (14.3); `test/dump-ordnen.spec.ts` hält die Zerlegung fest |
+| Kritikerwertung fehlt | Eintrag rutscht ans Listenende | Sortierung nach Wertung stellt Unbewertete hinten an, mit „unbekannt" statt 0; die Nachpflege (8.3) findet sie |
+| IGDB-Treffer falsch | Falsches Cover, falsche Wertung | Nur eindeutige Treffer automatisch, gegen die echten Titel gemessen (7.6); Herkunft in `igdb_matched_source`; jede Verknüpfung im Spieldetail lösbar oder austauschbar |
+| Fremde Plattform rutscht durch | PC- oder Switch-Spiel in Wunschliste oder Sammlung | Nur PS3/PS4/PS5/Vita: `release.platform` CHECK, Plattformfilter in jeder IGDB-Abfrage, `normalisiereTreffer` verwirft alles ohne genannte PlayStation-Plattform, Abgleich verlangt gemeinsame Plattform (7.6); gegen alle Verknüpfungen gemessen |
+| Zuordnung über den Titel trifft daneben | Spielzeit oder Besitz landen am falschen Release | Nur bei genau einem Treffer mit passender Plattform, sonst gar nicht – wie bei den Trophäenlisten (7.2); `release_id` bleibt korrigierbar, das Fremddatum unversehrt |
+| PSN kennt einen digitalen Kauf nicht (PS3, delistet, Region) | Ein Besitz sieht aus, als fehle er | Der Abgleich ergänzt nur und entfernt nie; eine Herkunftsspalte trennt „von PSN erkannt" von „selbst erfasst" (7.7) |
+| Spielzeit fehlt bei PS3 und Vita | Eine Sortierung nach Spielzeit stellt sie als „nie gespielt" hin | „unbekannt" statt 0, Einsortierung ans Listenende (5.2, 7.7) |
+| eBay-Angebot nennt ein fremdes Spiel | Falscher Titelvorschlag, im schlimmsten Fall eine falsch erfasste Disc | Mehrheitsregel über bis zu zehn Angebote je Code; nichts wird automatisch zugeordnet; gegen 34 bekannte Codes gemessen, 0 Fehlgriffe (9.2) |
+| eBay-Kontingent erschöpft oder Zugang weg | Kein Titel beim Scannen | 503 nur auf dieser Route, der Scanner arbeitet lokal weiter; der Nachtjob holt den Titel nach (9.3) |
+| Twitch-Token läuft ab | IGDB-Abfragen scheitern | Client-Credentials-Token im Speicher, Erneuerung bei Ablauf oder 401 ohne Zutun (7.6) |
+| Service Worker speichert die Access-Anmeldeseite | Offline erscheint die Anmeldeseite als Sammlung, oder die App-Hülle kommt ohne Anmeldung aus dem Cache | `index.html` nicht im Precache, Navigationen Network-First; in den Cache nur Antworten ohne Weiterleitung von der eigenen Origin (13) |
+| Sync bleibt auf `laufend` hängen | Der Cron fände ihn jede Nacht wieder, kein neuer Lauf | Abbruch nach drei Stunden ohne abgeleiteten Fortschritt, mit Test (10.1) |
+| Nachtlauf schlägt still fehl | Trophäen veralten, niemand merkt es | Hinweisblock meldet abgelaufenen Zugang und fehlgeschlagenen Nachtlauf; `letzterAutomatischerLauf` in den Einstellungen (10.1) |
+| Cron und Handabruf gleichzeitig | Doppelte Arbeit an einem Lauf | Schritte sind idempotent (UPSERT, `naechsteUnverarbeitete`); ein Nachtfenster, in dem selten jemand klickt |
+| IGDB-Ratenlimit | Abgleich bricht ab | 260 ms Abstand je Anfrage, acht Spiele je Aufruf, 429 beendet den Schritt sauber und die Oberfläche ruft erneut |
+| IGDB-Zugangsdaten fehlen | Kein Cover, keine Wertung | Nur die IGDB-Routen antworten 503, alles andere läuft; Hinweis in den Einstellungen |
+| AWIN-Freigabe nie beantragt | Kein Händlerfeed | Gegenstandslos seit Stufe 20: Die Quelle ist eBay, und beide Händler verkaufen dort selbst (7.3) |
+| eBay kennt den Titel nicht | Physisch-Status und Preis fehlen | Status bleibt `unbekannt`, niemals automatisch `nein`; das Ausbleiben steht als Hinweis in Block B, mit seiner gemessenen Fehlrate von 3 % |
+| eBay-Treffer ist ein Bündel oder ein fremdes Spiel | Falscher Preis, falsches `ja` | Drei Bedingungen zusammen: `sammlungstreffer` eindeutig auf dieses Spiel, kein Plattform-Widerspruch im Titel, höchstens `max(1, n−1)` fremde Worte. Gegen alle 490 Releases gemessen, kein bekannter Fehlgriff bleibt (7.3) |
+| eBays Plattform-Aspekt ist falsch gepflegt | PS3-Disc zählt als PS4 | Nennt der Titel eine andere PlayStation-Plattform und nicht auch die eigene, wird das Angebot verworfen |
+| eBay-Filter wirkt nicht | Stillschweigend falsche Ergebnisse | Unkodierte Klammern werden ohne Warnung ignoriert; der Client baut die Parameter über `URLSearchParams`, ein Test prüft die Kodierung |
+| Angebotspreis gilt als Marktwert | Falsche Kaufentscheidung | Verkaufte Preise sind bei eBay nicht zu bekommen (Finding API abgeschaltet, Marketplace Insights geschlossen). Die Zahl heißt überall "ab X € bei …", nie "Wert" |
+| Quelle für "nur digital" fehlt | Block B bleibt offen | Es gibt keine: Wikidata liegt bei 20 % falsch, IGDBs `media` ist zu 90 % leer, MobyGames kostet. "Nur digital" ist auch keine stabile Tatsache – Limited Run bringt digitale Titel nachträglich auf Disc. `nein` bleibt die Entscheidung des Nutzers (Abschnitt 3) |
+| Store-Preise inoffiziell und volatil | Sale verfälscht Verlauf | `is_sale`-Flag (aus `discountedValue < basePriceValue`, nicht geraten), Abruf nur für vorgemerkte Releases (7.4) |
+| IGDB kennt den Store-Eintrag nicht | Kein Preis, obwohl der Store das Spiel führt | Unvermeidbar – die Lücke sitzt in fremden Daten, drei Ersatzquellen sind gemessen und verworfen (7.4). Abgefedert: neue Einträge werden zuerst geprüft, IGDB wird nach 30 Tagen erneut gefragt, und der Posten steht an der Glocke mit einem Feld für die kopierte Store-Adresse |
+| Der Store baut sein Seitengerüst um | Store-Preise fallen still aus | Der Leser sucht den Block nach Inhalt, nicht nach Position, und gibt nach 256 KB auf statt die ganze Seite zu parsen; `store_befund` bleibt dann `unlesbar` und **stempelt nicht** – der nächste Lauf versucht es erneut. Tests gegen nachgebaute Seiten halten alle sechs Befunde fest (7.4) |
+| Falsches Produkt zum Spiel | Der Preis einer anderen Fassung oder einer Demo steht am Titel | Drei Stufen statt eines Rückfalls: Titelschlüssel, dann Sonys `defaultProduct`, dann nur ein **verwandter** Name; die Plattform kommt aus der Titel-Id im Produktschlüssel. Weicht Sonys Produktname ab, steht er im Spieldetail daneben – der Preis gibt nie vor, zum eigenen Titel zu gehören (7.4) |
+| PS-Plus-Werbung statt Kaufpreis | „0,00 €" an einem Titel, der Geld kostet | Genommen wird nur ein Kauftyp mit `serviceBranding: ["NONE"]`; der Katalog hängt am Knopftyp `UPSELL_PS_PLUS_GAME_CATALOG`, nicht an `isTiedToSubscription` (gemessen am 02.10.2026 an Baldur's Gate 3 und Mass Effect: Andromeda) |
+| Keine freie EAN-Datenbank | Barcode liefert beim ersten Scan keinen Titel | Eigene Zuordnungstabelle (jeder Code nach einmaliger Auswahl bekannt), offene Scans festgehalten; Messung von eBay-GTIN gegen die echten Codes nach Stufe 17 (9.2) |
+| Systemleisten von Android sind nicht färbbar | Heller Trenner zwischen App-Leiste und Gestenleiste (gemessen 1 px, rgb(226,226,234), OnePlus Nord 2 / Android 13) | Kein Zugriff über das Web: Die Statusleiste nimmt `theme_color`, die Navigationsleiste nicht; `viewport-fit=cover` ändert daran auf Android 13 nichts. Auswege liegen ausserhalb der Anwendung – Gestenleiste am Gerät ausblenden oder `display: "fullscreen"` (kostet Uhr und Akkustand) |
+| D1 relativ jung | Werkzeuge weniger ausgereift | Bei Single-User unkritisch, Schema ist Standard-SQLite und portierbar |
+| Ungewollt in einen Bezahlmodus rutschen | Unerwartete Kosten | Free-Pläne blocken bei Überschreitung, statt zu berechnen (15.4); Upgrade ist immer eine ausdrückliche Handlung |

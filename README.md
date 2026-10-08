@@ -4,7 +4,7 @@ Single-User-Webanwendung zur Verwaltung einer PlayStation-Spielesammlung
 (PS3, PS4, PS5, PS Vita):
 Besitz, Trophäenfortschritt, eigene Bewertung, Wunsch- und Kaufliste.
 
-Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifikation.md).
+Die vollständige Spezifikation steht in [`docs/spec/`](docs/spec/README.md).
 
 > **Die PSN-Anbindung ist inoffiziell.** Sony stellt kein öffentliches API für
 > Trophäendaten bereit; die Anwendung nutzt die Endpunkte, die auch die
@@ -15,7 +15,7 @@ Die vollständige Spezifikation steht in [`docs/spezifikation.md`](docs/spezifik
 ## Stand
 
 **Stufen bis 20e abgenommen** (20e am 02.10.2026)
-([Umsetzungsreihenfolge](docs/spezifikation.md#16-umsetzungsreihenfolge)).
+([Umsetzungsreihenfolge](docs/spec/16-umsetzung.md)).
 Die Anwendung läuft unter `trophytracker.philipp-ermer-bvb.workers.dev`. Aus
 den Trophäenlisten lassen sich Spiele und Releases anlegen, dazu Besitz
 erfassen (Use Case 1) und je Release die eigene Bewertung setzen (Use Case 2).
@@ -697,7 +697,7 @@ gehalten hätte.
 Schlüssel als Cloudflare Secret. Ein Datenbank-Dump enthält damit keinen
 verwertbaren Zugang. Warum nicht als Cloudflare Secret: Ein Worker kann keine
 Secrets schreiben, ein Eingabefeld braucht aber eine beschreibbare Ablage –
-siehe [Abschnitt 7.1](docs/spezifikation.md#71-psn-trophäen).
+siehe [Abschnitt 7.1](docs/spec/07-1-psn-trophaeen.md).
 
 **Keiner dieser Werte erscheint jemals in einer API-Antwort oder im Log**, auch
 nicht gekürzt. Durchgesetzt über die Hülle `Geheimnis` in
@@ -759,7 +759,7 @@ auch im Hinweisblock der Sammlung – „der nächtliche Abruf steht still".
 Seit Stufe 18 läuft ein Cron Trigger, seit **Stufe 18e zwei** (`wrangler.jsonc`).
 Der Free Tier gibt einem Cron-Aufruf dieselben 10 ms CPU wie einer Anfrage;
 deshalb tut jeder Aufruf genau **eine** Sache und merkt sich den Stand in der
-Datenbank ([Abschnitt 10.1](docs/spezifikation.md#101-automatik-der-cron-trigger-stufe-18)).
+Datenbank ([Abschnitt 10.1](docs/spec/10-1-cron.md)).
 
 **Fenster 1 – PSN (`*/5 3-5 * * *`, 36 Aufrufe):** alle fünf Minuten zwischen
 03:00 und 05:59 UTC, also 5–8 Uhr Sommerzeit beziehungsweise 4–7 Uhr Winterzeit.
@@ -844,7 +844,7 @@ nachts ein Lauf offen ist, setzt denselben Lauf fort; die Schritte vertragen das
 
 Cover, Kritikerwertung (`aggregated_rating`) und Erscheinungsdatum kommen von
 [IGDB](https://www.igdb.com), einer offiziellen, kostenlosen Schnittstelle
-([Spezifikation 7.6](docs/spezifikation.md#76-igdb-abgleich-stufe-9)).
+([Spezifikation 7.6](docs/spec/07-6-igdb.md)).
 
 **Zugang einrichten.** IGDB läuft über eine Twitch-Anwendung:
 
@@ -874,7 +874,7 @@ wie viele Spiele noch warten.
 Die Kandidaten stehen sortiert: Schlüsseltreffer zuerst, dann Hauptspiele,
 Remakes und Remaster vor DLC und Paketen, dann die Plattform des Spiels. Bleibt
 die Suche leer, greifen Rückfälle (gekürzter Begriff, ohne Plattformfilter,
-Teilstringsuche) – Details in [Spezifikation 7.6](docs/spezifikation.md#76-igdb-abgleich-stufe-9).
+Teilstringsuche) – Details in [Spezifikation 7.6](docs/spec/07-6-igdb.md).
 „Offene erneut suchen" schickt alle Spiele zur Prüfung noch einmal durch die
 Suche, wenn die Regel besser geworden ist.
 
@@ -906,8 +906,8 @@ gegen 469 verknüpfte Spiele: 226 mit physischem Eintrag, alle 2 020 Einträge
 mit Plattform, 199 von 481 Releases bekommen ein `ja`. Was IGDB nicht kennt,
 bleibt `unbekannt` – nie `nein`; das setzt du im Spieldetail oder in der
 Lückenansicht unter „Disc-Fassung unbekannt". Details in
-[Spezifikation 7.6](docs/spezifikation.md#76-igdb-abgleich-stufe-9) und
-[Abschnitt 3](docs/spezifikation.md#3-datenmodell--sammlung).
+[Spezifikation 7.6](docs/spec/07-6-igdb.md) und
+[Abschnitt 3](docs/spec/03-sammlung.md).
 
 ```
 GET  /api/igdb/status            Zähler und ob Zugangsdaten hinterlegt sind
@@ -929,7 +929,7 @@ entstanden (tabulatorgetrennt: Datum, Titel, Plattform, Status, Original,
 Hinweis); der Import nimmt die rohen Jahresdateien und diese Form, siehe
 [Wunschlisten-Import](#wunschlisten-import). Alles sind Wünsche, auch schon
 Gespieltes – Folgerungen in
-[Spezifikation 8.2](docs/spezifikation.md#82-wunschlisten-import-aus-textdateien-use-case-9).
+[Spezifikation 8.2](docs/spec/08-2-wunschlisten-import.md).
 
 ## Zugriffsschutz
 
@@ -1009,7 +1009,7 @@ Geheimnis, das leaken kann, für dieselbe Frage.
 
 **Folge: Der Worker trägt keine eigene Token-Prüfung.** `/api/export/*` und
 `/api/backup/*` sind gewöhnliche Routen; Access steht davor. Siehe
-[Abschnitt 15.3](docs/spezifikation.md#153-zugriffsschutz).
+[Abschnitt 15.3](docs/spec/15-repository-deployment.md#153-zugriffsschutz).
 
 **Eingerichtet sind zwei Access Service Tokens** (Zero Trust → Access →
 Service Auth → Service Tokens). Sie hängen an einer eigenen Richtlinie der
@@ -1119,7 +1119,7 @@ Sammlung, Spieldetail, Listen, Cover – mit einem Balken „Offline – du sieh
 zuletzt geladenen Stand". Änderungen sind erst wieder online möglich; eine
 Warteschlange gibt es nicht. Wie das mit Access zusammenspielt (Seite und API
 Network-First, nichts von einer Weiterleitung im Cache), steht in
-[Abschnitt 13](docs/spezifikation.md#13-frontend).
+[Abschnitt 13](docs/spec/13-frontend.md).
 
 Die PNG-Symbole entstehen aus `frontend/public/icon.svg`:
 
@@ -1271,7 +1271,7 @@ Bis Stufe 17d legte der Scanner solche Codes als **offene Scans** ab, und ein
 nächtlicher Job holte dazu Titel. Das ist abgeschafft: Ein Barcode ohne seine
 Hülle war später nicht mehr zuzuordnen – die Liste erzeugte Arbeit statt Nutzen
 (Entscheidung vom 21.09.2026, Begründung in
-[Abschnitt 9.3](docs/spezifikation.md#93-warum-es-keine-offenen-scans-mehr-gibt-stufe-17d)).
+[Abschnitt 9.3](docs/spec/09-barcode.md#93-warum-es-keine-offenen-scans-mehr-gibt-stufe-17d)).
 
 Heute gilt: Der Titel kommt sofort (eBay, sonst upcitemdb), das Spiel lässt sich
 im selben Fenster anlegen. Wer gerade nicht zuordnen will, drückt
@@ -1284,7 +1284,7 @@ bräuchte zwei Deployments und hat keine Eile.
 ## Wunschliste und Absichten
 
 Wunschliste, To-Do, Backlog und Kaufliste liegen in einer Tabelle `plan_entry`
-([Abschnitt 5](docs/spezifikation.md#5-datenmodell--absichten-use-cases-4-5-6));
+([Abschnitt 5](docs/spec/05-absichten.md));
 Stufe 10 bedient die Wunschliste, Stufe 12 To-Do und Backlog, Stufe 15 die
 Kaufliste – die Routen kennen alle vier Arten:
 
@@ -1393,7 +1393,7 @@ erzeugt keine Dubletten.
 
 ### Lücken
 
-`/luecken` (Use Case 3, [Abschnitt 5.3](docs/spezifikation.md#53-eine-lücke-bewusst-verwerfen)):
+`/luecken` (Use Case 3, [Abschnitt 5.3](docs/spec/05-3-luecke-verwerfen.md)):
 digital gespielt, Disc-Fassung belegt, nicht im Regal – aus `v_luecken`.
 „Physisch nicht gewünscht" legt einen Kaufeintrag mit `origin = 'luecke'` und
 `status = 'verworfen'` an; die Lücke bleibt in den Daten und wird nur
@@ -1434,7 +1434,7 @@ ein „RagnarÃ¶k".
 
 **Ein leeres Feld bedeutet „unbekannt"** – nie „0" und nie „–". Werte, die
 tatsächlich *den Wert* „unbekannt" tragen (Disc-Fassung), stehen als Wort da.
-Spaltenlisten: [Abschnitt 14.4](docs/spezifikation.md#144-csv-export).
+Spaltenlisten: [Abschnitt 14.4](docs/spec/14-backup-export.md#144-csv-export).
 
 CSV ist zum Auswerten und Weitergeben gedacht, **nicht als Sicherung**: Die
 Beziehungen zwischen den Tabellen gehen dabei verloren. Dafür ist der Dump da.
