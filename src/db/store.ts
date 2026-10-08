@@ -266,6 +266,10 @@ export class StoreRepository {
 	/**
 	 * Kein Preis - und warum.
 	 *
+	 * `imPlusKatalog` ueberlebt dabei: Ein Titel ohne Kaufknopf kann trotzdem
+	 * im Katalog liegen, und das ist fuer die Kaufentscheidung die wichtigere
+	 * Auskunft als "kein Preis" (Nachtrag 21e).
+	 *
 	 * `unlesbar` stempelt NICHT: Eine Seite, die gerade nicht antwortete, ist
 	 * keine Aussage ueber das Spiel, und der naechste Aufruf nimmt das
 	 * Release wieder. Jeder andere Befund stempelt und raeumt den alten Preis
@@ -274,14 +278,14 @@ export class StoreRepository {
 	 * bleibt dabei stehen: Sie ist eine Zuordnung und wird von keinem
 	 * automatischen Prozess zurueckgenommen.
 	 */
-	async befundSchreiben(releaseId: number, befund: StoreBefund): Promise<void> {
+	async befundSchreiben(releaseId: number, befund: StoreBefund, imPlusKatalog = false): Promise<void> {
 		if (befund === "unlesbar") return;
 		await this.db
 			.prepare(
 				"UPDATE release SET store_price_cents = NULL, store_base_price_cents = NULL, store_is_sale = 0, " +
-					"store_plus = 0, store_befund = ?, store_geprueft_am = datetime('now') WHERE id = ?",
+					"store_plus = ?, store_befund = ?, store_geprueft_am = datetime('now') WHERE id = ?",
 			)
-			.bind(befund, releaseId)
+			.bind(imPlusKatalog ? 1 : 0, befund, releaseId)
 			.run();
 	}
 

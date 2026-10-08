@@ -160,12 +160,16 @@ async function portion(
 		if (anfragen + 1 + PRODUKTE_JE_RELEASE > FREMDANFRAGEN_HOECHSTENS) break;
 
 		let befund: StoreBefund = "unlesbar";
+		// Ueberlebt den Weg bis zum Stempel: Ein Titel ohne Kaufknopf kann im
+		// PS-Plus-Katalog liegen, und das soll nicht verlorengehen (21e).
+		let nurKatalog = false;
 		try {
 			// 1. Eine bekannte Produkt-Id ist der billige Weg: eine Anfrage.
 			if (ziel.produktId !== null) {
 				const ergebnis = await store.holePreis(ziel.produktId);
 				anfragen++;
-				if (ergebnis) {
+				if (ergebnis === "nur_katalog") nurKatalog = true;
+				else if (ergebnis) {
 					const { neuZugeordnet } = await repos.store.preisSchreiben(ziel, ergebnis);
 					geprueft++;
 					mitPreis++;
@@ -189,7 +193,15 @@ async function portion(
 					anfragen++;
 					conceptPuffer.set(ziel.conceptId, stand);
 				}
-				if (stand === null) befund = "unlesbar";
+				// Drei verschiedene Antworten, drei verschiedene Befunde
+				// (Nachtrag 21e): Eine Seite, die es gar nicht gibt, ist
+				// endgueltig und gehoert in die Nachpflege; eine, die wir nicht
+				// lesen konnten, ist einen weiteren Versuch wert. Vorher waren
+				// beide `unlesbar` - und *Dying Light* versuchte es fuenf
+				// Naechte lang vergeblich, weil IGDBs Concept 201129 im
+				// deutschen Store mit 302 antwortet.
+				if (stand === "fehlt") befund = "ohne_id";
+				else if (stand === null) befund = "unlesbar";
 				else if (stand.ohneProdukt) befund = "delistet";
 				else {
 					const reihe = produktReihe(stand.produkte, ziel.titel, ziel.plattform, stand.standardId);
@@ -198,6 +210,10 @@ async function portion(
 						if (anfragen >= FREMDANFRAGEN_HOECHSTENS) break;
 						const ergebnis = await store.holePreis(produkt.id);
 						anfragen++;
+						if (ergebnis === "nur_katalog") {
+							nurKatalog = true;
+							continue;
+						}
 						if (!ergebnis) continue;
 						const { neuZugeordnet } = await repos.store.preisSchreiben(ziel, ergebnis);
 						geprueft++;
@@ -220,7 +236,7 @@ async function portion(
 			throw fehler;
 		}
 
-		await repos.store.befundSchreiben(ziel.releaseId, befund);
+		await repos.store.befundSchreiben(ziel.releaseId, befund, nurKatalog);
 		if (befund !== "unlesbar") {
 			geprueft++;
 			ohneTreffer++;

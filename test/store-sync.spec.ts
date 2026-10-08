@@ -293,6 +293,55 @@ describe("storeSchritt", () => {
 		expect(await stand(1)).toMatchObject({ befund: "delistet", preis: null });
 	});
 
+	it("stempelt eine Concept-Seite, die es gar nicht gibt - statt sie ewig zu wiederholen", async () => {
+		// Befund vom 08.10.2026: IGDBs Concept 201129 fuer Dying Light
+		// antwortet im deutschen Store mit 302. Weil 302 und "nicht lesbar"
+		// denselben Befund ergaben, blieb das Release ungestempelt und der
+		// Nachtlauf versuchte es FUENF Naechte lang vergeblich.
+		await spiel(1, "Dying Light", { conceptId: "201129" });
+		await absicht(1);
+		const { client } = fakeStore([[/\/concept\//, () => htmlAntwort("", 302)]]);
+		const e = await storeSchritt(repos(), client, igdbOhne());
+
+		expect(e).toMatchObject({ geprueft: 1, ohneTreffer: 1 });
+		expect(await stand(1)).toMatchObject({ befund: "ohne_id" });
+		// Gestempelt heisst: heute nicht noch einmal.
+		expect(await repos().store.zuPruefen(10)).toEqual([]);
+	});
+
+	it("unterscheidet davon eine Seite, die nur gerade nicht lesbar war", async () => {
+		await spiel(1, "Irgendein Spiel", { conceptId: "99" });
+		await absicht(1);
+		const { client } = fakeStore([[/\/concept\//, () => htmlAntwort("<html>nichts</html>")]]);
+		await storeSchritt(repos(), client, igdbOhne());
+		expect(await stand(1)).toMatchObject({ befund: null, wann: null });
+		expect(await repos().store.zuPruefen(10)).toHaveLength(1);
+	});
+
+	it("behaelt 'im PS-Plus-Katalog', auch wenn es keinen Kaufknopf gibt", async () => {
+		// Shadow of the Tomb Raider: Die Basisfassung wird einzeln nicht mehr
+		// verkauft, liegt aber im Katalog - fuer die Kaufentscheidung die
+		// wichtigere Auskunft als "kein Preis".
+		const produktId = "EP0082-CUSA10872_00-SHADOWTOMBRAIDER";
+		await spiel(1, "Shadow of the Tomb Raider", { produktId });
+		await absicht(1);
+		const { client } = fakeStore([
+			[
+				/\/product\//,
+				() =>
+					htmlAntwort(
+						produktSeite(
+							produktId,
+							[{ typ: "UPSELL_PS_PLUS_GAME_CATALOG", produktId, preisCents: 0, grundCents: 3999, marke: ["PS_PLUS"] }],
+							{ name: "Shadow of the Tomb Raider" },
+						),
+					),
+			],
+		]);
+		await storeSchritt(repos(), client, igdbOhne());
+		expect(await stand(1)).toMatchObject({ befund: "ohne_kauf", preis: null, plus: 1 });
+	});
+
 	it("merkt sich 'fremd', wenn der Store kein Produkt dieser Plattform fuehrt", async () => {
 		// Resident Evil 7 auf PS4: Das Concept fuehrt nur noch die PS5-Fassung
 		// und eine Demo. Lieber "unbekannt" als der Preis eines anderen

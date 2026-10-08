@@ -165,16 +165,24 @@ export function produktNameAbweichend(name: string | null, titel: string): strin
  * das Spiel. Deshalb nicht „keine Daten" für alles – und nie „0".
  */
 export const STORE_BEFUNDTEXT: Record<string, string> = {
-  ohne_id: 'Digital: unbekannt – zu diesem Spiel ist kein Store-Eintrag bekannt',
+  ohne_id: 'Digital: unbekannt – zu diesem Spiel ist kein brauchbarer Store-Eintrag bekannt',
   delistet: 'Digital: nicht mehr im Store',
-  ohne_kauf: 'Digital: im Store, aber nicht käuflich',
+  ohne_kauf: 'Digital: im Store, aber nicht einzeln käuflich',
   fremd: 'Digital: keine Fassung für diese Plattform im Store',
+  plattform: 'Digital: unbekannt – der Web-Store führt diese Plattform nicht mehr',
   unlesbar: 'Digital: unbekannt',
 }
 
-export function storeBefundText(befund: string | null, geprueftAm: string | null): string {
+/**
+ * Warum kein Preis dasteht – und, wo es zutrifft, die wichtigere Auskunft
+ * daneben (Stufe 21e): Ein Titel ohne Kaufknopf kann trotzdem im
+ * PS-Plus-Katalog liegen. Für die Kaufentscheidung zählt das mehr als
+ * „kein Preis“.
+ */
+export function storeBefundText(befund: string | null, geprueftAm: string | null, imPlusKatalog = false): string {
   const text = STORE_BEFUNDTEXT[befund ?? ''] ?? 'Digital: unbekannt'
-  return geprueftAm === null ? text : `${text} (${datum(geprueftAm)})`
+  const katalog = imPlusKatalog ? ' · im PS Plus-Katalog' : ''
+  return geprueftAm === null ? `${text}${katalog}` : `${text}${katalog} (${datum(geprueftAm)})`
 }
 
 export const PLAY_STATUS = [
