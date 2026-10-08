@@ -294,10 +294,13 @@ einem von Hand angelegten Wunsch: „Satisfactory" (PS5) hängt an einem eigens 
 entstandenen Release, `game_id` ist leer, und das Release zählt trotzdem nicht zur
 Sammlung – es trägt weder Besitz noch Fortschritt.
 
-**Stufe 19b ist am 02.10.2026 abgenommen, Stufe 20 am selben Tag gebaut,
-Stufe 21 am selben Abend.** Damit sind alle Funktionsstufen durch. Offen
-bleiben nur 20f (Preisverlauf) und 20g (Preisalarm) – beide warten auf
-Messpunkte. Danach stehen **fünf finale Stufen** an, die in der Spezifikation
+**Stufe 21 ist am 08.10.2026 abgenommen** – nach sechs Nachträgen (b–g), deren
+Befunde allesamt aus der Durchsicht der Nachtläufe oder vom Nutzer kamen.
+Damit sind alle Funktionsstufen durch. Offen bleiben nur 20f (Preisverlauf)
+und 20g (Preisalarm); beide haben seit dem 04.10. genügend Messpunkte.
+Vorgemerkt für „Die Sammlung finalisieren": die Frage nach den
+**Schnittfassungen** – sie lohnt erst bei vollständigem Bestand, weil das
+einzige verwertbare Signal gerade bei PS3 und Vita blind ist. Danach stehen **fünf finale Stufen** an, die in der Spezifikation
 beschrieben sind: die Sammlung finalisieren, Oberfläche und Bedienbarkeit,
 Refactoring, Wiederherstellungsprobe und die Außendarstellung auf GitHub. Die
 PSN-Stufen ergänzen nur, was die Sammlung schon kennt, und importieren nichts.
