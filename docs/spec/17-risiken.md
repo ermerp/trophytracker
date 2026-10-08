@@ -39,7 +39,6 @@
 | Cron und Handabruf gleichzeitig | Doppelte Arbeit an einem Lauf | Schritte sind idempotent (UPSERT, `naechsteUnverarbeitete`); ein Nachtfenster, in dem selten jemand klickt |
 | IGDB-Ratenlimit | Abgleich bricht ab | 260 ms Abstand je Anfrage, acht Spiele je Aufruf, 429 beendet den Schritt sauber und die Oberfläche ruft erneut |
 | IGDB-Zugangsdaten fehlen | Kein Cover, keine Wertung | Nur die IGDB-Routen antworten 503, alles andere läuft; Hinweis in den Einstellungen |
-| AWIN-Freigabe nie beantragt | Kein Händlerfeed | Gegenstandslos seit Stufe 20: Die Quelle ist eBay, und beide Händler verkaufen dort selbst (7.3) |
 | eBay kennt den Titel nicht | Physisch-Status und Preis fehlen | Status bleibt `unbekannt`, niemals automatisch `nein`; das Ausbleiben steht als Hinweis in Block B, mit seiner gemessenen Fehlrate von 3 % |
 | eBay-Treffer ist ein Bündel oder ein fremdes Spiel | Falscher Preis, falsches `ja` | Drei Bedingungen zusammen: `sammlungstreffer` eindeutig auf dieses Spiel, kein Plattform-Widerspruch im Titel, höchstens `max(1, n−1)` fremde Worte. Gegen alle 490 Releases gemessen, kein bekannter Fehlgriff bleibt (7.3) |
 | eBays Plattform-Aspekt ist falsch gepflegt | PS3-Disc zählt als PS4 | Nennt der Titel eine andere PlayStation-Plattform und nicht auch die eigene, wird das Angebot verworfen |

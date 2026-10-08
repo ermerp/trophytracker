@@ -15,9 +15,8 @@ späterer Sinneswandel ist ein Feld-Update auf `offen`, kein Neuanlegen.
 
 **Folgen für die Sichten:**
 
-- `v_kaufkandidaten` blendet Releases mit verworfenem Kaufeintrag aus. Bisher filterte die View nur
-  auf `status = 'offen'`, wodurch ein verworfener Eintrag den Kandidaten wieder auftauchen ließ –
-  das war ein Fehler.
+- `v_kaufkandidaten` blendet Releases mit verworfenem Kaufeintrag aus. Ein Filter nur auf
+  `status = 'offen'` genügt dafür nicht – er ließe den Kandidaten wieder auftauchen.
 - `v_luecken` behält den Eintrag, kennzeichnet ihn aber über eine Spalte `verworfen`. Eine Lücke ist
   eine **Tatsache** (digital gespielt, Disc existiert, nicht im Regal); dass sie nicht geschlossen
   werden soll, ist eine **Absicht**. Die Tatsache zu löschen, weil die Absicht fehlt, wäre dieselbe

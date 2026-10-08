@@ -26,7 +26,9 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 7.1 | [07-1-psn-trophaeen.md](07-1-psn-trophaeen.md) | NPSSO, Token, Zugang erneuern |
 | 7.2 | [07-2-matching.md](07-2-matching.md) | das Matching-Problem |
 | 7.3 | [07-3-ebay.md](07-3-ebay.md) | Gebrauchtpreise und Disc-Nachweis aus eBay |
-| 7.4 | [07-4-store-preise.md](07-4-store-preise.md) | PSN Store-Preise |
+| 7.3 | [07-3-ebay-verworfen.md](07-3-ebay-verworfen.md) | geprüft und verworfen: AWIN, eBays Aspekt `Spielname`, Quellen für „nur digital" |
+| 7.4 | [07-4-store-preise.md](07-4-store-preise.md) | PSN Store-Preise: Endpunkt, Produkt-Id, Zuschnitt |
+| 7.4 | [07-4-store-befunde.md](07-4-store-befunde.md) | was ohne Preis dasteht, Nachpflegeliste, Anzeige |
 | 7.5 | [07-5-kritikerwertungen.md](07-5-kritikerwertungen.md) | Kritikerwertungen |
 | 7.6 | [07-6-igdb.md](07-6-igdb.md) | IGDB-Abgleich |
 | 7.7 | [07-7-psn-weitere-daten.md](07-7-psn-weitere-daten.md) | Spielzeit, Kaufliste, PS+ gegen Kauf |
@@ -38,8 +40,10 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 8.4 | [08-4-unveroeffentlicht.md](08-4-unveroeffentlicht.md) | unveröffentlichte Titel |
 | 8.5 | [08-5-aenderungsprotokoll.md](08-5-aenderungsprotokoll.md) | Änderungsprotokoll je Spiel |
 | 9 | [09-barcode.md](09-barcode.md) | Barcode-Erfassung, Auflösungskette |
+| 9.2, 9.3 | [09-3-ean-quellen.md](09-3-ean-quellen.md) | geprüfte und verworfene EAN-Quellen; warum es keine offenen Scans gibt |
 | 10 | [10-sync-protokoll.md](10-sync-protokoll.md) | `psn_sync_run`, Rohablage, zwei Phasen |
 | 10.1 | [10-1-cron.md](10-1-cron.md) | die Automatik: zwei Cron-Fenster, 15 Schritte |
+| 10.1 | [10-1-cron-verlauf.md](10-1-cron-verlauf.md) | `cron_verlauf`, Verdichtung, örtlicher Aufruf |
 | 11 | [11-sichten.md](11-sichten.md) | die sieben Views |
 | 12 | [12-api-routen.md](12-api-routen.md) | Routen für Sammlung, Besitz, Bewertung, Absichten, Prüfliste; Filter |
 | 12 | [12-api-routen-extern-und-sync.md](12-api-routen-extern-und-sync.md) | Routen für IGDB, Import, Export, Scan, Preise, Sync, Kennzahlen |

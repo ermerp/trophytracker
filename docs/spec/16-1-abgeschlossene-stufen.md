@@ -35,7 +35,7 @@ finalen Stufen – [16.2](16-2-offene-stufen.md).
 | 17c | eBay als EAN-Quelle, **live beim Scannen**; Mehrheitsregel und Ballast-vor-Ziffern im Abgleich (9.2) | – | 21.09.2026 |
 | 17d | Offene Scans abgeschafft; upcitemdb wird Live-Rückfall im Worker (9.3) | – | 21.09.2026 |
 | 18 | Cron Trigger `*/5 3-5` mit einem Schritt je Aufruf (10.1), PWA mit Offline-Lesezugriff (13) | 0021 | 22.09.2026 |
-| 18b | Der Cron wird nachprüfbar: Stempel auch ohne IGDB-Antwort, `try/catch` um die IGDB-Schritte, Ausgang in `app_setting` (10.1) | – | 22.09.2026 |
+| 18b | Der Cron wird nachprüfbar, nachdem das IGDB-Auffrischen zwei Nächte nichts tat (418 von 477 Spielen überfällig): Stempel auch ohne IGDB-Antwort, `try/catch` um die IGDB-Schritte, Ausgang in `app_setting` (10.1) | – | 22.09.2026 |
 | 18c | Spielzeit und digitaler Besitz aus PSN: `gamelist/v2` und Kaufliste, Abgleich über `titelSchluessel`, nur ergänzend (7.7) | 0023, 0025 | 22.09.2026 |
 | 18d | Der Cron wird les- und aufräumbar: Verlauf verdichtet, zwanzig Einträge, alte `psn_raw_response` gelöscht (10.1) | – | – |
 | 18e | Das Cron-Fenster: **zwei** Einträge, Wiederholung nach Abrufsfehler, Verdichtung mit Spanne, `{fehlerAm}` (10.1) | 0024 | 29.09.2026 |
@@ -45,13 +45,13 @@ finalen Stufen – [16.2](16-2-offene-stufen.md).
 | 19b | Einzeltrophäen je Spiel: Definition, Stand, Seltenheit mit Stufe, Fortschrittszähler, Gruppen, Trophäen-Level; Erstbefüllung nachts plus Portionsknopf (7.7) | 0027 | 02.10.2026 |
 | 19c | Spieldetail neu gebaut: Besitz als zwei Knöpfe je Release, neun nie gefüllte Felder raus, Trophäenstufen absteigend (13) | – | 27.09.2026 |
 | 19d | Wunsch mit Plattform: „ohne Plattform" entfällt in allen vier Listen, „Freitext" als Kennzeichen (5) | – | 28.09.2026 |
-| 19e | Zugang erneuern: Knopf, Zwischenablage, `npssoAusText`; Frühwarnung ab 18 Tagen; `psn_zugang` zeichnet die Lebensdauer auf (7.1) | 0026 | 29.09.2026 |
+| 19e | Zugang erneuern: Knopf, Zwischenablage, `npssoAusText`; Frühwarnung ab 18 Tagen; `psn_zugang` zeichnet die Lebensdauer auf (7.1). Der erneuerte Zugang trägt `expires_in` bis 28.11.2026 – der zweite Eintrag der Zeitreihe, der erste steht mit 25 Tagen als `gestorben` darin | 0026 | 29.09.2026 |
 | 20 | **Marktdaten aus eBay statt AWIN**: Gebrauchtpreis je Release, `unbekannt → ja` bei geprüftem Treffer, Ausbleiben als Hinweis für Block B (7.3) – **Use Case 7**, Teil 1 | 0028 | 02.10.2026 |
 | 20b | Abgleich geschärft nach Durchsicht der 79 Statuswechsel: vier Bedingungen, fünf Fehlgriffe beseitigt (7.3) | – | 02.10.2026 |
 | 20c | Der Marktstand zählt Releases statt Angebotszeilen (323 gemeldet, 239 richtig) | – | 02.10.2026 |
 | 20d | Block B der Lückenansicht bekommt einen eigenen Schalter – zugeklappt war er praktisch unauffindbar (5.3) | – | 02.10.2026 |
 | 20e | **Preise in den Listen**: Gebrauchtpreis an Kaufliste und Wunsch als Link, `sort=preis` in fünf Listen über ein verankertes Menü; Takt täglich, Wartungsfenster `*/5 6-8`, Portion 20 Releases; beide Kanäle im Verlauf (7.3) | 0029, 0030 | 02.10.2026 |
-| 21 | **PSN Store-Preise**: Neupreis der digitalen Fassung, „im PS-Plus-Katalog", Angebote mit Grundpreis; Produkt-Id über IGDBs Concept-Id aufgelöst (7.4) – **Use Case 7** vollständig | 0031 | 08.10.2026 |
+| 21 | **PSN Store-Preise**: Neupreis der digitalen Fassung, „im PS-Plus-Katalog", Angebote mit Grundpreis; Produkt-Id über IGDBs Concept-Id aufgelöst (7.4) – **Use Case 7** vollständig. Stand bei der Abnahme: 65 Releases mit Preis, Nachpflegeliste leer, `rows_read_24h` 191 324 | 0031 | 08.10.2026 |
 | 21b | Der Leerlauf der Auswahl: CTE aus zwei Index-Lookups plus Teilindex, 4 statt 430 gelesene Zeilen (7.4) | 0032 | 08.10.2026 |
 | 21c | Innerhalb der Treffergruppe gewinnt der kürzeste Produktname (*Outcast*, 49,99 statt 14,99 €) (7.4) | – | 08.10.2026 |
 | 21d | PS3 und Vita ohne jeden Abruf; Nachpflegeliste an der Glocke, Store-Adresse einfügen (7.4) | – | 08.10.2026 |
@@ -108,8 +108,10 @@ der Concept-Seite des Store entsteht (7.4). Inoffiziell bleibt die Quelle, aber
 es ist eine gerenderte Webseite ohne Anmeldung, und die `robots.txt` des Store
 sperrt sie nicht.
 
-Die aus Stufe 14 offen gebliebenen 249 Releases mit unbekannter Disc-Fassung
-füllt Stufe 20 aus eBay nach. Die damals vorgemerkte Option „14b" (MobyGames)
+Die aus Stufe 14 offen gebliebenen **249 Releases** mit unbekannter Disc-Fassung
+füllt Stufe 20 aus eBay nach. IGDB belegt Disc-Fassungen nur positiv, über Amazon-Artikelnummern;
+die 249 teilen sich in 208 mit Händlereinträgen ohne Medium, 13 mit Disc auf einer anderen
+PS-Plattform, 13 nur auf fremden Plattformen, 11 nur digital und 3 ohne Eintrag. Die damals vorgemerkte Option „14b" (MobyGames)
 ist erledigt: Sie ist seit 2024 kostenpflichtig, und für „nur digital" gibt es
 ohnehin keine verlässliche Quelle, weil die Eigenschaft nicht stabil ist
 ([lehren.md](../lehren.md)).

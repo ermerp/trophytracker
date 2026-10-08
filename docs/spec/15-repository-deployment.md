@@ -121,10 +121,10 @@ Der Wechsel in einen Bezahlmodus ist damit immer eine **ausdrückliche Handlung*
 (Upgrade-Klick), kein Nebeneffekt von Nutzung. Für eine Single-User-Anwendung
 sind die Grenzen ohnehin um Größenordnungen entfernt: ein Sitz von 50, und ein
 Trophäen-Sync erzeugt einige hundert Anfragen, nicht hunderttausend. Die 72 Cron-Aufrufe je
-Nacht (10.1, zwei Einträge von fünf erlaubten) zählen als Anfragen; eine ganze Nacht liest seit
-Migration 0025 rund 54 000 Zeilen. **Gemessen am 01.10.2026: 116 040 gelesene und 799
-geschriebene Zeilen in 24 Stunden** – hier stand bis dahin „rund 80 000 im Leerlauf", eine Zahl
-aus der Zeit vor der Fensteraufteilung. Von den beiden Grenzen ist die **Schreibgrenze** die
+Nacht (10.1, zwei Einträge von fünf erlaubten) zählen als Anfragen. **Gemessen am 01.10.2026:
+116 040 gelesene und 799 geschriebene Zeilen in 24 Stunden**; die Rechnung aus den Einzelkosten
+liegt heute bei rund 80 800 im Leerlauf (10.1), und die 24-Stunden-Messung liegt vor der
+Erweiterung des Wartungsfensters. Von den beiden Grenzen ist die **Schreibgrenze** die
 engere, sobald eine Stufe den Bestand einmal durchschreibt: Stufe 19b käme mit 18 355 Trophäen
 auf rund 37 000 Schreibungen (7.7).
 

@@ -69,10 +69,10 @@ Android-Chrome aber nicht — und dort passiert es.
 
 Seit Stufe 18 stößt ein Cron Trigger den Lauf **nachts einmal** von allein an – über dieselben Pfade wie der Knopf „Jetzt abrufen", deshalb protokolliert er ohne Zusatzcode mit Quelle `sync` (8.5). `psn_sync_run.started_by` (`nutzer` / `cron`, Migration 0021) sagt, wer es war. Ein fehlgeschlagener Nachtlauf wird in derselben Nacht nicht wiederholt; bei `status = 'abgelaufen'` legt der Cron gar keinen Lauf an, bis ein neues NPSSO eingetragen ist (10.1).
 
-**Ablage der Zugangsdaten.** Eine frühere Fassung dieses Abschnitts verlangte „Tokens liegen als
-Cloudflare Secret, nicht in D1" und gleichzeitig ein Eingabefeld für ein neues NPSSO. Das schließt
-sich aus: Ein Worker kann keine Cloudflare Secrets schreiben, und Secrets-Store-Bindings sind zur
-Laufzeit ausschließlich lesbar. Ein Eingabefeld braucht aber eine zur Laufzeit beschreibbare Ablage.
+**Ablage der Zugangsdaten.** „Tokens liegen als Cloudflare Secret, nicht in D1" und ein Eingabefeld
+für ein neues NPSSO schließen sich aus: Ein Worker kann keine Cloudflare Secrets schreiben, und
+Secrets-Store-Bindings sind zur Laufzeit ausschließlich lesbar – ein Eingabefeld braucht aber eine
+zur Laufzeit beschreibbare Ablage.
 
 Deshalb: **NPSSO und Refresh-Token liegen AES-GCM-verschlüsselt in `psn_credentials`**, der
 Schlüssel als Cloudflare Secret `NPSSO_KEY`. Damit bleibt die Eingabe über die Oberfläche möglich –

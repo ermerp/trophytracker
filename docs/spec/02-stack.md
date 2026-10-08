@@ -24,30 +24,20 @@ Migrations über Wrangler D1 Migrations. Repository auf GitHub, die Deploy-Actio
 **Hinweis zur Zeilenlese-Grenze:** D1 zählt gelesene Zeilen – gescannte, nicht zurückgegebene – und
 der Free Tier erlaubt 5 Millionen am Tag. Ist die Grenze erreicht, antwortet jede Abfrage aus dem
 Worker bis Mitternacht UTC mit einem Fehler; die Anwendung ist bis dahin unbenutzbar, die Daten
-bleiben unberührt. Das ist am 13.09.2026 eingetreten: Ohne Indizes auf den Fremdschlüsseln war
-jeder Join auf `trophy_progress.release_id` ein Tabellenscan, und die korrelierten Unterabfragen
-der Sammlungsansicht lasen 160 000 Zeilen je Seite (741 000 bei Sortierung nach „zuletzt
-gespielt"). Seit Migration 0008 trägt jeder Fremdschlüssel einen Index; dieselben Abfragen lesen
-2 000 bis 5 000 Zeilen. `test/lesekosten.spec.ts` misst die heißen Abfragen gegen einen Bestand in
-Produktionsgröße und hält Obergrenzen fest. Regel: Wer eine Tabelle mit `REFERENCES` anlegt, legt
-den Index in derselben Migration an; korrelierte Unterabfragen laufen nur über indizierte Spalten.
+bleiben unberührt. **Jede Spalte, über die in einer Schleife gesucht wird, braucht einen Index** – Fremdschlüssel oder
+nicht. Beide Hälften dieser Regel sind teuer gelernt worden (13.09.2026 und 28.09.2026,
+Migrationen 0008, 0011 und 0025, Hergang in [lehren.md](../lehren.md)); die Zahlen dahinter: ohne
+Index auf den Fremdschlüsseln las die Sammlungsansicht **160 000 Zeilen je Seite** und
+**741 000** sortiert nach „zuletzt gespielt", heute 2 000 bis 5 000; ohne Index auf
+`game.sort_title` las der Titelabgleich **480 Zeilen je Aufruf** statt vier, 303-mal je Nacht und
+730-mal je Kaufliste-Durchlauf, was `rows_read_24h` ohne jeden Import auf **1 335 628** brachte.
+Kein `UNIQUE` auf `sort_title`: Zwei Spiele dürfen denselben Schlüssel tragen, das ist der
+mehrdeutige Fall aus 7.2.
 
-**Die Regel war zu eng gefasst (Befund vom 28.09.2026, Migration 0025).** Sie nannte nur
-Fremdschlüssel. `game.sort_title` ist keiner, sondern eine **Nachschlagespalte** – und die Abfrage,
-mit der jeder Titelabgleich sein Release sucht (`releasesNachSchluessel` mit
-`WHERE g.sort_title = ?`), war deshalb ein Tabellenscan: gemessen **480 gelesene Zeilen je
-einzelnem Abgleich** bei 477 Spielen. Für sich harmlos, in der Schleife nicht – der
-Spielzeit-Schritt ruft sie 303-mal je Nacht auf (rund **145 000** Zeilen), die Kaufliste 730-mal je
-Durchlauf (rund **350 000**). Deshalb stand `rows_read_24h` am 28.09.2026 bei **1 335 628** ohne
-jeden Import, über der Million, die ein Signal sein soll. Die erweiterte Regel: **Jede Spalte, über
-die in einer Schleife gesucht wird, braucht einen Index** – Fremdschlüssel oder nicht. Gemessen mit
-Index 4 Zeilen, ohne 432 (lokale D1, 430 Spiele). Kein `UNIQUE`: Zwei Spiele dürfen denselben
-Schlüssel tragen, das ist der mehrdeutige Fall aus 7.2.
-
-**Und der Wächter hatte ein blindes Feld:** `test/lesekosten.spec.ts` misst die Leseansichten, aber
-nie die **Schreibschritte des Syncs**. Ein Schritt, der je Eintrag eine Abfrage macht, gehört
-genauso dort hinein wie eine Listenansicht; seit 0025 steht der Titelabgleich als eigene Messung
-darin.
+`test/lesekosten.spec.ts` misst die heißen Abfragen gegen einen Bestand in Produktionsgröße und
+hält Obergrenzen fest – **Leseansichten und Schreibschritte**. Ein Sync-Schritt, der je Eintrag
+eine Abfrage macht, gehört genauso dort hinein wie eine Listenansicht. Korrelierte Unterabfragen
+laufen nur über indizierte Spalten.
 Migration 0011 holt den in 0008 übersehenen Index auf `plan_entry.game_id` nach (bis Stufe 10 hing
 kein Eintrag an einem Spiel) und legt einen auf `game.igdb_id` an; die Wunschliste liest bei 300
 Wünschen rund 900 Zeilen, die Absichten eines Spiels sechs. `v_backlog_kandidaten` liest bei 470

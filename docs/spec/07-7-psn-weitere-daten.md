@@ -24,7 +24,7 @@ Die Anbindung nutzt bis Stufe 18 nur einen einzigen Endpunkt: die Trophäenliste
 | Gespielte Titel (Spielzeit) | 379 | **284** | 0 | 95 |
 | Käufe und PS+-Titel | 730 | **247** | 0 | 483 |
 
-Der Abgleich lief über `titelSchluessel` gegen `game.sort_title` – dieselbe Normalisierung wie überall (7.2). **Seine Lesekosten waren bis zum 28.09.2026 die teuerste Stelle der Nacht:** je Eintrag eine Abfrage, und ohne Index auf `sort_title` je Abfrage ein Tabellenscan über alle Spiele (gemessen 480 Zeilen). 303 Abgleiche je Nacht und 730 je Kaufliste-Durchlauf – Migration 0025 macht daraus vier Zeilen je Abgleich (Abschnitt 2). Die 95 gespielten Titel ohne Treffer sind überwiegend gar keine Spiele (Streaming-Apps) oder Titel, deren Eintrag in der Sammlung eine Jahreszahl zur Unterscheidung trägt („Red Dead Redemption (2010)"); die 483 Käufe ohne Treffer sind PS+-Katalogtitel, die nie gespielt wurden. **Beides bleibt bewusst liegen** – Entscheidung des Nutzers vom 21.09.2026: Der Abgleich ergänzt nur, was die Sammlung schon kennt, und importiert nichts.
+Der Abgleich läuft über `titelSchluessel` gegen `game.sort_title` – dieselbe Normalisierung wie überall (7.2) – und braucht dort einen Index, sonst ist jede der 303 bzw. 730 Abfragen je Nacht ein Tabellenscan über alle Spiele (Migration 0025, Abschnitt 2). Die 95 gespielten Titel ohne Treffer sind überwiegend gar keine Spiele (Streaming-Apps) oder Titel, deren Eintrag in der Sammlung eine Jahreszahl zur Unterscheidung trägt („Red Dead Redemption (2010)"); die 483 Käufe ohne Treffer sind PS+-Katalogtitel, die nie gespielt wurden. **Beides bleibt bewusst liegen** – Entscheidung des Nutzers vom 21.09.2026: Der Abgleich ergänzt nur, was die Sammlung schon kennt, und importiert nichts.
 
 `subscriptionService` beantwortet die Frage „gekauft oder über PS+" **im Datensatz selbst**: gemessen 117 `NONE` (gekauft) gegenüber 613 `PS_PLUS`. Damit ist keine Heuristik nötig; das Feld entspricht `digital_entitlement.quelle` (`kauf` / `plus`).
 
@@ -40,14 +40,12 @@ Die Sammlung umfasst 18 355 definierte Trophäen in 431 Listen (11 168 erspielt,
 
 Das ist für D1 unkritisch **beim Speichern** – die Datenbank liegt bei **1,79 MB** von 5 GB (gemessen am 01.10.2026; hier standen bis dahin 2,6 MB, der Aufräumschritt aus 18d hat die Rohablage abgetragen). Kritisch wäre nur das Lesen, und das bleibt es nicht: Mit einem Index auf der Trophäenliste sind die Trophäen *eines* Spiels rund 43 gelesene Zeilen, nicht 18 000 (Abschnitt 2).
 
-**Die Grenze, die hier wirklich eng wird, ist eine andere – und sie stand bis zum 01.10.2026 in
-dieser Rechnung gar nicht:** D1 erlaubt **100 000 geschriebene Zeilen am Tag** (15.4), und
-Index-Schreibungen zählen mit. 18 355 Trophäen in einer Tabelle mit einem Index sind rund
-**37 000 Schreibungen** – an einem Tag, an dem sonst 799 anfallen (gemessen am 01.10.2026). Eine
-Erstbefüllung am Stück verbraucht gut ein Drittel des Tagesbudgets, ein zweiter Durchlauf am
-selben Tag zwei Drittel, ein dritter nähme der Anwendung das Schreiben. Die Lesegrenze war beim
-Entwurf dieser Stufe die naheliegende Sorge; sie ist mit 116 040 von 5 Mio. gelesenen Zeilen am
-01.10.2026 die harmlosere von beiden.
+**Die engere Grenze ist nicht das Lesen, sondern das Schreiben:** D1 erlaubt **100 000
+geschriebene Zeilen am Tag** (15.4), und Index-Schreibungen zählen mit. 18 355 Trophäen in einer
+Tabelle mit einem Index sind rund **37 000 Schreibungen** – an einem Tag, an dem sonst 799 anfallen
+(gemessen am 01.10.2026). Eine Erstbefüllung am Stück verbraucht gut ein Drittel des Tagesbudgets,
+ein zweiter Durchlauf am selben Tag zwei Drittel, ein dritter nähme der Anwendung das Schreiben. Die
+Lesegrenze war beim
 
 Beim Holen gilt derselbe Entwurf wie beim Sync (Entscheidung des Nutzers vom 21.09.2026, in drei
 Punkten entschieden am 01.10.2026):
@@ -79,14 +77,11 @@ Punkten entschieden am 01.10.2026):
    Datenbank und gingen über `d1 export` in jede wöchentliche Sicherung (14.2). Genau dafür
    musste 18d einen Aufräumschritt bauen.
 
-**Die freie Kapazität ist seit dem 01.10.2026 gemessen, nicht gerechnet.** Im PSN-Fenster bleiben
-nach Sync und Spielzeit **23 der 36 Aufrufe** frei – `cron_verlauf` zeigt für die Nächte zum 30.09.
-und zum 01.10. beide Male `nichts ×23` nach dreizehn Aufrufen Arbeit. An einer Kaufliste-Nacht
-sind es 8, also gut 146 je Woche. Bei einer Liste je Aufruf braucht die Erstbefüllung damit **rund
-drei Wochen**; der Portionsknopf ist der Weg, sie nicht abwarten zu müssen. Die Rechnung vom
-27.09.2026 nannte dieselbe Zahl – sie unterstellte aber eine Liste je Aufruf und hätte sich mit
-Rohablage auf sechs Wochen verdoppelt, weil Abruf und Auswertung dann zwei Aufrufe sind. Mit
-Entscheidung 3 ist das erledigt.
+**Die freie Kapazität ist gemessen, nicht gerechnet.** Im PSN-Fenster bleiben nach Sync und
+Spielzeit **23 der 36 Aufrufe** frei – `cron_verlauf` zeigt für die Nächte zum 30.09.2026 und zum
+01.10.2026 beide Male `nichts ×23` nach dreizehn Aufrufen Arbeit. An einer Kaufliste-Nacht sind es
+8, also gut 146 je Woche. Bei einer Liste je Aufruf bräuchte die Erstbefüllung damit **rund drei
+Wochen**; der Portionsknopf ist der Weg, sie nicht abwarten zu müssen.
 
 **Gruppen und Trophäen-Level gehören in dieselbe Stufe** (Entscheidung des Nutzers vom
 01.10.2026). Die Gruppe ist die Voraussetzung dafür, dass „was fehlt mir noch zu Platin" bei
@@ -122,16 +117,22 @@ Das Ersetzen greift **nur nach einem vollständigen Lauf**: Alle Seiten geholt, 
 **Ein erkannter Kauf erledigt einen Wunsch nur bei „nur digital"** (Entscheidung des Nutzers vom 22.09.2026). Wer von Hand Besitz erfasst, weiß, was er getan hat – dort schließt der Eintrag Kauf und Wunsch ohne Rückfrage (Abschnitt 5). Meldet dagegen PSN einen digitalen Kauf, könnte der Wunsch der **Disc** gelten. Deshalb greift das Erledigen ausschließlich, wenn `release.physical_release_status = 'nein'` ist; bei `ja` oder `unbekannt` bleibt der Eintrag offen. Beim Bau am 22.09.2026 traf das auf **kein einziges** Release zu – die Regel wird erst mit einem von Hand gesetzten `nein` wirksam – automatische Quellen setzen nie `nein` (Abschnitt 3) –, und genau deshalb steht sie schon jetzt fest.
 
 **Rhythmus:** Die ganze Kaufliste sind rund 15 Abfragen (730 Einträge à 50). Das ist so wenig, dass es keinen eigenen Zeitplan braucht – ein Durchlauf je Woche im Cron genügt und kostet den Bruchteil einer Nacht. Ein monatlicher Sonderweg wäre mehr Verwaltung als Gewinn und würde den Katalogwechsel trotzdem nur zufällig treffen.
-**Der Ausfall in der Produktion und was ihn verdeckte (27.09.2026, Stufe 18e).** Von diesem Weg stand in der Produktion **nichts**: `digital_entitlement` hielt 8 Zeilen, alle `herkunft='nutzer'`, und `game_event` keine einzige `berechtigung_angelegt` mit Quelle `sync`. Gemessen wurde an diesem Tag gegen das echte Konto, rein lesend: Die Kaufliste **antwortet einwandfrei** – Status 200, 730 Einträge, 50 je Seite, `subscriptionService` mit `PS_PLUS`/`NONE`, `platform` als `PS4`/`PS5`. Auch der Zugang und der Titelabgleich sind in Ordnung; die Spielzeit desselben Nachtschritts steht mit 303 Zeilen und 236 Zuordnungen in der Datenbank, und `test/besitz-sync.spec.ts` prüft den Schreibpfad gegen die lokale D1.
-
-Was den Fehler vier Tage verdeckte, ist dagegen belegt: **Erfolg und Fehler schrieben dieselbe Marke.** `{"fertigAm":"2026-09-23"}` entstand sowohl nach einem vollständigen Durchlauf als auch nach einer gescheiterten Seite. Weil eine erfolgreiche erste Seite `{start:50,…}` hinterlassen hätte (50 von 730), kann die Marke nur heißen: Der erste Durchlauf überhaupt scheiterte auf seiner **ersten** Seite – und legte den Schritt für sieben Tage still. Der Verlauf (damals fünf, heute zwanzig Einträge) war längst überschrieben, und die Meldung hätte ohnehin nur „Der PSN-Abruf ist fehlgeschlagen." gelautet.
-
-Stufe 18e behebt beides: `{fehlerAm}` statt `{fertigAm}`, der Statuscode geht in die Meldung, und `POST /api/sync/besitz` stößt den Durchlauf von Hand an.
+**Der Ausfall in der Produktion und was ihn verdeckte (27.09.2026, Stufe 18e).** Von diesem Weg
+stand in der Produktion **nichts**: `digital_entitlement` hielt 8 Zeilen, alle `herkunft='nutzer'`.
+Gemessen am 27.09.2026 gegen das echte Konto, rein lesend: Die Kaufliste **antwortet einwandfrei** –
+Status 200, 730 Einträge, 50 je Seite, `subscriptionService` mit `PS_PLUS`/`NONE`. Auch Zugang und
+Titelabgleich sind in Ordnung. **Was den Fehler vier Tage verdeckte, ist belegt: Erfolg und Fehler
+schrieben dieselbe Marke** – `{"fertigAm":"2026-09-23"}` entstand nach einem vollständigen Durchlauf
+wie nach einer gescheiterten Seite, und weil eine erfolgreiche erste Seite `{start:50,…}`
+hinterlassen hätte, kann die Marke nur heißen: Der erste Durchlauf überhaupt scheiterte auf seiner
+**ersten** Seite und legte den Schritt für sieben Tage still. Stufe 18e behebt das mit `{fehlerAm}`
+statt `{fertigAm}`, dem Statuscode in der Meldung und `POST /api/sync/besitz` für den Handlauf.
+**Warum die Nacht zum 23.09.2026 scheiterte, bleibt unerklärt** – die Egress-Vermutung ist widerlegt
+(derselbe Worker erreicht denselben Endpunkt), und der Verlauf war längst überschrieben. Die Stufe
+hat nicht die Ursache behoben, sondern die Blindheit ([lehren.md](../lehren.md)).
 
 **Gemessen auf Release-Ebene am 22.09.2026, beim Bau – das ist die Erwartung, nicht das Ergebnis:** Von den 379 gelieferten Einträgen sind 303 Spiele – die übrigen 76 sind Streaming-Apps und Unbestimmtes und fallen heraus, bevor etwas gespeichert wird. **236 davon bekommen ein Release**, 67 bleiben ohne Zuordnung liegen (die Plattform muss mitpassen, deshalb weniger als die 284 des Titelabgleichs). Die Kaufliste ergibt **56 Kauf- und 160 PS+-Einträge**; 514 Einträge betreffen Spiele, die die Sammlung nicht kennt.
 
-**Der Handlauf am 27.09.2026 ist durchgelaufen** und hat die Frage zur Hälfte beantwortet: **54 `kauf`- und 156 `plus`-Einträge** (erwartet waren 56 und 160; die Differenz ist der Katalogwechsel) mit `herkunft='psn'`, 210 Zeilen `berechtigung_angelegt` mit Quelle `sync`, Stand `{"fertigAm":"2026-09-27"}` (erwartet waren 56 und 160 – die Differenz ist der Katalogwechsel seit dem 21.09.). Kein `plan_entry` wurde dabei erledigt, wie vorhergesagt: Kein Release steht auf `physical_release_status = 'nein'`.
-
-**Damit ist die naheliegende Vermutung widerlegt.** Vermutet worden war, `web.np.playstation.com` (Kaufliste) weise Cloudflares Egress-Adressen ab, während `m.np.playstation.com` (Trophäen, Spielzeit) antwortet. Der Handlauf lief aus demselben Worker gegen denselben Endpunkt und kam durch. **Was am 23.09.2026 scheiterte, bleibt für diese eine Nacht unerklärt** – der Verlauf ist längst überschrieben, und die Meldung hätte ohnehin nichts gesagt. Genau deshalb steht das hier so: Die Stufe hat nicht die Ursache behoben, sondern die Blindheit; ein zweites Mal wäre am nächsten Morgen an `{fehlerAm}` und am Statuscode abzulesen (Lehre aus 18b).
+**Der Handlauf am 27.09.2026 ist durchgelaufen** und hat die Frage zur Hälfte beantwortet: **54 `kauf`- und 156 `plus`-Einträge** (erwartet waren 56 und 160; die Differenz ist der Katalogwechsel) mit `herkunft='psn'`, 210 Zeilen `berechtigung_angelegt` mit Quelle `sync`, Stand `{"fertigAm":"2026-09-27"}`. Kein `plan_entry` wurde dabei erledigt, wie vorhergesagt: Kein Release steht auf `physical_release_status = 'nein'`.
 
 - Jeder dieser Schreiber protokolliert mit Quelle `sync` (8.5).

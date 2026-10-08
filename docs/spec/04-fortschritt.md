@@ -53,9 +53,9 @@ CREATE INDEX idx_trophy_release   ON trophy_progress(release_id);   -- Migration
 Prüflisten-Eintrag „100 % → 78 %" sagen kann. Aus den gestempelten Zählern lässt er sich nicht
 rekonstruieren: Sony gewichtet nach Trophäenwert, bei **243 von 431** Listen der Sammlung weicht
 `progress_pct` vom Verhältnis erspielt/definiert ab. Jeder Stempel schreibt alle vier `reviewed_*`-
-Felder zugleich; die Migration hat den Bestand mit dem damals aktuellen Wert nachgefüllt.
+Felder zugleich.
 
-Migration 0005 ergänzt `matched_at` und `matched_source` (`automatisch` | `manuell`). Sie halten
+`matched_at` und `matched_source` (`automatisch` | `manuell`, Migration 0005) halten
 fest, wann und wodurch `release_id` gesetzt wurde — die Grundlage dafür, eine Zuordnung später
 nachvollziehen und gezielt korrigieren zu können (7.2).
 

@@ -2,7 +2,7 @@
 
 ## 6. Datenmodell – Marktdaten (Use Case 7)
 
-Zunächst inaktiv. Die Tabellen werden in Stufe 1 mit angelegt und bleiben leer, damit die spätere Anbindung ein reiner Import-Job ist und kein Schema-Umbau.
+Die Tabellen sind seit Stufe 1 angelegt und wurden mit Stufe 20 (Gebrauchtpreise) und Stufe 21 (Store-Preise) gefüllt – das Schema stand also vor der Anbindung, die Anbindung war kein Schema-Umbau.
 
 ```sql
 -- Das günstigste geprüfte Gebrauchtangebot je Release (Stufe 20, Migration 0028).

@@ -104,14 +104,15 @@ weg.
 
 **Die Auffrisch-Last kommt in Schüben, nicht gleichmäßig.** „Ein bis zwei Aufrufe für IGDB" gilt
 im Beharrungszustand, nicht nach einem Rückstand: Am 24.09.2026 trugen **368 der 477 verknüpften
-Spiele denselben Stempel vom 22.09.2026** – die Nacht, die den Rückstand aus 18b in einem Zug
-abarbeitete. Sie werden deshalb alle in derselben Nacht wieder fällig, ab der zum 29.09.2026, und
-brauchen bei fünfzig je Aufruf **acht** Aufrufe. In einem Fenster trug die Nacht das nicht mehr:
-elf Sync, zwei Spielzeit, fünfzehn Kaufliste, acht IGDB und einer Aufräumen sind **37 von 36**.
-Genau diese Rechnung ist der Grund für die Aufteilung in Stufe 18e – seither stehen 28 Aufrufe im
-PSN-Fenster (von 36) und 9 in der Wartung (von 36, seit Stufe 20e `*/5 6-8`). **Wer dem Cron einen
-Schritt hinzufügt, rechnet gegen die Hälfte, in die er gehört**, nicht mehr gegen 36 für alles
-zusammen.
+Spiele denselben Stempel** – eine Nacht hatte den Rückstand aus 18b in einem Zug abgearbeitet, und
+sie werden deshalb alle in derselben Nacht wieder fällig und brauchen bei fünfzig je Aufruf
+**acht** Aufrufe.
+
+**Eine volle Nacht sind 31 Aufrufe:** elf Sync, zwei Spielzeit, fünfzehn Kaufliste, ein bis acht
+IGDB und einer Aufräumen. In **einem** Fenster wären das **37 von 36** – genau die Rechnung, die zur
+Aufteilung in Stufe 18e geführt hat. Seither stehen 28 Aufrufe im PSN-Fenster (von 36) und 9 in der
+Wartung (von 36, seit Stufe 20e `*/5 6-8`). **Wer dem Cron einen Schritt hinzufügt, rechnet gegen
+die Hälfte, in die er gehört**, nicht gegen 36 für alles zusammen.
 
 Die Lesekosten sinken mit der Aufteilung, weil jedes Fenster nur noch seine eigenen Abfragen
 liest: Die drei teuren (erschienene Titel, IGDB-Auswahl, Disc-Auswahl) laufen nicht mehr im
@@ -119,90 +120,17 @@ PSN-Fenster mit. Gemessen in `test/lesekosten.spec.ts` bei 430 Listen: ein Leerl
 liest **15** Zeilen (`psn_sync_run`) plus vier für die Store-Auswahl seit 21b, einer in der Wartung
 **2 226** – weit unter dem Tagesbudget von fünf Millionen.
 
-**Hier stand bis zum 28.09.2026 „die Nacht damit rund 54 000“ – das war falsch, und zwar auf eine
-lehrreiche Weise.** Die Zahl war die Summe der **Leerlauf**-Aufrufe, damals 15 × 36 + 2 226 × 24;
-seit Stufe 20e hat auch die Wartung 36 Aufrufe, gerechnet sind es also rund **80 800** (19 × 36 +
-2 226 × 36) – gerechnet aus den gemessenen Einzelkosten, nicht frisch über 24 Stunden gemessen. Die
-*arbeitenden* Aufrufe waren nie gemessen. Der Spielzeit-Schritt allein las über einen Titelabgleich
-ohne Index rund **145 000** Zeilen je Nacht, die wöchentliche Kaufliste rund **350 000**
-(Abschnitt 2, Migration 0025). Eine Nacht lag damit bei gut **200 000** statt 54 000 – nie
-gefährlich, aber zusammen mit einer Arbeitssitzung ergab das am 28.09.2026 **1 335 628** gelesene
-Zeilen in 24 Stunden. Seit dem Index sind es je Abgleich vier statt 480. Die Lehre ist die
-allgemeinere: **Eine Messung, die nur den Leerlauf zählt, beschreibt nicht die Nacht** – und eine
-Summe aus zwei gemessenen Zahlen sieht genauso belegt aus wie eine gemessene.
+**Der Leerlauf einer Nacht summiert sich auf rund 80 800 Zeilen** (19 × 36 + 2 226 × 36) –
+gerechnet aus den gemessenen Einzelkosten, nicht frisch über 24 Stunden gemessen; die letzte
+24-Stunden-Messung (116 040 Zeilen am 01.10.2026, 15.4) liegt vor der Erweiterung des
+Wartungsfensters.
 
-**Sichtbarkeit.** Der Cron ist der erste Schreiber ohne Zuschauer. Jeder Aufruf schreibt eine
-Log-Zeile mit Zahlen und festen Texten (`cronLogzeile`; die Meldungen sind schon bereinigt,
-`test/keine-lecks.spec.ts` prüft sie) **und hinterlässt dieselbe Zeile mit Zeitstempel in
-`app_setting` unter `cron_verlauf`, wo die letzten zwanzig stehen** (Stufe 18b; zunächst nur der
-letzte, seit dem 22.09.2026 fünf – Migration 0022 –, seit Stufe 18d zwanzig mit Verdichtung).
-Das ist kein Gespeichertes, das sich berechnen ließe: Worker-Logs sind nur live einsehbar, und am
-Morgen des 21.09.2026 war deshalb nicht zu klären, warum der IGDB-Schritt zwei Nächte lang nichts
-tat. Auch ein Absturz wird vermerkt („cron: abgebrochen").
+**Der Leerlauf ist aber nicht die Nacht.** Die *arbeitenden* Aufrufe kosten mehr: Der
+Spielzeit-Schritt allein las über einen Titelabgleich ohne Index rund **145 000** Zeilen je Nacht,
+die wöchentliche Kaufliste rund **350 000** (Abschnitt 2, Migration 0025); eine Nacht lag damit bei
+gut **200 000**, und zusammen mit einer Arbeitssitzung ergab das am 28.09.2026 **1 335 628**
+gelesene Zeilen in 24 Stunden. Seit dem Index sind es je Abgleich vier statt 480. **Eine Messung,
+die nur den Leerlauf zählt, beschreibt nicht die Nacht** ([lehren.md](../lehren.md)).
 
-**Was die Zeile nennt, muss sich bewegen.** Eine Fortschrittszahl, die in jedem Aufruf gleich
-lautet, ist keine. Die Sync-Zeile nennt deshalb in der Abrufphase den `offset`, in der
-Normalisierung die noch **offenen Rohantworten** (`offen=4 3 2 1 0`): Der Offset ist dort fest 0,
-und in der Nacht zum 24.09.2026 standen fünf gleichlautende Zeilen
-„`sync=laufend/normalisierung offset=0`" im Verlauf – eine Seite, die immer wieder an derselben
-Stelle scheitert, hätte genau dieselben geschrieben. Den Übergangsaufruf schreibt noch der Abruf,
-er nennt weiter seinen Offset. Die Spielzeit-Zeile nennt alle drei Stufen ihres Trichters
-(`geholt` von Sony, `geschrieben` nach dem Plattformfilter, `zugeordnet` mit Release): Ohne die
-mittlere las sich „`geholt=200 zugeordnet=117`" als 83 nicht zugeordnete Spiele, während es die
-Streaming-Apps waren. Beides sind Befunde vom 24.09.2026 aus der Analyse der Nachtläufe, beides
-ohne Migration – dieselbe Blindheit wie in 18b und 18d, nur eine Phase weiter innen.
-
-**Warum zwanzig und warum verdichtet.** Der letzte Aufruf einer Nacht lautet fast immer „nichts",
-weil die Arbeit dann getan ist – in der Nacht zum 22.09.2026 hatte der Cron 368 Spiele
-aufgefrischt, und genau diese eine Zeile war gespeichert. Fünf Einträge lösten das nicht: Das
-Fenster hat 36 Aufrufe, die Arbeit ist gegen 04:10 getan, danach folgen gut zwanzig leere. Am
-Morgen des 23.09.2026 standen deshalb fünf Zeilen „nichts" von 05:36 bis 05:56 im Verlauf,
-während Sync, Spielzeit, Besitz und 49 aufgefrischte Spiele unsichtbar blieben – dieselbe
-Blindheit wie vorher, nur eine Stufe später. Seit Stufe 18d werden **aufeinanderfolgende Aufrufe
-ohne jede Wirkung zu einer Zeile zusammengezogen** („`2026-09-23 04:16–05:56 cron: nichts ×21`"),
-und der Verlauf fasst zwanzig Einträge. Das reichte nicht: Eine volle Nacht sind elf Sync-Aufrufe,
-zwei für die Spielzeit, **fünfzehn für die Kaufliste**, ein bis acht für IGDB, einer fürs Aufräumen
-und eine verdichtete Leerlaufzeile – **einunddreißig**. Hier stand bis zum 24.09.2026 „siebzehn",
-mit je einem Aufruf für Spielzeit und Besitz gerechnet, während 7.7 für dieselben Schritte zwei und
-fünfzehn nennt. Zwanzig Einträge fassen eine Kaufliste-Nacht damit nicht; aufgehoben würden die
-jüngsten zwanzig, also fielen die ältesten elf weg – und das sind die Sync-Zeilen.
-
-**Seit Stufe 18e wird deshalb jede gleichartige Arbeit verdichtet**, nicht nur der Leerlauf
-(Entscheidung des Nutzers vom 27.09.2026 – die Wahl stand zwischen mehr Einträgen, Verdichtung
-gleichartiger Aufrufe und einer Zeile je Schritt). Eine Nacht sind damit **sieben** Zeilen –
-gemessen, nicht geschätzt: `test/cron.spec.ts` spielt sechzig Aufrufe durch (36 PSN, 24 Wartung)
-und hält fest, dass die Sync-Zeilen darin stehen bleiben:
-
-```
-2026-09-28 06:00–07:55 cron: nichts ×24 bereich=wartung
-2026-09-28 04:05–05:55 cron: nichts ×23 bereich=psn
-2026-09-28 04:00 cron: besitz bereich=psn besitz=erfolg geholt=0 kauf=0 plus=0 entfallen=0
-2026-09-28 03:55 cron: spielzeit bereich=psn spielzeit=erfolg geholt=0 geschrieben=0 zugeordnet=0
-2026-09-28 03:50 cron: sync bereich=psn sync=erfolg/normalisierung offen=0 titel=431 eingereiht=0
-2026-09-28 03:25–03:45 cron: sync ×5 bereich=psn sync=laufend/normalisierung offen=4→0
-2026-09-28 03:00–03:20 cron: sync ×5 bereich=psn sync=laufend/abruf→laufend/normalisierung offset=100→400
-```
-
-Das Beispiel stammt aus der Nacht zum 28.09.2026, als die Wartung noch `*/5 6-7` lief – daher
-`×24`. **Offener Befund:** `test/cron.spec.ts` und `test/lesekosten.spec.ts` rechnen beide weiter
-mit **24** Wartungsaufrufen, obwohl Stufe 20e das Fenster auf `*/5 6-8` und damit auf 36 erweitert
-hat (`wrangler.jsonc`). Die Tests prüfen damit zwölf Aufrufe zu wenig; die Grenzwerte halten
-trotzdem. Zu beheben in der finalen Stufe „Refactoring" ([16.2](16-2-offene-stufen.md)).
-
-Drei Regeln halten die Zeile ehrlich: Verdichtet wird **nur bei gleicher Feldfolge** – wechselt der
-Sync von `offset` auf `offen`, beginnt eine neue Zeile, genau dort, wo auch ein Mensch trennen
-würde. Ein Wert, der sich bewegt, steht als **Spanne** `a→b`, ein gleichbleibender einfach so: Eine
-Seite, die dreimal an derselben Stelle scheitert, zeigt `×3` bei unverändertem Offset – die Lehre
-aus 18d, „was die Zeile nennt, muss sich bewegen". Und ein **Fehler ist kein Leerlauf**: Jede Zeile
-mit `meldung=` wird nie verdichtet, und über die **Fenstergrenze** hinweg auch
-nicht – sonst stünde da „`nichts ×36 bereich=psn→wartung`", und von keinem der
-beiden Fenster wäre zu sehen, ob es gelaufen ist. Das Lebenszeichen bleibt trotzdem stehen, weil die verdichtete
-Zeile die Zeit des jüngsten Aufrufs trägt. `erschienen=0` steht nicht mehr in jeder Zeile – die
-Zahl gibt es im PSN-Fenster gar nicht, und der Zeitstempel ist das Lebenszeichen. `GET /api/sync/status` nennt `letzterAutomatischerLauf`; die
-Einstellungen zeigen unter „Automatik" Fenster und letzten Nachtlauf, die Sync-Zeile nennt „von
-Hand" oder „automatisch". Der Hinweisblock meldet einen abgelaufenen Zugang („der nächtliche
-Abruf steht still") und einen fehlgeschlagenen Nachtlauf jünger als 24 Stunden (13).
-
-Lokal: `npx wrangler dev --test-scheduled`, dann `curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"`
-für das PSN-Fenster, `?cron=*/5+6-8+*+*+*` für die Wartung, ohne Parameter für beides
-– der Pfad `/cdn-cgi/` läuft am Asset-Fallback vorbei, `/__scheduled` nicht.
+**Wie eine Nacht nachträglich lesbar ist** – `cron_verlauf`, die Verdichtung und der
+örtliche Aufruf: [10-1-cron-verlauf.md](10-1-cron-verlauf.md).

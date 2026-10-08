@@ -1271,7 +1271,7 @@ Bis Stufe 17d legte der Scanner solche Codes als **offene Scans** ab, und ein
 nächtlicher Job holte dazu Titel. Das ist abgeschafft: Ein Barcode ohne seine
 Hülle war später nicht mehr zuzuordnen – die Liste erzeugte Arbeit statt Nutzen
 (Entscheidung vom 21.09.2026, Begründung in
-[Abschnitt 9.3](docs/spec/09-barcode.md#93-warum-es-keine-offenen-scans-mehr-gibt-stufe-17d)).
+[Abschnitt 9.3](docs/spec/09-3-ean-quellen.md#93-es-gibt-keine-offenen-scans-stufe-17d)).
 
 Heute gilt: Der Titel kommt sofort (eBay, sonst upcitemdb), das Spiel lässt sich
 im selben Fenster anlegen. Wer gerade nicht zuordnen will, drückt
