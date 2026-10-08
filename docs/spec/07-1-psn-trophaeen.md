@@ -91,6 +91,13 @@ Secret-Lösung scheitert.
 Der normale Sync fasst das NPSSO damit gar nicht an – schonend gegenüber einer inoffiziellen
 Schnittstelle.
 
+**Offen, als Vermutung notiert:** Sonys `refresh_token_expires_in` zählt möglicherweise auf einen
+festen Punkt herunter, statt beim Erneuern neu zu beginnen. Beobachtet am 01.10.2026: `refresh_expires_at`
+stand auf dem 09.10.2026 – exakt zehn Tage nach der NPSSO-Eintragung –, und zwei Nachtläufe haben den
+Token erneuert, ohne dass sich der Zeitpunkt bewegte. Die prüfbare Vorhersage war, dass der Lauf am
+09.10.2026 auf Schritt 2 zurückfällt, eine neue Kette bekommt und weiterläuft. **Belegt ist das nicht** –
+wer es prüft, sieht in `psn_zugang` und in der Verlaufszeile des Nachtlaufs nach.
+
 **Weder NPSSO noch Refresh- oder Access Token dürfen jemals in einer API-Antwort oder im Log
 erscheinen, auch nicht gekürzt.** Durchgesetzt wird das über eine Hülle `Geheimnis`, deren
 `toString()` und `toJSON()` redigieren; der Klartext ist nur über einen ausdrücklichen Aufruf
