@@ -494,6 +494,7 @@ export const gameRoutes = new Hono<AppEnv>()
 								imPlusKatalog: r.store_plus === 1,
 								produktName: r.store_produkt_name,
 								produktId: r.psn_product_id,
+								conceptId: detail.spiel.store_concept_id,
 							},
 				trophaeen:
 					r.np_communication_id === null

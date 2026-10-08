@@ -201,6 +201,10 @@ export class StoreRepository {
 	 * Arbeitsliste mit unerledigbaren Posten wird nach zwei Wochen ignoriert;
 	 * das war die Lehre aus den offenen Scans (Stufe 17d).
 	 *
+	 * `regional` gehoert aus demselben Grund nicht hinein: Der deutsche Store
+	 * fuehrt den Titel nicht, ein anderer schon - da ist keine Adresse
+	 * einzufuegen (21f).
+	 *
 	 * **PS3 und Vita bleiben auch dann draussen, wenn an ihnen noch ein altes
 	 * `ohne_id` steht.** Der Befund stammt dann aus einem Lauf vor 21d und
 	 * wird beim naechsten korrigiert - bis dahin stuenden vier unloesbare

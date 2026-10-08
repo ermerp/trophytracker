@@ -19,6 +19,7 @@ import {
   marktBefund,
   produktNameAbweichend,
   storeBefundText,
+  storeUrlAndereRegion,
   zeitpunkt,
   type Bewertung,
   type DiscFassung,
@@ -136,6 +137,7 @@ type Release = {
     imPlusKatalog: boolean
     produktName: string | null
     produktId: string | null
+    conceptId: string | null
   } | null
   trophaeen: Trophaeen | null
   bewertung: Bewertung | null
@@ -765,7 +767,24 @@ function ReleaseKarte({
               }}
             />
           ) : (
-            storeBefundText(r.store.befund, r.store.geprueftAm, r.store.imPlusKatalog)
+            <>
+              {storeBefundText(r.store.befund, r.store.geprueftAm, r.store.imPlusKatalog)}
+              {/* Nur beim regionalen Fall: Der Titel existiert, bloß nicht
+                  hier. Der Preis dort steht in Pfund und bleibt deshalb weg
+                  – gezeigt wird der Weg, nicht eine zweite Währung. */}
+              {r.store.befund === 'regional' && storeUrlAndereRegion(r.store.conceptId) !== null && (
+                <>
+                  <br />
+                  <a
+                    href={storeUrlAndereRegion(r.store.conceptId) ?? undefined}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    im britischen Store ansehen
+                  </a>
+                </>
+              )}
+            </>
           )}
         </p>
       )}

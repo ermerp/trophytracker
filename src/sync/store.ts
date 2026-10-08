@@ -200,7 +200,16 @@ async function portion(
 				// beide `unlesbar` - und *Dying Light* versuchte es fuenf
 				// Naechte lang vergeblich, weil IGDBs Concept 201129 im
 				// deutschen Store mit 302 antwortet.
-				if (stand === "fehlt") befund = "ohne_id";
+				if (stand === "fehlt") {
+					// Gibt es die Seite anderswo? Eine Anfrage, nur hier (21f).
+					// Antwortet ein anderer Store mit Produkten, liegt es an der
+					// REGION und nicht am Spiel - und dann gibt es nichts
+					// nachzutragen, also gehoert es auch nicht in die
+					// Nachpflegeliste. Ohne diese Unterscheidung stuende dort
+					// ein Posten, an dem niemand arbeiten kann.
+					befund = (await store.kenntAndereRegion(ziel.conceptId)) ? "regional" : "ohne_id";
+					anfragen++;
+				}
 				else if (stand === null) befund = "unlesbar";
 				else if (stand.ohneProdukt) befund = "delistet";
 				else {

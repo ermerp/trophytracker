@@ -33,7 +33,22 @@ import {
  * nicht - Sony beantwortet ihn mit der vollen Seite (gemessen).
  */
 
-const BASIS = "https://store.playstation.com/de-de";
+const BASIS = "https://store.playstation.com";
+
+/** Unser Store. Preise und Verfuegbarkeit haengen an der Sprachfassung. */
+const LOKAL = "de-de";
+
+/**
+ * Die Gegenprobe fuer "gibt es hier nicht" (Nachtrag 21f).
+ *
+ * Antwortet eine Concept-Seite in `de-de` mit 302, in `en-gb` aber mit
+ * Produkten, dann fuehrt der deutsche Store den Titel nicht - ein anderer
+ * schon. Gemessen am 08.10.2026 an *Dying Light*: 302 in de-de und at-de,
+ * 200 mit drei Produkten in en-gb, en-us und fr-fr. Das ist eine Aussage
+ * ueber die REGION, nicht ueber das Spiel, und fuer jemanden, der
+ * ungeschnittene Fassungen sucht, die interessantere.
+ */
+const GEGENPROBE = "en-gb";
 
 /**
  * Nach so vielen gelesenen Bytes gibt der Abruf auf.
@@ -73,10 +88,11 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 	async function ersterBlock<T>(
 		pfad: string,
 		pruefen: (daten: unknown) => T | null,
+		sprache: string = LOKAL,
 	): Promise<{ art: "treffer"; wert: T } | { art: "fehlt" } | { art: "unlesbar" }> {
 		let antwort: Response;
 		try {
-			antwort = await hole(`${BASIS}${pfad}`, {
+			antwort = await hole(`${BASIS}/${sprache}${pfad}`, {
 				// Kein `redirect: "follow"`: Eine unbekannte Produkt-Id leitet auf
 				// die Startseite oder eine Fehlerseite um, und die wollen wir
 				// nicht herunterladen, nur erkennen.
@@ -122,19 +138,16 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 		}
 	}
 
-	return {
-		/**
-		 * Die Fassungen eines Spiels. Die Concept-Id kommt aus IGDB
-		 * (`external_games`, Quelle 36) und ist regionsunabhaengig - nur die
-		 * Sprache in der Adresse entscheidet ueber Preis und Waehrung.
-		 *
-		 * `ohneProdukt` trennt zwei Faelle, die beide "kein Preis" bedeuten
-		 * und trotzdem verschieden sind: ein delisteter Titel (`products`
-		 * leer, die Seite schreibt "Angekuendigt") und eine Seite, die wir
-		 * nicht lesen konnten. Nur der erste ist eine Aussage ueber das Spiel.
-		 */
-		async holeConcept(conceptId: string): Promise<ConceptStand | "fehlt" | null> {
-			const aus = await ersterBlock(`/concept/${encodeURIComponent(conceptId)}`, (daten) => {
+	/**
+	 * Die Fassungen eines Spiels in einer Sprachfassung des Store.
+	 *
+	 * Eigene Funktion statt Methode, damit `kenntAndereRegion` sie ohne `this`
+	 * benutzen kann - der Client wird an einer Stelle destrukturiert.
+	 */
+	async function conceptIn(conceptId: string, sprache: string): Promise<ConceptStand | "fehlt" | null> {
+		const aus = await ersterBlock(
+			`/concept/${encodeURIComponent(conceptId)}`,
+			(daten) => {
 				const block = istConceptBlock(daten);
 				if (!block) return null;
 				const produkte = produkteAus(block.cache, block.concept);
@@ -143,8 +156,37 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 					standardId: standardProdukt(block.concept),
 					ohneProdukt: produkte.length === 0,
 				} satisfies ConceptStand;
-			});
-			return aus.art === "treffer" ? aus.wert : aus.art === "fehlt" ? "fehlt" : null;
+			},
+			sprache,
+		);
+		return aus.art === "treffer" ? aus.wert : aus.art === "fehlt" ? "fehlt" : null;
+	}
+
+	return {
+		/**
+		 * Die Fassungen eines Spiels. Die Concept-Id kommt aus IGDB
+		 * (`external_games`, Quelle 36) und ist regionsunabhaengig - nur die
+		 * Sprache in der Adresse entscheidet ueber Preis und Verfuegbarkeit.
+		 *
+		 * Drei Ausgaenge, die drei verschiedene Dinge heissen: ein Stand mit
+		 * Produkten, `"fehlt"` fuer eine Seite, die es nicht gibt (302), und
+		 * `null` fuer eine, die wir nicht lesen konnten. Nur das mittlere ist
+		 * endgueltig, nur das letzte verdient einen zweiten Versuch (21e).
+		 */
+		async holeConcept(conceptId: string): Promise<ConceptStand | "fehlt" | null> {
+			return conceptIn(conceptId, LOKAL);
+		},
+
+		/**
+		 * Kennt ein anderer Store diesen Titel? EINE Anfrage, und nur fuer den
+		 * seltenen Fall, dass die deutsche Seite gar nicht existiert (21f).
+		 *
+		 * Beantwortet die Frage "liegt es an der Region oder am Spiel?" - bei
+		 * *Dying Light* lag es an der Region.
+		 */
+		async kenntAndereRegion(conceptId: string): Promise<boolean> {
+			const aus = await conceptIn(conceptId, GEGENPROBE);
+			return aus !== "fehlt" && aus !== null && !aus.ohneProdukt;
 		},
 
 		/**

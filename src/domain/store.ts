@@ -41,7 +41,16 @@ export type StoreErgebnis = StorePreis & {
  * - "IGDB kennt das Spiel nicht" und "Sony verkauft es nicht mehr" sind
  * verschiedene Befunde, und nur der zweite ist eine Aussage ueber den Titel.
  */
-export const STORE_BEFUNDE = ["preis", "ohne_id", "delistet", "ohne_kauf", "fremd", "unlesbar", "plattform"] as const;
+export const STORE_BEFUNDE = [
+	"preis",
+	"ohne_id",
+	"delistet",
+	"ohne_kauf",
+	"fremd",
+	"unlesbar",
+	"plattform",
+	"regional",
+] as const;
 export type StoreBefund = (typeof STORE_BEFUNDE)[number];
 
 /**
