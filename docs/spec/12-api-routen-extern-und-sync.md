@@ -29,7 +29,7 @@ PATCH  /api/imports/wishlist/:id/zeilen/:zeileId            Body: { titel } – 
 POST   /api/imports/wishlist/:id/zeilen/:zeileId/aufteilen  Body: { titel: string[] } – Sammelzeile trennen
 
 GET    /api/export/:liste.csv         sammlung|wunsch|todo|backlog|kauf|luecken|trophaeen; Semikolon und BOM (14.4)
-GET    /api/export/backup.json        Vollsicherung: die 15 Fachtabellen, ohne Rohantworten und Zugangsdaten (14.2)
+GET    /api/export/backup.json        Vollsicherung: die 19 Fachtabellen, ohne Rohantworten und Zugangsdaten (14.2)
 GET    /api/backup/status             { letzterErfolgAm, letzterCommit, tageSeit }
 POST   /api/backup/vermerk            Body: { zeitpunkt (ISO), commit? } – die Backup-Action meldet ihren Lauf
 
@@ -47,17 +47,16 @@ GET    /api/purchase-candidates       { anzahl, luecken, wuensche, kandidaten[] 
 GET    /api/backlog-candidates        { anzahl, abgelehnt, kandidaten[] } aus v_backlog_kandidaten (5.4)
 
 POST   /api/scan                      Body: { ean } – 400 bei Form oder Prüfziffer; speichert seit Stufe 17d nichts (scans: 0); { ean, treffer: mapping|angebot|keiner, release? { releaseId, spielId, titel, plattform, bild, exemplare },
-                                      angebot? { titel, plattform }, scans } – ohne Mapping wird der Code in unresolved_scan festgehalten (Stufe 17, 9.2)
-DELETE /api/scan/:ean/vorschlag        „Titel ist falsch": Vorschlag weg, Code bleibt offen und geprüft (die Quelle lieferte zu einem Sony-Code Zahnpasta); 404 ohne Vorschlag
+                                      angebot? { titel, plattform }, scans }
 GET    /api/scan/:ean/online          eBay live (Stufe 17c): { ean, quelle, angebote, titel, eindeutig, zielSpielId, kandidaten[] };
-                                      vermerkt den Titel am offenen Scan, ordnet nichts zu; 503 ohne Zugangsdaten oder bei erschöpftem Kontingent
+                                      liest nur, schreibt nichts und ordnet nichts zu; 503 ohne Zugangsdaten oder bei erschöpftem Kontingent
 POST   /api/scan/:ean/assign          Body: { releaseId } oder { spielId, plattform } (Release entsteht bei Bedarf) – legt Disc mit EAN und Mapping an, erledigt Kauf/Wunsch;
                                       201 wie POST /api/physical-copies plus ean, spiel { spielId, titel, plattform }; ein vorhandenes Mapping wird überschrieben
 DELETE /api/scan/:ean                 Mapping lösen (Rückgängig: erst DELETE /api/physical-copies/:id); die Disc bleibt; 404 ohne Mapping
 
 GET    /api/releases/:id/prices?channel=
-                                      (`POST /api/imports/feed` ist mit dem AWIN-Feed entfallen, 7.3)
-POST   /api/sync/markt                eine Portion Gebrauchtpreise (10 Releases, Stufe 20); 503 ohne
+                                      (`POST /api/imports/feed` ist mit dem verworfenen Händlerfeed entfallen, 7.3)
+POST   /api/sync/markt                eine Portion Gebrauchtpreise (20 Releases, Stufe 20); 503 ohne
                                       eBay-Zugangsdaten, 502 bei Ratenlimit; { status, geprueft, mitPreis,
                                       discBelegt, ohneAngebot, nochOffen, weiter }
 GET    /api/sync/markt                { zugangsdaten, mitPreis, geprueft, ohneAngebot, offen }
@@ -74,7 +73,7 @@ GET    /api/sync/store/offen          { eintraege } – die Faelle, bei denen Na
 POST   /api/sync                      ein Schritt; ein neuer Lauf trägt started_by = 'nutzer'
 POST   /api/sync/besitz               eine Seite der Kaufliste, von Hand (Stufe 18e); überspringt die Sieben-Tage-Frist, nicht die Blätterung;
                                       Antwort wie der Cron-Schritt ({ status, geholt, kauf, plus, entfallen, erledigt, weiter, meldung }), 502 bei Fehler
-POST   /api/sync/trophaeen            eine Portion Einzeltrophäen (14 Listen, Stufe 19b); höchstens ein
+POST   /api/sync/trophaeen            eine Portion Einzeltrophäen (vier Listen, Stufe 19b); höchstens ein
                                       vollständiger Durchlauf je Tag – wegen der Schreibgrenze, nicht wegen PSN
 GET    /api/sync/trophaeen            wie weit die Erstbefüllung ist, dazu das Trophäen-Level
 GET    /api/feed                      Dashboard-Feed aus ZWEI Quellen (Stufe 19b): game_event und die

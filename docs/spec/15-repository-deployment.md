@@ -29,7 +29,7 @@ Dazu Cloudflare Secrets am Worker (nicht GitHub): `NPSSO_KEY` (Stufe 2) sowie `I
 
 **Was im öffentlichen Repo unbedenklich ist:** `account_id` und `database_id` in der Wrangler-Konfiguration. Das sind Bezeichner, keine Zugangsdaten – ohne authentifizierten Kontozugriff nutzlos.
 
-**Was dort niemals hingehört:** NPSSO und PSN-Refresh-Token, IGDB/Twitch-Zugangsdaten, AWIN-Feed-URLs (die enthalten die Publisher-ID), das API-Bearer-Token, der Cloudflare-API-Token. Alles davon liegt als Cloudflare Secret beziehungsweise GitHub Secret. `.dev.vars`, `.wrangler/` und `*.sql` gehören in die `.gitignore` – letzteres mit der Ausnahme `!migrations/*.sql`. Ohne diese Ausnahme würden die Migrationen mit ignoriert, und die Deploy-Action liefe gegen ein leeres Verzeichnis.
+**Was dort niemals hingehört:** NPSSO und PSN-Refresh-Token, IGDB/Twitch-Zugangsdaten, eBay-Cert-ID und Application-Token, das API-Bearer-Token, der Cloudflare-API-Token. Alles davon liegt als Cloudflare Secret beziehungsweise GitHub Secret. `.dev.vars`, `.wrangler/` und `*.sql` gehören in die `.gitignore` – letzteres mit der Ausnahme `!migrations/*.sql`. Ohne diese Ausnahme würden die Migrationen mit ignoriert, und die Deploy-Action liefe gegen ein leeres Verzeichnis.
 
 ### 15.2 Automatisches Deployment
 
@@ -120,7 +120,7 @@ hinein, sondern blocken hart.
 Der Wechsel in einen Bezahlmodus ist damit immer eine **ausdrückliche Handlung**
 (Upgrade-Klick), kein Nebeneffekt von Nutzung. Für eine Single-User-Anwendung
 sind die Grenzen ohnehin um Größenordnungen entfernt: ein Sitz von 50, und ein
-Trophäen-Sync erzeugt einige hundert Anfragen, nicht hunderttausend. Die 60 Cron-Aufrufe je
+Trophäen-Sync erzeugt einige hundert Anfragen, nicht hunderttausend. Die 72 Cron-Aufrufe je
 Nacht (10.1, zwei Einträge von fünf erlaubten) zählen als Anfragen; eine ganze Nacht liest seit
 Migration 0025 rund 54 000 Zeilen. **Gemessen am 01.10.2026: 116 040 gelesene und 799
 geschriebene Zeilen in 24 Stunden** – hier stand bis dahin „rund 80 000 im Leerlauf", eine Zahl

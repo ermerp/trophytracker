@@ -33,7 +33,7 @@ eine reine Funktion über Repositories und Clients, gegen die lokale D1 getestet
 **Ein Aufruf, eine schwere Arbeit.** Die 10-ms-CPU-Grenze gilt auch für Cron-Aufrufe (Abschnitt 2);
 ein Aufruf schafft eine Seite holen (≈ 3 ms) oder eine Seite auswerten (5–7 ms), nicht beides.
 Deshalb tut jeder Aufruf in dieser Reihenfolge genau **eines** und hört dann auf. Die Schritte 1
-bis 7 gehören dem PSN-Fenster, 8 bis 11 der Wartung:
+bis 8 gehören dem PSN-Fenster, 9 bis 15 der Wartung:
 
 1. **Hängengebliebene Läufe abbrechen.** Ein Lauf mit `status = 'laufend'`, dessen letzter
    Fortschritt älter als **drei Stunden** ist (die Länge des Fensters), wird auf `fehler` gesetzt
@@ -65,7 +65,7 @@ bis 7 gehören dem PSN-Fenster, 8 bis 11 der Wartung:
    weder ein Cron-Lauf gestartet noch irgendein Lauf erfolgreich war: einen Lauf mit
    `started_by = 'cron'` starten. Daraus folgt: **ein Cron-Versuch je Nacht**, auch nach `fehler`
    (keine Wiederholung, Entscheidung des Nutzers vom 19.09.2026); ein erfolgreicher Handabruf vom
-   selben Tag macht den Nachtlauf überflüssig; ein fehlgeschlagener oder in 1b abgebrochener
+   selben Tag macht den Nachtlauf überflüssig; ein fehlgeschlagener oder in Schritt 1 abgebrochener
    Handlauf blockiert ihn nicht. Bei `abgelaufen` entsteht gar kein Lauf – sonst stünde jede Nacht
    eine Fehlerzeile in der Historie; ein neues NPSSO setzt `ok`, dann geht es von allein weiter.
 4. Sonst, mit PSN-Zugang: **Spielzeit** (7.7) – eine Seite je Aufruf, täglich; der Stand steht als `datum:offset[:versuche]` in `app_setting`, ein abgeschlossener Tag ruht. **Ein Abrufsfehler beendet den Tag seit Stufe 18f nicht mehr:** Der Offset bleibt stehen, der nächste Aufruf holt fünf Minuten später dieselbe Seite, nach drei Anläufen ruht der Tag (`FEHLVERSUCHE_HOECHSTENS`, dieselbe Zahl wie beim Sync). **Anlass war die Nacht zum 01.10.2026:** Die erste Seite kam durch, die zweite bekam `403`, und weil jeder Fehler damals `-1` schrieb, blieben **179 von 379 Titeln** ohne frische Spielzeit, während 20 Aufrufe des Fensters leer liefen – derselbe Fall, den 18e für den Sync gelöst hatte, nur an einem Schritt, der älter ist als diese Einsicht. Die Verlaufszeile nennt `versuch=n/3` wie beim Sync.
@@ -89,7 +89,7 @@ bis 7 gehören dem PSN-Fenster, 8 bis 11 der Wartung:
    **Fremdanfragen** geschnitten, nicht nach Dauer: Beim ersten Mal kostet ein Release bis zu vier
    (Concept plus bis zu drei Produktseiten), danach genau eine; der Schritt zählt mit und hört bei
    vierzig auf. Der Stand steht je Zeile in `release.store_geprueft_am` – auch hier gibt es den
-   Fehlerfall aus 18e nicht. Ein Aufruf liest 540 Zeilen.
+   Fehlerfall aus 18e nicht. Ein Aufruf liest **791 Zeilen** (7.4).
 9. **Wartung, immer zuerst:** `erschieneneFreigeben` (8.4) – nur SQL, kein CPU, protokolliert selbst; im PSN-Fenster passiert das nicht.
 10. Sonst, mit IGDB-Zugang: `igdbAuffrischSchritt` mit Frist sieben Tage (7.6), wenn etwas fällig ist. Spiele, die IGDB nicht zurückgibt, werden trotzdem gestempelt – sonst wählt der nächste Aufruf dieselben und der Schritt dreht sich im Kreis (Befund vom 21.09.2026). Die Schritte 10 und 11 laufen in `try/catch`: Eine Ausnahme darf nicht den ganzen Aufruf reißen.
 11. Sonst `igdbPhysischSchritt` (30-Tage-Frist in `DISC_OFFEN`), wenn etwas fällig ist.
@@ -109,16 +109,20 @@ abarbeitete. Sie werden deshalb alle in derselben Nacht wieder fällig, ab der z
 brauchen bei fünfzig je Aufruf **acht** Aufrufe. In einem Fenster trug die Nacht das nicht mehr:
 elf Sync, zwei Spielzeit, fünfzehn Kaufliste, acht IGDB und einer Aufräumen sind **37 von 36**.
 Genau diese Rechnung ist der Grund für die Aufteilung in Stufe 18e – seither stehen 28 Aufrufe im
-PSN-Fenster (von 36) und 9 in der Wartung (von 24). **Wer dem Cron einen Schritt hinzufügt (Stufe
-20, 19b), rechnet gegen die Hälfte, in die er gehört**, nicht mehr gegen 36 für alles zusammen.
+PSN-Fenster (von 36) und 9 in der Wartung (von 36, seit Stufe 20e `*/5 6-8`). **Wer dem Cron einen
+Schritt hinzufügt, rechnet gegen die Hälfte, in die er gehört**, nicht mehr gegen 36 für alles
+zusammen.
 
-Die Lesekosten sinken mit der Aufteilung, weil die drei teuren Abfragen (erschienene Titel,
-IGDB-Auswahl, Disc-Auswahl) nur noch 24-mal statt 36-mal laufen. Gemessen in
-`test/lesekosten.spec.ts` bei 430 Listen: ein Leerlauf im PSN-Fenster liest **15** Zeilen (nur
-`psn_sync_run`), einer in der Wartung **2 226**, weit unter dem Tagesbudget von fünf Millionen.
+Die Lesekosten sinken mit der Aufteilung, weil jedes Fenster nur noch seine eigenen Abfragen
+liest: Die drei teuren (erschienene Titel, IGDB-Auswahl, Disc-Auswahl) laufen nicht mehr im
+PSN-Fenster mit. Gemessen in `test/lesekosten.spec.ts` bei 430 Listen: ein Leerlauf im PSN-Fenster
+liest **15** Zeilen (`psn_sync_run`) plus vier für die Store-Auswahl seit 21b, einer in der Wartung
+**2 226** – weit unter dem Tagesbudget von fünf Millionen.
 
 **Hier stand bis zum 28.09.2026 „die Nacht damit rund 54 000“ – das war falsch, und zwar auf eine
-lehrreiche Weise.** Die Zahl ist die Summe der **Leerlauf**-Aufrufe (15 × 36 + 2 226 × 24); die
+lehrreiche Weise.** Die Zahl war die Summe der **Leerlauf**-Aufrufe, damals 15 × 36 + 2 226 × 24;
+seit Stufe 20e hat auch die Wartung 36 Aufrufe, gerechnet sind es also rund **80 800** (19 × 36 +
+2 226 × 36) – gerechnet aus den gemessenen Einzelkosten, nicht frisch über 24 Stunden gemessen. Die
 *arbeitenden* Aufrufe waren nie gemessen. Der Spielzeit-Schritt allein las über einen Titelabgleich
 ohne Index rund **145 000** Zeilen je Nacht, die wöchentliche Kaufliste rund **350 000**
 (Abschnitt 2, Migration 0025). Eine Nacht lag damit bei gut **200 000** statt 54 000 – nie
@@ -178,6 +182,12 @@ und hält fest, dass die Sync-Zeilen darin stehen bleiben:
 2026-09-28 03:25–03:45 cron: sync ×5 bereich=psn sync=laufend/normalisierung offen=4→0
 2026-09-28 03:00–03:20 cron: sync ×5 bereich=psn sync=laufend/abruf→laufend/normalisierung offset=100→400
 ```
+
+Das Beispiel stammt aus der Nacht zum 28.09.2026, als die Wartung noch `*/5 6-7` lief – daher
+`×24`. **Offener Befund:** `test/cron.spec.ts` und `test/lesekosten.spec.ts` rechnen beide weiter
+mit **24** Wartungsaufrufen, obwohl Stufe 20e das Fenster auf `*/5 6-8` und damit auf 36 erweitert
+hat (`wrangler.jsonc`). Die Tests prüfen damit zwölf Aufrufe zu wenig; die Grenzwerte halten
+trotzdem. Zu beheben in der finalen Stufe „Refactoring" ([16.2](16-2-offene-stufen.md)).
 
 Drei Regeln halten die Zeile ehrlich: Verdichtet wird **nur bei gleicher Feldfolge** – wechselt der
 Sync von `offset` auf `offen`, beginnt eine neue Zeile, genau dort, wo auch ein Mensch trennen

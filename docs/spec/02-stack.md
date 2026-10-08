@@ -14,8 +14,8 @@
 | PSN-Trophäen | `psn-api` (npm) oder direkte fetch-Aufrufe |
 | Metadaten/Cover | IGDB API (kostenlos über Twitch-Client-ID) |
 | Titel zu Barcodes | eBay Browse API (Developer-Account), upcitemdb als Rückfall – beide live im Worker (9.2) |
-| Gebrauchtpreise *(optional)* | rebuy / medimops Produktdatenfeed über AWIN |
-| Store-Preise *(optional)* | PSN Store Katalog-Endpunkte |
+| Gebrauchtpreise | eBay Browse API, Händler- und Marktsuche je Release (7.3) |
+| Store-Preise | gerenderte Produktseite des PSN Store, als Strom gelesen (7.4) |
 
 Migrations über Wrangler D1 Migrations. Repository auf GitHub, die Deploy-Action baut und deployt bei Push auf `main`.
 

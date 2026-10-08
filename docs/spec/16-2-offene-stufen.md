@@ -2,6 +2,24 @@
 
 ## 16. Umsetzungsreihenfolge – offene Stufen
 
+### Offen aus Stufe 20
+
+Zwei Nachträge sind angelegt und **bewusst vertagt**, weil in beiden eine
+Entscheidung des Nutzers fehlt. Sie stehen hier vollständig, damit die offenen
+Punkte beim Planen vorliegen.
+
+#### 20f – Preisverlauf als Diagramm
+
+**Preisverlauf als Diagramm** (wie Idealo oder SteamDB), zwei getrennte Reihen je Release — die ruhige Händlerkurve und die springende Marktkurve; mit Stufe 21 käme der Store-Preis als dritter Kanal dazu, der nach Abschnitt 6 **nie** mit dem Gebrauchtpreis verrechnet werden darf
+
+**Offen, und bewusst vertagt:** Am 02.10.2026 gab es genau *einen* Punkt je Release. Noch zu entscheiden sind (a) **wie verdichtet wird** — Vorschlag war „Tageswerte 90 Tage, danach ein Wert je Woche", entschieden ist nichts —, (b) der daraus folgende **Speicherverbrauch** und (c) die **Auslastung des Wartungsfensters**, die mit dem täglichen Takt von ~8 auf ~33 von 36 Aufrufen steigt. Alle drei bespricht der Nutzer, bevor gebaut wird
+
+#### 20g – Preisalarm und Angebotskorrektur
+
+**Preisalarm und Angebotskorrektur** – die Glocke in der Kopfzeile meldet, und ein falsches Angebot lässt sich zurücknehmen
+
+**Offen, und bewusst vertagt:** Die Regel ist nicht entschieden. Zur Wahl stehen **relativ** („meldet, wenn der Preis 20 % unter seinem 30-Tage-Median liegt", greift ohne Zutun für alle offenen Absichten) und **absolut** („melde mir X unter 15 €", präziser, verlangt je Eintrag eine Eingabe); beides nebeneinander wäre möglich. Setzt 20f voraus, weil eine Grundlinie gebraucht wird. **Dazu gehört „ungültiges Angebot“** (Idee des Nutzers vom 02.10.2026): Wer einen Preis anklickt und sieht, dass das Angebot nicht taugt – sein Beispiel war *11-11: Memories Retold* für 6,98 €, im Angebotstitel „Nur Disc“ –, soll es verwerfen können: Das Angebot wird dauerhaft übergangen, sein Punkt aus dem Verlauf gestrichen und das nächstgünstigere sofort nachgeladen. Das ist dieselbe Regel wie bei Zuordnungen – was halb- oder vollautomatisch entsteht, muss sich zurücknehmen lassen (CLAUDE.md) –, nur bisher nicht für Preise. Technisch trägt es: eBay liefert zu jedem Angebot eine Kennung (`legacyItemId`), die auch in der URL steckt. Gebraucht werden eine Spalte dafür an `market_offer`, eine Liste verworfener Kennungen je Release, ein Filter in `guenstigstesGeprueft` und eine Route, die verwirft und sofort neu abruft. **Zu entscheiden, wenn die Stufe geplant wird:** ob `price_snapshot` die Kennung mitführt – nur dann lässt sich genau der Punkt löschen, der von diesem Angebot stammt, statt „alle Punkte mit diesem Preis“; und ob die Korrektur **vor** 20f gehört, weil jedes Falschangebot bis dahin weitere falsche Punkte in den Verlauf schreibt, den 20f dann zeichnet
+
 ### Die finalen Stufen
 
 Fünf Stufen zum Abschluss, **bewusst ohne Nummer** (Entscheidung des Nutzers vom 02.10.2026): Es ist offen, ob weitere Funktionsstufen dazukommen. Sie laufen in dieser Reihenfolge, nachdem die Funktionsstufen abgeschlossen sind; die Nummern 1–5 gelten nur innerhalb dieses Blocks.

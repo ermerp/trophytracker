@@ -127,7 +127,8 @@ dieser Schritt war älter und hatte die Einsicht nie bekommen.
 
 **01.10.2026 – vier Anläufe am Portionsknopf, und die naheliegende Vermutung war
 falsch.** Der Knopf für die Einzeltrophäen hielt beim ersten echten Durchlauf
-bei **126 von 431** Listen an, beim zweiten nach zwei Portionen bei **154**. Beide
+bei **126 von 431** Listen an – 5 464 Trophäen waren gespeichert und alle gestempelt, die Daten
+also in Ordnung –, beim zweiten nach zwei Portionen bei **154**. Beide
 Zahlen passten zu einem Ratenlimit mit noch offenem Fenster – belegt war es
 nicht, und es stand als Vermutung da. Erst weil der dritte Versuch seinen
 **Ausgang aufschrieb** (Zahl, Zeitpunkt und Grund in `app_setting`, das Neuladen
@@ -237,7 +238,8 @@ Ein Klassenname ist eine Zusage über seinen Kontext.
 wirkt.** `main` hatte **zwei** `max-width`-Regeln an derselben Auswahl – eine aus
 Stufe 5, eine aus der Gestaltungslinie von Stufe 19. Geändert wurde die erste,
 gewirkt hat die zweite: Die 80 rem blieben wirkungslos, das Layout blieb bei
-64 rem, und der gemeldete Fehler war am nächsten Tag unverändert da. Gemeldet,
+64 rem – auf einem 1920er Bildschirm hörte die Kopfzeilen-Linie damit nach 1 024 px mitten im
+Fenster auf, und die Glocke hängt an ihrem Ende, und der gemeldete Fehler war am nächsten Tag unverändert da. Gemeldet,
 gebaut, deployt, Hash geprüft – und geprüft war nur der Hash. Jetzt trägt die
 ältere Regel keinen Deckel mehr; bei 1920 px endet die Kopfzeilen-Linie bei
 1 705 und der Feed bei 1 697.
