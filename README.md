@@ -319,6 +319,16 @@ Kaufknopf ohne Preis, und ein ungeschützter Rückfall nahm „Kitchen [demo]" f
 Absicht steht oder keine Disc-Fassung hat – und nicht, was dauerhaft gekauft
 ist. Erster Lauf: 57 von 79 mit Preis, 18 davon im Angebot.
 
+**Nachtrag 21g**: Eine Quelle für „geschnitten oder ungeschnitten" ist geprüft
+und verworfen. schnittberichte.com – die kanonische deutsche Datenbank –
+sperrt `ClaudeBot` und `anthropic-ai` ausdrücklich in der `robots.txt`;
+dieselbe Linie wie bei rebuy. Die USK bewertet nur die eingereichte Fassung
+und sagt nichts über Kürzungen. Was bleibt, ist das Store-Signal aus 21f, und
+über die ganze Sammlung gemessen trägt es genau einen Fall: von 319 Spielen
+mit Store-Id sind 315 im deutschen Store erreichbar, 4 nirgends und eines nur
+anderswo. Die Grenze gehört dazu – das Signal gilt nur für PS4 und PS5, und
+gerade bei PS3 und Vita waren deutsche Schnittfassungen am häufigsten.
+
 **Nachtrag 21f**: Ein `302` auf die Store-Seite kann an der **Region** liegen,
 nicht am Spiel. Der Schritt fragt deshalb einmal im britischen Store nach;
 kennt der den Titel, heißt der Befund `regional`. Gemessen an *Dying Light*:

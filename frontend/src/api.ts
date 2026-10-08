@@ -170,7 +170,7 @@ export const STORE_BEFUNDTEXT: Record<string, string> = {
   ohne_kauf: 'Digital: im Store, aber nicht einzeln käuflich',
   fremd: 'Digital: keine Fassung für diese Plattform im Store',
   plattform: 'Digital: unbekannt – der Web-Store führt diese Plattform nicht mehr',
-  regional: 'Digital: im deutschen Store nicht erhältlich – in anderen Ländern schon',
+  regional: 'Digital: im deutschen Store nicht erhältlich',
   unlesbar: 'Digital: unbekannt',
 }
 
