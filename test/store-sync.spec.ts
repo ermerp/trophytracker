@@ -309,6 +309,35 @@ describe("storeSchritt", () => {
 		expect(await repos().store.zuPruefen(10)).toEqual([]);
 	});
 
+	it("erkennt einen Titel, den nur der deutsche Store nicht fuehrt", async () => {
+		// Dying Light, gemessen am 08.10.2026: 302 in de-de und at-de,
+		// 200 mit drei Produkten in en-gb, en-us und fr-fr. Das ist eine
+		// Aussage ueber die Region, nicht ueber das Spiel - und es gehoert
+		// NICHT in die Nachpflegeliste, weil es nichts einzutragen gibt.
+		await spiel(1, "Dying Light", { conceptId: "201129" });
+		await absicht(1);
+		const { client, aufrufe } = fakeStore([
+			[/en-gb\/concept\//, () => htmlAntwort(conceptSeite("201129", [{ id: "EP1018-CUSA02010_00-DL1BASEPSPLUS000", name: "Dying Light" }]))],
+			[/\/concept\//, () => htmlAntwort("", 302)],
+		]);
+		const e = await storeSchritt(repos(), client, igdbOhne());
+
+		expect(e).toMatchObject({ geprueft: 1, ohneTreffer: 1 });
+		expect(await stand(1)).toMatchObject({ befund: "regional" });
+		expect(await repos().store.ohneZuordnung()).toEqual([]);
+		// Zwei Anfragen: die deutsche Seite und die eine Gegenprobe.
+		expect(aufrufe).toHaveLength(2);
+	});
+
+	it("bleibt bei 'ohne_id', wenn auch der andere Store nichts kennt", async () => {
+		await spiel(1, "Kaputte Concept-Id", { conceptId: "999999" });
+		await absicht(1);
+		const { client } = fakeStore([[/\/concept\//, () => htmlAntwort("", 302)]]);
+		await storeSchritt(repos(), client, igdbOhne());
+		expect(await stand(1)).toMatchObject({ befund: "ohne_id" });
+		expect((await repos().store.ohneZuordnung()).map((x) => x.titel)).toEqual(["Kaputte Concept-Id"]);
+	});
+
 	it("unterscheidet davon eine Seite, die nur gerade nicht lesbar war", async () => {
 		await spiel(1, "Irgendein Spiel", { conceptId: "99" });
 		await absicht(1);

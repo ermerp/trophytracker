@@ -147,6 +147,7 @@ export type SpielDetail = {
 		igdb_synced_at: string | null;
 		release_date: string | null;
 		release_status: "erschienen" | "angekuendigt" | "unbekannt";
+		store_concept_id: string | null;
 		critic_score: number | null;
 		critic_score_count: number | null;
 		critic_source: string | null;
@@ -683,7 +684,11 @@ aeenliste haengt
 			.prepare(
 				"SELECT id, title, sort_title, cover_url, igdb_id, igdb_slug, igdb_matched_at, igdb_matched_source, " +
 					"igdb_checked_at, igdb_declined_at, igdb_synced_at, release_date, release_status, " +
-					"critic_score, critic_score_count, critic_source, critic_updated_at, created_at FROM game WHERE id = ?",
+					"critic_score, critic_score_count, critic_source, critic_updated_at, created_at, " +
+					// Die Concept-Id haengt am SPIEL, nicht am Release (21f): Sie
+					// deckt alle Fassungen ab, und die Release-Abfrage joint `game`
+					// gar nicht.
+					"store_concept_id FROM game WHERE id = ?",
 			)
 			.bind(id)
 			.first<SpielDetail["spiel"]>();

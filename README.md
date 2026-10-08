@@ -319,6 +319,16 @@ Kaufknopf ohne Preis, und ein ungeschützter Rückfall nahm „Kitchen [demo]" f
 Absicht steht oder keine Disc-Fassung hat – und nicht, was dauerhaft gekauft
 ist. Erster Lauf: 57 von 79 mit Preis, 18 davon im Angebot.
 
+**Nachtrag 21f**: Ein `302` auf die Store-Seite kann an der **Region** liegen,
+nicht am Spiel. Der Schritt fragt deshalb einmal im britischen Store nach;
+kennt der den Titel, heißt der Befund `regional`. Gemessen an *Dying Light*:
+302 in de-de und at-de, 200 mit drei Produkten in en-gb, en-us und fr-fr –
+die deutschsprachigen Stores führen ihn nicht. Das ist eine eigene Kategorie,
+weil es nichts nachzutragen gibt (gehört also nicht in die Arbeitsliste) und
+weil es für jemanden, der ungeschnittene Fassungen sucht, die interessante
+Auskunft ist. Das Spieldetail verlinkt die britische Seite – ohne deren Preis,
+der steht in Pfund.
+
 **Nachtrag 21e**: Zwei Befunde aus fünf Nachtläufen. Eine **Weiterleitung ist
 eine Antwort, kein Fehlschlag** – `302` und „Seite nicht lesbar" ergaben
 denselben Befund, und weil der absichtlich nicht stempelt, versuchte der

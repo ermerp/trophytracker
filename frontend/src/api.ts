@@ -170,6 +170,7 @@ export const STORE_BEFUNDTEXT: Record<string, string> = {
   ohne_kauf: 'Digital: im Store, aber nicht einzeln käuflich',
   fremd: 'Digital: keine Fassung für diese Plattform im Store',
   plattform: 'Digital: unbekannt – der Web-Store führt diese Plattform nicht mehr',
+  regional: 'Digital: im deutschen Store nicht erhältlich – in anderen Ländern schon',
   unlesbar: 'Digital: unbekannt',
 }
 
@@ -373,6 +374,15 @@ export type StorePreis = {
 /** Die Adresse des Angebots im Store. Aus der Produkt-Id gebildet, nicht gespeichert. */
 export const storeUrl = (produktId: string | null) =>
   produktId === null ? null : `https://store.playstation.com/de-de/product/${produktId}`
+
+/**
+ * Die Seite im britischen Store – für Titel, die es hier nicht gibt
+ * (Stufe 21f). Aus der Concept-Id gebildet, nicht gespeichert. Der Preis
+ * dort steht in Pfund und wird deshalb **nicht** angezeigt: Zwei Währungen
+ * nebeneinander wären zwei Zahlen, von denen niemand weiß, welche gilt.
+ */
+export const storeUrlAndereRegion = (conceptId: string | null) =>
+  conceptId === null ? null : `https://store.playstation.com/en-gb/concept/${conceptId}`
 
 /**
  * Der Store-Preis als Satz (Stufe 21).
