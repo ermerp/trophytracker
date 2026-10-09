@@ -165,7 +165,7 @@ Kein `env.DB.prepare()` direkt in Route-Handlern – alle Zugriffe laufen über 
 
 - **Eine Stufe aus Abschnitt 16 pro Branch**, Name `stufe-<n>-<kurzbeschreibung>`, Merge nach `main` immer mit `--no-ff` – dann nimmt `git revert -m 1 <merge>` eine ganze Stufe zurück. **Nach dem Merge steht man auf `main`**: Der nächste Branch wird angelegt, *bevor* die erste Datei angefasst wird. Nachträge beginnen bei `b` und gehören in die Spezifikation, nicht nur in den Branch-Namen.
 - **Dokumentation gehört zur Aufgabe.** Fünf Orte, jeder mit genau einer Aufgabe:
-  - [`docs/spec/`](docs/spec/README.md) – der **aktuelle Stand**. Der betroffene Abschnitt wird **ersetzt, nicht ergänzt**: Was heute gilt, steht da, nicht wie es dazu kam. Messwerte und Begründungen, die eine Entscheidung tragen, bleiben. Offene Entscheidungen bleiben ausdrücklich als offen markiert. Keine Datei über rund 15 KB.
+  - [`docs/spec/`](docs/spec/README.md) – der **aktuelle Stand**. Der betroffene Abschnitt wird **ersetzt, nicht ergänzt**: Was heute gilt, steht da, nicht wie es dazu kam. Messwerte und Begründungen, die eine Entscheidung tragen, bleiben – **beim Kürzen wird gegen die alte Fassung geprüft, welche Zahlen und Datumsangaben dabei verschwinden**, und was verschwindet, steht im Bericht. Offene Entscheidungen bleiben ausdrücklich als offen markiert. Keine Datei über rund 15 KB.
   - [`docs/changelog.md`](docs/changelog.md) – **eine Zeile je Stufe oder Nachtrag**, kein Fließtext in einem Dateikopf.
   - [`docs/lehren.md`](docs/lehren.md) – Vorfälle mit Datum und Zahlen, aus denen eine Regel entstanden ist. Die Regel steht hier und verweist dorthin.
   - [`docs/entscheidungen.md`](docs/entscheidungen.md) – Entscheidungen des Nutzers: Datum, Entscheidung, Abschnitt.

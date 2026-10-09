@@ -59,7 +59,7 @@ Ergebnis ist eine **Checkliste im Repository**, damit ein zweiter Durchgang verg
 
 #### 3. Refactoring
 
-Effizienz, Redundanz, Netz- und Fensterauslastung, toter Code. Bekannte Altlasten: `unresolved_scan` trägt 12 Zeilen und ist seit Stufe 17d funktionslos; `/api/imports/feed` ist mit dem AWIN-Feed entfallen.
+Effizienz, Redundanz, Netz- und Fensterauslastung, toter Code. Bekannte Altlasten: `unresolved_scan` trägt 12 Zeilen und ist seit Stufe 17d funktionslos; `/api/imports/feed` ist mit dem AWIN-Feed entfallen; `test/cron.spec.ts` und `test/lesekosten.spec.ts` rechnen das Wartungsfenster mit 24 statt 36 Aufrufen (10.1).
 
 **„Verhält sich noch genauso" braucht Zahlen, nicht nur grüne Tests.** Die Tests prüfen Verhalten, `test/lesekosten.spec.ts` prüft Kosten – und die sind hier der eigentliche Vertrag. Ein Refactoring, das eine Abfrage schöner macht und dabei den Index verliert, ist grün und trotzdem ein Ausfall. Also dieselben Messungen vorher und nachher, Zahl gegen Zahl.
 

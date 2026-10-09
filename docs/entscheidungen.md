@@ -115,8 +115,10 @@ Vier Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
 | 02.10.2026 | Die fünf finalen Stufen bleiben **bewusst ohne Nummer** | [16.2](spec/16-2-offene-stufen.md) |
 | 03.10.2026 | Abnahme-Befund: innerhalb der Treffergruppe gewinnt der **kürzeste** Produktname | [7.4](spec/07-4-store-preise.md) |
 | 08.10.2026 | Das Spieldetail sagt schlicht „im deutschen Store nicht erhältlich" | [7.4](spec/07-4-store-preise.md) |
-| 09.10.2026 | Beim Wunschlisten-Import blockieren **nur offene** Wünsche; ein verworfener zählt nicht als Doppelung (`verworfen` trüge sonst zwei Bedeutungen, und für „nie wieder" gibt es „entfernen") | [8.2](spec/08-2-wunschlisten-import.md) |
 | 08.10.2026 | Er will grundsätzlich die **ungeschnittenen** Fassungen – die Frage ist bei „Die Sammlung finalisieren" vorgemerkt | [7.4](spec/07-4-store-preise.md), [16.2](spec/16-2-offene-stufen.md) |
+| 08.10.2026 | Die Dokumentation wird aufgeteilt, und **keine regelmäßig gelesene Datei geht über rund 15 KB** – Abschnitt 7, 8, 13 und 16 deshalb je Unterabschnitt | [CLAUDE.md](../CLAUDE.md) |
+| 08.10.2026 | Der Versionsabsatz wird auf **eine Zeile je Version** verdichtet – aber erst, nachdem je Eintrag geprüft ist, ob seine Messwerte im zugehörigen Abschnitt stehen | [changelog.md](changelog.md) |
+| 09.10.2026 | Beim Wunschlisten-Import blockieren **nur offene** Wünsche; ein verworfener zählt nicht als Doppelung (`verworfen` trüge sonst zwei Bedeutungen, und für „nie wieder" gibt es „entfernen") | [8.2](spec/08-2-wunschlisten-import.md) |
 
 ## Umkehrungen
 
