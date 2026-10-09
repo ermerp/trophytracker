@@ -1,7 +1,8 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 77 – Dokumentation aufgeteilt. Die Abschnittsnummern sind unverändert;
-die Versionsgeschichte steht in [`../changelog.md`](../changelog.md).*
+*Version 82 – Stufe 20 entschieden, 20h geplant, drei Dateien geteilt. Die
+Abschnittsnummern sind unverändert; die Versionsgeschichte steht in
+[`../changelog.md`](../changelog.md).*
 
 Die Spezifikation ist die maßgebliche Quelle. Jeder Abschnitt beschreibt den
 **aktuellen Stand**. Wie er dazu kam, steht im
@@ -42,7 +43,8 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 9 | [09-barcode.md](09-barcode.md) | Barcode-Erfassung, Auflösungskette |
 | 9.2, 9.3 | [09-3-ean-quellen.md](09-3-ean-quellen.md) | geprüfte und verworfene EAN-Quellen; warum es keine offenen Scans gibt |
 | 10 | [10-sync-protokoll.md](10-sync-protokoll.md) | `psn_sync_run`, Rohablage, zwei Phasen |
-| 10.1 | [10-1-cron.md](10-1-cron.md) | die Automatik: zwei Cron-Fenster, 15 Schritte |
+| 10.1 | [10-1-cron.md](10-1-cron.md) | die Automatik: zwei Cron-Fenster, Auslastung, Lesekosten |
+| 10.1 | [10-1-cron-schritte.md](10-1-cron-schritte.md) | die 15 Schritte in ihrer Reihenfolge |
 | 10.1 | [10-1-cron-verlauf.md](10-1-cron-verlauf.md) | `cron_verlauf`, Verdichtung, örtlicher Aufruf |
 | 11 | [11-sichten.md](11-sichten.md) | die sieben Views |
 | 12 | [12-api-routen.md](12-api-routen.md) | Routen für Sammlung, Besitz, Bewertung, Absichten, Prüfliste; Filter |
@@ -55,7 +57,9 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 15 | [15-repository-deployment.md](15-repository-deployment.md) | zwei Repositories, Deployment, Zugriffsschutz, Kosten |
 | 16 | [16-umsetzung.md](16-umsetzung.md) | Übersicht Umsetzungsreihenfolge |
 | 16 | [16-1-abgeschlossene-stufen.md](16-1-abgeschlossene-stufen.md) | eine Zeile je abgeschlossener Stufe |
-| 16 | [16-2-offene-stufen.md](16-2-offene-stufen.md) | 20f, 20g und die fünf finalen Stufen |
+| 16 | [16-2-offene-stufen.md](16-2-offene-stufen.md) | die offenen Teile von Stufe 20: 20h, 20f, 20g |
+| 16 | [16-3-stufe-20h.md](16-3-stufe-20h.md) | Bauplan der nächsten Teilstufe 20h (Angebotskorrektur) |
+| 16 | [16-4-finale-stufen.md](16-4-finale-stufen.md) | die fünf finalen Stufen |
 | 17 | [17-risiken.md](17-risiken.md) | bekannte Risiken und wie damit umgegangen wird |
 
 Im Code stehen Verweise der Form „Abschnitt 5.3". Die Nummern gelten weiter;

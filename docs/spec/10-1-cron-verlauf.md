@@ -26,9 +26,9 @@ folgen gut zwanzig leere. Mit nur fünf gespeicherten Einträgen stand am Morgen
 „nichts" im Verlauf, während Sync, Spielzeit, Besitz und 49 aufgefrischte Spiele unsichtbar blieben.
 Seit Stufe 18d werden **aufeinanderfolgende Aufrufe ohne jede Wirkung zu einer Zeile
 zusammengezogen** („`2026-09-23 04:16–05:56 cron: nichts ×21`"), und der Verlauf fasst zwanzig
-Einträge. Das allein reichte nicht: Eine Nacht sind 31 Aufrufe (siehe oben), und zwanzig Einträge
-fassen eine Kaufliste-Nacht nicht – aufgehoben würden die jüngsten zwanzig, also fielen die ältesten
-elf weg, und das sind die Sync-Zeilen.
+Einträge. Das allein reichte nicht: Eine Kaufliste-Nacht belegt im PSN-Fenster 28 Aufrufe mit
+Arbeit ([10-1-cron.md](10-1-cron.md)), und zwanzig Einträge fassen sie nicht – aufgehoben würden
+die jüngsten zwanzig, also fielen die ältesten weg, und das sind die Sync-Zeilen.
 
 **Seit Stufe 18e wird deshalb jede gleichartige Arbeit verdichtet**, nicht nur der Leerlauf
 (Entscheidung des Nutzers vom 27.09.2026 – die Wahl stand zwischen mehr Einträgen, Verdichtung
