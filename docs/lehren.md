@@ -152,6 +152,18 @@ Refresh-Token vor seiner Frist fiel, ist es nicht. Naheliegend, aber unbelegt:
 ein Hängen an der NPSSO-Sitzung, aus der er stammt. Der Cron hat sich dabei genau
 wie entworfen verhalten – ein Versuch, dann 35 stille Aufrufe.
 
+**09.10.2026 – die Fixpunkt-Vermutung zum Refresh-Token ist widerlegt.** Am 01.10.2026 stand
+`refresh_expires_at` auf dem 09.10., exakt zehn Tage nach der NPSSO-Eintragung, und zwei Nachtläufe
+schienen den Zeitpunkt nicht zu bewegen. Daraus entstand die Vermutung, Sonys
+`refresh_token_expires_in` zähle auf einen **festen Punkt** herunter – mit der prüfbaren Vorhersage,
+dass der Lauf am 09.10. auf das NPSSO zurückfällt. Am 09.10.2026 hat der Nachtlauf um 03:05 schlicht
+erneuert, und die Frist steht seither auf dem **19.10.2026 03:05**: zehn Tage ab der Erneuerung, nicht
+ab der Eintragung. Kein Rückfall, keine neue Kette, `ausgang = 'offen'` unverändert (7.1).
+
+Dass die Vermutung sich überhaupt prüfen ließ, liegt daran, dass sie **als Vermutung mit Datum und
+Vorhersage** aufgeschrieben war. Wäre sie als Tatsache in den Abschnitt gewandert, stünde dort heute
+eine falsche Erklärung – und niemand hätte am 09.10. nachgesehen.
+
 **27.09.2026 – die Egress-Vermutung ist widerlegt.** Der Ausfall der Kaufliste
 in 18c war mit „Cloudflares Egress gegen `web.np.playstation.com`" erklärt
 worden. Derselbe Worker erreicht den Host; die Kaufliste antwortet einwandfrei

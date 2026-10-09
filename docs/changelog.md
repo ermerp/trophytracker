@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen**.
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 75 | 09.10.2026 | **Die Fixpunkt-Vermutung zum Refresh-Token ist widerlegt** (gemessen gegen die Produktion): Die Frist rollt mit jeder Erneuerung zehn Tage weiter, der Lauf am 09.10. fiel nicht auf das NPSSO zurück (7.1) |
 | 74 | 08.10.2026 | Dokumentation aufgeteilt: Spezifikation nach `docs/spec/`, Versionsgeschichte hierher, Vorfälle nach `lehren.md`, Entscheidungen nach `entscheidungen.md`; CLAUDE.md auf die Regeln gekürzt |
 | 73 | 08.10.2026 | **Stufe 21 abgenommen** nach sechs Nachträgen b–g; alle Funktionsstufen durch, offen nur 20f, 20g und die fünf finalen Stufen. Schnittfassungen in 16 bei „Die Sammlung finalisieren" vorgemerkt |
 | 72f | 08.10.2026 | Nachtrag 21g: Quelle für „geschnitten oder ungeschnitten" geprüft und verworfen; es bleibt das Store-Signal mit genau einem Fall (7.4) |

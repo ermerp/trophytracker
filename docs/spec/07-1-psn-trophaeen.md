@@ -91,12 +91,21 @@ Secret-Lösung scheitert.
 Der normale Sync fasst das NPSSO damit gar nicht an – schonend gegenüber einer inoffiziellen
 Schnittstelle.
 
-**Offen, als Vermutung notiert:** Sonys `refresh_token_expires_in` zählt möglicherweise auf einen
-festen Punkt herunter, statt beim Erneuern neu zu beginnen. Beobachtet am 01.10.2026: `refresh_expires_at`
-stand auf dem 09.10.2026 – exakt zehn Tage nach der NPSSO-Eintragung –, und zwei Nachtläufe haben den
-Token erneuert, ohne dass sich der Zeitpunkt bewegte. Die prüfbare Vorhersage war, dass der Lauf am
-09.10.2026 auf Schritt 2 zurückfällt, eine neue Kette bekommt und weiterläuft. **Belegt ist das nicht** –
-wer es prüft, sieht in `psn_zugang` und in der Verlaufszeile des Nachtlaufs nach.
+**Der Refresh-Token hält zehn Tage, und die Frist rollt mit jeder Erneuerung weiter** – gemessen am
+09.10.2026 gegen die Produktion. Am 01.10.2026 stand `refresh_expires_at` auf dem 09.10.2026, exakt
+zehn Tage nach der NPSSO-Eintragung vom 29.09., und zwei Nachtläufe hatten den Zeitpunkt scheinbar
+nicht bewegt; daraus war die Vermutung entstanden, Sonys `refresh_token_expires_in` zähle auf einen
+**festen Punkt** herunter, sodass der Lauf am 09.10. auf Schritt 2 zurückfallen müsste.
+
+**Diese Vermutung ist widerlegt.** Am 09.10.2026 um 03:05 hat der Nachtlauf den Token erneuert, und
+`refresh_expires_at` steht seither auf dem **19.10.2026 03:05** – zehn Tage ab der Erneuerung, nicht
+ab der NPSSO-Eintragung. Der Zugang vom 29.09. trägt in `psn_zugang` weiterhin `ausgang = 'offen'`,
+es gibt also keine neue Kette und keinen Rückfall auf das NPSSO. Der Sync hat an diesem Morgen
+regulär 431 Titel geholt.
+
+Praktische Folge: Solange der Nachtlauf läuft, läuft der Refresh-Token mit und das NPSSO wird gar
+nicht angefasst. Bleibt der Lauf länger als zehn Tage aus, fällt der nächste auf Schritt 2 zurück –
+dafür muss das NPSSO noch gültig sein (hier bis 28.11.2026).
 
 **Weder NPSSO noch Refresh- oder Access Token dürfen jemals in einer API-Antwort oder im Log
 erscheinen, auch nicht gekürzt.** Durchgesetzt wird das über eine Hülle `Geheimnis`, deren
