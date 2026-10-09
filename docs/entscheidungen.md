@@ -160,5 +160,21 @@ gestellt, weil sie die Gestalt des Repositories festlegen (13.3, 16.2):
   Ausgabe stattdessen über `WRANGLER_LOG=error` (13 Zeilen). Die ursprüngliche Wahl stand auf
   einer geschätzten Zahl von mir; der Vorfall steht in [`lehren.md`](lehren.md).
 
+**09.10.2026, Nachtrag c zum Refactoring, drei Entscheidungen zur Typprüfung** (15.1, 16.2):
+
+- **Die Env-Geheimnisse stehen von Hand und optional in `src/env.d.ts`**, die Bindings werden als
+  `CfBindings` erzeugt. Zur Wahl stand auch, `.dev.vars.example` in der Action als `--env-file`
+  einzuhängen – kleinerer Eingriff, aber die Prüfung hätte den falschen Typ `NPSSO_KEY: string`
+  bestätigt. Ausschlaggebend war die vor der Frage gemessene Zahl: Derselbe ungeprüfte
+  Secret-Zugriff fällt gegen die optionale Typisierung auf und gegen die erzeugte nicht.
+- **In zwei Schritten**, Mechanik getrennt von den Testkorrekturen – gleiche Endlage, aber die
+  Historie trennt beides.
+- **Ein reparierter Test wird nachgewiesen:** Der Nutzer hat verlangt, den wirkungslosen Leck-Test
+  nach der Korrektur gegen eine absichtlich undichte Stelle laufen zu lassen (er muss rot werden,
+  dann zurückbauen) und zu datieren, seit wann er grün war, ohne zu prüfen. Daraus ist die
+  geschärfte Belegregel in CLAUDE.md geworden; der Vorfall steht in [`lehren.md`](lehren.md).
+  **Ein PR nur zum Vorführen des Riegels war nicht nötig** – die Action zeigt den Schritt als
+  gelaufen, der Fehlschlag ist lokal belegt.
+
 Was in den offenen Stufen 20f und 20g noch zu entscheiden ist, steht dort:
 [16.2](spec/16-2-offene-stufen.md).
