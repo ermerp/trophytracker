@@ -176,5 +176,16 @@ gestellt, weil sie die Gestalt des Repositories festlegen (13.3, 16.2):
   **Ein PR nur zum Vorführen des Riegels war nicht nötig** – die Action zeigt den Schritt als
   gelaufen, der Fehlschlag ist lokal belegt.
 
+**09.10.2026, Reihenfolge und Altbestand** (16.2):
+
+- **20f und 20g kommen als Nächstes**, danach die finalen Stufen 1, 2, 4, 5 in ihrer geplanten
+  Reihenfolge. Stufe 3 (Refactoring) ist abgetragen.
+- **Die zwölf Zeilen in `unresolved_scan` sind Material, keine Altlast.** In Stufe 1 werden sie
+  lesend aufgelistet (`ean`, `title_raw`), nur im Chat; der Nutzer prüft sie gegen die Sammlung.
+  Erst danach und **vor Stufe 4** fällt die Tabelle, in zwei Deployments.
+- **Die Basisadresse steht in der README einmal als `BASIS`-Variable**, die Beispiele benutzen
+  `$BASIS` – kopierfertig für den Nutzer, eindeutig für andere. Löst die Platzhalter
+  `<subdomain>` ab.
+
 Was in den offenen Stufen 20f und 20g noch zu entscheiden ist, steht dort:
 [16.2](spec/16-2-offene-stufen.md).

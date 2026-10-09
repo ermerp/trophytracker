@@ -8,6 +8,10 @@ Zwei Nachträge sind angelegt und **bewusst vertagt**, weil in beiden eine
 Entscheidung des Nutzers fehlt. Sie stehen hier vollständig, damit die offenen
 Punkte beim Planen vorliegen.
 
+**Sie kommen als Nächstes** (Entscheidung des Nutzers vom 09.10.2026): erst 20f
+und 20g, danach die finalen Stufen in ihrer geplanten Reihenfolge – 1, 2, 4, 5.
+Stufe 3 (Refactoring) ist abgetragen.
+
 #### 20f – Preisverlauf als Diagramm
 
 **Preisverlauf als Diagramm** (wie Idealo oder SteamDB), zwei getrennte Reihen je Release — die ruhige Händlerkurve und die springende Marktkurve; mit Stufe 21 käme der Store-Preis als dritter Kanal dazu, der nach Abschnitt 6 **nie** mit dem Gebrauchtpreis verrechnet werden darf
@@ -41,6 +45,8 @@ Alles erfassen, was fehlt – per Barcode oder von Hand (Stand 02.10.2026: 53 Di
 
 **Die Frage nach den Schnittfassungen wird hier erneut geprüft** (Wunsch des Nutzers vom 08.10.2026). Er möchte grundsätzlich die ungeschnittenen Fassungen. Am 08.10.2026 war keine Quelle dafür zu haben – schnittberichte.com sperrt `ClaudeBot` und `anthropic-ai`, die USK bewertet nur die eingereichte Fassung (7.4). Das einzige verwertbare Signal ist die Store-Verfügbarkeit, und die gilt nur für PS4 und PS5: Über die ganze Sammlung gemessen fand sie **genau einen** Fall (Dying Light). Die Lücke sitzt bei **PS3 und Vita** – den Jahrgängen, in denen deutsche Schnittfassungen am häufigsten waren, und für die der Web-Store gar keine Seiten führt. Sobald die Sammlung vollständig ist, lohnt die Frage einmal neu: Wie viele Titel betrifft es überhaupt, gibt es inzwischen eine benutzbare Quelle, und reicht sonst ein Feld von Hand? Vorher ist jede Antwort eine Schätzung auf unvollständigem Bestand.
 
+**Die zwölf Zeilen in `unresolved_scan` gehören zum Material** (Entscheidung des Nutzers vom 09.10.2026). Sie stammen aus den Stufen 17/17b, sind seit 17d eingefroren und werden hier **lesend aufgelistet** (`ean`, `title_raw`) – nur im Chat, nie im Repository, weil es Nutzerdaten sind (15.1). Der Nutzer prüft sie gegen die Sammlung; was sich zuordnen lässt, erfasst er in der Anwendung. **Erst danach fällt die Tabelle, und zwar vor Stufe 4** – in zwei Deployments, weil eine Migration abwärtskompatibel bleiben muss und `src/db/scan.ts` noch ein `DELETE` darauf hält: erst den Code ohne die Tabelle ausliefern, dann sie entfernen. Dabei auch aus `EXPORT_TABELLEN` nehmen (`src/db/export.ts`).
+
 **Die Usability der Arbeitsansichten gehört hierher** – und zwar *bevor* die jeweilige Arbeit getan wird, nicht danach.
 
 **„Gemeinsam korrigieren" heißt weiterhin: Nutzerdaten ändert nur der Nutzer, in der Anwendung** (Entscheidung vom 18.09.2026). Wo ein Weg fehlt, wird er gebaut. Erster Kandidat ist eine **Sammelaktion in Block B**: 113 der 157 offenen Releases tragen den Befund „eBay kennt kein Angebot" (3 % gemessene Fehlrate) und wären einzeln 113 Klicks. Ein „alle übernehmen" mit der Möglichkeit, vorher einzelne herauszunehmen, ist dasselbe Muster wie „Alle erfassen" bei den Scans oder „Alle übernehmen" im Wunschlisten-Import – keine Umgehung der Regel, sondern ihre Erfüllung. Eine Ausnahme, bei der der Assistent direkt schreibt, ist erwogen und verworfen: Das Änderungsprotokoll bekäme die falsche Quelle, und `physical_release_status = 'nein'` ist nach Abschnitt 3 definitionsgemäß die Entscheidung des Nutzers – die Daten würden über sich selbst lügen.
@@ -67,7 +73,7 @@ Effizienz, Redundanz, Netz- und Fensterauslastung, toter Code.
 
 In `test/` waren 102 Fehler aus acht Ursachen zu räumen, keiner mit `any` oder `@ts-ignore`: zwei ungetypte Helfer in `plan-route.spec.ts` (75 – `.json()` gibt `unknown`), ein seit dem Plugin-Wechsel funktionsloses `test/env.d.ts` (14 – `ProvidedEnv` gibt es in `@cloudflare/vitest-plugin` 1.x nicht mehr, `env` ist `Cloudflare.Env`), drei `CronErgebnis`-Fixtures ohne `abgebrochen`, vier ungetypte `.json()`-Aufrufe, eine unnötige `@ts-expect-error`-Direktive, `TextDecoder`-Optionen und ein Typprädikat für `istBestaetigt`. Dazu **ein echter Befund**: `test/keine-lecks.spec.ts` prüfte seinen 18e-Fall seit dem 27.09.2026 nicht (falscher Markierungsname) – belegt gegen ein absichtlich eingebautes Leck, [`docs/lehren.md`](../lehren.md).
 
-**Offene Altlasten:** `unresolved_scan` trägt 12 Zeilen und ist seit Stufe 17d funktionslos; `/api/imports/feed` ist mit dem AWIN-Feed entfallen.
+**Offene Altlast:** `unresolved_scan` trägt 12 Zeilen und ist seit Stufe 17d funktionslos – nichts schreibt mehr hinein (nur `src/db/scan.ts` löscht noch). Die Zeilen sind aber **kein Müll, sondern Material für Stufe 1**; wann die Tabelle fällt, steht dort.
 
 **„Verhält sich noch genauso" braucht Zahlen, nicht nur grüne Tests.** Die Tests prüfen Verhalten, `test/lesekosten.spec.ts` prüft Kosten – und die sind hier der eigentliche Vertrag. Ein Refactoring, das eine Abfrage schöner macht und dabei den Index verliert, ist grün und trotzdem ein Ausfall. Also dieselben Messungen vorher und nachher, Zahl gegen Zahl.
 
