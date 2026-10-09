@@ -447,10 +447,14 @@ spätere Custom Domains gemeinsam ab. Einschränkung: WebSockets werden hinter
 Worker-Level-Access nicht unterstützt (403 beim Upgrade); die Anwendung nutzt
 keine.
 
-Prüfen, dass es greift:
+Prüfen, dass es greift. Die Basisadresse steht einmal als Variable – **bei
+eigenem Konto die eigene `workers.dev`-Subdomain einsetzen**, alle folgenden
+Beispiele benutzen `$BASIS`:
 
 ```bash
-curl -sS -o /dev/null -w '%{http_code}\n' https://trophytracker.<subdomain>.workers.dev/api/health
+BASIS=https://trophytracker.philipp-ermer-bvb.workers.dev
+
+curl -sS -o /dev/null -w '%{http_code}\n' "$BASIS/api/health"
 # 302 (auf cloudflareaccess.com) oder 403 – niemals 200
 ```
 
@@ -511,7 +515,7 @@ Beispielaufruf gegen die Produktion:
 ```bash
 curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
         -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-  https://trophytracker.<subdomain>.workers.dev/api/backup/status
+  "$BASIS/api/backup/status"
 ```
 
 ## Deployment
