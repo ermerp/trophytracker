@@ -144,5 +144,20 @@ damit sie nicht stillschweigend geschlossen wird.
 Beantwortet am 09.10.2026: ob ein **verworfener** Wunsch als Doppelung zählt (Frage vom
 15.09.2026) – nein, siehe die Liste oben.
 
+**09.10.2026, Refactoring (finale Stufe 3), vier Entscheidungen zur Ablage** – alle im Vorfeld
+gestellt, weil sie die Gestalt des Repositories festlegen (13.3, 16.2):
+
+- **Die Detailansicht wandert vollständig** nach `frontend/src/spieldetail/`, Einstieg
+  eingeschlossen. Die Alternative – Einstieg bleibt oben, nur die Teile wandern – hätte `App.tsx`
+  unberührt gelassen, aber den Ordner halb gemacht.
+- **Die Kaskade von `App.css` bleibt unangetastet:** nur lückenlose Ausschnitte, keine
+  Verschiebung, auch um den Preis, dass zwei Ansichten zwei Dateien tragen. Verschiebungen wären
+  mit Nachweis erlaubt gewesen; der Nutzer hat den beweisbaren Weg gewählt.
+- **`.leise` bleibt**, obwohl ungenutzt: gewolltes Paar mit `.still` aus Stufe 19c.
+- **Testreporter `dot`** – nach der Messung **zurückgenommen**: `dot` ergab 209 statt 71 Zeilen,
+  weil es in einer Pipe je Datei eine Zeile schreibt und zusätzlich die Messwerte druckt. Der
+  Reporter bleibt deshalb ungesetzt; knapp wird die Ausgabe über `WRANGLER_LOG=error` (13 Zeilen).
+  Die Entscheidung war auf einer falschen Zahl von mir aufgebaut.
+
 Was in den offenen Stufen 20f und 20g noch zu entscheiden ist, steht dort:
 [16.2](spec/16-2-offene-stufen.md).

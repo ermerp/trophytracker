@@ -47,10 +47,13 @@ und hält fest, dass die Sync-Zeilen darin stehen bleiben:
 ```
 
 Das Beispiel stammt aus der Nacht zum 28.09.2026, als die Wartung noch `*/5 6-7` lief – daher
-`×24`. **Offener Befund:** `test/cron.spec.ts` und `test/lesekosten.spec.ts` rechnen beide weiter
-mit **24** Wartungsaufrufen, obwohl Stufe 20e das Fenster auf `*/5 6-8` und damit auf 36 erweitert
-hat (`wrangler.jsonc`). Die Tests prüfen damit zwölf Aufrufe zu wenig; die Grenzwerte halten
-trotzdem. Zu beheben in der finalen Stufe „Refactoring" ([16.2](16-2-offene-stufen.md)).
+`×24`. Heute sind es 36 Aufrufe je Fenster, und **die Zahl steht nur noch im Cron-Ausdruck
+selbst**: `cronFenster(ausdruck)` in `src/sync/cron.ts` liest Startstunde, Takt und Anzahl heraus,
+beide Tests leiten sie daraus ab. Der Anlass war ein Befund – als Stufe 20e das Fenster auf
+`*/5 6-8` erweiterte, rechneten `test/cron.spec.ts` und `test/lesekosten.spec.ts` als Literal
+weiter mit 24 und prüften zwölf Aufrufe zu wenig. Seit der Umstellung (09.10.2026) simuliert die
+Nacht 72 statt 60 Aufrufe und verdichtet sie auf 8 Zeilen; die Nachtsumme der gelesenen Zeilen
+stieg von 54 072 auf **80 784** und bleibt unter der Grenze von 100 000.
 
 Drei Regeln halten die Zeile ehrlich: Verdichtet wird **nur bei gleicher Feldfolge** – wechselt der
 Sync von `offset` auf `offen`, beginnt eine neue Zeile, genau dort, wo auch ein Mensch trennen

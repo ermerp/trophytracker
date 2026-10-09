@@ -59,7 +59,11 @@ Ergebnis ist eine **Checkliste im Repository**, damit ein zweiter Durchgang verg
 
 #### 3. Refactoring
 
-Effizienz, Redundanz, Netz- und Fensterauslastung, toter Code. Bekannte Altlasten: `unresolved_scan` trägt 12 Zeilen und ist seit Stufe 17d funktionslos; `/api/imports/feed` ist mit dem AWIN-Feed entfallen; `test/cron.spec.ts` und `test/lesekosten.spec.ts` rechnen das Wartungsfenster mit 24 statt 36 Aufrufen (10.1).
+Effizienz, Redundanz, Netz- und Fensterauslastung, toter Code.
+
+**Abgetragen am 09.10.2026** (ein Branch, fünf Merges): `Spieldetail.tsx` (1 318 Zeilen) liegt als eine Datei je Komponente in `frontend/src/spieldetail/`, `App.css` (3 848 Zeilen) als 16 Ausschnitte in `frontend/src/css/` – beides nachweislich ohne Verhaltensänderung, das gebaute CSS war byte-identisch (13.3). Dazu 21 tote CSS-Regeln, die Wartungsfenster-Zahl aus dem Cron-Ausdruck statt als Literal in zwei Tests (10.1), die Testausgabe von 71 auf 13 Zeilen und `worker-configuration.d.ts` (580 KB, erzeugt) aus Git.
+
+**Offene Altlasten:** `unresolved_scan` trägt 12 Zeilen und ist seit Stufe 17d funktionslos; `/api/imports/feed` ist mit dem AWIN-Feed entfallen. **Neu dazugekommen (09.10.2026):** Die Typen des Workers werden nirgends geprüft – `npx tsc --noEmit -p tsconfig.json` läuft sauber durch, aber weder `npm test` (vitest transpiliert mit esbuild) noch `npm run build` (baut nur das Frontend) ruft ihn auf. Wer ihn in die Action hängt, muss zugleich die Env-Bindings erklären: Wrangler liest sie aus `.dev.vars`, die dort fehlt, und erzeugt sonst ein `Env` mit nur `DB` und `ASSETS`.
 
 **„Verhält sich noch genauso" braucht Zahlen, nicht nur grüne Tests.** Die Tests prüfen Verhalten, `test/lesekosten.spec.ts` prüft Kosten – und die sind hier der eigentliche Vertrag. Ein Refactoring, das eine Abfrage schöner macht und dabei den Index verliert, ist grün und trotzdem ein Ausfall. Also dieselben Messungen vorher und nachher, Zahl gegen Zahl.
 
