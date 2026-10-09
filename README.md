@@ -461,9 +461,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' "$BASIS/api/health"
 ### Maschinen-Endpunkte
 
 `GET /api/export/backup.json` und `POST /api/backup/vermerk` werden von GitHub
-Actions aufgerufen und können keinen Browser-Login durchlaufen. (Ein
-`POST /api/imports/feed` war für den AWIN-Händlerfeed vorgesehen und ist mit
-ihm entfallen – Stufe 20 holt die Marktdaten live über eBay.)
+Actions aufgerufen und können keinen Browser-Login durchlaufen.
 
 **Entschieden in Stufe 8: Access Service Token.** Der Alternativweg – diese
 Pfade von Access ausnehmen und mit einem eigenen Bearer-Token absichern – ist

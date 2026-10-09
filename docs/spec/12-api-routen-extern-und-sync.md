@@ -54,8 +54,6 @@ POST   /api/scan/:ean/assign          Body: { releaseId } oder { spielId, plattf
                                       201 wie POST /api/physical-copies plus ean, spiel { spielId, titel, plattform }; ein vorhandenes Mapping wird überschrieben
 DELETE /api/scan/:ean                 Mapping lösen (Rückgängig: erst DELETE /api/physical-copies/:id); die Disc bleibt; 404 ohne Mapping
 
-GET    /api/releases/:id/prices?channel=
-                                      (`POST /api/imports/feed` ist mit dem verworfenen Händlerfeed entfallen, 7.3)
 POST   /api/sync/markt                eine Portion Gebrauchtpreise (20 Releases, Stufe 20); 503 ohne
                                       eBay-Zugangsdaten, 502 bei Ratenlimit; { status, geprueft, mitPreis,
                                       discBelegt, ohneAngebot, nochOffen, weiter }
