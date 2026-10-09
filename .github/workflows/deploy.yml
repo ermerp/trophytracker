@@ -39,7 +39,12 @@ jobs:
       # transpiliert mit esbuild ohne Typpruefung, und `npm run build` baut nur
       # das Frontend (dessen `tsc -b` darin steckt). Vor npm test, damit ein
       # Typfehler nicht hinter einem Testlauf wartet.
-      - run: npm run typecheck:worker
+      #
+      # `typecheck` nimmt src/ UND test/. Die Tests mitzupruefen war kein
+      # Selbstzweck: Dabei kam heraus, dass test/keine-lecks.spec.ts seit dem
+      # 27.09.2026 eine Markierung mit falschem Namen benutzte und seinen
+      # 18e-Fall deshalb nicht pruefte (Befund in docs/lehren.md).
+      - run: npm run typecheck
 
       - run: npm test
       - run: npm run build

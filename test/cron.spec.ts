@@ -961,6 +961,7 @@ describe("cronSchritt", () => {
 			cronLogzeile({
 				getan: "sync",
 				erschienen: 0,
+				abgebrochen: 0,
 				sync: { status: "laufend", phase: "normalisierung", offset: 0, seitenGeholt: 0, titlesSeen: 431, offeneSeiten: offen, weiter: true },
 			}),
 		);
@@ -977,6 +978,7 @@ describe("cronSchritt", () => {
 		const zeile = cronLogzeile({
 			getan: "sync",
 			erschienen: 0,
+			abgebrochen: 0,
 			sync: { status: "laufend", phase: "normalisierung", offset: 400, seitenGeholt: 1, titlesSeen: 431, weiter: true },
 		});
 
@@ -990,6 +992,7 @@ describe("cronSchritt", () => {
 		const zeile = cronLogzeile({
 			getan: "spielzeit",
 			erschienen: 0,
+			abgebrochen: 0,
 			spielzeit: { status: "erfolg", geholt: 200, geschrieben: 160, zugeordnet: 117, weiter: true },
 		});
 

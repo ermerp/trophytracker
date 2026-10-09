@@ -37,7 +37,10 @@ export function zaehleLesung(bisher: Kandidat, code: string): Kandidat {
   return bisher?.code === code ? { code, anzahl: bisher.anzahl + 1 } : { code, anzahl: 1 }
 }
 
-export function istBestaetigt(kandidat: Kandidat, noetig: number = BESTAETIGUNGEN): boolean {
+export function istBestaetigt(
+  kandidat: Kandidat,
+  noetig: number = BESTAETIGUNGEN,
+): kandidat is NonNullable<Kandidat> {
   return kandidat !== null && kandidat.anzahl >= noetig
 }
 

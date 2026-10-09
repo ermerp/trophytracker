@@ -29,6 +29,12 @@ const MARKIERUNGEN = {
 	access: "MARKIERUNG-ACCESS-e51d67",
 	igdbSecret: "MARKIERUNG-IGDBSECRET-9c1d22",
 	twitchToken: "MARKIERUNG-TWITCH-4e7a08",
+	/**
+	 * Der Koerper einer PSN-Fehlerantwort (Stufe 18e). Eigener Wert, damit ein
+	 * Fund diesen Weg benennt und nicht den Access Token - hier geht es darum,
+	 * dass aus der FREMDEN Antwort nichts in Meldung, Log oder Verlauf kommt.
+	 */
+	psnFehlerkoerper: "MARKIERUNG-PSNKOERPER-6b4e30",
 };
 
 const ALLE = Object.values(MARKIERUNGEN);
@@ -221,9 +227,9 @@ function psnFehlertextMarkiert() {
 		fakeFetch([
 			[/oauth\/authorize/, () => redirectAntwort("v3.abc")],
 			[/oauth\/token/, () => jsonAntwort(TOKEN_ANTWORT)],
-			[/trophyTitles/, () => new Response(`Fehler: ${MARKIERUNGEN.accessToken}`, { status: 503 })],
-			[/gamelist\/v2/, () => new Response(`Fehler: ${MARKIERUNGEN.accessToken}`, { status: 503 })],
-			[/graphql/, () => new Response(`Fehler: ${MARKIERUNGEN.accessToken}`, { status: 403 })],
+			[/trophyTitles/, () => new Response(`Fehler: ${MARKIERUNGEN.psnFehlerkoerper}`, { status: 503 })],
+			[/gamelist\/v2/, () => new Response(`Fehler: ${MARKIERUNGEN.psnFehlerkoerper}`, { status: 503 })],
+			[/graphql/, () => new Response(`Fehler: ${MARKIERUNGEN.psnFehlerkoerper}`, { status: 403 })],
 		]).fetch,
 	);
 }

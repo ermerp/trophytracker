@@ -123,7 +123,7 @@ describe("GET /api/export/:liste.csv", () => {
 	it("beginnt mit der BOM - sonst liest Excel Windows-1252", async () => {
 		const bytes = new Uint8Array(await (await hole("/api/export/sammlung.csv")).arrayBuffer());
 		expect([bytes[0], bytes[1], bytes[2]]).toEqual([0xef, 0xbb, 0xbf]);
-		expect(new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes).startsWith(BOM)).toBe(true);
+		expect(new TextDecoder("utf-8", { ignoreBOM: true, fatal: false }).decode(bytes).startsWith(BOM)).toBe(true);
 	});
 
 	it("schreibt die deutsche Kopfzeile", async () => {

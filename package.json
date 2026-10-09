@@ -13,6 +13,8 @@
     "start": "wrangler dev",
     "test": "vitest run",
     "typecheck:worker": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p test/tsconfig.json --noEmit",
+    "typecheck": "npm run typecheck:worker && npm run typecheck:test",
     "cf-typegen": "wrangler types --env-interface CfBindings"
   },
   "devDependencies": {

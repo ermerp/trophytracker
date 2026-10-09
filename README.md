@@ -110,8 +110,9 @@ Zugriff auf ein Secret ohne Prüfung ist ein Typfehler. Gemessen am 09.10.2026:
 mit und ohne `.dev.vars` je 0 Fehler, und derselbe ungeprüfte Zugriff fällt mit
 der optionalen Typisierung auf, mit der erzeugten nicht.
 
-Geprüft wird mit `npm run typecheck:worker`; das Frontend prüft sich über
-`tsc -b` in seinem eigenen `npm run build`.
+Geprüft wird mit `npm run typecheck` – `typecheck:worker` für `src/`,
+`typecheck:test` für `test/` (dort liegen auch die Tests der Frontend-Module).
+Das Frontend selbst prüft sich über `tsc -b` in seinem eigenen `npm run build`.
 
 **Testdaten für die lokale D1:**
 
@@ -518,7 +519,7 @@ curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
 Jeder Push auf `main` löst [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
 aus. Die Reihenfolge ist der eigentliche Inhalt:
 
-1. `npm ci`, `npm run cf-typegen`, `npm run typecheck:worker`, `npm test`,
+1. `npm ci`, `npm run cf-typegen`, `npm run typecheck`, `npm test`,
    `npm run build`
 2. `wrangler d1 export` – **Sicherung vor jeder Schemaänderung**, anschliessend
    geprüft (`scripts/sicherung-pruefen.sh`): `INSERT`-Zeilen je Tabelle im Dump
