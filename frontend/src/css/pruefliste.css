@@ -1,17 +1,4 @@
-/* --- Stufe 7: Pruefliste und Hinweise --- */
-
-.hinweise {
-  list-style: none;
-  padding: 0.6rem 0.8rem;
-  margin: 0 0 1rem;
-  border: 1px solid var(--warnung);
-  border-radius: 6px;
-  background: rgba(232, 163, 61, 0.09);
-}
-
-.hinweise li + li {
-  margin-top: 0.3rem;
-}
+/* --- Stufe 7: Pruefliste --- */
 
 .prueflisten-kopf h1 {
   margin-bottom: 0.2rem;

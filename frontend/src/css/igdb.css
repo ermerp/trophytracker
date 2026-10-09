@@ -102,23 +102,3 @@
   }
 }
 
-
-
-
-
-
-
-
-
-.gewichte {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8rem;
-  align-items: center;
-}
-
-.gewichte input {
-  width: 5rem;
-  font: inherit;
-}
-

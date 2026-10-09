@@ -170,28 +170,6 @@ main {
   padding-bottom: 5rem; /* Platz für die Leiste unten */
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.besitz {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  align-items: center;
-  margin-top: 0.3rem;
-}
-
 .pille {
   display: inline-flex;
   align-items: center;
@@ -216,11 +194,6 @@ main {
 
 button.klein {
   padding: 0.1rem 0.5rem;
-  font-size: 0.8rem;
-}
-
-.besitz select {
-  font: inherit;
   font-size: 0.8rem;
 }
 
