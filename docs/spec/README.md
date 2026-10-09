@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 74 – Dokumentation aufgeteilt. Die Abschnittsnummern sind unverändert;
+*Version 75 – Dokumentation aufgeteilt. Die Abschnittsnummern sind unverändert;
 die Versionsgeschichte steht in [`../changelog.md`](../changelog.md).*
 
 Die Spezifikation ist die maßgebliche Quelle. Jeder Abschnitt beschreibt den
