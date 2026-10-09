@@ -1,0 +1,158 @@
+/* ---------------------------------------------------------------------------
+   **Global**, trotz der Lage hinter dem Spieldetail: `.still`, `.leise`,
+   `.zahl`, `.knopf` und `details.block` tragen jede Ansicht.
+   --------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   Textbausteine (Stufe 19c)
+
+   `.zeile` (0,85 rem, opacity 0.8) war bis hierher das Mittel fuer leisen
+   Text. Es benennt aber eine Zeile und faerbt ueber Deckkraft statt ueber
+   einen Ton - auf einer farbigen Flaeche ergibt das eine andere Farbe als
+   daneben. `.still` und `.leise` greifen stattdessen die Tokens ab.
+   `.zeile` bleibt, solange die noch nicht umgebauten Ansichten es tragen.
+   -------------------------------------------------------------------------- */
+
+.still {
+  color: var(--text-still);
+  font-size: 0.85rem;
+}
+
+.leise {
+  color: var(--text-leise);
+}
+
+/* Tabellenziffern: Zahlen sollen untereinander stehen, nicht tanzen. */
+.zahl {
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.knopf {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 5px 10px;
+  border-radius: var(--r2);
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.knopf:hover:not(:disabled) {
+  border-color: var(--text-still);
+}
+
+.knopf:disabled {
+  color: var(--aus);
+  cursor: default;
+}
+
+.knopf.leiser {
+  background: none;
+  color: var(--text-leise);
+}
+
+/* Ein Favorit faerbt seine Pille - dieselbe Regel wie in den Listen. */
+.pille.gold {
+  border: 1px solid var(--gold-rand);
+  background: var(--gold-flaeche);
+}
+
+/* Aufklappbarer Block: Verlauf heute, die Einzeltrophaeen ab Stufe 19b. */
+details.block > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  font-family: var(--schrift-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+details.block > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.block > summary::after {
+  content: '▾';
+  margin-left: auto;
+  font-size: 0.9rem;
+}
+
+details.block[open] > summary::after {
+  content: '▴';
+}
+
+details.block > summary .wert {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-leise);
+  font-family: var(--schrift);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+details.block > div {
+  margin-top: var(--a3);
+}
+
+/* Der Balken der Release-Karte traegt mehr Gewicht als der in einer Kachel. */
+.release .balken {
+  height: 6px;
+  background: var(--aus);
+  border-radius: var(--r-rund);
+}
+
+.release .balken > div {
+  border-radius: var(--r-rund);
+}
+
+.zustandzeile .zustand {
+  font-family: var(--schrift-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.zustandzeile .zustand .punkt {
+  width: 9px;
+  height: 9px;
+}
+
+/* Traegt die Kopfzeile ihren Titel nur fuer Vorlesegeraete, schiebt ein
+   Fueller die Symbole nach rechts - sonst rutschen sie an den Zurueck-Pfeil. */
+.kopfzeile .fueller {
+  flex: 1;
+}
+
+/* Eine Stufe ohne erspielte Trophaee behaelt ihre Metallfarbe, damit Platin
+   und Gold unterscheidbar bleiben - die Zahl tritt dafuer zurueck, damit die
+   Reihe nicht lauter wird als eine mit Inhalt. */
+.stufenzeichen-teil.leer b {
+  color: var(--text-still);
+  font-weight: 500;
+}
+
+/*
+ * Unter 360 px (22,4 rem) reicht die Zeile nicht mehr: Bei 320 px bleiben den Knoepfen
+ * je 84 px, und "Disc x2" wie "erfassen" schneiden ab (gemessen 27.09.2026).
+ * Dort ruecken sie unter das Kennzeichen, statt zu kuerzen - die Reihenfolge
+ * bleibt, nur der Umbruch kommt frueher. Auf 360 und 390 px steht weiter
+ * alles in einer Zeile, wie es der Nutzer wollte.
+ */
+@media (max-width: 22.4rem) {
+  .releasekopf {
+    flex-wrap: wrap;
+  }
+
+  .besitzknoepfe {
+    flex-basis: 100%;
+    order: 1;
+  }
+}
+

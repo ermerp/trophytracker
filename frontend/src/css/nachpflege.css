@@ -1,0 +1,42 @@
+/* Nachpflege fehlender Store-Zuordnungen (Stufe 21d).
+   Drei neue Namen, vorher gegen App.css gegrept (Regel aus 19b).
+   Eine Zeile je Eintrag: Titel oben, darunter Feld und Knopf nebeneinander.
+   Bei 360 px ist das die einzige Aufteilung, die ohne Abschneiden auskommt -
+   Titel und Eingabefeld in einer Reihe lassen dem Feld dort zu wenig. */
+.nachpflege {
+  display: flex;
+  flex-direction: column;
+  gap: var(--a2);
+  margin-block: var(--a3);
+}
+
+.nachpflegezeile {
+  display: grid;
+  /* Die erste Spalte endet bei 28 rem, weil `input` global dort endet - ein
+     Feld, das breiter aussieht als es wird, ist schlechter als ein schmales.
+     `justify-content: start` setzt den Knopf daneben statt an den Rand; sonst
+     klaffte bei 1280 px eine Luecke, die wie ein Fehler aussah. */
+  grid-template-columns: minmax(0, 28rem) auto;
+  justify-content: start;
+  gap: var(--a2);
+  align-items: center;
+  padding: var(--a3);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+  background: var(--flaeche);
+}
+
+.nachpflegetitel {
+  grid-column: 1 / -1;
+  font-weight: 600;
+}
+
+.nachpflegezeile input {
+  min-width: 0;
+  /* Der Aussenabstand der globalen Regel wuerde die Zeile schief machen. */
+  margin-bottom: 0;
+}
+
+.nachpflegezeile [role='status'] {
+  grid-column: 1 / -1;
+}

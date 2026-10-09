@@ -1,0 +1,663 @@
+/* ===========================================================================
+ * Stufe 19a: das Dashboard
+ *
+ * Alle Werte als var(--…) aus tokens.css. Der Aufbau ist auf dem Handy eine
+ * Spalte und am Desktop zwei – links die Zahlen, rechts der Feed über die
+ * volle Höhe. Das Verhalten ist auf beiden gleich; nur das Layout wechselt.
+ * ======================================================================== */
+
+.dashboard {
+  padding-bottom: var(--a4);
+}
+
+.dspalten {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Kopfzeile: Logo und Glocke ---------------------------------------- */
+
+.kopfzeile .logo {
+  flex: none;
+  margin-right: var(--a2);
+}
+
+/* Ohne das positioniert sich die Marke gegen die Kopfzeile statt gegen den
+   Knopf - sie sass im Bild vom 27.09.2026 auf dem Zahnrad. */
+.ikone {
+  position: relative;
+}
+
+.ikone.wach {
+  color: var(--warnung);
+}
+
+.ikone.alarm {
+  color: var(--gefahr);
+}
+
+/* Die Marke sitzt auf dem Zeichen, nicht daneben: 44 px sind der Knopf, das
+   Zeichen darin ist 22 px – rechts oben bleibt genug Platz. */
+.punktzahl {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: var(--r-rund);
+  background: var(--warnung);
+  color: var(--grund);
+  font-family: var(--schrift-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+.punktzahl.rot {
+  background: var(--gefahr);
+}
+
+/* „Da ist noch mehr" – ohne eine zweite Zahl aufzumachen. Der Rand in der
+   Grundfarbe trennt ihn von der roten Glocke darunter. */
+.nebenpunkt {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--warnung);
+  border: 2px solid var(--grund);
+}
+
+/* --- Warnungen und Tafel ------------------------------------------------ */
+
+.warnungen {
+  list-style: none;
+  padding: 0.6rem 0.8rem;
+  margin: 0 0 var(--a4);
+  border: 1px solid var(--warnung);
+  border-radius: var(--r2);
+  background: rgba(232, 163, 61, 0.09);
+}
+
+.warnungen li + li {
+  margin-top: 0.35rem;
+}
+
+.warnungen b {
+  color: var(--warnung);
+}
+
+/*
+ * Die Tafel geht unter der Glocke auf, nicht oben auf der Seite.
+ *
+ * Die Kopfzeile klebt oben, die Seite scrollt: Stünde die Tafel im Fluss,
+ * passierte beim Antippen der Glocke von weiter unten sichtbar nichts
+ * (gesehen im Bild vom 27.09.2026). Deshalb `fixed` direkt unter der
+ * Kopfzeile, rechtsbündig wie die Glocke selbst.
+ */
+.tafel {
+  position: fixed;
+  z-index: 10;
+  top: calc(var(--kopf-hoehe) + env(safe-area-inset-top) + var(--a1));
+  right: var(--a4);
+  left: var(--a4);
+  max-width: 26rem;
+  margin-left: auto;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+  background: var(--flaeche-hoch);
+  box-shadow: var(--schatten-2);
+}
+
+.tafel ul {
+  list-style: none;
+  margin: 0 0 var(--a3);
+  padding: 0;
+}
+
+.tafel ul:last-child {
+  margin-bottom: 0;
+}
+
+.tafel li + li {
+  margin-top: 0.3rem;
+}
+
+.tafel strong {
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.tafelname {
+  font-family: var(--schrift-display);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-still);
+  margin-bottom: 5px;
+}
+
+.tafelname.gefahr {
+  color: var(--gefahr);
+}
+
+/* --- Blöcke und Kacheln -------------------------------------------------- */
+
+.dashboard .block {
+  margin-bottom: var(--a5);
+}
+
+.blockname {
+  display: flex;
+  align-items: baseline;
+  gap: var(--a2);
+  margin-bottom: var(--a2);
+  font-family: var(--schrift-display);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+.blockname .rechts {
+  margin-left: auto;
+  letter-spacing: normal;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Die Überschrift ist auf dem Handy ein Knopf – sie klappt die Tabelle auf. */
+.knopfname {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Die Überschrift des zweiten Lücken-Blocks ist ihr eigener Schalter. */
+.kandidatenkopf {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+}
+
+.pfeil {
+  display: inline-flex;
+  color: var(--text-still);
+  transform: rotate(90deg);
+}
+
+.pfeil.auf {
+  transform: rotate(-90deg);
+  color: var(--text-leise);
+}
+
+.aufklapp {
+  margin-top: var(--a3);
+  padding-top: var(--a3);
+  border-top: 1px solid var(--linie);
+}
+
+.reihe {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--a2);
+}
+
+.kachel {
+  display: block;
+  padding: var(--a3) var(--a1);
+  text-align: center;
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+  color: inherit;
+  text-decoration: none;
+}
+
+a.kachel:hover {
+  border-color: var(--aus);
+}
+
+.kachel .zahl {
+  display: block;
+  font-family: var(--schrift-display);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.kachel .zahl.gold {
+  color: var(--gold);
+}
+
+.kachel .wort {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: var(--text-still);
+}
+
+.kachel .von {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-still);
+}
+
+.kachel.pk .zahl {
+  margin-top: 5px;
+}
+
+.kachel.tk > span:first-child {
+  display: block;
+  margin: 0 auto 3px;
+  width: 20px;
+}
+
+.kachel.tk .zahl {
+  font-size: 1.05rem;
+}
+
+/* Auf dem Handy tragen Farbe, Symbol und Reihenfolge die Stufe – das Wort
+   passt bei vier Kacheln auf 390 px nicht dazu (Wunsch des Nutzers vom
+   27.09.2026). Eine eigene Regel statt `.nur-desktop`: `.kachel .wort` ist
+   spezifischer und schlüge die Hilfsklasse. Der Name steht weiter im
+   `.nur-vorlesen`-Text daneben, damit die Kachel nicht nur farbig ist. */
+@media (max-width: 47.99rem) {
+  .kachel.tk .wort {
+    display: none;
+  }
+}
+
+/* --- Wie ich dastehe ----------------------------------------------------- */
+
+.dastehen {
+  display: flex;
+  align-items: center;
+  gap: var(--a4);
+}
+
+.kreis {
+  position: relative;
+  flex: none;
+  width: 116px;
+  height: 116px;
+}
+
+.kreis svg {
+  width: 116px;
+  height: 116px;
+}
+
+.kreismitte {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.kreismitte .zahl {
+  font-family: var(--schrift-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kreismitte .wort {
+  font-size: 0.68rem;
+  color: var(--text-still);
+}
+
+.legende {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.legende .zustand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--text-leise);
+  text-decoration: none;
+}
+
+.legende .zustand .punkt {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legende .zustand .n {
+  margin-left: auto;
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.legende .zustand:hover {
+  color: var(--text);
+}
+
+/* --- Tabellen ------------------------------------------------------------ */
+
+table.plattformtabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.plattformtabelle th {
+  padding: 0 0 var(--a1);
+  text-align: right;
+  font-family: var(--schrift-display);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+.plattformtabelle th:first-child {
+  text-align: left;
+}
+
+.plattformtabelle td {
+  padding: 7px 0;
+  border-top: 1px solid var(--linie);
+  text-align: right;
+  font-family: var(--schrift-display);
+  font-size: 0.95rem;
+}
+
+.plattformtabelle td:first-child {
+  text-align: left;
+}
+
+/* Keine Disc, kein Download: der `--aus`-Ton, nie ein Strich (Abschnitt 13). */
+.plattformtabelle td.aus {
+  color: var(--aus);
+}
+
+.plattformtabelle .von {
+  display: inline;
+  font-size: 0.8rem;
+  color: var(--text-still);
+}
+
+.stufe {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  padding: 6px 0;
+}
+
+.stufe .name {
+  width: 3.8rem;
+  font-size: 0.8rem;
+  color: var(--text-leise);
+}
+
+.stufe .spur {
+  display: block;
+  flex: 1;
+}
+
+.stufe .wert {
+  width: 6.4rem;
+  text-align: right;
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  color: var(--text-leise);
+}
+
+.balken.hoch {
+  height: 5px;
+  border-radius: var(--r-rund);
+}
+
+/* --- Zuletzt gespielt mit Platin ---------------------------------------- */
+
+.lp {
+  display: flex;
+  gap: var(--a3);
+  align-items: flex-start;
+}
+
+.lp-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.lp-titel {
+  font-family: var(--schrift-display);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.lp-zeile {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+}
+
+.lp-platin {
+  font-family: var(--schrift-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--troph-platin);
+}
+
+.lp-zahlen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--a3);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-fuss {
+  margin-top: auto;
+  font-size: 0.72rem;
+  color: var(--text-still);
+}
+
+/* --- Feed ---------------------------------------------------------------- */
+
+.feed .zeile {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--a2);
+  padding: var(--a2) 0;
+  border-top: 1px solid var(--linie);
+}
+
+.feed .zeile:first-child {
+  border-top: none;
+}
+
+.feed .text {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--text-leise);
+}
+
+.feed .text b {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.feed .text a {
+  text-decoration: none;
+}
+
+.feed .wann {
+  flex: none;
+  padding-top: 1px;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-still);
+}
+
+/* Die Quelle als Pille – dieselbe Aussage wie im Änderungsprotokoll (8.5):
+   ein Eintrag von dir ist eine Entscheidung, einer vom Sync ein Fremddatum. */
+.qpille {
+  flex: none;
+  margin-top: 2px;
+  padding: 1px 6px;
+  border: 1px solid var(--linie);
+  border-radius: var(--r-rund);
+  font-family: var(--schrift-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-still);
+  white-space: nowrap;
+}
+
+.qpille.q-nutzer {
+  color: var(--gold);
+  border-color: var(--gold-rand);
+}
+
+/* --- Desktop ------------------------------------------------------------- */
+
+@media (min-width: 48rem) {
+  /* Links die Zahlen, rechts der Feed über die volle Höhe. */
+  .dspalten {
+    display: grid;
+    grid-template-columns: 1fr 19rem;
+    gap: var(--a5);
+    align-items: stretch;
+  }
+
+  .drechts .block {
+    height: 100%;
+  }
+
+  /* Kreis und „Zuletzt gespielt" teilen sich eine Zeile, ebenso die beiden
+     Tabellen darunter. Das Handy stapelt beides. */
+  .dlinks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 var(--a5);
+    align-items: start;
+  }
+
+  /* Die Reihenfolge unterscheidet sich vom Handy: Dort stehen die Plattformen
+     vor dem Kreis, hier teilt sich der Kreis die Zeile mit „Zuletzt gespielt"
+     und die Plattformen mit den Trophäen. Der Quelltext bleibt in der
+     Handy-Reihenfolge, damit ein Vorleseprogramm sie so hört, wie die Seite
+     ohne Layout gemeint ist. */
+  .dlinks > .b-zahlen {
+    order: 1;
+    grid-column: 1 / -1;
+  }
+
+  .dlinks > .b-dastehen {
+    order: 2;
+  }
+
+  .dlinks > .b-platin {
+    order: 3;
+  }
+
+  .dlinks > .b-plattform {
+    order: 4;
+  }
+
+  .dlinks > .b-trophaeen {
+    order: 5;
+  }
+
+  /* Die Jahre stehen unter den Trophäen und über die ganze Breite: Fünfzehn
+     Säulen in einer halben Spalte wären drei Pixel breit. Ohne eigene
+     Ordnungszahl landet ein Block hier ganz vorn – `order: 0` ist die Vorgabe
+     (gesehen beim Rendern am 01.10.2026: „Trophäen je Jahr" stand über den
+     Kennzahlen). */
+  .dlinks > .b-jahre {
+    order: 6;
+    grid-column: 1 / -1;
+  }
+
+  .dlinks > .dtabellen {
+    order: 7;
+    grid-column: 1 / -1;
+  }
+
+  .dtabellen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 var(--a5);
+    align-items: start;
+  }
+
+  /* Die Legende gehört neben den Kreis, nicht über die halbe Seite. */
+  .dlinks .legende {
+    max-width: 21rem;
+  }
+
+  /* Am Desktop hängt die Tafel an der Glocke, nicht am Fensterrand. */
+  .tafel {
+    left: auto;
+    width: 26rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Sichtbarkeit je Gerät – ganz am Ende.
+ *
+ * `.nur-desktop` und `.nur-handy` müssen jede `display`-Regel darüber schlagen;
+ * stünden sie weiter oben, gewönne bei gleicher Spezifität die spätere Regel,
+ * und im Dashboard stand die Blocküberschrift zweimal da (gesehen im Bild vom
+ * 27.09.2026). Die Grenze ist 48 rem – dort erscheint die Seitenleiste; die
+ * frühere Grenze von 30 rem liess die Desktop-Tabellen schon auf einem
+ * 600-px-Fenster erscheinen.
+ * ------------------------------------------------------------------------ */
+
+.nur-handy-flex {
+  display: flex;
+}
+
+@media (max-width: 47.99rem) {
+  .nur-desktop {
+    display: none;
+  }
+}
+
+@media (min-width: 48rem) {
+  .nur-handy,
+  .nur-handy-flex {
+    display: none;
+  }
+}
+

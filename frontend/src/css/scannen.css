@@ -1,0 +1,222 @@
+/* --- Stufe 17: Scannen (Abschnitt 9) --- */
+
+/*
+ * Drei feste Zonen: Kamera, Textfeld, Ergebniskarte. Das Kamerabild ist auf
+ * dem Handy auf gut ein Drittel der Hoehe begrenzt, damit die Karte darunter
+ * ohne Scrollen bedienbar bleibt; die Karte hat eine Mindesthoehe, damit die
+ * Knoepfe bei jeder Disc an derselben Stelle stehen (Abschnitt 13).
+ */
+.scanner video[hidden] {
+  display: none;
+}
+
+.scanner video {
+  display: block;
+  width: 100%;
+  max-height: 40vh;
+  object-fit: cover;
+  background: #000;
+  border-radius: 6px;
+}
+
+.scanner .kamera-zeile {
+  margin: 0.4rem 0;
+}
+
+.scanner form {
+  margin-top: 0.4rem;
+}
+
+.scankarte {
+  min-height: 12rem;
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  border: 1px solid var(--aus);
+  border-radius: 6px;
+}
+
+.scankarte .pruefkarte {
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.scankarte .aktionen {
+  margin: 0.5rem 0;
+}
+
+.scankarte .aktionen button {
+  flex: 1 1 9rem;
+}
+
+.scankarte ul.treffer {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0;
+}
+
+.scankarte ul.treffer li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--linie);
+}
+
+.scankarte ul.treffer .titel {
+  flex: 1 1 12rem;
+  font-weight: 600;
+}
+
+@media (max-width: 30rem) {
+  .scanner video {
+    max-height: 32vh;
+  }
+
+  .scankarte {
+    padding: 0.6rem;
+  }
+
+  .scankarte .pruefkarte .bild {
+    width: 4.5rem;
+    height: 4.5rem;
+    font-size: 1.8rem;
+  }
+}
+
+/* Sammelmodus (9.1): die zuletzt weggeschriebenen Codes, neueste zuerst. */
+.gesammelt {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+}
+
+.gesammelt li {
+  padding: 0.25rem 0;
+  border-top: 1px solid var(--linie);
+}
+
+.gesammelt .titel {
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+}
+
+/*
+ * Frontkamera spiegeln: Die Laptop-Webcam zeigt die Szene so, wie die Kamera
+ * sie sieht - eine Bewegung nach rechts wandert im Bild nach links, und man
+ * korrigiert in die falsche Richtung. Nur die Darstellung; die Erkennung
+ * liest die echten Bilddaten (Rückmeldung des Nutzers vom 18.09.2026).
+ */
+.scanner video.gespiegelt {
+  transform: scaleX(-1);
+}
+
+/*
+ * Rueckmeldung im Bild (Rueckmeldung des Nutzers vom 18.09.2026): Beim
+ * Abscannen eines Regals schaut man auf die Huelle, nicht auf eine Liste
+ * weiter unten. Der Rahmen leuchtet kurz auf, Haken und Code stehen gross
+ * im Bild, und der Zaehler sitzt in der Ecke.
+ */
+.kamerabild {
+  position: relative;
+  line-height: 0;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.kamerabild[hidden] {
+  display: none;
+}
+
+.kamerabild.blitz-neu {
+  border-color: rgba(60, 170, 100, 0.95);
+  box-shadow: 0 0 0 4px rgba(60, 170, 100, 0.25);
+}
+
+.kamerabild.blitz-bekannt {
+  border-color: rgba(70, 130, 210, 0.95);
+  box-shadow: 0 0 0 4px rgba(70, 130, 210, 0.25);
+}
+
+.kamerabild.blitz-fehler {
+  border-color: rgba(200, 70, 60, 0.95);
+  box-shadow: 0 0 0 4px rgba(200, 70, 60, 0.25);
+}
+
+.kamerabild .blitz {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin: 0;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  /* Hell genug, dass die naechste Huelle waehrenddessen ins Bild kommt. */
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.kamerabild .blitz .zeichen {
+  font-size: 4rem;
+  font-weight: 700;
+}
+
+.kamerabild .blitz .text {
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 0.6rem;
+}
+
+/* Zaehler im Sammelmodus: immer sichtbar, ohne zu scrollen. */
+.kamerabild .zaehler {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  margin: 0;
+  padding: 0.1rem 0.6rem;
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.gesammelt .wozu {
+  opacity: 0.8;
+}
+
+.gesammelt button.klein {
+  float: right;
+}
+
+/* Offene Scans zuordnen (9.3): eine Zeile je Code, Blöcke wie im Import. */
+.scanliste {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 1rem;
+}
+
+.scanliste > li {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--linie);
+}
+
+.scanliste .titel {
+  font-weight: 600;
+}
+
+.scanliste .knopfzeile {
+  margin: 0.3rem 0 0;
+}
+
+.scanliste .auswahl {
+  margin-top: 0.4rem;
+}
+

@@ -1,0 +1,201 @@
+/* ---------------------------------------------------------------------------
+   Gehoert zum Dashboard, steht aber hinter `trophaeenliste.css`: Beide fassen
+   `.trophkopf` an, und die Reihenfolge entscheidet.
+   --------------------------------------------------------------------------- */
+
+/* --- Trophäen-Block und Jahre auf dem Dashboard (Stufe 19b) --------------
+   Level und die vier Stufen in einer Zeile; an einem Prototyp in vier Runden
+   abgestimmt (01.10.2026). */
+
+.levelzeile {
+  display: flex;
+  align-items: baseline;
+  gap: var(--a3);
+  flex-wrap: wrap;
+}
+
+.level {
+  display: flex;
+  align-items: baseline;
+  gap: var(--a2);
+}
+
+.level .wert {
+  font-family: var(--schrift-display);
+  font-size: 2.4rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--gold);
+}
+
+.level .wort {
+  font-family: var(--schrift-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+/*
+ * Die vier Stufen nehmen die Fläche zwischen Level-Zahl und rechtem Rand ein,
+ * statt als Grüppchen am Rand zu kleben. `min-width` erzwingt den Umbruch,
+ * statt die Zahlen zu quetschen: Reicht der Platz nicht, rutscht die Reihe
+ * auf eine eigene Zeile und nimmt sie ganz ein. Ohne das schrumpft der
+ * Flex-Kasten und die letzte Zahl läuft aus dem Block (bei 360 px gesehen).
+ */
+.stufenkurz {
+  flex: 1 1 auto;
+  min-width: 15rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--a2);
+}
+
+.sk {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.15rem;
+  font-weight: 600;
+  /* Eine Zahl bricht nie mitten durch: „2 348" wurde bei 360 px zu „2" und
+     „348" in zwei Zeilen, weil das Tausendertrennzeichen ein Leerraum ist. */
+  white-space: nowrap;
+}
+
+.sk svg {
+  flex: none;
+  align-self: center;
+}
+
+@media (min-width: 30rem) {
+  .sk {
+    font-size: 1.5rem;
+    gap: 8px;
+  }
+}
+
+@media (min-width: 48rem) {
+  .stufenkurz {
+    padding-left: var(--a5);
+    justify-content: space-around;
+  }
+
+  .sk {
+    font-size: 2.4rem;
+    gap: 10px;
+  }
+}
+
+.levelbalken {
+  margin-top: var(--a3);
+  height: 6px;
+  border-radius: 6px;
+}
+
+.levelfuss {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--text-still);
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Trophäen je Jahr: Balken, die von unten wachsen. Gold nur fürs beste Jahr. */
+.jahre {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 92px;
+  margin-top: var(--a2);
+}
+
+.jahr {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.jahr .saeule {
+  background: var(--aus);
+  border-radius: 2px 2px 0 0;
+}
+
+.jahr.best .saeule {
+  background: var(--gold);
+}
+
+.jahrnamen {
+  display: flex;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.jahrnamen span {
+  flex: 1;
+  text-align: center;
+  font-size: 0.6rem;
+  color: var(--text-still);
+  font-family: var(--schrift-display);
+}
+
+.jahrfuss {
+  margin-top: var(--a2);
+}
+
+/* Die Zahl steht vor dem Pfeil, nicht ganz am Rand: „11 von 49 ⌄" liest sich
+   als eine Einheit (Rückmeldung des Nutzers vom 01.10.2026). */
+.trophliste .trophzahl {
+  margin-right: var(--a2);
+}
+
+/*
+ * Die Chips der Trophäenliste sind KEINE Filterleiste.
+ *
+ * `.chips` ist für die Sammlung gebaut: Sie ragt mit negativen Rändern aus
+ * dem Kasten heraus, scrollt waagerecht und trägt unten eine Linie, die den
+ * Filter vom Inhalt trennt. In der Trophäenliste sitzt die Reihe mitten in
+ * einer Karte – dort ragte die Linie links heraus und hörte rechts mitten im
+ * Kasten auf (Rückmeldung des Nutzers vom 01.10.2026 mit Bildschirmfoto).
+ * Hier wird nur das Aussehen der einzelnen Chips geerbt, nicht das Verhalten
+ * der Leiste.
+ */
+.trophkopf .chips {
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
+  overflow: visible;
+  flex-wrap: wrap;
+}
+
+/* Jede Säule ist ein Knopf: überfahren am Rechner, antippen auf dem Handy
+   (Wunsch des Nutzers vom 01.10.2026). Sie sieht aus wie vorher – der Knopf
+   bringt nur das Verhalten mit, nicht sein Aussehen. */
+button.jahr {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+button.jahr .saeule {
+  transition: background 0.1s;
+}
+
+button.jahr:hover .saeule,
+button.jahr.gewaehlt .saeule {
+  background: var(--text-leise);
+}
+
+button.jahr.best:hover .saeule,
+button.jahr.best.gewaehlt .saeule {
+  background: var(--gold);
+}
+
+
