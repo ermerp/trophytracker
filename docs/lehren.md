@@ -332,6 +332,17 @@ echte Daten.
 → Regel: Vor dem Prüfen in den Code sehen und mit Wegwerf-Daten arbeiten, nie
 mit echten.
 
+**09.10.2026 – die Zahl, auf der eine Entscheidung stand, war geschätzt.** Zur
+Wahl des Testreporters hiess es in der Frage an den Nutzer, der Standardreporter
+drucke „rund 1 300 Zeilen" und `dot` mache daraus „wenige". Beide Zahlen waren
+geraten; der Nutzer entschied daraufhin für `dot`. Gemessen waren es dann
+**71 Zeilen** für den Standard, **209** für `dot` und **89** für ein
+ausdrückliches `["default"]` – die Entscheidung kehrte sich um, nachdem sie
+gefallen war. Die eigentliche Flut waren 58 Wrangler-Zeilen, die kein Reporter
+betrifft.
+→ Regel: Eine Zahl, auf der eine Entscheidung ruhen soll, wird **vor** der Frage
+gemessen.
+
 ---
 
 ## Migrationen, Export, Sicherung

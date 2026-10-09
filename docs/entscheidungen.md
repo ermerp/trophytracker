@@ -154,10 +154,11 @@ gestellt, weil sie die Gestalt des Repositories festlegen (13.3, 16.2):
   Verschiebung, auch um den Preis, dass zwei Ansichten zwei Dateien tragen. Verschiebungen wären
   mit Nachweis erlaubt gewesen; der Nutzer hat den beweisbaren Weg gewählt.
 - **`.leise` bleibt**, obwohl ungenutzt: gewolltes Paar mit `.still` aus Stufe 19c.
-- **Testreporter `dot`** – nach der Messung **zurückgenommen**: `dot` ergab 209 statt 71 Zeilen,
-  weil es in einer Pipe je Datei eine Zeile schreibt und zusätzlich die Messwerte druckt. Der
-  Reporter bleibt deshalb ungesetzt; knapp wird die Ausgabe über `WRANGLER_LOG=error` (13 Zeilen).
-  Die Entscheidung war auf einer falschen Zahl von mir aufgebaut.
+- **Testreporter `dot`** – nach der Messung zurückgenommen und vom Nutzer **bestätigt**
+  („Reporter bleibt ungesetzt, deine Messung gilt"): `dot` ergab 209 statt 71 Zeilen, weil es in
+  einer Pipe je Datei eine Zeile schreibt und zusätzlich die Messwerte druckt. Knapp wird die
+  Ausgabe stattdessen über `WRANGLER_LOG=error` (13 Zeilen). Die ursprüngliche Wahl stand auf
+  einer geschätzten Zahl von mir; der Vorfall steht in [`lehren.md`](lehren.md).
 
 Was in den offenen Stufen 20f und 20g noch zu entscheiden ist, steht dort:
 [16.2](spec/16-2-offene-stufen.md).
