@@ -31,6 +31,8 @@ Dazu Cloudflare Secrets am Worker (nicht GitHub): `NPSSO_KEY` (Stufe 2) sowie `I
 
 **Was dort niemals hingehört:** NPSSO und PSN-Refresh-Token, IGDB/Twitch-Zugangsdaten, eBay-Cert-ID und Application-Token, das API-Bearer-Token, der Cloudflare-API-Token. Alles davon liegt als Cloudflare Secret beziehungsweise GitHub Secret. `.dev.vars`, `.wrangler/` und `*.sql` gehören in die `.gitignore` – letzteres mit der Ausnahme `!migrations/*.sql`. Ohne diese Ausnahme würden die Migrationen mit ignoriert, und die Deploy-Action liefe gegen ein leeres Verzeichnis.
 
+**Was erzeugt ist, gehört ebenfalls nicht hinein** (seit 09.10.2026): `worker-configuration.d.ts` entsteht aus `npm run cf-typegen` – 15 392 Zeilen, davon 15 379 Runtime-Typen von workerd. Die eingecheckte Fassung war beim Entfernen bereits veraltet. Die Deploy-Action erzeugt sie in **beiden** Jobs vor Test und Build, die README nennt den Aufruf nach einem frischen Klon. **Zwei Dinge dazu, die nicht offensichtlich sind:** Erstens liest Wrangler die eigenen Bindings aus `.dev.vars`, die in der Action fehlt – dort trägt `Env` nur `DB` und `ASSETS`. Das ist heute folgenlos, weil die Action die Typen des Workers nicht prüft, aber eine Falle für den Tag, an dem sie es tut (16.2). Zweitens taugt `--include-runtime=false` hier **nicht**, obwohl Wrangler es kann (26 statt 15 392 Zeilen): Die Runtime-Typen kommen ausschliesslich aus dieser Datei – `@cloudflare/workers-types` ist nicht installiert –, und ohne sie meldet `tsc` 64 Fehler, angefangen bei `Cannot find name 'D1Database'`.
+
 ### 15.2 Automatisches Deployment
 
 **Frontend:** Kein eigenes Hosting. Vite baut das Frontend nach `frontend/dist`, und derselbe Worker liefert es als Static Assets aus (`assets.directory`, `not_found_handling: "single-page-application"`). `run_worker_first: ["/api/*"]` sorgt dafür, dass die API immer den Worker erreicht und alles Übrige auf `index.html` zurückfällt.
@@ -39,6 +41,7 @@ Frontend und API teilen sich damit eine Origin: **kein CORS, ein Deploy-Pfad, ei
 
 **Worker und Datenbank:** GitHub Action mit `cloudflare/wrangler-action`, ausgelöst durch Push auf `main`. Die Reihenfolge der Schritte ist wichtiger als das Werkzeug:
 
+0. Im Job davor: `npm ci`, `npm run cf-typegen`, `npm test`, `npm run build`
 1. `wrangler d1 export` – Sicherung **vor** jeder Schemaänderung
 2. Sicherung prüfen (`scripts/sicherung-pruefen.sh`): Der Dump schreibt eine `INSERT`-Zeile je Datensatz; die Zahlen werden je Tabelle gegen `COUNT(*)` der Datenbank gehalten. Weicht eine ab, **bricht der Job hier ab**, vor der Migration. Ins Log kommen nur Zahlen, nie Inhalt
 3. Dump auf Klartext prüfen (`scripts/dump-pruefen.sh`, 14.5)

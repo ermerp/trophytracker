@@ -1,0 +1,927 @@
+/* ---------------------------------------------------------------------------
+   Die Linie "Vitrine" (Stufe 19): Rahmen, Kopfzeile, Chip-Filter, Reiter,
+   Listenkopf, die Zeichen der Karten, Kachel und Zeile, Navigation und das
+   Desktop-Raster. **Global** - das Geruest aller Listenansichten.
+   --------------------------------------------------------------------------- */
+
+/* ===========================================================================
+ * Stufe 19: Gestaltungslinie „Vitrine"
+ *
+ * Alles darüber ist in vierzehn Stufen gewachsen und benutzt seit dieser
+ * Stufe die Tokens aus tokens.css. Was hier steht, ist neu: Kopfzeile,
+ * Chip-Filter, Kachel und Zeile, die Navigation aus vier Symbolen.
+ * ======================================================================== */
+
+/* --- Rahmen ------------------------------------------------------------ */
+
+main {
+  /*
+   * 80 rem, nicht 64 (Entscheidung des Nutzers vom 01.10.2026).
+   *
+   * Gemeldet war, dass die Kopfzeile auf einem breiten Bildschirm mitten im
+   * Fenster endet und die Glocke weit vom Rand sitzt – beides, weil die Zeile
+   * mit dem Inhalt endet. Der erste Versuch hob den Deckel ganz auf; das
+   * behob es, zog aber **jede** Ansicht über die volle Bildschirmbreite. Der
+   * zweite setzte 80 rem – an der falschen der **zwei** `main`-Regeln, und
+   * blieb deshalb wirkungslos. **Dies hier ist die wirksame.**
+   */
+  max-width: 80rem;
+  margin: 0 auto;
+  /* Waagerecht gepolstert, senkrecht nicht: Kopfzeile und Chipleiste laufen
+     bis an den Rand und holen sich die Polsterung mit negativem Rand zurueck. */
+  /* Genau so viel, wie die Leiste unten braucht - mehr erzeugt eine Seite,
+     die scrollt, obwohl alles zu sehen ist (Rueckmeldung des Nutzers vom
+     27.09.2026). `env(safe-area-inset-bottom)` gehoert dazu: Die Leiste ist
+     so hoch, und ohne den Anteil verschwaende die Seite ihn nicht, sondern
+     legte den letzten Inhalt darunter. */
+  padding: 0 var(--a4) calc(var(--leiste-hoehe) + env(safe-area-inset-bottom) + var(--a2));
+}
+
+/* Ansichten ohne eigene Kopfzeile (Einstellungen, Scannen, Import …). */
+main > h1 {
+  margin-top: 1.25rem;
+}
+
+.seite {
+  padding-top: var(--a4);
+}
+
+button,
+input,
+select,
+textarea {
+  color: var(--text);
+}
+
+button {
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+input,
+select,
+textarea {
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+}
+
+/* Nur fuer Vorleseprogramme: sichtbar ist das Symbol, gesagt wird der Name. */
+.nur-vorlesen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ruhig {
+  color: var(--text-leise);
+}
+
+.klein {
+  font-size: 0.8125rem;
+}
+
+/* --- Kopfzeile --------------------------------------------------------- */
+
+.kopfzeile {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--kopf-hoehe);
+  margin: 0 calc(-1 * var(--a4));
+  padding: 0 var(--a2) 0 var(--a4);
+  background: var(--grund);
+  border-bottom: 1px solid var(--linie);
+}
+
+.kopfzeile h1 {
+  flex-grow: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--schrift-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ein Symbolknopf: 44 px, damit er auf dem Handy sicher zu treffen ist. */
+.ikone {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--r2);
+  color: var(--text-leise);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ikone:hover {
+  color: var(--text);
+  background: var(--flaeche-hoch);
+}
+
+.ikone.gefahr:hover {
+  color: var(--gefahr);
+}
+
+.ikone.stern.aktiv {
+  color: var(--gold);
+}
+
+.suchfeld {
+  flex-grow: 1;
+  min-width: 0;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  padding: 0 var(--a3);
+  border-radius: var(--r-rund);
+  background: var(--flaeche-hoch);
+  color: var(--text-still);
+}
+
+.suchfeld input {
+  flex-grow: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  outline: none;
+}
+
+/* --- Chip-Filter ------------------------------------------------------- */
+
+.chips {
+  display: flex;
+  gap: 6px;
+  margin: 0 calc(-1 * var(--a4));
+  padding: var(--a2) var(--a4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--linie);
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: none;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 1px solid var(--linie);
+  border-radius: var(--r-rund);
+  background: none;
+  color: var(--text-leise);
+  font: inherit;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.chip.aktiv {
+  border-color: var(--gold-rand);
+  background: var(--gold-flaeche);
+  color: var(--gold);
+  font-weight: 600;
+  padding-right: 9px;
+}
+
+.chip.ab {
+  color: var(--text-still);
+  border-style: dashed;
+}
+
+/* --- Reiter ------------------------------------------------------------ */
+
+.reiter {
+  margin: 0 calc(-1 * var(--a4));
+  padding: 0 var(--a2);
+  border-bottom: 1px solid var(--linie);
+}
+
+.reiter a.active {
+  border-bottom-color: var(--gold);
+  color: var(--text);
+}
+
+/* --- Listenkopf -------------------------------------------------------- */
+
+.listenkopf {
+  display: flex;
+  align-items: center;
+  gap: var(--a3);
+  flex-wrap: wrap;
+  margin-bottom: var(--a3);
+  font-size: 0.8125rem;
+  color: var(--text-still);
+}
+
+/* Die Überschrift ist in der Lückenansicht ein Schalter und darf die
+   Sortierung nicht an den Rand drängen (Stufe 20e). */
+.listenkopf .knopfname {
+  width: auto;
+}
+
+/* Die Sortierung ist ein verankertes Menue (Stufe 20e) - dieselbe Tafel wie
+   im Spieldetail, statt eines nativen <select>, das als einziges
+   Bedienelement die Gestaltungslinie aus Stufe 19 nicht mitmachte. */
+.sortierleiste {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.sortierleiste .chip {
+  height: 28px;
+  padding: 0 10px;
+}
+
+/* Der Pfeil zeigt die TATSAECHLICHE Richtung, nicht "Standard oder
+   umgekehrt": aufsteigend nach oben, absteigend nach unten. */
+.richtung {
+  display: inline-flex;
+  color: var(--text-still);
+}
+
+.richtung.ab {
+  transform: rotate(180deg);
+}
+
+.sortierleiste .menuezeile .knopf {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: var(--a3);
+}
+
+.listenkopf label {
+  display: inline;
+  margin: 0 0 0 auto;
+}
+
+.listenkopf select {
+  background: none;
+  border-color: transparent;
+  color: var(--text-leise);
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 2px 4px;
+}
+
+.blaettern {
+  margin-top: var(--a5);
+}
+
+/* --- Die Zeichen der Karten -------------------------------------------- */
+
+.deckel {
+  display: flex;
+  flex: none;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: var(--cover);
+  background: var(--flaeche-hoch);
+  border-radius: var(--r1);
+  overflow: hidden;
+  color: var(--text-still);
+  font-family: var(--schrift-display);
+  font-size: 1.6rem;
+  text-decoration: none;
+}
+
+.deckel img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Das IGDB-Cover hat genau das Seitenverhaeltnis der Flaeche und fuellt sie;
+   das Trophaeensymbol ist quadratisch und bleibt vollstaendig sichtbar. */
+.deckel img.fuellend {
+  object-fit: cover;
+}
+
+.plattform {
+  flex: none;
+  font-family: var(--schrift-display);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 3px;
+}
+
+.plattform.leer {
+  color: var(--text-still);
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.balken {
+  /*
+   * `display: block` ist hier nicht selbstverständlich, sondern nötig: In
+   * „Anteil je Stufe" ist der Balken ein `<span>`, und ein Inline-Kasten
+   * nimmt keine Höhe an – die farbigen Verhältnisbalken waren dadurch
+   * unsichtbar, obwohl Breite und Farbe im Markup standen (Rückmeldung des
+   * Nutzers vom 01.10.2026: „es gab mal einen Prototyp mit farbigen Balken,
+   * den hätte ich gerne wieder"). Überall sonst ist der Balken ein `<div>`
+   * und war es ohnehin.
+   */
+  display: block;
+  height: 3px;
+  background: var(--linie);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.balken.duenn {
+  height: 2px;
+}
+
+.balken > div {
+  height: 100%;
+}
+
+.prozent {
+  font-family: var(--schrift-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-leise);
+}
+
+.prozent.voll {
+  color: var(--gold);
+}
+
+.prozent.leer {
+  font-family: var(--schrift);
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-still);
+}
+
+.zeichen {
+  display: inline-flex;
+  align-items: center;
+}
+
+.zustand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-still);
+}
+
+.zustand .punkt {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* --- Kachel und Zeile -------------------------------------------------- */
+
+.titel {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.kacheln {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 1.15rem 0.9rem;
+}
+
+.kachel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.kachel-bild {
+  position: relative;
+}
+
+/* Der Fortschritt sitzt an der Unterkante des Covers - ein Element traegt
+   Fortschritt und Zustandsfarbe, statt die Kachel zusaetzlich einzufaerben. */
+.kachel-bild .balken {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 0;
+}
+
+.zeilen {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.eintrag {
+  display: flex;
+  align-items: center;
+  gap: var(--a3);
+  padding: var(--a2) 0;
+  border-bottom: 1px solid var(--linie);
+}
+
+.eintrag-text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eintrag-text .titel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.release {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.release-daten {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.release-daten select {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 1px 4px;
+}
+
+.fueller {
+  flex-grow: 1;
+}
+
+.knoepfe {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kachel.erledigt,
+.eintrag.erledigt {
+  opacity: 0.55;
+}
+
+/* Verschieben ohne Griff (To-Do): die ganze Karte ist der Anfasser. */
+.ziehbar {
+  touch-action: none;
+  cursor: grab;
+}
+
+.ziehbar:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.kachel.zieht,
+.eintrag.zieht {
+  opacity: 0.6;
+  background: var(--flaeche-hoch);
+  border-radius: var(--r2);
+  box-shadow: var(--schatten-2);
+}
+
+/* --- Navigation -------------------------------------------------------- */
+
+.nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  height: calc(var(--leiste-hoehe) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  /*
+   * Die Grundfarbe, nicht die hellere Flaeche: Darunter malt Android ein
+   * schwarzes Systemband, und der Sprung von #1a1f2a auf Schwarz war eine
+   * Stufe (Freigabe des Nutzers vom 24.09.2026). Die Leiste trennt sich
+   * jetzt nur noch durch ihre Oberkante vom Inhalt.
+   */
+  background: var(--grund);
+  border-top: 1px solid var(--linie);
+}
+
+.nav-gruppe {
+  flex: 1 1 0;
+  display: flex;
+}
+
+.nav-haupt {
+  flex: 1 1 0;
+  height: var(--leiste-hoehe);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--text-still);
+  text-decoration: none;
+}
+
+.nav-haupt.active {
+  color: var(--gold);
+}
+
+.nav-punkt {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.nav-haupt.active .nav-punkt {
+  background: var(--gold);
+}
+
+/* Auf dem Handy traegt die Leiste nur Symbole; Text und Unterpunkte
+   erscheinen erst am Desktop, wo der Platz dafuer da ist. */
+.nav-text,
+.nav-unter,
+.nav-unten {
+  display: none;
+}
+
+.nach-oben {
+  position: fixed;
+  right: var(--a4);
+  bottom: calc(var(--leiste-hoehe) + env(safe-area-inset-bottom) + var(--a4));
+  z-index: 9;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--linie);
+  border-radius: 50%;
+  background: var(--flaeche-hoch);
+  color: var(--text-leise);
+  box-shadow: var(--schatten-1);
+}
+
+/* --- Desktop ----------------------------------------------------------- */
+
+@media (min-width: 48rem) {
+  .app {
+    display: grid;
+    grid-template-columns: 14rem 1fr;
+  }
+
+  .nav {
+    position: sticky;
+    top: 0;
+    bottom: auto;
+    align-self: start;
+    height: 100vh;
+    /* Ohne das addiert sich die Polsterung auf die 100vh und der letzte
+       Eintrag (Einstellungen) rutscht unter den Bildrand. */
+    box-sizing: border-box;
+    overflow-y: auto;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 2px;
+    padding: var(--a5) var(--a3);
+    border-top: none;
+    border-right: 1px solid var(--linie);
+  }
+
+  .nav-gruppe {
+    flex: none;
+    flex-direction: column;
+  }
+
+  .nav-haupt {
+    flex: none;
+    height: 42px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.7rem;
+    padding: 0 0.85rem;
+    border-radius: var(--r2);
+    font-size: 0.92rem;
+  }
+
+  .nav-haupt.active {
+    background: var(--flaeche-hoch);
+    font-weight: 600;
+  }
+
+  .nav-text {
+    display: inline;
+  }
+
+  .nav-punkt {
+    display: none;
+  }
+
+  .nav-unter {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 0.85rem 0 3rem;
+    border-radius: var(--r2);
+    color: var(--text-still);
+    text-decoration: none;
+    font-size: 0.84rem;
+  }
+
+  .nav-unter.active {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .nav-unten {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-top: auto;
+    height: 42px;
+    padding: 0 0.85rem;
+    border-radius: var(--r2);
+    color: var(--text-still);
+    text-decoration: none;
+    font-size: 0.92rem;
+  }
+
+  /* Am Desktop steht es in der Seitenleiste. */
+  .nur-handy {
+    display: none;
+  }
+
+  main {
+    width: 100%;
+    box-sizing: border-box;
+    padding-bottom: var(--a6);
+  }
+
+  .nach-oben {
+    bottom: var(--a5);
+  }
+}
+
+/*
+ * Die Absichtslisten tragen fuenf Symbolknoepfe je Eintrag. Neben dem Titel
+ * blieben davon auf 390 px 66 Pixel Text uebrig - deshalb steht die
+ * Knopfreihe dort unter dem Text. Die Zeile wird damit knapp so hoch wie ihr
+ * Cover (52 x 74), statt den Titel auf sechs Zeichen zu kuerzen.
+ */
+.eintrag.hoch {
+  align-items: flex-start;
+}
+
+.eintrag.hoch .eintrag-text {
+  gap: 2px;
+}
+
+.eintrag.hoch .knoepfe {
+  margin-left: -8px;
+}
+
+.eintrag.hoch .ikone {
+  width: 40px;
+  height: 40px;
+}
+
+.release-daten.umbrechend {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+/*
+ * Der Favoritenstern sitzt in der Kachel auf dem Cover. Fuenf Symbolknoepfe
+ * nebeneinander brauchen 220 px, eine Kachel ist auf dem Handy 171 px breit -
+ * ohne das brach die Knopfreihe um und die Kacheln wurden ungleich hoch.
+ */
+.kachel-bild .ecke {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+
+.kachel-bild .ecke .ikone {
+  width: 36px;
+  height: 36px;
+  background: rgba(18, 21, 28, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.kachel .knoepfe {
+  gap: 0;
+}
+
+.kachel .knoepfe .ikone {
+  width: 40px;
+}
+
+/* Verweise sind gold, aber nur, wo sie wirklich Verweise sind. */
+a {
+  color: var(--gold);
+}
+
+a:hover {
+  color: var(--text);
+}
+
+.ruhig a,
+a.ruhig {
+  color: var(--text-leise);
+}
+
+/*
+ * Ueberschriften. Die Ansichten ohne eigene Kopfzeile (Einstellungen,
+ * Scannen, Import, Zuordnung) trugen bis hierher die Browser-Groessen und
+ * wirkten neben den neuen Listen riesig.
+ */
+h1,
+h2,
+h3 {
+  font-family: var(--schrift-display);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+main > h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: var(--a5) 0 var(--a2);
+}
+
+h3 {
+  font-size: 1rem;
+}
+
+/*
+ * Sichere Bereiche (seit `viewport-fit=cover`, Stufe 19).
+ *
+ * Die Seite reicht jetzt unter Status- und Systemleiste. Die Kopfzeile holt
+ * sich den oberen Rand mit negativem Aussenabstand zurueck und fuellt ihn mit
+ * ihrer eigenen Flaeche - auch wenn sie beim Scrollen oben klebt. Auf Geraeten
+ * ohne Aussparung sind alle Werte null und es aendert sich nichts.
+ */
+main {
+  padding-top: env(safe-area-inset-top);
+}
+
+.kopfzeile {
+  box-sizing: border-box;
+  margin-top: calc(-1 * env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  height: calc(var(--kopf-hoehe) + env(safe-area-inset-top));
+}
+
+@media (min-width: 48rem) {
+  .nav {
+    padding-top: calc(var(--a5) + env(safe-area-inset-top));
+  }
+}
+
+/*
+ * Filter in zwei Ebenen (24.09.2026). Sichtbar sind nur gesetzte Filter und
+ * ein Knopf, der die Tafel aufklappt - 23 Chips nebeneinander waren "zu lang"
+ * (Rueckmeldung des Nutzers).
+ */
+.filter {
+  margin: 0 calc(-1 * var(--a4));
+  border-bottom: 1px solid var(--linie);
+}
+
+.filter .chips {
+  margin: 0;
+  border-bottom: none;
+}
+
+.chip.griff {
+  gap: 7px;
+  padding-left: 10px;
+  color: var(--text-leise);
+}
+
+.chip.griff.offen {
+  background: var(--flaeche-hoch);
+  color: var(--text);
+}
+
+.chip .zahl {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-rund);
+  background: var(--gold);
+  color: var(--grund);
+  font-family: var(--schrift-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.filtertafel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--a3);
+  padding: var(--a2) var(--a4) var(--a4);
+  background: var(--flaeche);
+  border-top: 1px solid var(--linie);
+}
+
+.filtergruppe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filtername {
+  font-family: var(--schrift-display);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+/* In der Tafel duerfen die Chips umbrechen statt zu scrollen. */
+.chips.lose {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+/* Die Plattform ist eine Box, die auf Tippen zum Auswahlfeld wird. */
+.plattform-knopf {
+  padding: 0;
+  border: none;
+  background: none;
+  line-height: 0;
+}
+
+.anlegen {
+  margin-bottom: var(--a5);
+}
+

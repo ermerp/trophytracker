@@ -2,6 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
+import { CRON_PSN, CRON_WARTUNG, cronFenster } from "../src/sync/cron";
 import { EXPORT_ORDNUNG, EXPORT_TABELLEN } from "../src/db/export";
 import {
 	LETZTES_PLATIN_SQL,
@@ -1072,7 +1073,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// einmal die Listentabelle, 36-mal je Nacht also rund 15 000 Zeilen.
 		expect(auswahlOffen).toBeLessThan(50);
 		expect(auswahlLeer).toBeLessThan(listen.length + 50);
-		expect(auswahlLeer * 36).toBeLessThan(20_000);
+		expect(auswahlLeer * cronFenster(CRON_PSN).aufrufe).toBeLessThan(20_000);
 		// Der Feed bleibt im Fenster statt im Bestand - und die Route auch:
 		// Sie darf den Bestand nicht ein zweites Mal durchzaehlen.
 		expect(feed).toBeLessThan(2_000);
@@ -1162,11 +1163,12 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		);
 
 		// Seit Stufe 18e sind es zwei Fenster, und jedes liest nur seine
-		// eigenen Abfragen: das PSN-Fenster 36-mal je Nacht, die Wartung
-		// 24-mal.
+		// eigenen Abfragen. Wie oft jedes laeuft, sagt sein Cron-Ausdruck -
+		// hier stand die Zahl bis zur Stufe "Refactoring" doppelt und fiel
+		// bei der Erweiterung auf drei Stunden zurueck (10.1).
 		const leerlaufPsn = haenger + laufend + heutige + storeAuswahl;
 		const leerlaufWartung = erschienen + auffrischen + disc + aufraeumen;
-		const nacht = leerlaufPsn * 36 + leerlaufWartung * 24;
+		const nacht = leerlaufPsn * cronFenster(CRON_PSN).aufrufe + leerlaufWartung * cronFenster(CRON_WARTUNG).aufrufe;
 		console.info({ erschienen, haenger, laufend, heutige, storeAuswahl, auffrischen, disc, aufraeumen, leerlaufPsn, leerlaufWartung, nacht });
 
 		// Gemessen bis Stufe 18d: 2 241 Zeilen in einem Aufruf, der alles tat -

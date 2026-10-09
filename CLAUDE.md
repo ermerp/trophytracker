@@ -59,9 +59,9 @@ Wenn eine Änderung sie verletzen würde, weise darauf hin, statt sie zu umgehen
 
 ### Gestaltung kommt aus Tokens
 
-- Farben, Abstände, Radien und Schriften stehen in `frontend/src/tokens.css` und werden nur als `var(--…)` benutzt. Kein Literalwert in `App.css`, keine Systemfarbe wie `Canvas`.
+- Farben, Abstände, Radien und Schriften stehen in `frontend/src/tokens.css` und werden nur als `var(--…)` benutzt. Kein Literalwert in `frontend/src/css/`, keine Systemfarbe wie `Canvas`.
 - Die Anwendung ist **nur dunkel**; ein zweiter Tokensatz ist eine Entscheidung des Nutzers, keine Ergänzung nebenbei.
-- **Ein Klassenname ist eine Zusage über seinen Kontext.** Vor jedem neuen Namen in `App.css` (über 3 600 Zeilen) danach greppen; wer eine bestehende Klasse mitbenutzt, prüft ihre Regeln ganz, nicht nur die Farbe.
+- **Ein Klassenname ist eine Zusage über seinen Kontext.** Die Regeln liegen in `frontend/src/css/`, eine Datei je Ansicht; `App.css` ist nur die `@import`-Liste, und **ihre Reihenfolge ist die Kaskade** (13.3). Vor jedem neuen Namen über **alle** Dateien greppen – zehn Selektoren kommen in mehreren vor; wer eine bestehende Klasse mitbenutzt, prüft ihre Regeln ganz, nicht nur die Farbe. Ein neuer Abschnitt kommt in die Datei seiner Ansicht, nicht in `basis.css` oder `textbausteine.css`: Die beiden sind global.
 - **Ein neues Bedienelement ist fast immer schon da:** verankertes Menü (`.menueanker` + `.menuetafel`), Chip mit Tafel (`Chips`), Auswahltafel (`ZustandTafel`, `QuellenTafel`), Sortierung (`Sortierung.tsx`). Native Felder bleiben richtig, wo sie ein **Formular** bedienen.
 
 ### Nur PS3, PS4, PS5 und PS Vita

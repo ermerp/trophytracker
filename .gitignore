@@ -179,6 +179,12 @@ dist
 frontend/dist/
 frontend/dev-dist/
 
+# Erzeugte Typen des Workers: 15 392 Zeilen aus `npm run cf-typegen`, davon
+# 15 379 Runtime-Typen von workerd. Sie gehoeren nicht in die Geschichte des
+# Repositories - die eingecheckte Fassung war am 09.10.2026 ohnehin veraltet.
+# Nach einem frischen Klon einmal `npm run cf-typegen` laufen lassen (README).
+worker-configuration.d.ts
+
 # WSL-Artefakte aus Windows-Downloads
 *:Zone.Identifier
 

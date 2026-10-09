@@ -1,0 +1,460 @@
+/* ==========================================================================
+   Spieldetail (Stufe 19c)
+
+   Die Ansicht trug bis hierher als einzige oft besuchte keine Kopfzeile und
+   kein Zeichen aus `SpielTeile.tsx`. Sie besteht jetzt aus drei Teilen: dem
+   Heldenblock mit Cover und Titel, einer Karte je Release und dem
+   zugeklappten Verlauf. Alles Seltene liegt in einer `.menuetafel`.
+   ========================================================================== */
+
+/* Die Kopfzeile klebt oben; ohne eigenen Abstand sass das Cover direkt an
+   ihrer Kante (Rueckmeldung des Nutzers vom 27.09.2026). Unten polstert
+   `main` bereits fuer die Leiste - ein zweites Polster hier waren 24 px, die
+   die Seite grundlos scrollen liessen. */
+.detail {
+  padding-top: var(--a4);
+}
+
+/* --- Heldenblock --- */
+
+.held {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: var(--a3);
+  align-items: start;
+  margin-bottom: var(--a4);
+}
+
+.heldtext {
+  min-width: 0;
+}
+
+.spieltitel {
+  font-family: var(--schrift-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  /* Ein langer Titel bricht um, statt aus der Seite zu laufen. */
+  overflow-wrap: anywhere;
+}
+
+.stift {
+  background: none;
+  border: none;
+  color: var(--text-still);
+  cursor: pointer;
+  padding: 2px;
+  margin-left: var(--a2);
+  vertical-align: middle;
+}
+
+.stift:hover {
+  color: var(--text);
+}
+
+.titelform {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a2);
+  align-items: center;
+}
+
+.titelform input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-family: var(--schrift-display);
+  font-size: 1.1rem;
+}
+
+.herkunft {
+  margin: var(--a2) 0 0;
+  color: var(--text-leise);
+  font-size: 0.9rem;
+}
+
+.herkunft .zahl,
+.herkunft b {
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.pillen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a2);
+  align-items: center;
+  margin-top: var(--a3);
+}
+
+/* --- Release-Karten --- */
+
+.releasespalten {
+  display: grid;
+  gap: var(--a3);
+}
+
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--r3);
+  padding: var(--a3);
+}
+
+.karte > h2 {
+  font-family: var(--schrift-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-still);
+  margin: 0 0 var(--a2);
+}
+
+/* Die Zeile ist eng: Kennzeichen, zwei Knoepfe und das Punktmenue teilen
+   sich 358 px. Gemessen am 27.09.2026 blieben der Wortspalte je 49 px - genau
+   so viel, wie "erfassen" braucht, und auf dem Geraet des Nutzers eines zu
+   wenig ("erfass..."). Die Abstaende sind deshalb knapper als sonst. */
+.releasekopf {
+  display: flex;
+  align-items: center;
+  gap: var(--a1);
+  margin-bottom: var(--a3);
+}
+
+.releasekopf .ikone {
+  width: 32px;
+  height: 32px;
+}
+
+/* Das Kennzeichen ist hier die Ueberschrift der Karte, nicht eine
+   Nebenangabe wie in einer Kachel (Wunsch des Nutzers vom 27.09.2026). */
+.plattform.gross {
+  font-size: 0.85rem;
+  padding: 3px 9px;
+  border-width: 1.5px;
+  flex: none;
+}
+
+.releasekopf .menueanker {
+  flex: none;
+}
+
+/* Besitz: zwei grosse Knoepfe. Gesetzt ist hell, fehlend gestrichelt -
+   dieselbe Regel wie ueberall (Abschnitt 13). */
+
+/* Zwei Knoepfe in derselben Zeile wie das Kennzeichen. Sie teilen sich den
+   Rest der Breite; die Nebenzeile kuerzt mit Ellipse, statt umzubrechen. */
+.besitzknoepfe {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--a1);
+  flex: 1;
+  min-width: 0;
+}
+
+.besitzknopf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border-radius: var(--r2);
+  border: 1px solid var(--linie);
+  background: var(--flaeche-hoch);
+  color: var(--text-leise);
+  font: inherit;
+  text-align: left;
+  min-width: 0;
+}
+
+.besitzknopf .wort {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+/* "PS Plus" brach in der schmalen Fassung auf zwei Zeilen um und machte den
+   Knopf hoeher als seinen Nachbarn (gesehen in der Produktion, 27.09.2026). */
+.besitzknopf .wort b {
+  font-family: var(--schrift-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.besitzknopf .wort span {
+  font-size: 0.72rem;
+  color: var(--text-still);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.besitzknopf.aus {
+  background: none;
+  border-style: dashed;
+  color: var(--aus);
+  cursor: pointer;
+}
+
+.besitzknopf.aus .wort b {
+  color: var(--text-still);
+  font-weight: 500;
+}
+
+.besitzknopf.aus:hover:not(:disabled) {
+  border-color: var(--text-still);
+  color: var(--text-leise);
+}
+
+/* Trophaeen: Prozent, Balken, Stufen. */
+
+.trophzeile {
+  display: flex;
+  align-items: baseline;
+  gap: var(--a2);
+  margin: 0;
+}
+
+.trophzeile .prozent {
+  font-family: var(--schrift-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.6rem;
+}
+
+/*
+ * Die Trophäenzeichen des Spieldetails (Stufe 19c).
+ *
+ * **Hießen bis zum 01.10.2026 `.stufen` / `.stufe` – und das waren schon die
+ * Namen der Tabellenzeilen auf dem Dashboard.** Die spätere Regel gewann:
+ * `display: inline-flex` machte aus jeder Tabellenzeile einen Inline-Kasten,
+ * „Platin 164 / 338" und „Gold 812 / 1564" liefen in einer Zeile ineinander,
+ * und der Balken mit `flex: 1` fiel auf Breite null zusammen – die farbigen
+ * Verhältnisbalken waren damit schlicht unsichtbar. Gemeldet vom Nutzer mit
+ * Bildschirmfoto; es ist die dritte Klassenkollision dieser Stufe nach
+ * `.deckel` und `.chips`.
+ */
+.stufenzeichen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a3);
+  margin-top: var(--a3);
+  font-size: 0.8rem;
+}
+
+.stufenzeichen-teil {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.stufenzeichen-teil b {
+  font-weight: 600;
+}
+
+.stufenzeichen-teil .von {
+  color: var(--text-still);
+}
+
+/* Der eigene Zustand, zwischen Fortschritt und Stufen. */
+
+.zustandzeile {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  margin-top: var(--a3);
+  padding: var(--a2) var(--a2) var(--a2) var(--a3);
+  border-radius: var(--r2);
+  background: var(--flaeche-hoch);
+}
+
+.zustandzeile .zustand {
+  font-family: var(--schrift-display);
+  font-weight: 600;
+}
+
+.zustandzeile > button {
+  margin-left: auto;
+}
+
+/* Zwei feste Zeilen statt eines Flusses: "zuletzt gespielt 2.8.2026 ·
+   Spielzeit 49 h in 23 Sitzungen" brach auf dem Handy ohnehin um, und der
+   Umbruch lag je nach Datum woanders (Wunsch des Nutzers vom 27.09.2026). */
+.fusszeile {
+  margin: var(--a3) 0 0;
+}
+
+.fusszeile span.reihe {
+  display: block;
+}
+
+.fusszeile .zahl {
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-leise);
+}
+
+.meldung,
+.hinweiszeile {
+  margin: 0 0 var(--a3);
+  color: var(--text-leise);
+  font-size: 0.9rem;
+}
+
+/* --- Tafeln: Zustand waehlen, auf eine Liste setzen --- */
+
+.wahltafel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a2);
+  margin-top: var(--a2);
+  padding: var(--a3);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+  background: var(--flaeche-hoch);
+}
+
+.wahltafel .still {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.wahltafel.breit {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.listenzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--a2);
+}
+
+.zustandwahl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: var(--r-rund);
+  border: 1px solid var(--linie);
+  background: var(--flaeche);
+  color: var(--text-leise);
+  cursor: pointer;
+}
+
+.zustandwahl.aktiv {
+  border-color: var(--text-still);
+  color: var(--text);
+}
+
+/* --- Punktmenues --- */
+
+.menueanker {
+  position: relative;
+  display: inline-flex;
+}
+
+.menuetafel {
+  position: absolute;
+  top: calc(100% + var(--a1));
+  right: 0;
+  left: auto;
+  width: max-content;
+  min-width: 15rem;
+  max-width: min(22rem, calc(100vw - 2 * var(--a3)));
+}
+
+/* Das Menue der Kopfzeile haengt an der klebenden Leiste, nicht an der Karte. */
+.kopfmenue {
+  position: fixed;
+  top: calc(var(--kopf-hoehe) + env(safe-area-inset-top) + var(--a1));
+  right: var(--a3);
+}
+
+.menuezeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--a2);
+  margin: 0 0 var(--a2);
+  font-size: 0.9rem;
+}
+
+.menuezeile:last-child {
+  margin-bottom: 0;
+}
+
+.menuezeile:not(.knopfzeile) > button:last-child {
+  margin-left: auto;
+}
+
+/* In einer Knopfzeile stehen die Knoepfe beieinander; nur das Gefaehrliche
+   rueckt nach rechts, damit es nicht in Reichweite der haeufigen liegt. */
+.menuezeile.knopfzeile {
+  margin: 0 0 var(--a2);
+}
+
+.menuezeile > .knopf.gefahr:only-child {
+  margin-left: auto;
+}
+
+.menuezeile input[type='text'],
+.menuezeile select {
+  font: inherit;
+  font-size: 0.9rem;
+  margin: 0;
+  width: auto;
+}
+
+.menuetafel .tafelname {
+  margin-top: var(--a3);
+}
+
+.menuetafel .tafelname:first-child {
+  margin-top: 0;
+}
+
+.knopf.gefahr {
+  color: var(--gefahr);
+  border-color: transparent;
+  background: none;
+}
+
+/* --- Desktop: Releases nebeneinander, Verlauf daneben --- */
+
+@media (min-width: 48rem) {
+  .detail {
+    max-width: 62rem;
+  }
+
+  .held {
+    grid-template-columns: 168px 1fr;
+    gap: var(--a4);
+    margin-bottom: var(--a5);
+  }
+
+  .spieltitel {
+    font-size: 1.9rem;
+  }
+
+  /* Zwei Spalten. 421 der 431 Spiele haben genau ein Release - dann steht
+     der Verlauf daneben statt darunter, und die Seite wirkt nicht leer
+     (Rückmeldung des Nutzers vom 27.09.2026). */
+  .releasespalten {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--a4);
+    align-items: start;
+  }
+}
+

@@ -1,0 +1,68 @@
+/* Wunschlisten-Import (Stufe 11) */
+.import-form {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.import-form textarea,
+.aufteilen textarea {
+  width: 100%;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.import-form input[type='number'] {
+  width: 7rem;
+  font: inherit;
+}
+
+.import-block {
+  margin-bottom: 1.5rem;
+}
+
+.import-block summary {
+  cursor: pointer;
+}
+
+.importliste {
+  list-style: none;
+  padding: 0;
+}
+
+.importliste li + li {
+  margin-top: 0.4rem;
+}
+
+.offen-block.erledigt {
+  opacity: 0.7;
+}
+
+.aufteilen {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+/* Plattform je Treffer (Nachbesserung Stufe 11) */
+.kandidat.mit-plattform {
+  grid-template-columns: 3rem 1fr auto auto;
+}
+
+.kandidat.mit-plattform select {
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .kandidat.mit-plattform {
+    grid-template-columns: 3rem 1fr;
+  }
+
+  .kandidat.mit-plattform select,
+  .kandidat.mit-plattform button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+

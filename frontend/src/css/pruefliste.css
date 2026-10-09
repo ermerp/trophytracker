@@ -1,0 +1,152 @@
+/* --- Stufe 7: Pruefliste --- */
+
+.prueflisten-kopf h1 {
+  margin-bottom: 0.2rem;
+}
+
+.hinweiszeile {
+  margin: 0.2rem 0 0.5rem;
+}
+
+.fortschrittsbalken {
+  height: 0.4rem;
+  background: var(--linie);
+  border-radius: 0.2rem;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.fortschrittsbalken div {
+  height: 100%;
+  background: var(--st-am_spielen);
+}
+
+/*
+ * Feste Mindesthoehe: Ein zweizeiliger Titel darf die Knoepfe nicht nach
+ * unten schieben. Wer mehrere hundert Eintraege durchgeht, zielt blind auf
+ * dieselbe Stelle - eine springende Knopfreihe fuehrt zu Fehlklicks, und
+ * eine Fehlentscheidung faellt erst Wochen spaeter auf.
+ */
+.pruefkarte {
+  display: flex;
+  gap: 1.2rem;
+  align-items: flex-start;
+  margin-bottom: 1.2rem;
+  min-height: 9.5rem;
+}
+
+.pruefkarte .bild {
+  flex: none;
+  width: 8rem;
+  height: 8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--flaeche-hoch);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 3rem;
+  color: var(--text-still);
+}
+
+.pruefkarte .bild img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pruefkarte h2 {
+  margin: 0.2rem 0 0.6rem;
+}
+
+/* Vorher-Nachher-Vergleich aus review_queue.detail (8.1): "100 % → 78 %, …" */
+.pruefkarte .vergleich {
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-left: 3px solid var(--st-durchgespielt);
+  padding-left: 0.6rem;
+  margin: 0.3rem 0 0.6rem;
+}
+
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.aktionen button {
+  flex: 1 1 11rem;
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.aktionen kbd {
+  display: inline-block;
+  min-width: 1.2rem;
+  margin-right: 0.3rem;
+  padding: 0 0.3rem;
+  border: 1px solid var(--aus);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+/*
+ * Auf dem Handy muss die Pruefliste ohne Scrollen bedienbar sein: Sie wird
+ * bei der Ersteinrichtung mehrere hundert Mal hintereinander benutzt, und
+ * einmal Scrollen je Entscheidung ist der Unterschied zwischen "geht" und
+ * "macht man nicht zu Ende". Bild klein neben dem Text, Knoepfe zweispaltig.
+ */
+@media (max-width: 30rem) {
+  .prueflisten-kopf h1 {
+    font-size: 1.4rem;
+    margin: 0;
+  }
+
+  .fortschrittsbalken {
+    margin-bottom: 0.8rem;
+  }
+
+  .pruefkarte {
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+    /* Deckt auch einen dreizeiligen Titel ab, ohne dass die Knoepfe wandern. */
+    min-height: 12.5rem;
+  }
+
+  .pruefkarte .bild {
+    width: 4.5rem;
+    height: 4.5rem;
+    font-size: 1.8rem;
+  }
+
+  .pruefkarte h2 {
+    font-size: 1rem;
+    line-height: 1.3;
+    margin: 0.1rem 0 0.4rem;
+  }
+
+  /* Absaetze eng fuehren, damit der letzte Knopf ueber der Falz bleibt. */
+  .pruefkarte p {
+    margin: 0.25rem 0;
+  }
+
+  .aktionen {
+    gap: 0.4rem;
+  }
+
+  .aktionen button {
+    flex: 1 1 calc(50% - 0.2rem);
+    padding: 0.6rem 0.5rem;
+    font-size: 0.9rem;
+    /* In der halben Spalte darf "Unveraendert lassen" umbrechen. */
+    white-space: normal;
+  }
+
+  /* Tastenkuerzel gibt es auf dem Handy nicht - die Zeile spart Platz. */
+  .nur-desktop {
+    display: none;
+  }
+}
+

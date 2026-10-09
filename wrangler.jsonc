@@ -27,7 +27,7 @@
 	 * 1. 03:00-05:59 UTC (05-08 Uhr MESZ), 36 Aufrufe - alles, was PSN
 	 *    anfasst: Sync (rund elf Aufrufe), Spielzeit (zwei), Kaufliste
 	 *    (fuenfzehn, woechentlich). Zusammen 28 an einer Kaufliste-Nacht.
-	 * 2. 06:00-07:59 UTC (08-10 Uhr MESZ), 24 Aufrufe - die Wartung:
+	 * 2. 06:00-08:59 UTC (08-11 Uhr MESZ), 36 Aufrufe - die Wartung:
 	 *    erschienene Titel freigeben, IGDB-Auffrischen (nach einem Rueckstand
 	 *    bis zu acht Aufrufe), Disc-Fassungen, alte Rohantworten loeschen.
 	 *

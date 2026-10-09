@@ -860,7 +860,7 @@ export function Einstellungen() {
       <p>
         Der Worker arbeitet in zwei Fenstern, alle fünf Minuten je ein kleiner Schritt. Zwischen 5 und 8 Uhr
         (03:00–05:59 UTC) alles, was PlayStation anspricht: Trophäen, Spielzeiten und einmal wöchentlich die
-        Kaufliste. Zwischen 8 und 10 Uhr (06:00–07:59 UTC) die Wartung – erschienene Titel freigeben,
+        Kaufliste. Zwischen 8 und 11 Uhr (06:00–08:59 UTC) die Wartung – erschienene Titel freigeben,
         IGDB-Metadaten und Disc-Fassungen auffrischen, Gebrauchtpreise bei eBay holen, alte PSN-Rohantworten
         wegräumen.
       </p>

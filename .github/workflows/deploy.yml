@@ -28,6 +28,14 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # Die Typen des Workers sind erzeugt und nicht eingecheckt (.gitignore).
+      # Hinweis fuer spaeter: Die Env-Haelfte kommt aus .dev.vars, die hier
+      # fehlt - in der Action traegt `Env` deshalb nur DB und ASSETS. Fuer
+      # Test und Build ist das ohne Belang (vitest und vite pruefen die Typen
+      # des Workers nicht), fuer ein spaeteres `tsc -p tsconfig.json` nicht.
+      - run: npm run cf-typegen
+
       - run: npm test
       - run: npm run build
 
@@ -45,6 +53,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - run: npm run cf-typegen
 
       - name: Frontend bauen
         run: npm run build
