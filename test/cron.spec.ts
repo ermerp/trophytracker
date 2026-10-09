@@ -15,6 +15,7 @@ import {
 	besitzStand,
 	CRON_PSN,
 	CRON_WARTUNG,
+	cronFenster,
 	cronLogzeile,
 	cronSchritt,
 	HAENGT_NACH_STUNDEN,
@@ -626,6 +627,21 @@ describe("cronSchritt", () => {
 			expect(bereichFuerAusdruck(undefined)).toBe("alles");
 		});
 
+		it("die Anzahl der Aufrufe kommt aus dem Ausdruck, nicht aus einer Zahl im Test", () => {
+			// `*/5 6-8` deckt die Stunden 6, 7 und 8 ab: zwoelf Aufrufe je
+			// Stunde, also 36. Genau diese Rechnung stand bis zur Stufe
+			// "Refactoring" als Literal `24` in zwei Tests (10.1).
+			expect(cronFenster(CRON_PSN)).toEqual({ startStunde: 3, takt: 5, aufrufe: 36 });
+			expect(cronFenster(CRON_WARTUNG)).toEqual({ startStunde: 6, takt: 5, aufrufe: 36 });
+			expect(cronFenster("*/5 6-7 * * *").aufrufe).toBe(24);
+			expect(cronFenster("*/15 0-23 * * *").aufrufe).toBe(96);
+			// Raten waere schlimmer als werfen: Eine falsche Zahl haelt sich
+			// jahrelang, ein Fehler faellt beim ersten Lauf auf.
+			expect(() => cronFenster("*/5 * * * *")).toThrow();
+			expect(() => cronFenster("0 3 * * *")).toThrow();
+			expect(() => cronFenster("*/5 8-6 * * *")).toThrow();
+		});
+
 		it("das PSN-Fenster raeumt nicht auf und gibt nichts frei", async () => {
 			await spielMitIgdb(1, 11, null);
 			await env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2020-01-01' WHERE id = 1").run();
@@ -693,15 +709,20 @@ describe("cronSchritt", () => {
 			}
 		};
 
-		await nacht("psn", 3, 36);
-		await nacht("wartung", 6, 24);
+		// Startstunde und Anzahl kommen aus den Ausdruecken selbst. Sie hier
+		// zu wiederholen hat zwoelf Wartungsaufrufe gekostet, als 20e das
+		// Fenster erweiterte (10.1).
+		const psnFenster = cronFenster(CRON_PSN);
+		const wartungFenster = cronFenster(CRON_WARTUNG);
+		await nacht("psn", psnFenster.startStunde, psnFenster.aufrufe);
+		await nacht("wartung", wartungFenster.startStunde, wartungFenster.aufrufe);
 
 		const verlauf = await r.sync.cronVerlauf();
 		console.info(`${aufrufe} Aufrufe ergeben ${verlauf.length} Zeilen:\n` + verlauf.join("\n"));
 
-		// Sechzig Aufrufe, eine Handvoll Zeilen - und die Sync-Zeilen sind
+		// Eine ganze Nacht, eine Handvoll Zeilen - und die Sync-Zeilen sind
 		// noch da, statt aus dem Verlauf gedraengt zu sein.
-		expect(aufrufe).toBe(60);
+		expect(aufrufe).toBe(psnFenster.aufrufe + wartungFenster.aufrufe);
 		expect(verlauf.length).toBeLessThanOrEqual(10);
 		expect(verlauf.join("\n")).toContain("cron: sync ×");
 		// Der erste geloggte Aufruf hat Seite 0 schon geholt und meldet 100.

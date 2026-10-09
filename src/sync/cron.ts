@@ -30,7 +30,7 @@ import { eineListe, jahreSchritt, levelSchritt, type ListenErgebnis } from "./tr
  * - `psn` (alle fuenf Minuten 03:00-05:59 UTC, 36 Aufrufe): Haenger
  *   aufraeumen, Sync-Schritt, Spielzeit, Kaufliste. Alles, was Sony anfasst,
  *   und damit alles, was viele Aufrufe braucht.
- * - `wartung` (alle fuenf Minuten 06:00-07:59 UTC, 24 Aufrufe): erschienene
+ * - `wartung` (alle fuenf Minuten 06:00-08:59 UTC, 36 Aufrufe): erschienene
  *   Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, alte Rohantworten.
  *   Nichts davon fasst PSN an.
  *
@@ -59,6 +59,32 @@ export type CronBereich = "psn" | "wartung" | "alles";
  */
 export const CRON_PSN = "*/5 3-5 * * *";
 export const CRON_WARTUNG = "*/5 6-8 * * *";
+
+/**
+ * Startstunde, Takt und Anzahl der Aufrufe eines Cron-Ausdrucks.
+ *
+ * Die Zahl stand bis Stufe "Refactoring" als Literal in zwei Tests und lief
+ * damit auseinander: Als 20e das Wartungsfenster von den Stunden 6-7 auf 6-8
+ * erweiterte, rechneten `test/cron.spec.ts` und `test/lesekosten.spec.ts`
+ * weiter mit 24 statt 36 Aufrufen und prueften zwoelf Aufrufe zu wenig
+ * (10.1). Jetzt steht sie nur noch im Ausdruck selbst.
+ *
+ * Erkannt wird allein die Form, die hier vorkommt - alle N Minuten zwischen
+ * zwei Stunden; alles andere wirft, statt eine Zahl zu raten. (Die Form als
+ * Muster steht in der Regex darunter: Ein Cron-Ausdruck mit Stern-Schrägstrich
+ * laesst sich in einem Blockkommentar nicht schreiben, er beendet ihn.)
+ */
+export function cronFenster(ausdruck: string): { startStunde: number; takt: number; aufrufe: number } {
+	const treffer = /^\*\/(\d+) (\d+)-(\d+) \* \* \*$/.exec(ausdruck);
+	if (!treffer) throw new Error(`Cron-Ausdruck nicht auswertbar: ${ausdruck}`);
+	const takt = Number(treffer[1]);
+	const startStunde = Number(treffer[2]);
+	const endStunde = Number(treffer[3]);
+	if (takt < 1 || takt > 60 || startStunde > endStunde || endStunde > 23) {
+		throw new Error(`Cron-Ausdruck nicht auswertbar: ${ausdruck}`);
+	}
+	return { startStunde, takt, aufrufe: Math.ceil(60 / takt) * (endStunde - startStunde + 1) };
+}
 
 /**
  * Bereich zu einem Cron-Ausdruck. Ein unbekannter Ausdruck bekommt `alles`:
