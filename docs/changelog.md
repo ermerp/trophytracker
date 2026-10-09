@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen**.
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 79 | 09.10.2026 | **Refactoring, Nachtrag c: Typprüfung in der Action.** `npm run typecheck` (src/ und test/) im Job `pruefen` vor `npm test`; Env-Geheimnisse eingecheckt und optional in `src/env.d.ts`, Bindings erzeugt als `CfBindings` – mit und ohne `.dev.vars` je 0 Fehler. 102 Fehler in `test/` aus acht Ursachen geräumt, ohne `any`. Befund: `keine-lecks.spec.ts` prüfte seinen 18e-Fall seit dem 27.09.2026 nicht (16.2, lehren.md) |
 | 78 | 09.10.2026 | **Refactoring (finale Stufe 3), Teil 1: Struktur ohne Verhaltensänderung.** `Spieldetail.tsx` als eine Datei je Komponente, `App.css` als 16 Ausschnitte unter `frontend/src/css/` (gebautes CSS byte-identisch), 21 tote Regeln entfernt, Wartungsfenster aus dem Cron-Ausdruck statt als Literal (10.1), Testausgabe 71 → 13 Zeilen, `worker-configuration.d.ts` aus Git (13.3, 15.1, 16.2). **Auf dem Gerät des Nutzers abgenommen** |
 | 77 | 09.10.2026 | Nachtrag zur Diät: die Testlücke beim Wartungsfenster als bekannte Altlast bei „Refactoring" vermerkt (16.2), die Entscheidungen zur Diät selbst nachgetragen, und die Regel zu `docs/spec/` um die Prüfung beim Kürzen geschärft |
 | 76 | 09.10.2026 | **Beim Wunschlisten-Import blockieren nur offene Wünsche** – die Frage vom 15.09.2026 ist entschieden, am Code ändert sich nichts (8.2). Dabei als **offen** vermerkt: Der Import prüft keinen Besitz, ein erledigter Wunsch blockiert also auch nicht |

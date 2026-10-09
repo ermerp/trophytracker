@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error - reines JS-Modul ohne Typdeklaration, bewusst ausserhalb von src/
+// Reines JS-Modul, bewusst ausserhalb von src/ - allowJs loest es auf.
 import { anweisungenZerlegen, fuerWiederherstellungOrdnen } from "../scripts/dump-ordnen.mjs";
 
 /**

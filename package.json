@@ -12,7 +12,10 @@
     "deploy": "wrangler deploy",
     "start": "wrangler dev",
     "test": "vitest run",
-    "cf-typegen": "wrangler types"
+    "typecheck:worker": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p test/tsconfig.json --noEmit",
+    "typecheck": "npm run typecheck:worker && npm run typecheck:test",
+    "cf-typegen": "wrangler types --env-interface CfBindings"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.0.0",

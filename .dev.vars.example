@@ -1,5 +1,10 @@
 # Lokale Geheimnisse. Diese Datei ist ein Muster ohne Werte und darf
 # eingecheckt werden - .dev.vars selbst niemals.
+#
+# Sie ist das Muster fuer die lokale Entwicklung, NICHT die Quelle der
+# Env-Typen: Die stehen in src/env.d.ts (Geheimnisse, optional) und in
+# wrangler.jsonc (Bindings, erzeugt als CfBindings). Deshalb braucht die
+# GitHub Action diese Datei nicht.
 
 # Schluessel fuer die Verschluesselung von NPSSO und Refresh-Token in D1.
 # Erzeugen mit: openssl rand -base64 32
@@ -9,3 +14,14 @@ NPSSO_KEY=
 # Produktiv: npx wrangler secret put IGDB_CLIENT_ID / IGDB_CLIENT_SECRET
 IGDB_CLIENT_ID=
 IGDB_CLIENT_SECRET=
+
+# eBay Browse API (developer.ebay.com), ab Stufe 17c. Die Cert-ID ist das
+# Secret. Produktiv: npx wrangler secret put EBAY_CLIENT_ID / EBAY_CLIENT_SECRET
+EBAY_CLIENT_ID=
+EBAY_CLIENT_SECRET=
+
+# Access Service Token fuer die Pruefaufrufe gegen die Produktion (15.3).
+# Zugangsdaten des Betreibers, kein Binding des Workers - sie stehen bewusst
+# nicht in src/env.d.ts. Verwendung: curl -H "CF-Access-Client-Id: ..."
+CF_ACCESS_CLIENT_ID=
+CF_ACCESS_CLIENT_SECRET=

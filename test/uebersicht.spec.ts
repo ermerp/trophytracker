@@ -163,7 +163,7 @@ describe("POST /api/games/release/:id/abtrennen", () => {
 
 		const antwort = await abtrennen(releaseIds[1], "Shadow of the Colossus (2018)");
 		expect(antwort.status).toBe(200);
-		expect((await antwort.json()).altesSpielGeloescht).toBe(false);
+		expect((await antwort.json<{ altesSpielGeloescht: boolean }>()).altesSpielGeloescht).toBe(false);
 
 		const zahlen = await env.DB.prepare(
 			"SELECT (SELECT COUNT(*) FROM game) AS spiele, (SELECT COUNT(*) FROM release) AS rel, " +
@@ -187,7 +187,7 @@ describe("POST /api/games/release/:id/abtrennen", () => {
 		]);
 
 		const antwort = await abtrennen(releaseIds[0], "Neuer Name");
-		expect((await antwort.json()).altesSpielGeloescht).toBe(true);
+		expect((await antwort.json<{ altesSpielGeloescht: boolean }>()).altesSpielGeloescht).toBe(true);
 		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM game").first<any>()).toEqual({ n: 1 });
 	});
 

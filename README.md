@@ -98,8 +98,21 @@ die produktive Datenbank. Nur Befehle mit `--remote` fassen die echten Daten an.
 `worker-configuration.d.ts` ist erzeugt und steht in der `.gitignore` – 15 392
 Zeilen, davon 15 379 Runtime-Typen von workerd. **Nach einem frischen Klon
 einmal `npm run cf-typegen` aufrufen**, sonst findet `tsc` die Worker-Typen
-nicht. Die Hälfte mit den eigenen Bindings liest Wrangler aus `.dev.vars`: Ohne
-diese Datei trägt `Env` nur `DB` und `ASSETS`, mit ihr auch die sieben Secrets.
+nicht.
+
+Erzeugt wird daraus nur die **Binding**-Hälfte aus `wrangler.jsonc` – `DB` und
+`ASSETS`, abgelegt als `CfBindings`. Die **Geheimnis**-Hälfte steht von Hand in
+[`src/env.d.ts`](src/env.d.ts) und ist dort **optional** getypt, weil die Werte
+produktiv Cloudflare Secrets sind, die Wrangler nie sieht; jeder Lesepfad im
+Code prüft deshalb auf Abwesenheit. Das hat zwei Folgen: `.dev.vars` ist kein
+Eingang für Typen mehr (die GitHub Action braucht die Datei nicht), und ein
+Zugriff auf ein Secret ohne Prüfung ist ein Typfehler. Gemessen am 09.10.2026:
+mit und ohne `.dev.vars` je 0 Fehler, und derselbe ungeprüfte Zugriff fällt mit
+der optionalen Typisierung auf, mit der erzeugten nicht.
+
+Geprüft wird mit `npm run typecheck` – `typecheck:worker` für `src/`,
+`typecheck:test` für `test/` (dort liegen auch die Tests der Frontend-Module).
+Das Frontend selbst prüft sich über `tsc -b` in seinem eigenen `npm run build`.
 
 **Testdaten für die lokale D1:**
 
@@ -506,7 +519,8 @@ curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
 Jeder Push auf `main` löst [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
 aus. Die Reihenfolge ist der eigentliche Inhalt:
 
-1. `npm ci`, `npm run cf-typegen`, `npm test`, `npm run build`
+1. `npm ci`, `npm run cf-typegen`, `npm run typecheck`, `npm test`,
+   `npm run build`
 2. `wrangler d1 export` – **Sicherung vor jeder Schemaänderung**, anschliessend
    geprüft (`scripts/sicherung-pruefen.sh`): `INSERT`-Zeilen je Tabelle im Dump
    gegen `COUNT(*)` der Datenbank. Weicht eine Zahl ab, bricht der Job vor der

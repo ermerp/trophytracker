@@ -477,3 +477,41 @@ Erfahrung, die zur Live-Auflösung geführt hat. Seit der Scanner Titel sofort
 liefert (eBay, sonst upcitemdb) und „Spiel anlegen" im selben Fenster steht, gibt
 es nichts mehr zu vertagen: Wer gerade nicht zuordnen kann, überspringt und
 scannt die Disc später erneut.
+
+---
+
+## Ein Test, der nichts prüfte, ist grün
+
+`test/keine-lecks.spec.ts` hält die Regel aus Abschnitt 15.3: Geheimnisse
+dürfen nie in einer Antwort, einer Fehlermeldung oder im Log erscheinen. Der
+Test setzt in jede Fremdantwort einen Markierungswert und sucht ihn in allen
+Ausgaben.
+
+Für den Fall aus Stufe 18e – der Körper einer PSN-Fehlerantwort darf nicht in
+die Meldung wandern – stand im Fake `MARKIERUNGEN.accessToken`. Diesen
+Schlüssel gab es nicht; er heißt `access`. Der Antwortkörper lautete also
+wörtlich `Fehler: undefined`, und der Test prüfte **12 Tage** nichts
+(27.09.2026 bis 09.10.2026). Sein eigener Kommentar versprach das Gegenteil:
+*„Wer die Schablone später um den Antwortkörper erweitert, fällt hier auf."*
+
+Gefunden hat es nicht ein Testlauf, sondern `tsc` – die Typen des Workers
+wurden bis dahin nirgends geprüft (vitest transpiliert mit esbuild,
+`npm run build` baut nur das Frontend). **Ein Zugriff auf einen Schlüssel, den
+es nicht gibt, ist in JavaScript `undefined` und kein Fehler**; in einem Test
+ist er deshalb unsichtbar, weil der Test grün bleibt.
+
+Zwei Lehren:
+
+1. **Ein reparierter Test wird gegen ein echtes Leck gehalten.** Nach der
+   Korrektur wurde die Schablone in `holeTrophyTitlesSeite` absichtlich um
+   `await antwort.text()` erweitert: Vier Tests wurden rot, und das Leck reichte
+   bis in `app_setting` (den Cron-Verlauf) und `backup.json` – ein fremder
+   Fehlertext wäre also dauerhaft gespeichert und mitexportiert worden. Danach
+   zurückgebaut. Der erste Versuch traf die falsche der beiden Stellen mit
+   derselben Schablone (`trophyJson`, die der Sync nicht nimmt) und blieb grün –
+   auch das ist Teil der Lehre: Wer einen Nachweis führt, prüft, dass die Probe
+   überhaupt am geprüften Pfad liegt.
+2. **Eine Messung aus einer schon veränderten Arbeitskopie ist keine
+   Ausgangszahl.** Der erste Lauf in `test/` zählte 52 Fehler, ein Lauf gegen
+   den unberührten Stand in einem eigenen `git worktree` 102. Berichtet wurde
+   zuerst die falsche Zahl.

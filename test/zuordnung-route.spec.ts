@@ -113,7 +113,7 @@ describe("POST /api/zuordnung/gruppe", () => {
 		});
 
 		expect(antwort.status).toBe(400);
-		expect((await antwort.json()).fehler).toMatch(/dieselbe Plattform/);
+		expect((await antwort.json<{ fehler: string }>()).fehler).toMatch(/dieselbe Plattform/);
 	});
 
 	it("weist eine unbekannte Plattform ab", async () => {
@@ -155,7 +155,7 @@ describe("POST /api/zuordnung/liste/:npCommId", () => {
 		const antwort = await sende(`/api/zuordnung/liste/${b}`, { releaseId: neu!.id });
 
 		expect(antwort.status).toBe(200);
-		expect((await antwort.json()).nochOffen).toBe(0);
+		expect((await antwort.json<{ nochOffen: number }>()).nochOffen).toBe(0);
 	});
 
 	it("lehnt ein bereits belegtes Release ab", async () => {

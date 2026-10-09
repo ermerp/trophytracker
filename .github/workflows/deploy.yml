@@ -30,11 +30,21 @@ jobs:
       - run: npm ci
 
       # Die Typen des Workers sind erzeugt und nicht eingecheckt (.gitignore).
-      # Hinweis fuer spaeter: Die Env-Haelfte kommt aus .dev.vars, die hier
-      # fehlt - in der Action traegt `Env` deshalb nur DB und ASSETS. Fuer
-      # Test und Build ist das ohne Belang (vitest und vite pruefen die Typen
-      # des Workers nicht), fuer ein spaeteres `tsc -p tsconfig.json` nicht.
+      # Erzeugt wird nur die Binding-Haelfte aus wrangler.jsonc (DB, ASSETS)
+      # als `CfBindings`; die Geheimnis-Haelfte steht von Hand in src/env.d.ts
+      # und ist dort optional. Deshalb braucht dieser Lauf keine .dev.vars.
       - run: npm run cf-typegen
+
+      # Ohne diesen Schritt pruefte niemand die Typen des Workers: vitest
+      # transpiliert mit esbuild ohne Typpruefung, und `npm run build` baut nur
+      # das Frontend (dessen `tsc -b` darin steckt). Vor npm test, damit ein
+      # Typfehler nicht hinter einem Testlauf wartet.
+      #
+      # `typecheck` nimmt src/ UND test/. Die Tests mitzupruefen war kein
+      # Selbstzweck: Dabei kam heraus, dass test/keine-lecks.spec.ts seit dem
+      # 27.09.2026 eine Markierung mit falschem Namen benutzte und seinen
+      # 18e-Fall deshalb nicht pruefte (Befund in docs/lehren.md).
+      - run: npm run typecheck
 
       - run: npm test
       - run: npm run build
@@ -54,6 +64,8 @@ jobs:
 
       - run: npm ci
 
+      # Nur fuer den Build gebraucht; die Typpruefung ist im Job `pruefen`
+      # gelaufen, von dem dieser Job abhaengt.
       - run: npm run cf-typegen
 
       - name: Frontend bauen
