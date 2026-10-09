@@ -1,96 +1,134 @@
 ← [Inhaltsverzeichnis](README.md)
 
-## 16. Umsetzungsreihenfolge – offene Stufen
+## 16. Umsetzungsreihenfolge – die offenen Teile von Stufe 20
 
-### Offen aus Stufe 20
+Drei Teile stehen offen. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
+Messung von sechs vollständigen Tagen im täglichen Takt; was trotzdem offen bleibt, steht
+unten ausdrücklich als offen.
 
-Zwei Nachträge sind angelegt und **bewusst vertagt**, weil in beiden eine
-Entscheidung des Nutzers fehlt. Sie stehen hier vollständig, damit die offenen
-Punkte beim Planen vorliegen.
+**Reihenfolge** (Entscheidung des Nutzers vom 09.10.2026): **20h**, dann **20f**, dann
+**20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
 
-**Sie kommen als Nächstes** (Entscheidung des Nutzers vom 09.10.2026): erst 20f
-und 20g, danach die finalen Stufen in ihrer geplanten Reihenfolge – 1, 2, 4, 5.
-Stufe 3 (Refactoring) ist abgetragen.
+#### 20h – Angebotskorrektur (die nächste Teilstufe)
+
+Ein untaugliches Angebot lässt sich verwerfen; das Angebot wird dauerhaft übergangen, seine
+Punkte verschwinden aus dem Verlauf, und das nächstgünstigste wird sofort nachgeladen. Idee
+des Nutzers vom 02.10.2026; sein Beispiel war *11-11: Memories Retold* für 6,98 € mit „Nur
+Disc" im Angebotstitel. Dieselbe Regel wie bei Zuordnungen – was halb- oder vollautomatisch
+entsteht, muss sich zurücknehmen lassen (CLAUDE.md) –, nur bisher nicht für Preise.
+
+**Herausgelöst aus 20g und vorgezogen** (09.10.2026). Drei gemessene Gründe: Jeder Tag
+schreibt **157 Punkte** ohne Angebotskennung, die später nicht mehr zuzuordnen sind; **13 %**
+der Markttreffer liegen unter der Hälfte des Händlerpreises und sind damit Kandidaten für ein
+untaugliches Angebot ([7.3](07-3-ebay.md)); und der Allzeittief-Alarm aus 20g würde genau
+dieses Muster als Meldung erben.
+
+**Der vollständige Bauplan steht in [16.3](16-3-stufe-20h.md)** – Migration, Filter, Routen,
+Oberfläche, Tests und Abnahme, so festgehalten, dass eine neue Sitzung danach bauen kann.
 
 #### 20f – Preisverlauf als Diagramm
 
-**Preisverlauf als Diagramm** (wie Idealo oder SteamDB), zwei getrennte Reihen je Release — die ruhige Händlerkurve und die springende Marktkurve; mit Stufe 21 käme der Store-Preis als dritter Kanal dazu, der nach Abschnitt 6 **nie** mit dem Gebrauchtpreis verrechnet werden darf
+**Preisverlauf als Diagramm** (wie Idealo oder SteamDB), zwei getrennte Reihen je Release — die ruhige Händlerkurve und die springende Marktkurve; der Store-Preis ist seit Stufe 21 der dritte Kanal, der nach Abschnitt 6 **nie** mit dem Gebrauchtpreis verrechnet werden darf.
 
-**Gebraucht wird dafür erst eine Leseroute:** `price_snapshot` wird heute nur geschrieben (`src/db/store.ts`, `src/db/markt.ts`) und exportiert – keine Route liest es. Der Routenkatalog in [12](12-api-routen-extern-und-sync.md) führt sie deshalb nicht; sie kommt mit dieser Stufe dazu.
+**Gebraucht wird dafür erst eine Leseroute:** `price_snapshot` wird heute nur geschrieben (`src/db/store.ts`, `src/db/markt.ts`) und exportiert – keine Route liest es. Der Routenkatalog in [12](12-api-routen-extern-und-sync.md) führt sie deshalb nicht; sie kommt mit dieser Stufe dazu. Sie **filtert die Punkte verworfener Angebote aus** (20h) – das ist die Bedingung beim Lesen, die dort an die Stelle eines Löschens tritt.
 
-**Offen, und bewusst vertagt:** Am 02.10.2026 gab es genau *einen* Punkt je Release. Noch zu entscheiden sind (a) **wie verdichtet wird** — Vorschlag war „Tageswerte 90 Tage, danach ein Wert je Woche", entschieden ist nichts —, (b) der daraus folgende **Speicherverbrauch** und (c) die **Auslastung des Wartungsfensters**, die mit dem täglichen Takt von ~8 auf ~33 von 36 Aufrufen steigt. Alle drei bespricht der Nutzer, bevor gebaut wird
+**Verdichtet wird nur beim Lesen** (Entscheidung des Nutzers vom 09.10.2026). Der Bestand
+bleibt vollständig; die Leseroute liefert je Reihe höchstens rund 120 Punkte – tageweise im
+nahen Bereich, wochenweise weiter hinten, gerechnet in SQL. Begründung und Zahlen:
 
-#### 20g – Preisalarm und Angebotskorrektur
+- Ein Diagramm auf 360 px kann keine 365 Punkte zeigen; die Verdichtung beim Lesen löst
+  **das** Problem, das 20f tatsächlich hat.
+- Der Speicher ist das kleinere Problem: **7,3 MB im Jahr** gegen 2,2 MB mit Verdichtung beim
+  Schreiben ([6](06-marktdaten.md)). Für D1 ist beides belanglos; es zählt, dass der
+  wöchentliche Dump den Zuwachs dauerhaft in die Historie des Backup-Repositorys trägt
+  ([14.2](14-backup-export.md)).
+- Verdichten beim Schreiben ist **jederzeit nachholbar** und die einzige der drei Varianten,
+  die Daten unumkehrbar vernichtet. Sie hätte heute auf sechs Tagen Messung entschieden
+  werden müssen und bräuchte einen täglichen Cron-Schritt dort, wo das Wartungsfenster am
+  engsten ist ([10.1](10-1-cron.md)), plus einen Index auf `captured_at`.
 
-**Preisalarm und Angebotskorrektur** – die Glocke in der Kopfzeile meldet, und ein falsches Angebot lässt sich zurücknehmen
+**Offen, ausdrücklich:** Die Verdichtung **beim Schreiben** wird **im Januar 2027 neu
+aufgerufen** – dann liegen rund zehnmal so viele Punkte vor. Vorschlag war „Tageswerte 90
+Tage, danach ein Wert je Woche"; zur zweiten Frage, welcher Wert je Woche überlebt (Minimum,
+Median, letzter), ist nichts entschieden. Kommt sie, gehört sie in ein **drittes
+Cron-Fenster** – drei der fünf erlaubten Einträge sind frei.
 
-**Offen, und bewusst vertagt:** Die Regel ist nicht entschieden. Zur Wahl stehen **relativ** („meldet, wenn der Preis 20 % unter seinem 30-Tage-Median liegt", greift ohne Zutun für alle offenen Absichten) und **absolut** („melde mir X unter 15 €", präziser, verlangt je Eintrag eine Eingabe); beides nebeneinander wäre möglich. Setzt 20f voraus, weil eine Grundlinie gebraucht wird. **Dazu gehört „ungültiges Angebot“** (Idee des Nutzers vom 02.10.2026): Wer einen Preis anklickt und sieht, dass das Angebot nicht taugt – sein Beispiel war *11-11: Memories Retold* für 6,98 €, im Angebotstitel „Nur Disc“ –, soll es verwerfen können: Das Angebot wird dauerhaft übergangen, sein Punkt aus dem Verlauf gestrichen und das nächstgünstigere sofort nachgeladen. Das ist dieselbe Regel wie bei Zuordnungen – was halb- oder vollautomatisch entsteht, muss sich zurücknehmen lassen (CLAUDE.md) –, nur bisher nicht für Preise. Technisch trägt es: eBay liefert zu jedem Angebot eine Kennung (`legacyItemId`), die auch in der URL steckt. Gebraucht werden eine Spalte dafür an `market_offer`, eine Liste verworfener Kennungen je Release, ein Filter in `guenstigstesGeprueft` und eine Route, die verwirft und sofort neu abruft. **Zu entscheiden, wenn die Stufe geplant wird:** ob `price_snapshot` die Kennung mitführt – nur dann lässt sich genau der Punkt löschen, der von diesem Angebot stammt, statt „alle Punkte mit diesem Preis“; und ob die Korrektur **vor** 20f gehört, weil jedes Falschangebot bis dahin weitere falsche Punkte in den Verlauf schreibt, den 20f dann zeichnet
+#### 20g – Preisalarm
 
-### Die finalen Stufen
+Die Glocke in der Kopfzeile meldet einen Preis, der zur Absicht passt.
 
-Fünf Stufen zum Abschluss, **bewusst ohne Nummer** (Entscheidung des Nutzers vom 02.10.2026): Es ist offen, ob weitere Funktionsstufen dazukommen. Sie laufen in dieser Reihenfolge, nachdem die Funktionsstufen abgeschlossen sind; die Nummern 1–5 gelten nur innerhalb dieses Blocks.
+**Der Kanal folgt der Absicht** (Entscheidung des Nutzers vom 09.10.2026) – für Alarm *und*
+Anzeige: Disc-Fassung `ja` → Gebrauchtpreis, `nein` oder „physisch nicht gewünscht"
+([5.3](05-3-luecke-verwerfen.md)) → Store-Preis, `unbekannt` → beide anzeigen, **nicht**
+alarmieren. Reichweite am 09.10.2026 über die 60 Releases mit offener Kauf- oder
+Wunschabsicht: **48 mit `ja`** (alle mit Gebrauchtreihe), **12 mit `unbekannt`**, **0 mit
+`nein`** und 0 mit verworfenem Lücken-Kauf. Der Store-Zweig ist damit heute leer und füllt
+sich in der finalen Stufe 1, wo 113 der 157 offenen Releases den Befund „eBay kennt kein
+Angebot" tragen; gebaut wird er trotzdem mit, sonst erbt ihn später niemand.
 
-**Warum diese Reihenfolge.** Der erste Entwurf stellte die Oberflächenprüfung vor die Finalisierung der Sammlung. Der Nutzer hat eingewandt, dass ihm dann das Material fehlt – und das sticht. Die 22 Ansichten zerfallen nämlich in zwei Gruppen, die **entgegengesetzte** Datenlagen brauchen:
+**Zwei Regeln, beide entschieden:**
 
-- **Arbeitsansichten** (`/scannen`, `/import`, `/pruefliste`, `/zuordnung`, `/ohne-zuordnung`, `/igdb`, `/pruefen`, Block B der Lücken) brauchen offenes Material. Nach der Finalisierung lassen sie sich gar nicht mehr ernsthaft prüfen, ohne Arbeit zu erfinden – zehn ungelesene Wunschlisten und 157 offene Disc-Fragen sind das letzte echte Material.
-- **Leseansichten** (`/start`, `/sammlung`, `/spiel/:id`, die vier Listen, `/erscheint-bald`, `/trophaeen`, `/aenderungen`, `/einstellungen`) sehen auf unvollständigen Daten falsch aus.
+1. **Absolut** – eine Schwelle je offener Absicht. Das Feld bleibt **leer**, nie vorbelegt
+   (Abschnitt 3): 29 der 41 Reihen auf der Wunschliste stehen schon unter 15 €, eine globale
+   Vorbelegung löste sofort 29 Meldungen aus. Braucht 20f nicht und hat keine Falschmeldungen.
+2. **Allzeittief**, mit vier Bedingungen zugleich: der Kanal passt zur Absicht; der Punkt ist
+   das Tief **seiner** Reihe (Händler und Markt werden nie verrechnet, Abschnitt 6);
+   **Mindesthistorie 30 Tage seit dem ersten Punkt der Reihe und mindestens 3 Punkte**; und
+   **Mindesttiefe 10 %** unter dem bisherigen Tief. Die Mindesthistorie zählt in **Tagen,
+   nicht in Punkten** – eine Reihe mit wenigen Punkten ist ein *stabiler* Preis und damit die
+   bessere Grundlage. Praktische Folge: Der Alarm wird gebaut, bleibt aber **bis zum
+   03.11.2026 still** (erste Punkte mit Kanal am 04.10., Store am 03.10.).
 
-Deshalb trägt Stufe 1 die Usability-Arbeit an den Arbeitsansichten mit, und Stufe 2 beschränkt sich auf die Leseansichten. So wird keine Ansicht auf der falschen Datenlage beurteilt.
+**Warum eine Mindesttiefe sein muss:** Ohne sie feuert allein die Händlerreihe rund 20-mal je
+Nacht – ihre neuen Tiefs liegen im Median **3,7 %** unter dem bisherigen, zwei Drittel
+flacher als 5 % ([7.3](07-3-ebay.md)). Mit 10 % bleiben auf den offenen Absichten **2,5
+Meldungen je Nacht statt 5,8**, und 12 der 15 kommen aus der Marktreihe.
 
-#### 1. Die Sammlung finalisieren
+**Gerechnet wird im Preisschritt selbst**, nicht als eigener Cron-Schritt: Er ist der einzige
+Zeitpunkt, an dem sich etwas ändern kann, er kennt den neuen Punkt schon, und „die
+Nebenwirkung gehört an den Schritt, nicht an seinen Auslöser" (CLAUDE.md). Das Wartungsfenster
+trägt keinen 16. Schritt ([10.1](10-1-cron.md)).
 
-Alles erfassen, was fehlt – per Barcode oder von Hand (Stand 02.10.2026: 53 Discs erfasst) –, die restlichen **zehn von dreizehn** Wunschlisten importieren, und die Datensätze gemeinsam durchgehen.
+**Offen, ausdrücklich:**
 
-**Vor dem Import der zehn Listen zu entscheiden:** Der Import prüft keinen Besitz – ein erledigter Wunsch blockiert nicht, eine alte Liste legt ihn also neu an (8.2). Bisher nie eingetreten, aber mit zehn Listen wahrscheinlich; die beiden Haken sind, dass ein Wunsch am **Release** hängt (PS4 gekauft schließt PS5 gewünscht nicht aus) und dass eine PS+-Berechtigung kein Besitz ist (7.7).
+- **Die relative Regel** („20 % unter dem 30-Tage-Median") ist **nicht entschieden** und
+  bleibt ein möglicher Nachtrag. Messbar wird sie ab dem **03.11.2026**. Dann steht auch die
+  Frage, die sie technisch trägt: Der Median über `price_snapshot` ist **nicht** der Median
+  des Preises – geschrieben wird nur bei Änderung, also wiegen Tage mit Bewegung schwerer.
+  Richtig gerechnet braucht es eine Treppenfunktion (letzten Wert fortschreiben) oder eine
+  bewusst in Kauf genommene Verzerrung.
+- **Ob `unbekannt` ohne jede Gebrauchtreihe in den Store-Zweig fällt.** Tendenz des Nutzers
+  vom 09.10.2026: **ja, Store-Zweig.** Es betrifft 12 der 60 offenen Einträge: Sie haben
+  keine Gebrauchtreihe – deshalb sind sie unbekannt, eBay kennt dort nichts –, aber alle zwölf
+  haben einen Store-Preis. „Beide anzeigen, nicht alarmieren" heißt dort also, dass der
+  einzige vorhandene Kanal nichts auslöst. Entschieden wird es, wenn 20g geplant wird.
+- **Quittierung und Sperrfrist.** Ohne Quittung stünde dasselbe Tief jede Nacht erneut da;
+  ohne Sperrfrist meldet ein Preis, der in drei Nächten dreimal fällt, dreimal. Hängt am
+  Entwurf der Glocke.
+- **Ob ein Allzeittief aus einem später verworfenen Angebot (20h) seine Meldung rückwirkend
+  verliert.** Technisch trägt es: Mit `price_snapshot.ebay_item_id` ist der Punkt eindeutig.
 
-**Beginnt mit einem Prüfbericht, nicht mit dem Aufräumen:** eine Handvoll Abfragen, die jede Art von Lücke benennt und zählt (am 02.10.2026: 183 Releases mit unbekannter Disc-Fassung, 59 Spiele ohne Trophäenliste, 1 ohne IGDB-Eintrag, dazu veraltete Sortierschlüssel und Einträge ohne Zuordnung). Das macht aus „validieren" eine endliche Liste. Teile davon gibt es als Ansicht (`/pruefen`, `/abweichungen`, `/ohne-zuordnung`), zusammengefasst sind sie nirgends.
+#### Offen, bevor der grosse Wunschlisten-Import kommt
 
-**Die Frage nach den Schnittfassungen wird hier erneut geprüft** (Wunsch des Nutzers vom 08.10.2026). Er möchte grundsätzlich die ungeschnittenen Fassungen. Am 08.10.2026 war keine Quelle dafür zu haben – schnittberichte.com sperrt `ClaudeBot` und `anthropic-ai`, die USK bewertet nur die eingereichte Fassung (7.4). Das einzige verwertbare Signal ist die Store-Verfügbarkeit, und die gilt nur für PS4 und PS5: Über die ganze Sammlung gemessen fand sie **genau einen** Fall (Dying Light). Die Lücke sitzt bei **PS3 und Vita** – den Jahrgängen, in denen deutsche Schnittfassungen am häufigsten waren, und für die der Web-Store gar keine Seiten führt. Sobald die Sammlung vollständig ist, lohnt die Frage einmal neu: Wie viele Titel betrifft es überhaupt, gibt es inzwischen eine benutzbare Quelle, und reicht sonst ein Feld von Hand? Vorher ist jede Antwort eine Schätzung auf unvollständigem Bestand.
+**Die Fensterkapazität entscheidet, ob der tägliche Takt überlebt** – und damit, ob 20f
+weiter Punkte bekommt und 20g weiter melden kann. Gemessen am 09.10.2026: Der
+Gebrauchtpreis-Schritt belegt **24 von 36** Aufrufen der Wartung und endet neun Minuten vor
+Fensterschluss ([10.1](10-1-cron.md)). Die Decke des täglichen Takts liegt bei **520 bis 660
+Releases**; im Zuschnitt sind **431**.
 
-**Die zwölf Zeilen in `unresolved_scan` gehören zum Material** (Entscheidung des Nutzers vom 09.10.2026). Sie stammen aus den Stufen 17/17b, sind seit 17d eingefroren und werden hier **lesend aufgelistet** (`ean`, `title_raw`) – nur im Chat, nie im Repository, weil es Nutzerdaten sind (15.1). Der Nutzer prüft sie gegen die Sammlung; was sich zuordnen lässt, erfasst er in der Anwendung. **Erst danach fällt die Tabelle, und zwar vor Stufe 4** – in zwei Deployments, weil eine Migration abwärtskompatibel bleiben muss und `src/db/scan.ts` noch ein `DELETE` darauf hält: erst den Code ohne die Tabelle ausliefern, dann sie entfernen. Dabei auch aus `EXPORT_TABELLEN` nehmen (`src/db/export.ts`).
+Die **zehn noch nicht importierten Wunschlisten** der finalen Stufe 1 brauchen diese Luft
+auf – heute stammen 57 offene Wünsche aus drei Listen. **Zu entscheiden, bevor importiert
+wird:** ob der Takt täglich bleibt (dann muss der Zuschnitt enger werden oder ein weiteres
+Cron-Fenster dazu), oder ob er auf zwei Tage geht (dann halbiert sich die Punktdichte, die
+20f und 20g tragen). Vorher ist jede Antwort eine Schätzung auf unvollständigem Bestand.
 
-**Die Usability der Arbeitsansichten gehört hierher** – und zwar *bevor* die jeweilige Arbeit getan wird, nicht danach.
+**Ungeklärt, als Befund notiert:** `rows_read_24h` stand am 09.10.2026 bei **1 212 977**.
+Über einer Million ohne Import heisst laut CLAUDE.md „stimmt etwas nicht". Der gerechnete
+Leerlauf einer Nacht ist 80 784, die arbeitenden Aufrufe erklären rund 60 000 weitere
+(`markt` 24 × 940, `store` 10 × 791, `jahre` 18 060) – der Rest ist **nicht erklärt**. Das
+Fenster ist rollierend und enthielt einen Arbeitstag mit Deploy-Prüfungen; das ist eine
+Vermutung, keine Messung. Gehört einmal eigens angesehen, blockiert aber keine Teilstufe.
 
-**„Gemeinsam korrigieren" heißt weiterhin: Nutzerdaten ändert nur der Nutzer, in der Anwendung** (Entscheidung vom 18.09.2026). Wo ein Weg fehlt, wird er gebaut. Erster Kandidat ist eine **Sammelaktion in Block B**: 113 der 157 offenen Releases tragen den Befund „eBay kennt kein Angebot" (3 % gemessene Fehlrate) und wären einzeln 113 Klicks. Ein „alle übernehmen" mit der Möglichkeit, vorher einzelne herauszunehmen, ist dasselbe Muster wie „Alle erfassen" bei den Scans oder „Alle übernehmen" im Wunschlisten-Import – keine Umgehung der Regel, sondern ihre Erfüllung. Eine Ausnahme, bei der der Assistent direkt schreibt, ist erwogen und verworfen: Das Änderungsprotokoll bekäme die falsche Quelle, und `physical_release_status = 'nein'` ist nach Abschnitt 3 definitionsgemäß die Entscheidung des Nutzers – die Daten würden über sich selbst lügen.
-
-#### 2. Oberfläche und Bedienbarkeit
-
-Die **Leseansichten** final durchgehen, in allen drei Breiten, dazu drei Dinge, die im Alltag selten vorkommen und deshalb oft falsch sind:
-
-- **Leere Zustände** – jede Liste mit null Einträgen.
-- **Offline** – die PWA hält alle Leseansichten vor; systematisch geprüft wurde das zuletzt in Stufe 18, vor Dashboard, Trophäenliste, Spieldetail-Umbau und Preisen.
-- **Das Gerät des Nutzers** für die sicheren Bereiche. `env(safe-area-inset-*)` ist headless null – in 19c wurde dasselbe Verhalten dreimal falsch erklärt, bevor es gemessen war.
-
-**Abgrenzung zu den Tests:** Die 786 automatischen Tests prüfen Verhalten und laufen bei jedem Deploy. Was sie nicht sehen können, ist, ob etwas **auffindbar** ist – und genau das war am 02.10.2026 dreimal der Fehler (Block B ließ sich nicht öffnen, die Preissortierung war nicht zu finden, das native Auswahlfeld passte nicht ins Bild). Keiner davon wäre je rot geworden. Die Handprüfung richtet sich deshalb auf Auffindbarkeit, Verständlichkeit und Wegelänge, nicht auf Funktion.
-
-Ergebnis ist eine **Checkliste im Repository**, damit ein zweiter Durchgang vergleichbar ist.
-
-#### 3. Refactoring
-
-Effizienz, Redundanz, Netz- und Fensterauslastung, toter Code.
-
-**Abgetragen am 09.10.2026** (ein Branch, fünf Merges): `Spieldetail.tsx` (1 318 Zeilen) liegt als eine Datei je Komponente in `frontend/src/spieldetail/`, `App.css` (3 848 Zeilen) als 16 Ausschnitte in `frontend/src/css/` – beides nachweislich ohne Verhaltensänderung, das gebaute CSS war byte-identisch (13.3). Dazu 21 tote CSS-Regeln, die Wartungsfenster-Zahl aus dem Cron-Ausdruck statt als Literal in zwei Tests (10.1), die Testausgabe von 71 auf 13 Zeilen und `worker-configuration.d.ts` (580 KB, erzeugt) aus Git.
-
-**Nachtrag c am 09.10.2026: die Typprüfung hängt in der Action.** Ein Typfehler im Worker lässt den Deploy jetzt scheitern. Wie die Env-Typen dabei ohne `.dev.vars` zustande kommen, steht in [15.1](15-repository-deployment.md) – hier nur, was der Nachtrag geräumt hat.
-
-In `test/` waren 102 Fehler aus acht Ursachen zu räumen, keiner mit `any` oder `@ts-ignore`: zwei ungetypte Helfer in `plan-route.spec.ts` (75 – `.json()` gibt `unknown`), ein seit dem Plugin-Wechsel funktionsloses `test/env.d.ts` (14 – `ProvidedEnv` gibt es in `@cloudflare/vitest-plugin` 1.x nicht mehr, `env` ist `Cloudflare.Env`), drei `CronErgebnis`-Fixtures ohne `abgebrochen`, vier ungetypte `.json()`-Aufrufe, eine unnötige `@ts-expect-error`-Direktive, `TextDecoder`-Optionen und ein Typprädikat für `istBestaetigt`. Dazu **ein echter Befund**: `test/keine-lecks.spec.ts` prüfte seinen 18e-Fall seit dem 27.09.2026 nicht (falscher Markierungsname) – belegt gegen ein absichtlich eingebautes Leck, [`docs/lehren.md`](../lehren.md).
-
-**Offene Altlast:** `unresolved_scan` trägt 12 Zeilen und ist seit Stufe 17d funktionslos – nichts schreibt mehr hinein (nur `src/db/scan.ts` löscht noch). Die Zeilen sind aber **kein Müll, sondern Material für Stufe 1**; wann die Tabelle fällt, steht dort.
-
-**„Verhält sich noch genauso" braucht Zahlen, nicht nur grüne Tests.** Die Tests prüfen Verhalten, `test/lesekosten.spec.ts` prüft Kosten – und die sind hier der eigentliche Vertrag. Ein Refactoring, das eine Abfrage schöner macht und dabei den Index verliert, ist grün und trotzdem ein Ausfall. Also dieselben Messungen vorher und nachher, Zahl gegen Zahl.
-
-**In kleinen Merges**, jeder mit `git revert -m 1` einzeln zurücknehmbar – die `--no-ff`-Konvention trägt das bereits.
-
-**Feedback einer fremden KI ist ausdrücklich erwünscht, aber als Hinweisliste**, nicht als Vorlage: Ein Außenstehender kennt die Grenzen dieses Projekts nicht (10 ms CPU je Aufruf, 5 Millionen gelesene Zeilen am Tag, 50 Fremdanfragen je Aufruf, fünf Terme in einem zusammengesetzten SELECT). Vieles, was allgemein sauberer heißt, wäre hier falsch. Jeder Punkt wird gegen die Regeln in CLAUDE.md gemessen – als Anstoß für eigene Ideen taugt er trotzdem.
-
-#### 4. Wiederherstellungsprobe
-
-Die letzte war am **14.09.2026** und hat einen echten Fehler gefunden (14.3). Seitdem ist die Datenbank von 1,79 auf **8,47 MB** gewachsen, der Dump auf 12,6 MB, und es sind drei Tabellen und sechs Migrationen dazugekommen. Eine Sicherung, die nie gegen den gewachsenen Bestand geprobt wurde, ist nur scheinbar eine Sicherung – und sie ist das Einzige zwischen dem Nutzer und dem Verlust seiner Bewertungen: Die Trophäen kämen aus PSN zurück, seine Entscheidungen nicht (Risikotabelle, Abschnitt 17).
-
-#### 5. Außendarstellung auf GitHub
-
-Die README ist heute ein **Betriebshandbuch von 1 550 Zeilen**; wer das Projekt zum ersten Mal sieht, findet darin nicht, was es ist. Sie wird geteilt: README als Schaufenster, der Betrieb nach `docs/`. Dazu Unterkapitel für FAQ, Einrichtung und Architektur.
-
-**Bildschirmfotos sind eine Datenschutzfrage.** Das Repository ist öffentlich, echte Bilder zeigen die Sammlung des Nutzers. Dafür gibt es `scripts/testdaten.mjs` mit erfundenen Zeilen – genau daraus entstehen die Bilder. Dieselbe Regel wie beim Datenbank-Dump.
-
-**Die Spezifikation ist das Interessanteste am Projekt** – fast 3 000 Zeilen Entscheidungen *mit Begründung*, verworfene Quellen samt Messung, Entwürfe, die an Zahlen gescheitert sind. Sie gehört ins Schaufenster, nicht in den Keller. Für die KI-Seite bleibt **CLAUDE.md die eine Quelle**; sie wird im README verlinkt, nicht dupliziert – zwei Dateien, die dasselbe sagen wollen, laufen auseinander.
+**Die fünf finalen Stufen** – die Sammlung finalisieren, Oberfläche, Refactoring
+(abgetragen), Wiederherstellungsprobe, Außendarstellung – stehen in
+[16.4](16-4-finale-stufen.md).

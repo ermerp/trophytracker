@@ -27,8 +27,8 @@ samt Einstellungen-Kachel, der Job `scripts/scans-aufloesen.mjs` mit
 nie das Problem, nur ihr Platz. Und die Tabelle `unresolved_scan`: Sie trägt noch die **12 Zeilen**
 aus der Zeit davor und wird von keinem Schreibpfad mehr gefüllt; `src/db/scan.ts` löscht nur noch
 daraus. Ein `DROP TABLE` bräuchte zwei Deployments (Abschnitt 15.2), sie bleibt deshalb in
-`EXPORT_TABELLEN`, bis sie in der finalen Stufe „Refactoring" fällt
-([16.2](16-2-offene-stufen.md)).
+`EXPORT_TABELLEN`, bis sie fällt – die Zeilen sind Material für die finale Stufe 1 und die
+Tabelle geht danach, vor Stufe 4 ([16.4](16-4-finale-stufen.md)).
 
 **Der Preis, bewusst bezahlt:** Es gibt keinen Notausgang für eine Disc, die man gerade weder
 zuordnen noch anlegen will. Weil sie in der Hand liegt und ein erneuter Scan nichts kostet, ist das

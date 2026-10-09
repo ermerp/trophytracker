@@ -111,11 +111,11 @@ Vier Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
 | 02.10.2026 | Releases mit digitaler Berechtigung `source='kauf'` sind vom Store-Preis **ausgenommen** (`plus` schließt nicht aus) | [7.4](spec/07-4-store-preise.md) |
 | 02.10.2026 | **Nicht nach dem Store-Preis sortieren** – zwei Preissortierungen passen bei 360 px nicht | [7.4](spec/07-4-store-preise.md) |
 | 02.10.2026 | Vier Wünsche zu Stufe 20e | [16](spec/16-1-abgeschlossene-stufen.md) |
-| 02.10.2026 | Seine Idee „ungültiges Angebot" – gehört zu 20g | [16.2](spec/16-2-offene-stufen.md) |
-| 02.10.2026 | Die fünf finalen Stufen bleiben **bewusst ohne Nummer** | [16.2](spec/16-2-offene-stufen.md) |
+| 02.10.2026 | Seine Idee „ungültiges Angebot" – ist seit dem 09.10.2026 die eigene Teilstufe 20h | [16.3](spec/16-3-stufe-20h.md) |
+| 02.10.2026 | Die fünf finalen Stufen bleiben **bewusst ohne Nummer** | [16.4](spec/16-4-finale-stufen.md) |
 | 03.10.2026 | Abnahme-Befund: innerhalb der Treffergruppe gewinnt der **kürzeste** Produktname | [7.4](spec/07-4-store-preise.md) |
 | 08.10.2026 | Das Spieldetail sagt schlicht „im deutschen Store nicht erhältlich" | [7.4](spec/07-4-store-preise.md) |
-| 08.10.2026 | Er will grundsätzlich die **ungeschnittenen** Fassungen – die Frage ist bei „Die Sammlung finalisieren" vorgemerkt | [7.4](spec/07-4-store-preise.md), [16.2](spec/16-2-offene-stufen.md) |
+| 08.10.2026 | Er will grundsätzlich die **ungeschnittenen** Fassungen – die Frage ist bei „Die Sammlung finalisieren" vorgemerkt | [7.4](spec/07-4-store-preise.md), [16.4](spec/16-4-finale-stufen.md) |
 | 08.10.2026 | Die Dokumentation wird aufgeteilt, und **keine regelmäßig gelesene Datei geht über rund 15 KB** – Abschnitt 7, 8, 13 und 16 deshalb je Unterabschnitt | [CLAUDE.md](../CLAUDE.md) |
 | 08.10.2026 | Der Versionsabsatz wird auf **eine Zeile je Version** verdichtet – aber erst, nachdem je Eintrag geprüft ist, ob seine Messwerte im zugehörigen Abschnitt stehen | [changelog.md](changelog.md) |
 | 09.10.2026 | Beim Wunschlisten-Import blockieren **nur offene** Wünsche; ein verworfener zählt nicht als Doppelung (`verworfen` trüge sonst zwei Bedeutungen, und für „nie wieder" gibt es „entfernen") | [8.2](spec/08-2-wunschlisten-import.md) |
@@ -187,5 +187,25 @@ gestellt, weil sie die Gestalt des Repositories festlegen (13.3, 16.2):
   `$BASIS` – kopierfertig für den Nutzer, eindeutig für andere. Löst die Platzhalter
   `<subdomain>` ab.
 
-Was in den offenen Stufen 20f und 20g noch zu entscheiden ist, steht dort:
-[16.2](spec/16-2-offene-stufen.md).
+**09.10.2026, Preisverlauf und Preisalarm** (16.2, 16.3) – entschieden auf der Messung von
+sechs vollständigen Tagen im täglichen Takt:
+
+- **Reihenfolge: Angebotskorrektur zuerst**, als eigene Teilstufe **20h**, dann 20f
+  (Preisverlauf), dann 20g (Preisalarm). Grund: Jeder Tag ohne Korrektur schreibt 157 Punkte
+  ohne Angebotskennung, und 13 % der Markttreffer sind Kandidaten für ein untaugliches
+  Angebot.
+- **Verdichtung des Preisverlaufs nur beim Lesen.** Der Bestand bleibt vollständig
+  (7,3 MB im Jahr); die Leseroute liefert je Reihe höchstens rund 120 Punkte. Die Frage nach
+  einer Verdichtung beim Schreiben wird **im Januar 2027 neu aufgerufen** – sie ist jederzeit
+  nachholbar, und sie wäre die einzige der drei Varianten, die Daten unumkehrbar vernichtet.
+- **Die Angebotskennung kommt in beide Tabellen**, `market_offer` und `price_snapshot`. Nur
+  dann lässt sich genau der Punkt streichen, der von einem verworfenen Angebot stammt: In 9 %
+  der Reihen kommt derselbe Preis mehrfach vor.
+- **Der Alarm ist absolut und kanalgebunden**, dazu ein **Allzeittief-Alarm** mit
+  Mindesthistorie. Der Kanal folgt der Absicht: Disc-Fassung `ja` → Gebrauchtpreis, `nein`
+  oder „physisch nicht gewünscht" → Store-Preis, `unbekannt` → beide anzeigen, nicht
+  alarmieren. **Die relative Regel (20 % unter dem 30-Tage-Median) bleibt ausdrücklich
+  offen** als späterer Nachtrag.
+
+Was in 20f, 20g und 20h noch offen ist, steht dort:
+[16.2](spec/16-2-offene-stufen.md) und [16.3](spec/16-3-stufe-20h.md).

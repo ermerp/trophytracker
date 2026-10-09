@@ -76,15 +76,41 @@ Was bleibt, ist eine **Forderung** — „so viel verlangt dieser Anbieter gerad
 
 #### Umfang und Takt
 
-Der Schritt läuft im **Wartungsfenster** (`*/5 6-8`, 36 Aufrufe) — er fasst Sony nicht an. Zwanzig Releases je Aufruf, also zwanzig Fremdanfragen von erlaubten fünfzig (15.4). Gefragt werden **nicht alle** Releases, sondern dieselbe Menge, die 7.4 für die Store-Preise festlegt: was in der Lückenansicht auftaucht oder auf einer offenen Absicht steht. Ein Release wird nach 14 Tagen erneut gefragt.
+Der Schritt läuft im **Wartungsfenster** (`*/5 6-8`, 36 Aufrufe) — er fasst Sony nicht an. Zwanzig Releases je Aufruf, also zwanzig Fremdanfragen von erlaubten fünfzig (15.4). Gefragt werden **nicht alle** Releases, sondern dieselbe Menge, die 7.4 für die Store-Preise festlegt: was in der Lückenansicht auftaucht oder auf einer offenen Absicht steht. Ein Release wird **täglich** erneut gefragt (`MARKT_FRIST_TAGE = 1` seit Stufe 20e).
 
 **Takt: täglich** (Entscheidung des Nutzers vom 02.10.2026). Nicht, weil Gebrauchtpreise sich täglich bewegen — sie tun es nicht —, sondern weil der Verlauf (20f) und der Preisalarm (20g) Punkte brauchen: Ein gleitender Median ist nur über genügend Werte robust gegen den einzelnen Verkäufer, der eine Disc für drei Euro einstellt, und melden kann ein Alarm nur, was er gesehen hat. Dafür ist das **Wartungsfenster auf drei Stunden** verlängert (`*/5 6-8`, 36 statt 24 Aufrufe) — es fasst Sony nicht an, und drei der fünf erlaubten Cron-Einträge sind weiterhin frei.
 
-**Zwanzig Releases je Aufruf, nicht vierundzwanzig.** Vierzig von fünfzig erlaubten Fremdanfragen lassen zehn Reserve: Läuft das eBay-Token mitten in der Portion ab, kommen eine Token-Anfrage und ein zweiter Versuch dazu. Bei 431 Releases im Zuschnitt sind das 22 Aufrufe von 36, dazu IGDB (schubweise bis zu neun) und zwei billige Schritte.
+**Zwanzig Releases je Aufruf, nicht vierundzwanzig.** Vierzig von fünfzig erlaubten Fremdanfragen lassen zehn Reserve: Läuft das eBay-Token mitten in der Portion ab, kommen eine Token-Anfrage und ein zweiter Versuch dazu. Bei 431 Releases im Zuschnitt sind das rechnerisch 22 Aufrufe; **gemessen am 09.10.2026 waren es 24 von 36**, dazu IGDB (schubweise bis zu neun) und zwei billige Schritte – das Fenster ist damit voll ([10.1](10-1-cron.md)).
 
-**Beide Kanäle kommen in den Verlauf** (`price_snapshot.kanal`, Migration 0030), jeder als eigene Reihe. Ein Händlerpreis bei rebuy oder medimops ist ein Katalogpreis und ändert sich bewusst; der Marktpreis ist das Minimum über die gerade eingestellten Angebote und springt mit jedem neuen. In einer Reihe vermischt wären beide unbrauchbar. `source` sagt weiterhin, **wer** das Angebot stellt — der kann innerhalb eines Kanals wechseln und taugt deshalb nicht als Schlüssel der Reihe. Die **Händlerreihe deckt allerdings nur ein Drittel ab**: 84 von 239 Releases mit Preis, und auf Kauf- und Wunschliste nur 15 von 43. Die Glättung muss also die Hauptarbeit tragen, die Händlerbevorzugung ist der Bonus.
+**Beide Kanäle kommen in den Verlauf** (`price_snapshot.kanal`, Migration 0030), jeder als eigene Reihe. Ein Händlerpreis bei rebuy oder medimops ist ein Katalogpreis und ändert sich bewusst; der Marktpreis ist das Minimum über die gerade eingestellten Angebote und springt mit jedem neuen. In einer Reihe vermischt wären beide unbrauchbar. `source` sagt weiterhin, **wer** das Angebot stellt — der kann innerhalb eines Kanals wechseln und taugt deshalb nicht als Schlüssel der Reihe. Die **Händlerreihe deckt knapp die Hälfte ab**: 116 von 250 Reihen (46 %, gemessen am 09.10.2026; am 02.10.2026 waren es 84 von 239). Die Glättung muss also die Hauptarbeit tragen, die Händlerbevorzugung ist der Bonus.
 
-**Ein Aufruf liest 940 Zeilen** (gemessen am 02.10.2026 gegen 430 Listen): 30 für die Auswahl, 430 für die einmal zerlegte Sammlung, 50 fürs Schreiben und 430 für den offenen Zähler. Im Dauerbetrieb sind nach der 14-Tage-Frist rund drei Aufrufe je Nacht fällig, also etwa 2 800 Zeilen — gegen 5 Millionen am Tag. Die erste Fassung las 2 059 je Aufruf, davon **1 549 für vier Zähler, die nur in der Verlaufszeile standen**; sie sind durch einen einzigen ersetzt, und `weiter` kommt jetzt aus der Portionsgröße statt aus einem Zähler. Dieselbe Form wie der `COUNT(*)` in der Feed-Route am 01.10.2026, nur kleiner — und derselbe Grund, warum ein Schreibschritt vollständig gemessen gehört und nicht nur in seiner Hauptabfrage.
+#### Wie sich die beiden Reihen bewegen (gemessen am 09.10.2026)
+
+Sechs vollständige Tage im täglichen Takt, 366 Reihen mit Kanal. Gezählt ist jeder Punkt, der
+ein **neues Minimum seiner Reihe** war, und wie tief er unter dem bisherigen Tief lag:
+
+| Reihe | Reihen | neue Tiefs | Tiefe: Median | davon < 5 % | davon ≥ 20 % |
+|---|---|---|---|---|---|
+| gebraucht/händler | 116 | 121 | **3,7 %** | 66 % | 7 % |
+| gebraucht/markt | 250 | 113 | **10,0 %** | 31 % | 27 % |
+| psn_store | 65 | 17 | **80,0 %** | 0 % | 100 % |
+
+**Die Marktreihe trägt ein Allzeittief, die Händlerreihe nicht von sich aus** – das kehrt die
+Vermutung um, die der Entwurf zu 20g zuerst hatte. rebuy und medimops rücken ihren Katalogpreis
+um Cents: zwei Drittel ihrer neuen Tiefs sind flacher als 5 %. Der Marktpreis bewegt sich
+seltener und tiefer, und die Trefferrate fällt schnell — Anteil der Punkte, die ein neues Tief
+sind, nach Position in der Reihe: **42 / 22 / 13 %** (Händler **74 / 66 / 50 %**). Ein reiner
+Zufallslauf läge bei 1/n, also 50 / 33 / 25 %; der Marktpreis liegt **darunter**, ist also träge,
+und ein spätes Tief ist entsprechend aussagekräftig. Der Store schlägt beide: Alle 17 Tiefs liegen
+≥ 20 % unter dem bisherigen, im Median 80 % — das ist eine Rabattaktion.
+
+Der Haken der Marktreihe ist nicht ihre Bewegung, sondern ihre Datenlage: Ein tiefes Markttief ist
+genau das Muster eines untauglichen Angebots. Von 111 Releases mit **beiden** Kanälen liegt der
+Markttreffer im Median bei 0,82 des Händlerpreises, aber **14 (13 %) unter der Hälfte** — Bündel,
+falsche Fassung, Hülle ohne Disc. Deshalb steht die Angebotskorrektur (20h) vor dem Alarm
+([16.2](16-2-offene-stufen.md)).
+
+**Ein Aufruf liest 940 Zeilen** (gemessen am 02.10.2026 gegen 430 Listen): 30 für die Auswahl, 430 für die einmal zerlegte Sammlung, 50 fürs Schreiben und 430 für den offenen Zähler. Seit dem täglichen Takt sind es **24 Aufrufe je Nacht, also rund 22 600 Zeilen** — gegen 5 Millionen am Tag; die früheren „rund drei Aufrufe je Nacht“ galten für die abgelöste 14-Tage-Frist. Die erste Fassung las 2 059 je Aufruf, davon **1 549 für vier Zähler, die nur in der Verlaufszeile standen**; sie sind durch einen einzigen ersetzt, und `weiter` kommt jetzt aus der Portionsgröße statt aus einem Zähler. Dieselbe Form wie der `COUNT(*)` in der Feed-Route am 01.10.2026, nur kleiner — und derselbe Grund, warum ein Schreibschritt vollständig gemessen gehört und nicht nur in seiner Hauptabfrage.
 
 Der Stand steht je Zeile in `release.markt_geprueft_am`, nicht als Marke in `app_setting`. Damit gibt es den Fehlerfall aus 18e hier nicht: Ein abgebrochener Lauf lässt die ungeprüften Releases ungestempelt, und der nächste Aufruf nimmt sie wieder — Erfolg und Fehler können keine gemeinsame Marke hinterlassen, weil es keine gibt.
 

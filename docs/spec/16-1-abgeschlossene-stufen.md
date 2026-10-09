@@ -8,8 +8,9 @@ wurde, steht in [`entscheidungen.md`](../entscheidungen.md); was dabei
 *schiefgegangen* ist, in [`lehren.md`](../lehren.md); die Fassungsgeschichte im
 [Changelog](../changelog.md).
 
-**Alle Funktionsstufen sind durch.** Offen sind nur 20f, 20g und die fünf
-finalen Stufen – [16.2](16-2-offene-stufen.md).
+**Alle Funktionsstufen sind durch.** Offen sind nur die drei Teile von Stufe 20
+– [16.2](16-2-offene-stufen.md), als Nächstes 20h ([16.3](16-3-stufe-20h.md)) –
+und die fünf finalen Stufen ([16.4](16-4-finale-stufen.md)).
 
 | Stufe | Inhalt | Migration | Abgenommen |
 |---|---|---|---|
