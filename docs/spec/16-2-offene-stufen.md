@@ -16,6 +16,8 @@ Stufe 3 (Refactoring) ist abgetragen.
 
 **Preisverlauf als Diagramm** (wie Idealo oder SteamDB), zwei getrennte Reihen je Release — die ruhige Händlerkurve und die springende Marktkurve; mit Stufe 21 käme der Store-Preis als dritter Kanal dazu, der nach Abschnitt 6 **nie** mit dem Gebrauchtpreis verrechnet werden darf
 
+**Gebraucht wird dafür erst eine Leseroute:** `price_snapshot` wird heute nur geschrieben (`src/db/store.ts`, `src/db/markt.ts`) und exportiert – keine Route liest es. Der Routenkatalog in [12](12-api-routen-extern-und-sync.md) führt sie deshalb nicht; sie kommt mit dieser Stufe dazu.
+
 **Offen, und bewusst vertagt:** Am 02.10.2026 gab es genau *einen* Punkt je Release. Noch zu entscheiden sind (a) **wie verdichtet wird** — Vorschlag war „Tageswerte 90 Tage, danach ein Wert je Woche", entschieden ist nichts —, (b) der daraus folgende **Speicherverbrauch** und (c) die **Auslastung des Wartungsfensters**, die mit dem täglichen Takt von ~8 auf ~33 von 36 Aufrufen steigt. Alle drei bespricht der Nutzer, bevor gebaut wird
 
 #### 20g – Preisalarm und Angebotskorrektur
