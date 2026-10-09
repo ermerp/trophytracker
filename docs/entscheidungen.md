@@ -115,6 +115,7 @@ Vier Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
 | 02.10.2026 | Die fünf finalen Stufen bleiben **bewusst ohne Nummer** | [16.2](spec/16-2-offene-stufen.md) |
 | 03.10.2026 | Abnahme-Befund: innerhalb der Treffergruppe gewinnt der **kürzeste** Produktname | [7.4](spec/07-4-store-preise.md) |
 | 08.10.2026 | Das Spieldetail sagt schlicht „im deutschen Store nicht erhältlich" | [7.4](spec/07-4-store-preise.md) |
+| 09.10.2026 | Beim Wunschlisten-Import blockieren **nur offene** Wünsche; ein verworfener zählt nicht als Doppelung (`verworfen` trüge sonst zwei Bedeutungen, und für „nie wieder" gibt es „entfernen") | [8.2](spec/08-2-wunschlisten-import.md) |
 | 08.10.2026 | Er will grundsätzlich die **ungeschnittenen** Fassungen – die Frage ist bei „Die Sammlung finalisieren" vorgemerkt | [7.4](spec/07-4-store-preise.md), [16.2](spec/16-2-offene-stufen.md) |
 
 ## Umkehrungen
@@ -136,7 +137,10 @@ damit sie nicht stillschweigend geschlossen wird.
 
 | Datum | Frage | Abschnitt |
 |---|---|---|
-| 15.09.2026 | Zählt ein **verworfener** Wunsch beim Wunschlisten-Import als Doppelung? | [8.2](spec/08-2-wunschlisten-import.md) |
+| 09.10.2026 | Soll der Wunschlisten-Import **Besitz** prüfen? Ein erledigter Wunsch blockiert nicht, eine alte Liste legt ihn also neu an – zu entscheiden bei „Die Sammlung finalisieren" | [8.2](spec/08-2-wunschlisten-import.md) |
+
+Beantwortet am 09.10.2026: ob ein **verworfener** Wunsch als Doppelung zählt (Frage vom
+15.09.2026) – nein, siehe die Liste oben.
 
 Was in den offenen Stufen 20f und 20g noch zu entscheiden ist, steht dort:
 [16.2](spec/16-2-offene-stufen.md).
