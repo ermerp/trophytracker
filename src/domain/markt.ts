@@ -127,6 +127,38 @@ const KEIN_DATENTRAEGER =
 	/\b(account|service|boosting|leerh[üu]lle|nur h[üu]lle|ohne spiel|poster|sticker|aufkleber|schl[üu]sselanh[äa]nger|key|download\s?code)\b/i;
 
 /**
+ * Ein loser Datentraeger: die Disc ohne Huelle, das Vita-Modul ohne alles.
+ *
+ * ER IST EIN ANGEBOT, ABER KEIN PREIS - und das ist der Unterschied zu
+ * KEIN_DATENTRAEGER. Ein Konto belegt gar nichts; eine lose Disc belegt die
+ * Disc-Fassung sogar besonders gut, taugt aber nicht als Vergleichspreis.
+ * Deshalb zwei Listen und zwei Antworten aus `guenstigstesGeprueft`
+ * (Entscheidung des Nutzers vom 11.10.2026, Stufe 20h-b).
+ *
+ * Anlass waren zwei Angebote, die er am 11.10.2026 nacheinander von Hand
+ * verworfen hat - beide zu "11-11: Memories Retold", beide mit "Nur Disc"
+ * im Titel (6,98 und 8,37 EUR). Gemessen ueber die 355 damals vorliegenden
+ * Angebote trifft das Muster **9 (2,5 %)**, alle im Marktkanal, keines bei
+ * rebuy oder medimops.
+ *
+ * Die Fuellworte zwischen "nur" und dem Datentraeger sind gemessen, nicht
+ * vorsichtshalber da: "Knowledge is Power Playstation PS4 Videospiel NUR PAL
+ * DISC". Und `ohne` zaehlt NUR mit einem Verpackungswort dahinter - sonst
+ * faellt "PS5 Marvel's Spider-Man: Miles Morales (ohne Spiderman
+ * remastered)" mit heraus, wo nicht die Huelle fehlt, sondern das zweite
+ * Spiel des Buendels.
+ */
+const UNVOLLSTAENDIG: RegExp[] = [
+	/\bnur\s+(?:\w+\s+){0,2}(discs?|disks?|cds?|dvds?|module?|spiel|game|cart(?:ridge)?)\b/i,
+	/\bohne\s+(h[\u00fcu]lle|ovp|cover|box|case|verpackung)\b/i,
+];
+
+/** Fehlt dem Angebot die Verpackung? Dann ist es ein Beleg, aber kein Preis. */
+export function unvollstaendig(angebotstitel: string): boolean {
+	return UNVOLLSTAENDIG.some((re) => re.test(angebotstitel));
+}
+
+/**
  * Nennt der Angebotstitel eine andere PlayStation-Plattform als die gesuchte?
  *
  * Nennt er beide ("PS4 / PS5"), ist es eine Mehrfachangabe und kein
@@ -212,11 +244,24 @@ export function zusatzwortGrenze(meinTitel: string): number {
 
 export type AngebotUrteil = { angebot: MarktAngebot; anbieter: string };
 
+/**
+ * Was eine Suche je Kanal ergibt - ZWEI Antworten, nicht eine (Stufe 20h-b).
+ *
+ * `preis` ist das guenstigste **vollstaendige** Angebot und das einzige, das
+ * in `market_offer` und in den Verlauf kommt. `beleg` ist das guenstigste
+ * geprueffte Angebot ueberhaupt, auch ein loser Datentraeger, und entscheidet
+ * allein ueber `physical_release_status: unbekannt -> ja`.
+ *
+ * `beleg` ist nie null, wenn `preis` es nicht ist: Jedes vollstaendige
+ * Angebot ist auch ein Beleg.
+ */
+export type AngebotWahl = { preis: AngebotUrteil | null; beleg: AngebotUrteil | null };
+
 /** Leere Sperrliste - der Normalfall, und eine Menge statt eines Sonderwegs. */
 const KEINE: ReadonlySet<string> = new Set();
 
 /**
- * Das guenstigste Angebot, das alle drei Bedingungen erfuellt - oder null.
+ * Das guenstigste geprueffte Angebot - als PREIS und als BELEG getrennt.
  *
  * `sammlung` ist der EINMAL zerlegte Bestand (`vorbereiten`), nicht je
  * Angebot neu: Bei 490 Releases und 20 Angeboten waeren das sonst Zehntausende
@@ -227,9 +272,14 @@ export function guenstigstesGeprueft<T extends SammlungsSpiel>(
 	release: { gameId: number; titel: string; plattform: Plattform },
 	sammlung: readonly VorbereitetesSpiel<T>[],
 	verworfen: ReadonlySet<string> = KEINE,
-): AngebotUrteil | null {
+): AngebotWahl {
 	const grenze = zusatzwortGrenze(release.titel);
+	// Zwei Sieger aus EINEM Durchlauf: der guenstigste ueberhaupt (Beleg) und
+	// der guenstigste vollstaendige (Preis). Ein zweiter Durchlauf waere
+	// dieselbe Arbeit noch einmal - bei 20 Angeboten x 20 Releases je Aufruf
+	// zaehlt das gegen die CPU-Grenze (CLAUDE.md).
 	let bestes: MarktAngebot | null = null;
+	let bestesVollstaendig: MarktAngebot | null = null;
 	for (const angebot of angebote) {
 		// Die Sperrliste ZUERST: Sie ist die billigste der sieben Pruefungen,
 		// ein Lookup in einer Menge mit wenigen Eintraegen. Das naechste
@@ -245,10 +295,16 @@ export function guenstigstesGeprueft<T extends SammlungsSpiel>(
 		const { treffer, eindeutig } = sammlungstreffer(angebot.titel, sammlung);
 		if (!eindeutig || treffer[0]?.spielId !== release.gameId) continue;
 		if (bestes === null || angebot.preisCents < bestes.preisCents) bestes = angebot;
+		if (unvollstaendig(angebot.titel)) continue;
+		if (bestesVollstaendig === null || angebot.preisCents < bestesVollstaendig.preisCents) {
+			bestesVollstaendig = angebot;
+		}
 	}
-	if (bestes === null) return null;
-	return { angebot: bestes, anbieter: anbieterName(bestes.verkaeufer) };
+	return { preis: urteil(bestesVollstaendig), beleg: urteil(bestes) };
 }
+
+const urteil = (a: MarktAngebot | null): AngebotUrteil | null =>
+	a === null ? null : { angebot: a, anbieter: anbieterName(a.verkaeufer) };
 
 /** Wer verkauft - der Haendlername, wenn es einer der beiden ist, sonst "eBay". */
 export function anbieterName(verkaeufer: string | null): string {

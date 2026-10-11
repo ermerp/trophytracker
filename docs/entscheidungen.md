@@ -214,4 +214,5 @@ Was in 20f und 20g noch offen ist, steht dort: [16.2](spec/16-2-offene-stufen.md
 | Datum | Entscheidung | Abschnitt |
 |---|---|---|
 | 11.10.2026 | **Die Rücknahme steht im Punktmenü aller vier Ansichten**, nicht als Zusatzzeile nur im Spieldetail (so der Bauplan). Das Menü gibt es überall schon; eine fünfte Angabe in einer Zeile, die auf 360 px voll ist, hätte es nicht gegeben | [7.3](spec/07-3-ebay.md) |
+| 11.10.2026 | **Ein loser Datenträger wird automatisch übergangen – aber nur beim Preis.** Nicht in `KEIN_DATENTRAEGER` aufnehmen: Das hätte auch den Disc-Nachweis gekostet, und eine lose Disc belegt die Disc-Fassung besonders gut. Stattdessen zwei Antworten aus `guenstigstesGeprueft` | [7.3](spec/07-3-ebay.md) |
 | 11.10.2026 | **Die Sperrliste trägt `titel` und `preis_cents` mit.** Ohne sie könnte die Rücknahme nur eine Zahl nennen – die eBay-Kennung allein ist nicht lesbar, und „zurücknehmen", ohne zu sagen, was zurückkommt, ist keine Korrektur | [6](spec/06-marktdaten.md) |

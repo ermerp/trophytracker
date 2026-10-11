@@ -1,4 +1,4 @@
-import type { AngebotUrteil, MarktKanal } from "../domain/markt";
+import type { AngebotUrteil, AngebotWahl, MarktKanal } from "../domain/markt";
 import type { Plattform } from "../domain/titel";
 import type { EventRepository } from "./events";
 
@@ -35,7 +35,7 @@ export type ZuPruefen = {
 	discFassung: string;
 };
 
-export type AngebotJeKanal = Partial<Record<MarktKanal, AngebotUrteil | null>>;
+export type AngebotJeKanal = Partial<Record<MarktKanal, AngebotWahl>>;
 
 /**
  * Das Angebot, das die Oberflaeche zeigt - Haendler zuerst, Markt als
@@ -139,10 +139,16 @@ export class MarktRepository {
 	): Promise<{ discBelegt: boolean; preis: AngezeigtesAngebot | null }> {
 		const anweisungen: D1PreparedStatement[] = [];
 
+		// In `market_offer` kommt der PREIS, nicht der Beleg: Ein loser
+		// Datentraeger ist kein Vergleichspreis (Stufe 20h-b). Ist er das
+		// einzige Angebot, steht hier `in_stock = 0` und die Oberflaeche sagt
+		// "unbekannt" - die Disc-Fassung belegt er trotzdem, weiter unten.
 		for (const kanal of ["haendler", "markt"] as const) {
-			if (!(kanal in angebote)) continue;
-			const urteil = angebote[kanal] ?? null;
-			anweisungen.push(urteil === null ? this.leerSetzen(ziel, kanal) : this.angebotSetzen(ziel, kanal, urteil));
+			const wahl = angebote[kanal];
+			if (wahl === undefined) continue;
+			anweisungen.push(
+				wahl.preis === null ? this.leerSetzen(ziel, kanal) : this.angebotSetzen(ziel, kanal, wahl.preis),
+			);
 		}
 
 		// BEIDE Kanaele kommen in den Verlauf, jeder als eigene Reihe (Stufe
@@ -150,18 +156,23 @@ export class MarktRepository {
 		// bewusst, der Marktpreis springt mit jedem eingestellten Angebot. In
 		// einer Reihe vermischt waeren beide unbrauchbar.
 		for (const kanal of ["haendler", "markt"] as const) {
-			const urteil = angebote[kanal];
-			if (urteil) anweisungen.push(this.verlaufSchreiben(ziel.releaseId, kanal, urteil));
+			const preis = angebote[kanal]?.preis;
+			if (preis) anweisungen.push(this.verlaufSchreiben(ziel.releaseId, kanal, preis));
 		}
 
 		// Der ANGEZEIGTE Preis bleibt Haendler zuerst, sonst Markt - dieselbe
 		// Regel wie in v_luecken.
-		const gezeigt = angebote.haendler ?? angebote.markt ?? null;
+		const gezeigt = angebote.haendler?.preis ?? angebote.markt?.preis ?? null;
+
+		// Der BELEG, nicht der Preis: Eine lose Disc ohne Huelle ist der
+		// staerkste Hinweis darauf, dass es die Disc-Fassung gibt - sie faellt
+		// nur aus dem Preis heraus, nicht aus dem Nachweis (Stufe 20h-b).
+		const beleg = angebote.haendler?.beleg ?? angebote.markt?.beleg ?? null;
 
 		// Disc-Nachweis: nur unbekannt -> ja, nie ein 'nein' und nie ein
 		// bestehendes 'ja' anfassen (Abschnitt 3). Protokoll mit derselben
 		// Bedingung, davor im Batch, damit der alte Wert noch steht (8.5).
-		const belegt = gezeigt !== null && ziel.discFassung === "unbekannt";
+		const belegt = beleg !== null && ziel.discFassung === "unbekannt";
 		if (belegt) {
 			anweisungen.push(
 				this.events.insertSelect(

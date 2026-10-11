@@ -83,7 +83,7 @@ Angebot" tragen; gebaut wird er trotzdem mit, sonst erbt ihn später niemand.
 
 **Warum eine Mindesttiefe sein muss:** Ohne sie feuert allein die Händlerreihe rund 20-mal je
 Nacht – ihre neuen Tiefs liegen im Median **3,7 %** unter dem bisherigen, zwei Drittel
-flacher als 5 % ([7.3](07-3-ebay.md)). Mit 10 % bleiben auf den offenen Absichten **2,5
+flacher als 5 % ([7.3](07-3-ebay-reihen.md)). Mit 10 % bleiben auf den offenen Absichten **2,5
 Meldungen je Nacht statt 5,8**, und 12 der 15 kommen aus der Marktreihe.
 
 **Gerechnet wird im Preisschritt selbst**, nicht als eigener Cron-Schritt: Er ist der einzige

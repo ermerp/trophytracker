@@ -53,6 +53,7 @@ wurde, steht in [`entscheidungen.md`](../entscheidungen.md); was dabei
 | 20d | Block B der Lückenansicht bekommt einen eigenen Schalter – zugeklappt war er praktisch unauffindbar (5.3) | – | 02.10.2026 |
 | 20e | **Preise in den Listen**: Gebrauchtpreis an Kaufliste und Wunsch als Link, `sort=preis` in fünf Listen über ein verankertes Menü; Takt täglich, Wartungsfenster `*/5 6-8`, Portion 20 Releases; beide Kanäle im Verlauf (7.3) | 0029, 0030 | 02.10.2026 |
 | 20h | **Angebotskorrektur**: ein untaugliches Angebot verwerfen und zurücknehmen; Sperrliste je Release statt Löschen, Angebotskennung an `market_offer` und `price_snapshot`, Punktmenü am Preis in allen vier Ansichten (6, 7.3) | 0033 | 11.10.2026 |
+| 20h-b | Ein loser Datenträger („Nur Disc", „NUR MODUL") ist ein **Beleg, aber kein Preis**: `guenstigstesGeprueft` gibt `preis` und `beleg` getrennt zurück (7.3) | – | 11.10.2026 |
 | 21 | **PSN Store-Preise**: Neupreis der digitalen Fassung, „im PS-Plus-Katalog", Angebote mit Grundpreis; Produkt-Id über IGDBs Concept-Id aufgelöst (7.4) – **Use Case 7** vollständig. Stand bei der Abnahme: 65 Releases mit Preis, Nachpflegeliste leer, `rows_read_24h` 191 324 | 0031 | 08.10.2026 |
 | 21b | Der Leerlauf der Auswahl: CTE aus zwei Index-Lookups plus Teilindex, 4 statt 430 gelesene Zeilen (7.4) | 0032 | 08.10.2026 |
 | 21c | Innerhalb der Treffergruppe gewinnt der kürzeste Produktname (*Outcast*, 49,99 statt 14,99 €) (7.4) | – | 08.10.2026 |
