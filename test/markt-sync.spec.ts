@@ -219,6 +219,34 @@ describe("marktSchritt", () => {
 		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM game_event").first<{ n: number }>()).toMatchObject({ n: 0 });
 	});
 
+	/**
+	 * Lose Datentraeger (Stufe 20h-b): Der Beleg und der Preis kommen aus
+	 * demselben Durchlauf, aber nicht aus demselben Angebot.
+	 */
+	it("belegt die Disc-Fassung mit einer losen Disc, nimmt sie aber nicht als Preis", async () => {
+		await luecke(1, "Bloodborne");
+		const e = await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4 Nur Disc", "3.98")] }));
+
+		// Belegt ist sie - eine lose Disc ist der staerkste Hinweis darauf,
+		// dass es die Disc-Fassung gibt.
+		expect(await release(1)).toMatchObject({ s: "ja", q: "ebay" });
+		expect(e).toMatchObject({ geprueft: 1, discBelegt: 1, mitPreis: 0 });
+		// Ein Preis steht trotzdem nicht da: keine Angebotszeile, kein Punkt
+		// im Verlauf.
+		expect(await angebote()).toEqual([]);
+		expect(await verlauf(1)).toEqual([]);
+	});
+
+	it("nimmt bei einer losen und einer ganzen Disc die ganze als Preis", async () => {
+		await luecke(1, "Bloodborne");
+		await marktSchritt(
+			repos(),
+			ebayMit({ markt: [angebot("Bloodborne PS4 Nur Disc", "3.98"), angebot("Bloodborne PS4", "12.99")] }),
+		);
+		expect(await angebote()).toMatchObject([{ kanal: "markt", price_cents: 1299 }]);
+		expect(await verlauf(1, "markt")).toMatchObject([{ price_cents: 1299 }]);
+	});
+
 	it("haelt fest, dass eBay gar nichts kennt - der Hinweis fuer Block B", async () => {
 		await luecke(1, "Bloodborne");
 		const e = await marktSchritt(repos(), ebayMit({}));

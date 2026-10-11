@@ -27,6 +27,7 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 7.1 | [07-1-psn-trophaeen.md](07-1-psn-trophaeen.md) | NPSSO, Token, Zugang erneuern |
 | 7.2 | [07-2-matching.md](07-2-matching.md) | das Matching-Problem |
 | 7.3 | [07-3-ebay.md](07-3-ebay.md) | Gebrauchtpreise und Disc-Nachweis aus eBay |
+| 7.3 | [07-3-ebay-reihen.md](07-3-ebay-reihen.md) | wie sich Händler-, Markt- und Store-Reihe bewegen (Messung für 20g) |
 | 7.3 | [07-3-ebay-verworfen.md](07-3-ebay-verworfen.md) | geprüft und verworfen: AWIN, eBays Aspekt `Spielname`, Quellen für „nur digital" |
 | 7.4 | [07-4-store-preise.md](07-4-store-preise.md) | PSN Store-Preise: Endpunkt, Produkt-Id, Zuschnitt |
 | 7.4 | [07-4-store-befunde.md](07-4-store-befunde.md) | was ohne Preis dasteht, Nachpflegeliste, Anzeige |

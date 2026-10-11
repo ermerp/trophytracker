@@ -35,6 +35,23 @@ Ein Angebot zählt nur, wenn alle sechs Bedingungen zusammenkommen (`guenstigste
 5. Kein fremdes Wort ist eine **blanke Ziffer**, solange unser Titel keine trägt.
 6. Höchstens `max(1, n−1)` Worte, die im eigenen Titel nicht vorkommen (`n` = Inhaltsworte des eigenen Titels).
 
+**Ein loser Datenträger ist ein Beleg, aber kein Preis** (Stufe 20h-b, Entscheidung des
+Nutzers vom 11.10.2026). „Nur Disc", „NUR MODUL", „ohne Hülle" – solche Angebote bestehen
+den Abgleich, taugen aber nicht als Vergleichspreis, während sie die Disc-Fassung *besonders
+gut* belegen. `guenstigstesGeprueft` gibt deshalb **zwei** Antworten aus einem Durchlauf:
+`preis` (das günstigste vollständige Angebot, es allein kommt in `market_offer` und in den
+Verlauf) und `beleg` (das günstigste geprüfte überhaupt, es allein entscheidet über
+`unbekannt → ja`). Das ist der Unterschied zu `KEIN_DATENTRAEGER`: Ein Konto belegt gar
+nichts.
+
+Anlass waren zwei Angebote zu *11-11: Memories Retold*, die der Nutzer am 11.10.2026
+nacheinander von Hand verworfen hat (6,98 und 8,37 €, beide „Nur Disc"). Gemessen über die
+355 damals vorliegenden Angebote trifft das Muster **9 (2,5 %)**, alle im Marktkanal, keines
+bei rebuy oder medimops; alle neun gehören zu Releases, die schon `ja` sind. Die Füllworte in
+`UNVOLLSTAENDIG` sind gemessen („NUR PAL DISC"), und `ohne` zählt **nur mit einem
+Verpackungswort dahinter** – sonst fiele „Miles Morales (ohne Spiderman remastered)" mit
+heraus, wo nicht die Hülle fehlt, sondern das zweite Spiel des Bündels.
+
 **Die Bedingungen 2 bis 5 stammen aus der Durchsicht der 79 Statuswechsel selbst** (02.10.2026) – fünf Fehlgriffe, von denen keiner in einer Kennzahl sichtbar war ([lehren.md](../lehren.md)):
 
 | Release | Angebot | Ursache |
@@ -76,7 +93,7 @@ Die dritte Bedingung ist an fünf Varianten gegen den echten Bestand gemessen. E
 
 #### Ableitung von `physical_release_status`
 
-Ein geprüfter Treffer setzt `unbekannt → ja`, `physical_source='ebay'`. Niemals ein `nein`, niemals ein bestehendes `ja` oder `nein` angefasst (Abschnitt 3). Protokolliert wird mit der reservierten Quelle `feed` und `detail='ebay'` (8.5).
+Ein geprüfter Treffer setzt `unbekannt → ja`, `physical_source='ebay'` – maßgeblich ist der **Beleg**, nicht der angezeigte Preis (20h-b). Niemals ein `nein`, niemals ein bestehendes `ja` oder `nein` angefasst (Abschnitt 3). Protokolliert wird mit der reservierten Quelle `feed` und `detail='ebay'` (8.5).
 
 **Das Ausbleiben ist der Hinweis für die Gegenrichtung.** Gemessen: Von 235 durch IGDB belegten Discs findet eBay **224 (95 %)**, und nur **8 (3 %)** haben gar kein Angebot in der Plattform-Kategorie. „eBay kennt hier nichts" ist damit ein belastbarer Hinweis auf eine reine Download-Fassung — und betrifft 125 der 255 unbekannten Releases. Er steht in Block B der Lückenansicht (5.3) neben den Ja/Nein-Knöpfen und sortiert ihn; **geschrieben wird `nein` weiterhin nur vom Nutzer.**
 
@@ -105,31 +122,9 @@ Der Schritt läuft im **Wartungsfenster** (`*/5 6-8`, 36 Aufrufe) — er fasst S
 
 **Beide Kanäle kommen in den Verlauf** (`price_snapshot.kanal`, Migration 0030), jeder als eigene Reihe. Ein Händlerpreis bei rebuy oder medimops ist ein Katalogpreis und ändert sich bewusst; der Marktpreis ist das Minimum über die gerade eingestellten Angebote und springt mit jedem neuen. In einer Reihe vermischt wären beide unbrauchbar. `source` sagt weiterhin, **wer** das Angebot stellt — der kann innerhalb eines Kanals wechseln und taugt deshalb nicht als Schlüssel der Reihe. Die **Händlerreihe deckt knapp die Hälfte ab**: 116 von 250 Reihen (46 %, gemessen am 09.10.2026; am 02.10.2026 waren es 84 von 239). Die Glättung muss also die Hauptarbeit tragen, die Händlerbevorzugung ist der Bonus.
 
-#### Wie sich die beiden Reihen bewegen (gemessen am 09.10.2026)
-
-Sechs vollständige Tage im täglichen Takt, 366 Reihen mit Kanal. Gezählt ist jeder Punkt, der
-ein **neues Minimum seiner Reihe** war, und wie tief er unter dem bisherigen Tief lag:
-
-| Reihe | Reihen | neue Tiefs | Tiefe: Median | davon < 5 % | davon ≥ 20 % |
-|---|---|---|---|---|---|
-| gebraucht/händler | 116 | 121 | **3,7 %** | 66 % | 7 % |
-| gebraucht/markt | 250 | 113 | **10,0 %** | 31 % | 27 % |
-| psn_store | 65 | 17 | **80,0 %** | 0 % | 100 % |
-
-**Die Marktreihe trägt ein Allzeittief, die Händlerreihe nicht von sich aus** – das kehrt die
-Vermutung um, die der Entwurf zu 20g zuerst hatte. rebuy und medimops rücken ihren Katalogpreis
-um Cents: zwei Drittel ihrer neuen Tiefs sind flacher als 5 %. Der Marktpreis bewegt sich
-seltener und tiefer, und die Trefferrate fällt schnell — Anteil der Punkte, die ein neues Tief
-sind, nach Position in der Reihe: **42 / 22 / 13 %** (Händler **74 / 66 / 50 %**). Ein reiner
-Zufallslauf läge bei 1/n, also 50 / 33 / 25 %; der Marktpreis liegt **darunter**, ist also träge,
-und ein spätes Tief ist entsprechend aussagekräftig. Der Store schlägt beide: Alle 17 Tiefs liegen
-≥ 20 % unter dem bisherigen, im Median 80 % — das ist eine Rabattaktion.
-
-Der Haken der Marktreihe ist nicht ihre Bewegung, sondern ihre Datenlage: Ein tiefes Markttief ist
-genau das Muster eines untauglichen Angebots. Von 111 Releases mit **beiden** Kanälen liegt der
-Markttreffer im Median bei 0,82 des Händlerpreises, aber **14 (13 %) unter der Hälfte** — Bündel,
-falsche Fassung, Hülle ohne Disc. Deshalb steht die Angebotskorrektur (20h) vor dem Alarm
-([16.2](16-2-offene-stufen.md)).
+**Wie sich die beiden Reihen bewegen** – neue Tiefs, ihre Tiefe und warum ein tiefes
+Markttief das Muster eines untauglichen Angebots ist – steht in
+[07-3-ebay-reihen.md](07-3-ebay-reihen.md). Die Zahlen tragen den Preisalarm aus 20g.
 
 **Ein Aufruf liest 1 000 Zeilen** (gemessen gegen 430 Listen): 30 für die Auswahl, 430 für die einmal zerlegte Sammlung, 50 fürs Schreiben, 430 für den offenen Zähler und seit 20h **60 für die Sperrliste** (am 02.10.2026 ohne sie: 940). Seit dem täglichen Takt sind es **24 Aufrufe je Nacht, also rund 24 000 Zeilen** — gegen 5 Millionen am Tag; die früheren „rund drei Aufrufe je Nacht“ galten für die abgelöste 14-Tage-Frist. Die erste Fassung las 2 059 je Aufruf, davon **1 549 für vier Zähler, die nur in der Verlaufszeile standen**; sie sind durch einen einzigen ersetzt, und `weiter` kommt jetzt aus der Portionsgröße statt aus einem Zähler. Dieselbe Form wie der `COUNT(*)` in der Feed-Route am 01.10.2026, nur kleiner — und derselbe Grund, warum ein Schreibschritt vollständig gemessen gehört und nicht nur in seiner Hauptabfrage.
 
