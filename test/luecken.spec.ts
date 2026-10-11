@@ -230,6 +230,8 @@ describe("GET /api/gaps und verwerfen", () => {
 				besterGebrauchtpreisCents: null,
 				gebrauchtpreisAnbieter: null,
 				gebrauchtpreisUrl: null,
+				gebrauchtpreisItemId: null,
+				gebrauchtpreisVerworfen: 0,
 				marktGeprueftAm: null,
 				marktRohangebote: null,
 				verworfen: false,

@@ -29,7 +29,17 @@ export function fakeEbay(
 			() => {
 				const a = antworten[Math.min(n++, antworten.length - 1)];
 				if (a instanceof Response) return a.clone();
-				return jsonAntwort({ total: a.length, itemSummaries: a.map((titel, i) => ({ itemId: `v1|${i}|0`, title: titel })) });
+				// `legacyItemId` gehoert dazu, nicht nur `itemId`: An ihr haengt
+				// die Sperrliste aus Stufe 20h, und ohne sie waere jede
+				// Testzeile kennungslos und der Filter nie wirklich geprueft.
+				return jsonAntwort({
+					total: a.length,
+					itemSummaries: a.map((titel, i) => ({
+						itemId: `v1|${1_000_000_000_00 + i}|0`,
+						legacyItemId: String(1_000_000_000_00 + i),
+						title: titel,
+					})),
+				});
 			},
 		],
 	]);

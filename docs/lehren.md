@@ -480,6 +480,51 @@ scannt die Disc später erneut.
 
 ---
 
+## Eine gemessene Größe zurückzuschreiben ist eine Rückkopplung
+
+**11.10.2026 – die Tafel am Preis wuchs bei jedem Durchgang.** Das Punktmenü der
+Angebotskorrektur (20h) misst beim Aufklappen die eigene Breite, um sich am
+Fensterrand zu klemmen, und schrieb sie als `width` zurück. `offsetWidth` ist
+**immer** die Rahmenbreite, `.tafel` rechnet aber in `content-box` – die App
+setzt nirgends ein globales `box-sizing: border-box`. Also kamen Polster und
+Rahmen bei jedem Durchgang obendrauf: **358 → 386 → 414 px**, bis die Tafel bei
+390 px Fensterbreite 32 px rechts aus dem Bild stand.
+
+Gesehen wurde es im **Bild**, nicht im Code und nicht in einem Test: Die
+Zwischenwerte standen in keiner Ausgabe, und der Fehler sah aus wie ein zu
+breites Menü. Gefunden wurde die Ursache erst, als die Breite über einen
+`MutationObserver` bei jedem Schritt mitgeschrieben wurde – die Spur zeigte
+drei verschiedene Werte, wo einer hätte stehen müssen.
+
+Davor derselbe Vorfall in klein: Die Tafel benutzte zuerst `.menuetafel`, die
+mit `right: 0` am Anker hängt. Im Spieldetail und in der Sortierleiste steht
+der Anker am rechten Rand, hier mitten in einer Textzeile – die Tafel lief bei
+360 px links aus dem Bild. **Ein Klassenname ist eine Zusage über seinen
+Kontext**, und diese galt nur für Anker am Rand.
+
+→ Regel: Eine gemessene Größe nie als derselbe Wert zurückschreiben, ohne die
+Einheit zu prüfen, die beide meinen. Und: Gestaltung wird angesehen, nicht nur
+gebaut – beides wäre in keinem Test aufgefallen.
+
+---
+
+## Ein Bauplan ist eine Behauptung über den Code
+
+**11.10.2026 – „ist schon die eine Stelle für alle vier Vorkommen".** So stand es
+im Bauplan zu 20h über `frontend/src/Preis.tsx`. Tatsächlich benutzten nur drei
+Ansichten die Komponente; die `ReleaseKarte` im Spieldetail rendert ihren Preis
+seit Stufe 20 selbst, mit eigener „Angebot ansehen"-Zeile. Hätte das Menü nur in
+`Preis.tsx` gehangen, wäre es im Spieldetail nicht erschienen – und der Bauplan
+hätte recht behalten, nur die Oberfläche nicht.
+
+Gefunden beim Lesen des Codes **vor** dem ersten Handgriff, nicht beim Bauen.
+Der Satz war zum Zeitpunkt des Plans schon falsch, nicht veraltet.
+
+→ Regel: Ein Bauplan sagt, was gelten **soll**; was gilt, sagt der Code. Beim
+Lesen des Plans wird jede Behauptung über den Bestand nachgesehen.
+
+---
+
 ## Ein Test, der nichts prüfte, ist grün
 
 `test/keine-lecks.spec.ts` hält die Regel aus Abschnitt 15.3: Geheimnisse

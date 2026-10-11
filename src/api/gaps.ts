@@ -37,6 +37,10 @@ function lueckeAntwort(z: LueckeZeile) {
 		/** Wer das Angebot stellt, fuer "ab 12,77 EUR bei rebuy" (Stufe 20). */
 		gebrauchtpreisAnbieter: z.gebrauchtpreis_anbieter,
 		gebrauchtpreisUrl: z.gebrauchtpreis_url,
+		/** eBays Angebotskennung (Stufe 20h); null heisst: dieses Angebot ist nicht verwerfbar. */
+		gebrauchtpreisItemId: z.gebrauchtpreis_item_id,
+		/** Wie viele Angebote hier verworfen sind - 0 heisst: nichts zurueckzunehmen. */
+		gebrauchtpreisVerworfen: z.gebrauchtpreis_verworfen,
 		marktGeprueftAm: z.markt_geprueft_am,
 		/** 0 = eBay kennt in der Plattform-Kategorie nichts, null = ungeprueft. */
 		marktRohangebote: z.markt_rohangebote,

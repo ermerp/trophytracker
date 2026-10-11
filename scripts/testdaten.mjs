@@ -50,10 +50,16 @@ const escape = (text) => text.replace(/'/g, "''");
 
 s("-- Erfundene Zeilen, erzeugt von scripts/testdaten.mjs. Nur fuer --local.");
 s("PRAGMA foreign_keys = OFF;");
+
+//
+// Jede Angebotszeile traegt eine zwoelfstellige Kennung, wie eBay sie vergibt
+// (Stufe 20h): An ihr haengt die Sperrliste, und ohne sie waere im Bild kein
+// Verwerfen-Knopf zu sehen.
+const kennung = (i, art) => `${{ m: 11, h: 12, x: 13, y: 14 }[art]}${String(1_000_000_000 + i).slice(0, 10)}`;
 for (const tabelle of [
 	"game_event", "plan_entry", "play_status", "physical_copy", "digital_entitlement",
 	"review_queue", "trophy_progress", "psn_played_title", "ean_mapping", "price_snapshot",
-	"market_offer", "release", "game", "psn_raw_response", "psn_sync_run", "app_setting",
+	"market_offer_verworfen", "market_offer", "release", "game", "psn_raw_response", "psn_sync_run", "app_setting",
 ]) {
 	s(`DELETE FROM ${tabelle};`);
 }
@@ -106,6 +112,23 @@ for (let i = 9001; i <= 9008; i++) {
 	s(`INSERT INTO game (id, title, sort_title) VALUES (${i}, 'Wunschtitel ${i}', 'wunschtitel ${i}');`);
 	s(`INSERT INTO release (id, game_id, platform) VALUES (${i}, ${i}, 'PS5');`);
 	s(`INSERT INTO plan_entry (kind, release_id, status, origin) VALUES ('wunsch', ${i}, 'offen', 'manuell');`);
+	// Gebrauchtangebot am Wunsch (Stufe 20e) - sonst zeigt die Wunschliste
+	// nie einen Preis, und das Punktmenue aus 20h waere dort im Bild nie zu
+	// sehen. Jeder zweite Wunsch traegt dazu ein verworfenes Angebot.
+	const wunschCents = 1900 + ((i * 97) % 3000);
+	s(
+		"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, " +
+			`condition, price_cents, currency, in_stock, url, ebay_item_id, imported_at, release_id) VALUES ('ebay', 'markt:${i}', ` +
+			`'eBay', 'markt', 'Wunschtitel ${i}', 'PS5', 'Gut', ${wunschCents}, 'EUR', 1, ` +
+			`'https://example.invalid/${i}', '${kennung(i, "m")}', datetime('now'), ${i});`,
+	);
+	s(`UPDATE release SET markt_geprueft_am = datetime('now'), markt_rohangebote = 4 WHERE id = ${i};`);
+	if (i % 2 === 0) {
+		s(
+			"INSERT INTO market_offer_verworfen (release_id, ebay_item_id, titel, preis_cents, verworfen_am) " +
+				`VALUES (${i}, '${kennung(i, "x")}', 'Wunschtitel ${i} – Leerhuelle, ohne Disc', ${wunschCents - 800}, datetime('now', '-2 days'));`,
+		);
+	}
 }
 
 for (let i = 1; i <= 25; i++) {
@@ -243,26 +266,47 @@ for (let i = 1; i <= ANZAHL; i++) {
 	const marktCents = 400 + ((i * 137) % 4200);
 	s(
 		"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, " +
-			`condition, price_cents, currency, in_stock, url, imported_at, release_id) VALUES ('ebay', 'markt:${i}', ` +
+			`condition, price_cents, currency, in_stock, url, ebay_item_id, imported_at, release_id) VALUES ('ebay', 'markt:${i}', ` +
 			`'eBay', 'markt', 'Spiel ${i}', (SELECT platform FROM release WHERE id = ${i}), 'Gut', ${marktCents}, ` +
-			`'EUR', 1, 'https://example.invalid/${i}', datetime('now'), ${i});`,
+			`'EUR', 1, 'https://example.invalid/${i}', '${kennung(i, "m")}', datetime('now'), ${i});`,
 	);
 	// Jedes vierte Release hat zusaetzlich ein Haendlerangebot - teurer als
 	// der Markt, damit im Bild zu sehen ist, dass der Haendler Vorrang hat.
 	if (rest === 0) {
 		s(
 			"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, " +
-				`condition, price_cents, currency, in_stock, url, imported_at, release_id) VALUES ('ebay', 'haendler:${i}', ` +
+				`condition, price_cents, currency, in_stock, url, ebay_item_id, imported_at, release_id) VALUES ('ebay', 'haendler:${i}', ` +
 				`'${i % 8 === 0 ? "medimops" : "rebuy"}', 'haendler', 'Spiel ${i}', ` +
 				`(SELECT platform FROM release WHERE id = ${i}), 'Sehr gut', ${marktCents + 300 + (i % 700)}, ` +
-				`'EUR', 1, 'https://example.invalid/h${i}', datetime('now'), ${i});`,
+				`'EUR', 1, 'https://example.invalid/h${i}', '${kennung(i, "h")}', datetime('now'), ${i});`,
 		);
 	}
 	s(
-		"INSERT INTO price_snapshot (release_id, channel, source, condition, price_cents, currency, captured_at) " +
-			`VALUES (${i}, 'gebraucht', 'ebay', 'Gut', ${marktCents + 250}, 'EUR', datetime('now', '-40 days')), ` +
-			`(${i}, 'gebraucht', 'ebay', 'Gut', ${marktCents}, 'EUR', datetime('now', '-2 days'));`,
+		"INSERT INTO price_snapshot (release_id, channel, source, condition, price_cents, currency, ebay_item_id, captured_at) " +
+			`VALUES (${i}, 'gebraucht', 'ebay', 'Gut', ${marktCents + 250}, 'EUR', '${kennung(i, "m")}', datetime('now', '-40 days')), ` +
+			`(${i}, 'gebraucht', 'ebay', 'Gut', ${marktCents}, 'EUR', '${kennung(i, "m")}', datetime('now', '-2 days'));`,
 	);
+
+	// Verworfene Angebote (Stufe 20h). Drei Faelle, damit im Bild alle drei
+	// Zustaende vorkommen:
+	//   * jedes siebte Release hat EINES verworfen und trotzdem einen Preis,
+	//   * jedes einundzwanzigste hat ZWEI verworfen (die Tafel wird laenger),
+	//   * und jedes neunzehnte hat sein einziges Angebot verworfen - dort
+	//     steht "unbekannt", WEIL entschieden wurde (in_stock = 0).
+	if (i % 7 === 0) {
+		const zeilen = [`(${i}, '${kennung(i, "x")}', 'Spiel ${i} – nur Disc, ohne Huelle', ${marktCents - 300}, datetime('now', '-6 days'))`];
+		if (i % 21 === 0) {
+			zeilen.push(`(${i}, '${kennung(i, "y")}', 'Spiel ${i} Leerhuelle', ${marktCents - 250}, datetime('now', '-3 days'))`);
+		}
+		s(`INSERT INTO market_offer_verworfen (release_id, ebay_item_id, titel, preis_cents, verworfen_am) VALUES ${zeilen.join(", ")};`);
+	}
+	if (i % 19 === 0) {
+		s(
+			`INSERT INTO market_offer_verworfen (release_id, ebay_item_id, titel, preis_cents, verworfen_am) ` +
+				`VALUES (${i}, '${kennung(i, "m")}', 'Spiel ${i} – Konto, keine Disc', ${marktCents}, datetime('now', '-1 days'));`,
+		);
+		s(`UPDATE market_offer SET in_stock = 0 WHERE release_id = ${i};`);
+	}
 }
 
 // --- Store-Preise (Stufe 21) -------------------------------------------------

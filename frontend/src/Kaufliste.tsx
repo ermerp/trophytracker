@@ -108,7 +108,18 @@ export function Kaufliste() {
             {k.plattform ?? 'Plattform fehlt'} · Kritik {k.kritik ?? 'unbekannt'}
             {k.quelle === 'luecke' && (
               <>
-                {' · '}Gebraucht <Preis {...gebrauchtpreis(k.besterGebrauchtpreisCents, k.gebrauchtpreisAnbieter, k.gebrauchtpreisUrl)} />
+                {' · '}Gebraucht{' '}
+                <Preis
+                  {...gebrauchtpreis(
+                    k.besterGebrauchtpreisCents,
+                    k.gebrauchtpreisAnbieter,
+                    k.gebrauchtpreisUrl,
+                    k.gebrauchtpreisItemId,
+                    k.gebrauchtpreisVerworfen,
+                  )}
+                  releaseId={k.releaseId}
+                  onGeaendert={() => void kandidatenLaden()}
+                />
               </>
             )}
             {k.favorit && ' · ★'}

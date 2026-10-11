@@ -393,6 +393,25 @@ describe("Dichtheitsprüfung", () => {
 			await ruf(app, "/api/export/backup.json"),
 			await ruf(app, "/api/export/sammlung.csv"),
 			await ruf(app, "/api/export/trophaeen.csv"),
+			// Angebotskorrektur (Stufe 20h), auch die Fehlerpfade: 409 ohne
+			// vorliegendes Angebot, 404 ohne Sperrlisteneintrag, 400 bei
+			// unbrauchbarer Kennung.
+			await ruf(app, "/api/sync/markt/verwerfen", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ releaseId: 1, itemId: "110000000001" }),
+			}),
+			await ruf(app, "/api/sync/markt/verwerfen", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ releaseId: 1, itemId: "keine-kennung" }),
+			}),
+			await ruf(app, "/api/sync/markt/verwerfen/ruecknahme", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ releaseId: 1, itemId: "110000000001" }),
+			}),
+			await ruf(app, "/api/sync/markt/verwerfen/1"),
 			await ruf(app, "/api/backup/status"),
 			await ruf(app, "/api/backup/vermerk", {
 				method: "POST",
@@ -457,6 +476,21 @@ describe("Dichtheitsprüfung", () => {
 			const texte = [
 				await ruf(app, "/api/scan/4006381333931/online"),
 				await ruf(app, "/api/scan/5026555403719/online"),
+				// Die Angebotskorrektur (Stufe 20h) laeuft ueber denselben
+				// Client: Sie holt nach jeder Entscheidung neu ab, und ihre
+				// Meldung landet in der Antwort.
+				await ruf(app, "/api/sync/markt", { method: "POST" }),
+				await ruf(app, "/api/sync/markt/verwerfen", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ releaseId: 1, itemId: "110000000001" }),
+				}),
+				await ruf(app, "/api/sync/markt/verwerfen/ruecknahme", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ releaseId: 1, itemId: "110000000001" }),
+				}),
+				await ruf(app, "/api/sync/markt/verwerfen/1"),
 			];
 			for (const text of texte) {
 				expect(istDicht(text), `Leck in: ${text.slice(0, 200)}`).toMatchObject({ dicht: true });

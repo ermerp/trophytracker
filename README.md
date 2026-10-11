@@ -52,7 +52,7 @@ erfasste Discs, nächtliche Läufe seit dem 20.09.2026.
 | Lücken | Digital gespielt, Disc belegt. Block A mit drei Knöpfen, darunter zuklappbar „Disc-Fassung unbekannt" mit **zwei** | [5.3](docs/spec/05-3-luecke-verwerfen.md) |
 | Kaufliste | Kandidaten aus belegten Lücken und offenen Wünschen; ein Wunsch kommt als **Kopie**, der Wunsch bleibt offen | [5](docs/spec/05-absichten.md) |
 | Erscheint bald | Unveröffentlichte Titel, `angekuendigt → erschienen` täglich im Cron | [8.4](docs/spec/08-4-unveroeffentlicht.md) |
-| Gebrauchtpreise | Zwei eBay-Suchen je Release (Händler, Markt), Titelabgleich Pflicht, als Link aufs Angebot, sortierbar | [7.3](docs/spec/07-3-ebay.md) |
+| Gebrauchtpreise | Zwei eBay-Suchen je Release (Händler, Markt), Titelabgleich Pflicht, als Link aufs Angebot, sortierbar; ein untaugliches Angebot lässt sich verwerfen und zurücknehmen | [7.3](docs/spec/07-3-ebay.md) |
 | Store-Preise | Neupreis der digitalen Fassung aus der gerenderten Produktseite, „im PS-Plus-Katalog", Angebote mit Grundpreis | [7.4](docs/spec/07-4-store-preise.md) |
 | Spielzeit und digitaler Besitz | Aus PSN ergänzt, nie importiert; `kauf` schlägt `plus`, PS+ ist eine Momentaufnahme | [7.7](docs/spec/07-7-psn-weitere-daten.md) |
 | Einzeltrophäen | 18 355 Trophäen mit Seltenheit, Stufe und Fortschrittszähler; Liste je Release, Level und Jahre im Dashboard | [7.7](docs/spec/07-7-einzeltrophaeen.md) |

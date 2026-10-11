@@ -177,6 +177,10 @@ export type SpielDetail = {
 		preis_anbieter: string | null;
 		preis_zustand: string | null;
 		preis_url: string | null;
+		/** eBays Angebotskennung - was der Verwerfen-Knopf verwirft (Stufe 20h). */
+		preis_item_id: string | null;
+		/** Wie viele Angebote fuer dieses Release verworfen sind (Stufe 20h). */
+		preis_verworfen: number;
 		np_communication_id: string | null;
 		title_name: string | null;
 		icon_url: string | null;
@@ -708,7 +712,11 @@ aeenliste haengt
 					"COALESCE(mh.price_cents, mm.price_cents) AS preis_cents, " +
 					"COALESCE(mh.anbieter, mm.anbieter) AS preis_anbieter, " +
 					"COALESCE(mh.condition, mm.condition) AS preis_zustand, " +
-					"COALESCE(mh.url, mm.url) AS preis_url " +
+					"COALESCE(mh.url, mm.url) AS preis_url, " +
+					"COALESCE(mh.ebay_item_id, mm.ebay_item_id) AS preis_item_id, " +
+					// Korrelierter COUNT ueber den Primaerschluessel der
+					// Sperrliste (Stufe 20h) - kein neuer Join.
+					"(SELECT COUNT(*) FROM market_offer_verworfen v WHERE v.release_id = r.id) AS preis_verworfen " +
 					"FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id " +
 					"LEFT JOIN market_offer mh ON mh.release_id = r.id AND mh.kanal = 'haendler' AND mh.in_stock = 1 " +
 					"LEFT JOIN market_offer mm ON mm.release_id = r.id AND mm.kanal = 'markt' AND mm.in_stock = 1 " +

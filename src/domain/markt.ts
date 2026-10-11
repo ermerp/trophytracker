@@ -25,6 +25,10 @@ import type { Plattform } from "./titel";
  * 5. Kein fremdes Wort ist eine blanke Ziffer, solange unser Titel keine traegt.
  * 6. Das Angebot traegt hoechstens `zusatzwortGrenze` fremde Worte.
  *
+ * Davor steht seit Stufe 20h die Sperrliste des Releases: Was der Nutzer
+ * einmal verworfen hat, wird uebergangen, ohne dass irgendwo etwas geloescht
+ * wird (`market_offer_verworfen`, Migration 0033).
+ *
  * Die Bedingungen 2 bis 5 sind am 02.10.2026 an den 79 Releases nachgemessen
  * worden, die der erste Entwurf automatisch auf `ja` gesetzt haette: Fuenf
  * davon waren falsch, und diese vier Regeln beseitigen alle fuenf. Sie kosten
@@ -68,6 +72,14 @@ export type MarktAngebot = {
 	zustand: string | null;
 	verkaeufer: string | null;
 	url: string | null;
+	/**
+	 * eBays Angebotskennung (`legacyItemId`), zwoelfstellig - oder null,
+	 * wenn die Antwort keine nennt. Ein Angebot ohne Kennung bleibt GUELTIG,
+	 * ist aber nicht verwerfbar: Die Sperrliste braucht etwas, worauf sie
+	 * zeigen kann (Stufe 20h). Ein Fall fuer null, nicht fuer ein Verwerfen
+	 * des Angebots.
+	 */
+	itemId: string | null;
 };
 
 /** 'haendler' = rebuy/medimops, 'markt' = alle Verkaeufer. Zwei Zeilen je Release, hoechstens. */
@@ -200,6 +212,9 @@ export function zusatzwortGrenze(meinTitel: string): number {
 
 export type AngebotUrteil = { angebot: MarktAngebot; anbieter: string };
 
+/** Leere Sperrliste - der Normalfall, und eine Menge statt eines Sonderwegs. */
+const KEINE: ReadonlySet<string> = new Set();
+
 /**
  * Das guenstigste Angebot, das alle drei Bedingungen erfuellt - oder null.
  *
@@ -211,10 +226,17 @@ export function guenstigstesGeprueft<T extends SammlungsSpiel>(
 	angebote: readonly MarktAngebot[],
 	release: { gameId: number; titel: string; plattform: Plattform },
 	sammlung: readonly VorbereitetesSpiel<T>[],
+	verworfen: ReadonlySet<string> = KEINE,
 ): AngebotUrteil | null {
 	const grenze = zusatzwortGrenze(release.titel);
 	let bestes: MarktAngebot | null = null;
 	for (const angebot of angebote) {
+		// Die Sperrliste ZUERST: Sie ist die billigste der sieben Pruefungen,
+		// ein Lookup in einer Menge mit wenigen Eintraegen. Das naechste
+		// gueltige Angebot wird damit von selbst das guenstigste - es braucht
+		// keine Sonderlogik. Ein Angebot ohne Kennung kann nicht auf der
+		// Liste stehen und bleibt waehlbar.
+		if (angebot.itemId !== null && verworfen.has(angebot.itemId)) continue;
 		if (plattformWiderspruch(angebot.titel, release.plattform)) continue;
 		if (keinDatentraeger(angebot.titel)) continue;
 		if (!beginntMitTitel(angebot.titel, release.titel)) continue;

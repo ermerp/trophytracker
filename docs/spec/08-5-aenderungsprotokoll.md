@@ -32,7 +32,15 @@ CREATE TABLE game_event (
 
 Der Scanner (Stufe 17) schreibt nichts Eigenes: Er ruft `addPhysicalCopy` mit Anlass `scan` auf – „Disc erfasst (per Barcode)" – und bei einem neuen Release `releaseFuerPlattform` mit demselben Detail; das Mapping in `ean_mapping` bekommt kein Ereignis, weil es dieselbe Entscheidung ist. Die Quelle wird aus vorhandenen Feldern abgeleitet, nicht durch alle Routen gereicht: `plan_entry.origin = 'import'` → `import`, sonst `nutzer`; `matched_source = 'automatisch'` → `sync` (7.2) beziehungsweise `igdb` (7.6), `manuell` → `nutzer`. Der Wunschlisten-Import gibt `import` an die Spiel- und Release-Anlage weiter (`zielAusKandidat`). Die Kopplung (5.5) und das Erledigen beim Erfassen (5) bleiben die einzigen Kopplungspfade; sie tragen nur ein `detail` (`kopplung`, `besitz`, `kauf`), keinen neuen Weg.
 
-**Ereignisarten** (`EREIGNIS_ARTEN`, kein CHECK in der Datenbank, weil Stufe 17, 18 und 20 neue anhängen): `liste_neu`, `zugeordnet`, `zuordnung_geloest`, `spiel_angelegt`, `spiel_umbenannt`, `spiel_geloescht`, `release_angelegt`, `release_abgetrennt`, `release_geloescht`, `release_geaendert` (Disc-Fassung, PSN-Produkt-Id), `disc_fassung_belegt`, `status_geaendert`, `bewertung_geaendert` (je Feld), `status_vorbelegt`, `pruefliste_eingereiht`, `pruefliste_entschieden`, `liste_eintrag_angelegt` / `_geaendert` (umgehängt, Status, Favorit, Notiz, Ziel) / `_erledigt` / `_geloescht`, `exemplar_angelegt` / `_geaendert` / `_geloescht`, `berechtigung_angelegt` / `_geloescht`, `igdb_verknuepft`, `igdb_geloest`, `igdb_abgelehnt`, `erschienen`.
+**Ereignisarten** (`EREIGNIS_ARTEN`, kein CHECK in der Datenbank, weil Stufe 17, 18 und 20 neue anhängen): `liste_neu`, `zugeordnet`, `zuordnung_geloest`, `spiel_angelegt`, `spiel_umbenannt`, `spiel_geloescht`, `release_angelegt`, `release_abgetrennt`, `release_geloescht`, `release_geaendert` (Disc-Fassung, PSN-Produkt-Id), `disc_fassung_belegt`, `status_geaendert`, `bewertung_geaendert` (je Feld), `status_vorbelegt`, `pruefliste_eingereiht`, `pruefliste_entschieden`, `liste_eintrag_angelegt` / `_geaendert` (umgehängt, Status, Favorit, Notiz, Ziel) / `_erledigt` / `_geloescht`, `exemplar_angelegt` / `_geaendert` / `_geloescht`, `berechtigung_angelegt` / `_geloescht`, `igdb_verknuepft`, `igdb_geloest`, `igdb_abgelehnt`, `erschienen`, `angebot_verworfen`.
+
+**`angebot_verworfen` trägt beide Richtungen** (Stufe 20h): Quelle `nutzer` – es ist seine
+Entscheidung, nicht ein Befund des Feeds –, `detail='ebay'`, und die Richtung steht in den
+Werten. Das Verwerfen nennt das Angebot als `new_value` („Titel (6,98 €)"), die Rücknahme als
+`old_value`; dieselbe Form wie bei jedem Übergang, nur dass die eine Seite leer ist. Eine Art
+statt zweier, weil es **eine** Entscheidung mit zwei Richtungen ist. Die Rücknahme ist ein
+set-basierter Schreiber und protokolliert per `INSERT … SELECT` **vor** dem DELETE – danach
+wäre der alte Wert fort.
 
 **Bewusst nicht protokolliert:** die To-Do-Reihenfolge (`neuOrdnen`), die Neuberechnung der Sortierschlüssel (abgeleitet), IGDB-Kandidaten und Suchstempel (Arbeitszustand), das Auffrischen von Cover, Wertung und Datum, die Zeilen eines Wunschlisten-Imports (Arbeitszustand – erst die Übernahme als `plan_entry` zählt) und die Sync-Läufe selbst (`psn_sync_run` ist deren Protokoll).
 

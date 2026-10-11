@@ -111,7 +111,7 @@ Vier Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
 | 02.10.2026 | Releases mit digitaler Berechtigung `source='kauf'` sind vom Store-Preis **ausgenommen** (`plus` schließt nicht aus) | [7.4](spec/07-4-store-preise.md) |
 | 02.10.2026 | **Nicht nach dem Store-Preis sortieren** – zwei Preissortierungen passen bei 360 px nicht | [7.4](spec/07-4-store-preise.md) |
 | 02.10.2026 | Vier Wünsche zu Stufe 20e | [16](spec/16-1-abgeschlossene-stufen.md) |
-| 02.10.2026 | Seine Idee „ungültiges Angebot" – ist seit dem 09.10.2026 die eigene Teilstufe 20h | [16.3](spec/16-3-stufe-20h.md) |
+| 02.10.2026 | Seine Idee „ungültiges Angebot" – wurde Teilstufe 20h, abgenommen am 11.10.2026 | [6](spec/06-marktdaten.md), [7.3](spec/07-3-ebay.md) |
 | 02.10.2026 | Die fünf finalen Stufen bleiben **bewusst ohne Nummer** | [16.4](spec/16-4-finale-stufen.md) |
 | 03.10.2026 | Abnahme-Befund: innerhalb der Treffergruppe gewinnt der **kürzeste** Produktname | [7.4](spec/07-4-store-preise.md) |
 | 08.10.2026 | Das Spieldetail sagt schlicht „im deutschen Store nicht erhältlich" | [7.4](spec/07-4-store-preise.md) |
@@ -207,5 +207,11 @@ sechs vollständigen Tagen im täglichen Takt:
   alarmieren. **Die relative Regel (20 % unter dem 30-Tage-Median) bleibt ausdrücklich
   offen** als späterer Nachtrag.
 
-Was in 20f, 20g und 20h noch offen ist, steht dort:
-[16.2](spec/16-2-offene-stufen.md) und [16.3](spec/16-3-stufe-20h.md).
+Was in 20f und 20g noch offen ist, steht dort: [16.2](spec/16-2-offene-stufen.md).
+
+## Stufe 20h, 11.10.2026 – zwei Entscheidungen zur Angebotskorrektur
+
+| Datum | Entscheidung | Abschnitt |
+|---|---|---|
+| 11.10.2026 | **Die Rücknahme steht im Punktmenü aller vier Ansichten**, nicht als Zusatzzeile nur im Spieldetail (so der Bauplan). Das Menü gibt es überall schon; eine fünfte Angabe in einer Zeile, die auf 360 px voll ist, hätte es nicht gegeben | [7.3](spec/07-3-ebay.md) |
+| 11.10.2026 | **Die Sperrliste trägt `titel` und `preis_cents` mit.** Ohne sie könnte die Rücknahme nur eine Zahl nennen – die eBay-Kennung allein ist nicht lesbar, und „zurücknehmen", ohne zu sagen, was zurückkommt, ist keine Korrektur | [6](spec/06-marktdaten.md) |

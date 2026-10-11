@@ -37,6 +37,44 @@ export type ZuPruefen = {
 
 export type AngebotJeKanal = Partial<Record<MarktKanal, AngebotUrteil | null>>;
 
+/**
+ * Das Angebot, das die Oberflaeche zeigt - Haendler zuerst, Markt als
+ * Rueckfall, dieselbe Regel wie in `v_luecken`. Die Route zum Verwerfen gibt
+ * es zurueck, damit die Liste den neuen Preis sofort zeigt, statt neu zu laden
+ * (Stufe 20h).
+ */
+export type AngezeigtesAngebot = {
+	preisCents: number;
+	anbieter: string;
+	zustand: string | null;
+	url: string | null;
+	itemId: string | null;
+};
+
+const angezeigt = (urteil: AngebotUrteil): AngezeigtesAngebot => ({
+	preisCents: urteil.angebot.preisCents,
+	anbieter: urteil.anbieter,
+	zustand: urteil.angebot.zustand,
+	url: urteil.angebot.url,
+	itemId: urteil.angebot.itemId,
+});
+
+/**
+ * Wie ein verworfenes Angebot im Aenderungsprotokoll steht: "Titel (6,98 €)".
+ * Der Preis mit Komma, wie ueberall in der Oberflaeche - die Ruecknahme bildet
+ * denselben Satz in SQL (`ruecknahme`).
+ */
+const angebotstext = (titel: string, preisCents: number) =>
+	`${titel} (${(preisCents / 100).toFixed(2).replace(".", ",")} €)`;
+
+/** Eine Zeile der Sperrliste, wie sie die Oberflaeche zeigt (Stufe 20h). */
+export type VerworfenesAngebot = {
+	itemId: string;
+	titel: string;
+	preisCents: number;
+	verworfenAm: string;
+};
+
 export class MarktRepository {
 	constructor(
 		private readonly db: D1Database,
@@ -98,7 +136,7 @@ export class MarktRepository {
 		ziel: ZuPruefen,
 		angebote: AngebotJeKanal,
 		rohangebote: number,
-	): Promise<{ discBelegt: boolean; preisCents: number | null }> {
+	): Promise<{ discBelegt: boolean; preis: AngezeigtesAngebot | null }> {
 		const anweisungen: D1PreparedStatement[] = [];
 
 		for (const kanal of ["haendler", "markt"] as const) {
@@ -150,7 +188,7 @@ export class MarktRepository {
 
 		const ergebnisse = await this.db.batch(anweisungen);
 		const discBelegt = belegt && (ergebnisse[stempelIndex - 1]?.meta.changes ?? 0) > 0;
-		return { discBelegt, preisCents: gezeigt?.angebot.preisCents ?? null };
+		return { discBelegt, preis: gezeigt === null ? null : angezeigt(gezeigt) };
 	}
 
 	/** Ein gefundenes Angebot - UPSERT, damit der naechste Lauf dieselbe Zeile trifft. */
@@ -159,11 +197,12 @@ export class MarktRepository {
 		return this.db
 			.prepare(
 				"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, " +
-					"condition, price_cents, currency, in_stock, url, imported_at, release_id) " +
-					"VALUES ('ebay', ?, ?, ?, ?, ?, ?, ?, 'EUR', 1, ?, datetime('now'), ?) " +
+					"condition, price_cents, currency, in_stock, url, ebay_item_id, imported_at, release_id) " +
+					"VALUES ('ebay', ?, ?, ?, ?, ?, ?, ?, 'EUR', 1, ?, ?, datetime('now'), ?) " +
 					"ON CONFLICT (source, source_product_id) DO UPDATE SET " +
 					"anbieter = excluded.anbieter, title_raw = excluded.title_raw, condition = excluded.condition, " +
 					"price_cents = excluded.price_cents, in_stock = 1, url = excluded.url, " +
+					"ebay_item_id = excluded.ebay_item_id, " +
 					"imported_at = excluded.imported_at, release_id = excluded.release_id",
 			)
 			.bind(
@@ -175,6 +214,7 @@ export class MarktRepository {
 				a.zustand,
 				a.preisCents,
 				a.url,
+				a.itemId,
 				ziel.releaseId,
 			);
 	}
@@ -198,8 +238,9 @@ export class MarktRepository {
 	private verlaufSchreiben(releaseId: number, kanal: MarktKanal, urteil: AngebotUrteil): D1PreparedStatement {
 		return this.db
 			.prepare(
-				"INSERT INTO price_snapshot (release_id, channel, kanal, source, condition, price_cents, currency, captured_at) " +
-					"SELECT ?, 'gebraucht', ?, ?, ?, ?, 'EUR', datetime('now') " +
+				"INSERT INTO price_snapshot (release_id, channel, kanal, source, condition, price_cents, currency, " +
+					"ebay_item_id, captured_at) " +
+					"SELECT ?, 'gebraucht', ?, ?, ?, ?, 'EUR', ?, datetime('now') " +
 					"WHERE NOT EXISTS (SELECT 1 FROM price_snapshot p WHERE p.release_id = ? AND p.channel = 'gebraucht' " +
 					"AND p.kanal = ? AND p.price_cents = ? AND p.captured_at = " +
 					"(SELECT MAX(q.captured_at) FROM price_snapshot q WHERE q.release_id = ? AND q.channel = 'gebraucht' " +
@@ -213,12 +254,148 @@ export class MarktRepository {
 				urteil.anbieter.toLowerCase(),
 				urteil.angebot.zustand,
 				urteil.angebot.preisCents,
+				// Der Punkt traegt die Kennung seines Angebots - daran haengt
+				// der Filter aus Stufe 20h. Die Altzeilen bleiben leer, es gibt
+				// keine URL, aus der sie nachzutragen waere (Migration 0033).
+				urteil.angebot.itemId,
 				releaseId,
 				kanal,
 				urteil.angebot.preisCents,
 				releaseId,
 				kanal,
 			);
+	}
+
+	/**
+	 * EIN Release jetzt fragen, ohne Frist und ohne Zuschnitt (Stufe 20h).
+	 *
+	 * Der Neuabruf nach einem Verwerfen braucht genau diese Zeile: Die Frist
+	 * aus `zuPruefen` wuerde ihn bis zum naechsten Morgen stumm lassen, und
+	 * genau das ist der Weg, mit dem man ein falsches Angebot loswird.
+	 */
+	async eines(releaseId: number): Promise<ZuPruefen | null> {
+		return this.db
+			.prepare(
+				"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
+					"r.physical_release_status AS discFassung " +
+					"FROM release r JOIN game g ON g.id = r.game_id WHERE r.id = ?",
+			)
+			.bind(releaseId)
+			.first<ZuPruefen>();
+	}
+
+	/**
+	 * Die Sperrliste fuer eine ganze Portion - EINMAL, nicht je Release.
+	 *
+	 * Dieselbe Begruendung wie bei `vorbereiten` in `scan-titel.ts`: Der
+	 * Bestand wird einmal vorbereitet, nicht je Eingabe. Zwanzig Binds je
+	 * Aufruf, weit innerhalb der 100-Bind-Grenze von D1 (CLAUDE.md).
+	 *
+	 * Gelesen wird ueber den Primaerschluessel (release_id, ebay_item_id);
+	 * ein eigener Index auf release_id waere dieselbe fuehrende Spalte und
+	 * damit nur Schreibaufwand.
+	 */
+	async verworfeneJeRelease(releaseIds: readonly number[]): Promise<Map<number, Set<string>>> {
+		const je = new Map<number, Set<string>>();
+		if (releaseIds.length === 0) return je;
+		const { results } = await this.db
+			.prepare(
+				`SELECT release_id, ebay_item_id FROM market_offer_verworfen WHERE release_id IN (${releaseIds.map(() => "?").join(",")})`,
+			)
+			.bind(...releaseIds)
+			.all<{ release_id: number; ebay_item_id: string }>();
+		for (const z of results ?? []) {
+			const menge = je.get(z.release_id) ?? new Set<string>();
+			menge.add(z.ebay_item_id);
+			je.set(z.release_id, menge);
+		}
+		return je;
+	}
+
+	/** Was fuer dieses Release verworfen ist - fuer die Ruecknahme im Punktmenue, neueste zuerst. */
+	async verworfene(releaseId: number): Promise<VerworfenesAngebot[]> {
+		const { results } = await this.db
+			.prepare(
+				"SELECT ebay_item_id AS itemId, titel, preis_cents AS preisCents, verworfen_am AS verworfenAm " +
+					"FROM market_offer_verworfen WHERE release_id = ? ORDER BY verworfen_am DESC, ebay_item_id",
+			)
+			.bind(releaseId)
+			.all<VerworfenesAngebot>();
+		return results ?? [];
+	}
+
+	/**
+	 * Das Angebot, das zu dieser Kennung gerade vorliegt - oder null.
+	 *
+	 * Die Route braucht es fuer zwei Dinge: Sie antwortet `409`, wenn der
+	 * Nachtlauf das Angebot inzwischen ersetzt hat (statt stillschweigend das
+	 * falsche zu verwerfen), und sie nimmt Titel und Preis von hier, statt
+	 * sie sich vom Browser sagen zu lassen - was in der Sperrliste steht,
+	 * stammt dann aus der eigenen Datenbank.
+	 */
+	async angebotNachKennung(releaseId: number, itemId: string): Promise<{ titel: string; preisCents: number } | null> {
+		return this.db
+			.prepare(
+				"SELECT title_raw AS titel, price_cents AS preisCents FROM market_offer " +
+					"WHERE release_id = ? AND ebay_item_id = ? AND source = 'ebay' AND in_stock = 1 " +
+					"ORDER BY kanal LIMIT 1",
+			)
+			.bind(releaseId, itemId)
+			.first<{ titel: string; preisCents: number }>();
+	}
+
+	/**
+	 * Ein Angebot auf die Sperrliste setzen - mit Protokoll im DEMSELBEN
+	 * Batch (8.5). Quelle `nutzer`: Es ist seine Entscheidung, nicht ein
+	 * Befund des Feeds.
+	 *
+	 * `INSERT OR IGNORE` ist hier Sicherheitsnetz, nicht der Normalfall: Ein
+	 * Angebot, das schon auf der Liste steht, kann nicht das angezeigte sein,
+	 * weil der Filter es uebergeht. Trifft es trotzdem zu, bleibt die
+	 * urspruengliche Zeile mit ihrem Datum stehen.
+	 */
+	async verwerfen(releaseId: number, itemId: string, titel: string, preisCents: number): Promise<void> {
+		await this.db.batch([
+			this.events.statement({
+				source: "nutzer",
+				kind: "angebot_verworfen",
+				releaseId,
+				neu: angebotstext(titel, preisCents),
+				detail: "ebay",
+			}),
+			this.db
+				.prepare(
+					"INSERT OR IGNORE INTO market_offer_verworfen (release_id, ebay_item_id, titel, preis_cents, verworfen_am) " +
+						"VALUES (?, ?, ?, ?, datetime('now'))",
+				)
+				.bind(releaseId, itemId, titel, preisCents),
+		]);
+	}
+
+	/**
+	 * Die Ruecknahme: eine Zeile aus der Sperrliste, Ereignis DAVOR im selben
+	 * Batch (Regel fuer set-basierte Schreiber, 8.5) - danach waere der alte
+	 * Wert fort. Gibt zurueck, ob ueberhaupt eine Zeile getroffen wurde;
+	 * `meta.changes` kommt vom DELETE allein, nie als Summe ueber den Batch.
+	 */
+	async ruecknahme(releaseId: number, itemId: string): Promise<boolean> {
+		const ergebnisse = await this.db.batch([
+			this.events.insertSelect(
+				"SELECT 'nutzer', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'angebot_verworfen', " +
+					// Derselbe Satz wie beim Verwerfen, nur in SQL gebildet -
+					// set-basierte Schreiber lesen den alten Wert nicht vor.
+					"NULL, v.titel || ' (' || replace(printf('%.2f', v.preis_cents / 100.0), '.', ',') || ' €)', " +
+					"NULL, 'ebay' " +
+					"FROM market_offer_verworfen v JOIN release r ON r.id = v.release_id JOIN game g ON g.id = r.game_id " +
+					"WHERE v.release_id = ? AND v.ebay_item_id = ?",
+				releaseId,
+				itemId,
+			),
+			this.db
+				.prepare("DELETE FROM market_offer_verworfen WHERE release_id = ? AND ebay_item_id = ?")
+				.bind(releaseId, itemId),
+		]);
+		return (ergebnisse[1]?.meta.changes ?? 0) > 0;
 	}
 
 	/**

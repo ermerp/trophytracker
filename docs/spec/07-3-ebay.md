@@ -26,7 +26,7 @@ Angezeigt wird der Händlerpreis zuerst, sonst der Markttreffer (Entscheidung de
 
 eBays Relevanzsortierung ist **keine** Zuordnung. Gemessen am 02.10.2026 über alle 490 Releases: Ohne Abgleich wäre der roh günstigste Markttreffer in **21 %** der Fälle ein anderes Spiel gewesen — „Blue Prince" → *Prince of Persia: The Lost Crown*, „Borderlands 2" → *Borderlands: The Handsome Collection*, „Brothers" → *Brothers in Arms*.
 
-Ein Angebot zählt nur, wenn alle sechs Bedingungen zusammenkommen (`guenstigstesGeprueft`, `src/domain/markt.ts`):
+Ein Angebot zählt nur, wenn alle sechs Bedingungen zusammenkommen (`guenstigstesGeprueft`, `src/domain/markt.ts`). **Davor steht seit Stufe 20h die Sperrliste des Releases** — als erste Prüfung, weil sie die billigste ist: ein Lookup in einer Menge. Das nächste gültige Angebot wird damit von selbst das günstigste, es braucht keine Sonderlogik; ein Angebot **ohne** Kennung bleibt wählbar.
 
 1. `sammlungstreffer` aus 17c findet **genau dieses** Spiel und ist eindeutig — der Abgleich läuft von der Sammlung aus, nicht vom Angebotstext.
 2. Kein Plattform-Widerspruch im Titel — weder eine der eigenen vier noch eine **fremde** wie PS2, Xbox oder Switch.
@@ -48,6 +48,27 @@ Ein Angebot zählt nur, wenn alle sechs Bedingungen zusammenkommen (`guenstigste
 Die vier Regeln beseitigen alle fünf und kosten dabei **einen** belegten und **vier** unbekannte Treffer (214 → 213 und 79 → 75). Bei Metal Gear Solid 2 wird aus dem Fehlgriff sogar ein Treffer: Nach dem Wegfallen des PS2-Angebots bleibt die HD Collection, auf der das Spiel tatsächlich ist.
 
 Der Preis steht seit Stufe 20e in **Lücken, Kaufliste und am offenen Wunsch** und ist ein **Link auf das Angebot** (`market_offer.url`, in den Views seit Migration 0029). Der Link kann ins Leere führen – ein eBay-Angebot verschwindet, wenn es verkauft ist, und gefragt wird einmal am Tag –, und das `title` des Links sagt es, damit niemand einen Fehler vermutet. Sortiert wird nach ihm mit `sort=preis`, **ohne Preis ans Ende** (5.2); in der Lückenansicht nur für die obere Liste, denn im zweiten Block ist „eBay kennt kein Angebot" die Reihenfolge, die ihn abarbeitbar macht. In den Kacheln von Kauf- und Wunschliste erscheint die Angabe **nur, wenn es einen Preis gibt** – „Gebraucht unbekannt" an jedem der rund 350 Wünsche wäre Lärm. Wo der Preis eine Spalte ist, in der Lückenansicht, steht „unbekannt" ausgeschrieben.
+
+#### Ein untaugliches Angebot verwerfen (Stufe 20h)
+
+Was der Abgleich nicht sieht, sieht der Mensch: „Nur Disc", eine Leerhülle, ein Bündel. Jeder
+Preis trägt deshalb ein Punktmenü — **dasselbe in allen vier Ansichten**, weil
+`frontend/src/Preis.tsx` seit 20h die eine Stelle dafür ist; das Spieldetail rendert seinen
+Preis nicht mehr selbst. Darin „Angebot verwerfen" und, was schon verworfen ist, mit Titel und
+Preis zum Zurücknehmen (Entscheidung des Nutzers vom 11.10.2026). Keine Rückfrage: Es ist
+vollständig umkehrbar, und die Rücknahme steht in derselben Tafel.
+
+Die **Anzahl** steht in den Listen (`v_luecken`, `v_kaufkandidaten`, `PLAN_AUSWAHL`) — sonst
+sähe „Gebraucht: unbekannt" aus wie „eBay kennt nichts". Die **Titel** holt erst die
+aufgeklappte Tafel; sie in jede Zeile von vier Ansichten zu legen wären Lesekosten für etwas,
+das fast nie zu sehen ist. Ein Angebot **ohne Kennung** ist gültig, nur nicht verwerfbar.
+
+Nach jeder Entscheidung läuft **derselbe Pfad wie im Cron** (`einesPruefen` → `portion`,
+`src/sync/markt.ts`), nicht ein zweiter — sonst erbte er dessen Nebenwirkungen nicht. Die
+Sperrliste wird **einmal je Portion** geladen (höchstens 20 Binds), nicht je Release.
+
+Entwurf und Grenzen der Sperrliste stehen in [6](06-marktdaten.md), die Routen in
+[12](12-api-routen-extern-und-sync.md), das Ereignis in [8.5](08-5-aenderungsprotokoll.md).
 
 Was bleibt, sind **Bündel**, die das Spiel enthalten („Goat Simulator The Bundle", „Syberia Collection"). Dort ist `ja` richtig — eine Disc existiert —, der Preis gilt aber fürs ganze Paket. Das ist die Asymmetrie aus Abschnitt 6: Ein Bündel belegt die Disc und taugt nicht als Preis.
 
@@ -110,7 +131,7 @@ Markttreffer im Median bei 0,82 des Händlerpreises, aber **14 (13 %) unter der 
 falsche Fassung, Hülle ohne Disc. Deshalb steht die Angebotskorrektur (20h) vor dem Alarm
 ([16.2](16-2-offene-stufen.md)).
 
-**Ein Aufruf liest 940 Zeilen** (gemessen am 02.10.2026 gegen 430 Listen): 30 für die Auswahl, 430 für die einmal zerlegte Sammlung, 50 fürs Schreiben und 430 für den offenen Zähler. Seit dem täglichen Takt sind es **24 Aufrufe je Nacht, also rund 22 600 Zeilen** — gegen 5 Millionen am Tag; die früheren „rund drei Aufrufe je Nacht“ galten für die abgelöste 14-Tage-Frist. Die erste Fassung las 2 059 je Aufruf, davon **1 549 für vier Zähler, die nur in der Verlaufszeile standen**; sie sind durch einen einzigen ersetzt, und `weiter` kommt jetzt aus der Portionsgröße statt aus einem Zähler. Dieselbe Form wie der `COUNT(*)` in der Feed-Route am 01.10.2026, nur kleiner — und derselbe Grund, warum ein Schreibschritt vollständig gemessen gehört und nicht nur in seiner Hauptabfrage.
+**Ein Aufruf liest 1 000 Zeilen** (gemessen gegen 430 Listen): 30 für die Auswahl, 430 für die einmal zerlegte Sammlung, 50 fürs Schreiben, 430 für den offenen Zähler und seit 20h **60 für die Sperrliste** (am 02.10.2026 ohne sie: 940). Seit dem täglichen Takt sind es **24 Aufrufe je Nacht, also rund 24 000 Zeilen** — gegen 5 Millionen am Tag; die früheren „rund drei Aufrufe je Nacht“ galten für die abgelöste 14-Tage-Frist. Die erste Fassung las 2 059 je Aufruf, davon **1 549 für vier Zähler, die nur in der Verlaufszeile standen**; sie sind durch einen einzigen ersetzt, und `weiter` kommt jetzt aus der Portionsgröße statt aus einem Zähler. Dieselbe Form wie der `COUNT(*)` in der Feed-Route am 01.10.2026, nur kleiner — und derselbe Grund, warum ein Schreibschritt vollständig gemessen gehört und nicht nur in seiner Hauptabfrage.
 
 Der Stand steht je Zeile in `release.markt_geprueft_am`, nicht als Marke in `app_setting`. Damit gibt es den Fehlerfall aus 18e hier nicht: Ein abgebrochener Lauf lässt die ungeprüften Releases ungestempelt, und der nächste Aufruf nimmt sie wieder — Erfolg und Fehler können keine gemeinsame Marke hinterlassen, weil es keine gibt.
 

@@ -88,6 +88,35 @@ describe("Live-Aufloesung beim Scannen (Stufe 17c/17d)", () => {
 	 */
 	it("liest die Sammlung einmal, nicht 430 Unterabfragen", async () => {
 		const sammlung = await zeilenGelesen("SELECT id AS spielId, title AS titel FROM game");
+		// Der Sperrlisten-Lookup des Schritts (Stufe 20h): EINMAL je Portion
+		// ueber den Primaerschluessel, nicht je Release. Er laeuft 24-mal je
+		// Nacht mit, also auch im LEERLAUF - deshalb steht er hier und nicht
+		// nur im Schreibpfad.
+		const sperrliste = await zeilenGelesen(
+			`SELECT release_id, ebay_item_id FROM market_offer_verworfen WHERE release_id IN (${Array.from({ length: 20 }, () => "?").join(",")})`,
+			...Array.from({ length: 20 }, (_, i) => i + 1),
+		);
+		// Die Tafel am Preis holt die Titel erst beim Aufklappen - ein
+		// Index-Lookup auf eine kleine Tabelle.
+		const tafel = await zeilenGelesen(
+			"SELECT ebay_item_id AS itemId, titel, preis_cents AS preisCents, verworfen_am AS verworfenAm " +
+				"FROM market_offer_verworfen WHERE release_id = ? ORDER BY verworfen_am DESC, ebay_item_id",
+			1,
+		);
+		// Die Pruefung der Route vor dem Verwerfen: Liegt dieses Angebot
+		// ueberhaupt noch vor (sonst 409)? Ueber idx_market_offer_kanal.
+		const kennungspruefung = await zeilenGelesen(
+			"SELECT title_raw AS titel, price_cents AS preisCents FROM market_offer " +
+				"WHERE release_id = ? AND ebay_item_id = ? AND source = 'ebay' AND in_stock = 1 ORDER BY kanal LIMIT 1",
+			1,
+			`12${1_000_001}`,
+		);
+		// Und das Ziel des Einzelabrufs - eine Zeile ueber den Primaerschluessel.
+		const eines = await zeilenGelesen(
+			"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
+				"r.physical_release_status AS discFassung FROM release r JOIN game g ON g.id = r.game_id WHERE r.id = ?",
+			1,
+		);
 		const jeTreffer = await zeilenGelesen(
 			"SELECT r.id, r.platform, g.cover_url, (SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare " +
 				"FROM release r JOIN game g ON g.id = r.game_id WHERE r.game_id = ? ORDER BY r.id",
@@ -572,20 +601,30 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// nach einem vollen Durchlauf aus.
 		const angebot = env.DB.prepare(
 			"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, " +
-				"condition, price_cents, currency, in_stock, imported_at, release_id) " +
-				"VALUES ('ebay', ?, ?, ?, ?, 'PS4', 'Gut', ?, 'EUR', 1, datetime('now'), ?)",
+				"condition, price_cents, currency, in_stock, ebay_item_id, imported_at, release_id) " +
+				"VALUES ('ebay', ?, ?, ?, ?, 'PS4', 'Gut', ?, 'EUR', 1, ?, datetime('now'), ?)",
 		);
 		const zeilen: D1PreparedStatement[] = [];
 		for (let i = 1; i <= Math.floor(ANZAHL * 0.8); i++) {
-			zeilen.push(angebot.bind(`haendler:${i}`, "rebuy", "haendler", `Spiel ${i}`, 1200 + i, i));
-			zeilen.push(angebot.bind(`markt:${i}`, "eBay", "markt", `Spiel ${i}`, 900 + i, i));
+			zeilen.push(angebot.bind(`haendler:${i}`, "rebuy", "haendler", `Spiel ${i}`, 1200 + i, `11${1_000_000 + i}`, i));
+			zeilen.push(angebot.bind(`markt:${i}`, "eBay", "markt", `Spiel ${i}`, 900 + i, `12${1_000_000 + i}`, i));
 		}
 		await env.DB.batch(zeilen);
+		// Die Sperrliste in der Groesse, die sie realistisch erreicht: 13 % der
+		// Markttreffer liegen unter der Haelfte des Haendlerpreises und sind
+		// damit Kandidaten fuers Verwerfen (16.2). Vierzig Zeilen ist das
+		// Mehrfache dessen, was nach Monaten zu erwarten ist.
+		const verworfen = env.DB.prepare(
+			"INSERT INTO market_offer_verworfen (release_id, ebay_item_id, titel, preis_cents, verworfen_am) " +
+				"VALUES (?, ?, ?, ?, datetime('now'))",
+		);
+		await env.DB.batch(Array.from({ length: 40 }, (_, i) => verworfen.bind(i + 1, `12${1_000_000 + i + 1}`, `Spiel ${i + 1}`, 500)));
 
 		const luecken = await zeilenGelesen(
 			`SELECT l.game_id, l.title, l.cover_url, l.release_id, l.platform, l.disc_fassung, l.disc_quelle,
 			        l.progress_pct, l.hat_platin, l.eigener_status, l.verworfen, l.bester_gebrauchtpreis_cents,
-			        l.gebrauchtpreis_anbieter, l.markt_geprueft_am, l.markt_rohangebote,
+			        l.gebrauchtpreis_anbieter, l.gebrauchtpreis_item_id, l.gebrauchtpreis_verworfen,
+			        l.markt_geprueft_am, l.markt_rohangebote,
 			        (SELECT pe.id FROM plan_entry pe WHERE pe.release_id = l.release_id
 			           AND pe.kind = 'kauf' AND pe.status = 'verworfen' ORDER BY pe.id LIMIT 1) AS plan_id
 			 FROM v_luecken l ORDER BY l.title, l.platform`,
@@ -628,6 +667,35 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// seinen Stand. Genau das war der Fehler vom 01.10.2026 - gemessen
 		// wurde die Abfrage, gezahlt hat die Route.
 		const sammlung = await zeilenGelesen("SELECT id AS spielId, title AS titel FROM game");
+		// Der Sperrlisten-Lookup des Schritts (Stufe 20h): EINMAL je Portion
+		// ueber den Primaerschluessel, nicht je Release. Er laeuft 24-mal je
+		// Nacht mit, also auch im LEERLAUF - deshalb steht er hier und nicht
+		// nur im Schreibpfad.
+		const sperrliste = await zeilenGelesen(
+			`SELECT release_id, ebay_item_id FROM market_offer_verworfen WHERE release_id IN (${Array.from({ length: 20 }, () => "?").join(",")})`,
+			...Array.from({ length: 20 }, (_, i) => i + 1),
+		);
+		// Die Tafel am Preis holt die Titel erst beim Aufklappen - ein
+		// Index-Lookup auf eine kleine Tabelle.
+		const tafel = await zeilenGelesen(
+			"SELECT ebay_item_id AS itemId, titel, preis_cents AS preisCents, verworfen_am AS verworfenAm " +
+				"FROM market_offer_verworfen WHERE release_id = ? ORDER BY verworfen_am DESC, ebay_item_id",
+			1,
+		);
+		// Die Pruefung der Route vor dem Verwerfen: Liegt dieses Angebot
+		// ueberhaupt noch vor (sonst 409)? Ueber idx_market_offer_kanal.
+		const kennungspruefung = await zeilenGelesen(
+			"SELECT title_raw AS titel, price_cents AS preisCents FROM market_offer " +
+				"WHERE release_id = ? AND ebay_item_id = ? AND source = 'ebay' AND in_stock = 1 ORDER BY kanal LIMIT 1",
+			1,
+			`12${1_000_001}`,
+		);
+		// Und das Ziel des Einzelabrufs - eine Zeile ueber den Primaerschluessel.
+		const eines = await zeilenGelesen(
+			"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
+				"r.physical_release_status AS discFassung FROM release r JOIN game g ON g.id = r.game_id WHERE r.id = ?",
+			1,
+		);
 		// Der Schritt fragt nur noch den einen Zaehler, den die Verlaufszeile
 		// braucht. Die vier Zaehler von `stand()` kosteten 1 549 Zeilen - drei
 		// Viertel eines ganzen Aufrufs fuer eine Anzeigezahl.
@@ -648,8 +716,14 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const absichtenMitPreis = await zeilenGelesen(`${PLAN_AUSWAHL}WHERE pe.kind = ? AND pe.status = ?`, "kauf", "offen");
 		await env.DB.prepare("DELETE FROM plan_entry").run();
 
-		const jeAufruf = auswahl + sammlung + schreibkosten * 10 + stand;
-		console.info({ luecken, auswahl, sammlung, stand, standVoll, schreibkosten, jeAufruf, absichtenMitPreis });
+		const jeAufruf = auswahl + sammlung + sperrliste + schreibkosten * 10 + stand;
+		// Der Einzelabruf nach einem Verwerfen: dieselbe Portion mit EINEM
+		// Release, ohne den Zaehler fuer die Verlaufszeile.
+		const verwerfenRoute = tafel + kennungspruefung + eines + sammlung + sperrliste + schreibkosten;
+		console.info({
+			luecken, auswahl, sammlung, sperrliste, tafel, kennungspruefung, eines,
+			stand, standVoll, schreibkosten, jeAufruf, verwerfenRoute, absichtenMitPreis,
+		});
 
 		// Vor Stufe 20 las dieselbe Abfrage 2 620 Zeilen mit leerer
 		// market_offer; mit den beiden LEFT JOINs sind es dort 2 194 und mit
@@ -660,9 +734,20 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Zehn Releases je Aufruf, also das Zehnfache - und das bleibt weit
 		// unter dem, was eine Nacht vertraegt.
 		expect(schreibkosten).toBeLessThan(200);
-		// Ein ganzer Cron-Aufruf des Schritts. Im Dauerbetrieb sind nach der
-		// 14-Tage-Frist rund drei Aufrufe je Nacht faellig.
-		expect(jeAufruf).toBeLessThan(1_000);
+		// Ein ganzer Cron-Aufruf des Schritts. Gemessen am 09.10.2026 bei 940
+		// Zeilen, mit dem Sperrlisten-Lookup aus Stufe 20h bei 1 000 - die 60
+		// Zeilen sind der Lookup, und er laeuft 24-mal je Nacht mit: 1 440
+		// Zeilen je Nacht gegen ein Tageskontingent von 5 Millionen.
+		expect(jeAufruf).toBeLessThan(1_100);
+		// Der Lookup selbst: 20 Index-Treffer auf eine Sperrliste von 40
+		// Zeilen, kein Scan. In der Produktion steht dort heute nichts, die
+		// 40 sind das Mehrfache des Erwarteten.
+		expect(sperrliste).toBeLessThan(80);
+		// Die Routen der Angebotskorrektur (Stufe 20h) - gemessen wird die
+		// ROUTE, also alles, was ein Aufruf tut.
+		expect(tafel).toBeLessThan(50);
+		expect(kennungspruefung).toBeLessThan(50);
+		expect(verwerfenRoute).toBeLessThan(1_000);
 		// Die Einstellungen duerfen die vier Zaehler haben - sie werden selten geoeffnet.
 		expect(standVoll).toBeLessThan(3_000);
 		// 60 offene Kaufeintraege mit Preis-Join. Zwei Index-Lookups je Zeile
@@ -671,6 +756,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM price_snapshot"),
+			env.DB.prepare("DELETE FROM market_offer_verworfen"),
 			env.DB.prepare("DELETE FROM market_offer"),
 			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, markt_geprueft_am = NULL, markt_rohangebote = NULL"),
 		]);

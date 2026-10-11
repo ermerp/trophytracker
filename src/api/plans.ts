@@ -145,6 +145,10 @@ export function eintragAntwort(z: PlanZeile) {
 		preisCents: z.preis_cents,
 		preisAnbieter: z.preis_anbieter,
 		preisUrl: z.preis_url,
+		/** eBays Angebotskennung (Stufe 20h); null heisst: nicht verwerfbar. */
+		preisItemId: z.preis_item_id,
+		/** Wie viele Angebote hier verworfen sind - 0 heisst: nichts zurueckzunehmen. */
+		preisVerworfen: z.preis_verworfen,
 		/**
 		 * Store-Preis (Stufe 21), getrennt vom Gebrauchtpreis - die beiden
 		 * Kanaele werden nie zu einem Wert verrechnet (Abschnitt 6). `null`
@@ -198,6 +202,10 @@ export function kaufKandidatAntwort(k: KaufKandidatZeile) {
 		besterGebrauchtpreisCents: k.bester_gebrauchtpreis_cents,
 		gebrauchtpreisAnbieter: k.gebrauchtpreis_anbieter,
 		gebrauchtpreisUrl: k.gebrauchtpreis_url,
+		/** eBays Angebotskennung (Stufe 20h); null heisst: nicht verwerfbar. */
+		gebrauchtpreisItemId: k.gebrauchtpreis_item_id,
+		/** Wie viele Angebote hier verworfen sind - 0 heisst: nichts zurueckzunehmen. */
+		gebrauchtpreisVerworfen: k.gebrauchtpreis_verworfen,
 	};
 }
 

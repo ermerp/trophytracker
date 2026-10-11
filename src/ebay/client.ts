@@ -221,11 +221,36 @@ export function erstelleEbayClient(
 					zustand: typeof eintrag.condition === "string" ? eintrag.condition : null,
 					verkaeufer: typeof verkaeufer.username === "string" ? verkaeufer.username : null,
 					url: typeof eintrag.itemWebUrl === "string" ? eintrag.itemWebUrl : null,
+					itemId: itemIdAus(eintrag),
 				});
 			}
 			return angebote;
 		},
 	};
+}
+
+/**
+ * Die Angebotskennung, an der die Sperrliste haengt (Stufe 20h).
+ *
+ * Zwei Wege, in dieser Reihenfolge: `legacyItemId` ist die zwoelfstellige
+ * Zahl, die auch in der Angebotsadresse steht - sie ist die Kennung, die
+ * `market_offer.ebay_item_id` schon aus dem Backfill der Migration 0033
+ * traegt. Fehlt sie, wird sie aus `itemWebUrl` gelesen, damit die beiden
+ * Wege dieselbe Zahl ergeben; `itemId` ("v1|123456789012|0") wird
+ * ABSICHTLICH nicht genommen, sonst stuenden zwei Schreibweisen derselben
+ * Kennung in einer Spalte und der Filter griffe daneben.
+ *
+ * Nichts davon gefunden heisst null: Das Angebot bleibt gueltig, ist aber
+ * nicht verwerfbar.
+ */
+export function itemIdAus(eintrag: Record<string, unknown>): string | null {
+	const legacy = eintrag.legacyItemId;
+	if (typeof legacy === "string" && /^\d+$/.test(legacy)) return legacy;
+	if (typeof eintrag.itemWebUrl === "string") {
+		const treffer = /\/itm\/(?:[^/?]*\/)?(\d+)/.exec(eintrag.itemWebUrl);
+		if (treffer) return treffer[1];
+	}
+	return null;
 }
 
 export type EbayClient = ReturnType<typeof erstelleEbayClient>;

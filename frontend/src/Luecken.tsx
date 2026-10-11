@@ -51,6 +51,8 @@ type Luecke = {
   besterGebrauchtpreisCents: number | null
   gebrauchtpreisAnbieter: string | null
   gebrauchtpreisUrl: string | null
+  gebrauchtpreisItemId: string | null
+  gebrauchtpreisVerworfen: number
   marktGeprueftAm: string | null
   marktRohangebote: number | null
   verworfen: boolean
@@ -262,7 +264,7 @@ export function Luecken() {
           {lueckenOffen && (
           <ul className="kandidatenliste">
             {[...daten.luecken].sort(lueckenVergleich(sortierung, richtung)).map((l) => (
-              <LueckeZeile key={l.releaseId} l={l}>
+              <LueckeZeile key={l.releaseId} l={l} onGeaendert={() => void laden()}>
                 {l.verworfen ? (
                   <button type="button" className="klein" disabled={laeuft} onClick={() => wiederZeigen(l)}>wieder als Lücke zeigen</button>
                 ) : (
@@ -318,7 +320,7 @@ export function Luecken() {
           ) : (
             <ul className="kandidatenliste">
               {nachBefund(daten.moeglich).map((l) => (
-                <LueckeZeile key={l.releaseId} l={l}>
+                <LueckeZeile key={l.releaseId} l={l} onGeaendert={() => void laden()}>
                   {l.verworfen ? (
                     <button type="button" className="klein" disabled={laeuft} onClick={() => wiederZeigen(l)}>wieder zeigen</button>
                   ) : (
@@ -337,7 +339,7 @@ export function Luecken() {
   )
 }
 
-function LueckeZeile({ l, children }: { l: Luecke; children: ReactNode }) {
+function LueckeZeile({ l, children, onGeaendert }: { l: Luecke; children: ReactNode; onGeaendert: () => void }) {
   // Nur im zweiten Block interessant: Bei einer belegten Luecke ist die Frage
   // ja schon beantwortet.
   const befund = l.discFassung === 'unbekannt' ? marktBefund(l.marktRohangebote, l.marktGeprueftAm) : null
@@ -351,7 +353,18 @@ function LueckeZeile({ l, children }: { l: Luecke; children: ReactNode }) {
         <div className="ruhig klein">
           <PlattformChip plattform={l.plattform} /> {l.fortschritt} %{l.platin && ' · Platin'}
           {l.eigenerStatus && ` · ${STATUSTEXT[l.eigenerStatus]}`}
-          {' · '}Gebraucht: <Preis {...gebrauchtpreis(l.besterGebrauchtpreisCents, l.gebrauchtpreisAnbieter, l.gebrauchtpreisUrl)} />
+          {' · '}Gebraucht:{' '}
+          <Preis
+            {...gebrauchtpreis(
+              l.besterGebrauchtpreisCents,
+              l.gebrauchtpreisAnbieter,
+              l.gebrauchtpreisUrl,
+              l.gebrauchtpreisItemId,
+              l.gebrauchtpreisVerworfen,
+            )}
+            releaseId={l.releaseId}
+            onGeaendert={onGeaendert}
+          />
           {l.verworfen && ' · verworfen'}
         </div>
         {befund && <div className="ruhig klein">{befund}</div>}
