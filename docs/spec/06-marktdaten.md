@@ -30,6 +30,12 @@ CREATE TABLE market_offer (
   currency          TEXT NOT NULL DEFAULT 'EUR',
   in_stock          INTEGER NOT NULL DEFAULT 0,
   url               TEXT,
+  -- eBays Angebotskennung (`legacyItemId`), zwölfstellig (Stufe 20h,
+  -- Migration 0033). KEIN UNIQUE-Index: Gemessen am 09.10.2026 stehen in
+  -- 370 Angebotszeilen nur 350 verschiedene Kennungen, am 11.10.2026 in 372
+  -- nur 357 — ein Angebot kann gleichzeitig das günstigste für zwei
+  -- verschiedene Releases sein.
+  ebay_item_id      TEXT,
   imported_at       TEXT NOT NULL,
   release_id        INTEGER REFERENCES release(id) ON DELETE SET NULL,
   UNIQUE (source, source_product_id)
@@ -57,11 +63,60 @@ CREATE TABLE price_snapshot (
   price_cents   INTEGER NOT NULL,
   is_sale       INTEGER NOT NULL DEFAULT 0,   -- nur bei channel='psn_store'
   currency      TEXT NOT NULL DEFAULT 'EUR',
+  -- Das Angebot, zu dem dieser Punkt gehört (Stufe 20h, Migration 0033).
+  -- Daran hängt der Filter der verworfenen Angebote. Die Punkte seit dem
+  -- 02.10.2026 bleiben leer: `price_snapshot` führt keine URL, aus der die
+  -- Kennung nachzutragen wäre (1 383 am 11.10.2026).
+  ebay_item_id  TEXT,
   captured_at   TEXT NOT NULL
 );
 
 CREATE INDEX idx_price_release ON price_snapshot(release_id, channel, captured_at);
+
+-- Verworfene Angebote (Stufe 20h, Migration 0033). Je Release, nicht global:
+-- Ein Verwerfen für das PS4-Release darf dasselbe Angebot beim PS5-Release
+-- nicht mitnehmen — der Nutzer hat über EINEN Preis entschieden.
+--
+-- `titel` und `preis_cents` halten fest, WAS verworfen wurde (Entscheidung
+-- des Nutzers vom 11.10.2026): Die Kennung allein ist nicht lesbar, und
+-- „zurücknehmen", ohne zu sagen, was zurückkommt, ist keine Korrektur. Sie
+-- stehen hier und nicht in `market_offer`, deren Zeile der nächste Lauf
+-- überschreibt.
+--
+-- Der Primärschlüssel ist zugleich der Index, über den der Filter liest.
+-- Kein `WITHOUT ROWID`, damit der Export `ORDER BY rowid` behält (14.2).
+CREATE TABLE market_offer_verworfen (
+  release_id    INTEGER NOT NULL REFERENCES release(id) ON DELETE CASCADE,
+  ebay_item_id  TEXT NOT NULL,
+  titel         TEXT NOT NULL,
+  preis_cents   INTEGER NOT NULL,
+  verworfen_am  TEXT NOT NULL,
+  PRIMARY KEY (release_id, ebay_item_id)
+);
 ```
+
+### Ein Punkt wird gestrichen, nicht gelöscht (Stufe 20h)
+
+Ein untaugliches Angebot lässt sich verwerfen — der Fall des Nutzers vom 02.10.2026 war
+*11-11: Memories Retold* für 6,98 € mit „Nur Disc" im Angebotstitel. **Gelöscht wird dabei
+nichts.** Ein Punkt ist gestrichen, *weil* seine Angebotskennung auf der Sperrliste des
+Releases steht: eine Bedingung beim Lesen, kein zweiter gespeicherter Zustand („Berechnetes
+nicht speichern"). Drei Folgen:
+
+- **„Rückgängig" ist eine gelöschte Zeile in der Sperrliste**; alle Punkte sind augenblicklich
+  zurück. Keine Kopie, keine Sonderbehandlung.
+- `price_snapshot` bleibt reine anhängende Historie — dieselbe Eigenschaft, auf der die
+  Entscheidung „Verdichtung nur beim Lesen" ruht.
+- **Das Diagramm (20f) und der Alarm (20g) müssen den Filter beide anwenden.** Das ist die
+  eine Stelle, an der dieser Entwurf teurer ist als ein `DELETE`; dafür ist es ein Lookup über
+  `release_id` auf eine Tabelle mit wenigen Zeilen (gemessen: 60 gelesene Zeilen für eine
+  Portion von 20 Releases).
+
+**Was das Rückgängig nicht kann:** Nach dem Verwerfen läuft derselbe Neuabruf wie im Cron. War
+das verworfene das einzige Angebot, setzt er `in_stock = 0`, und der Preis steht als
+„unbekannt" da. Die Rücknahme holt ihn zurück, **sofern eBay das Angebot noch führt** — ist es
+inzwischen verkauft, bleibt es fort. Das ist keine Lücke im Rückgängig, sondern die Grenze
+einer Fremdquelle: Ein Preis, den niemand mehr anbietet, würde sonst erfunden.
 
 Die beiden Kanäle sind nicht vergleichbar und dürfen in der Oberfläche nie zu einem Wert verrechnet werden. Store-Preis heisst "so viel kostet es neu digital", Gebrauchtpreis heisst "so viel verlangt Händler X gerade für die Disc". Beide nebeneinander anzeigen, mit Kanalbezeichnung.
 

@@ -476,6 +476,10 @@ export const gameRoutes = new Hono<AppEnv>()
 								anbieter: r.preis_anbieter,
 								zustand: r.preis_zustand,
 								url: r.preis_url,
+								/** Was der Verwerfen-Knopf verwirft (Stufe 20h); null heisst: nicht verwerfbar. */
+								itemId: r.preis_item_id,
+								/** Wie viele Angebote hier verworfen sind - 0 heisst: nichts zurueckzunehmen. */
+								verworfen: r.preis_verworfen,
 							},
 				/**
 				 * Store-Preis (Stufe 21), neben dem Gebrauchtpreis und nie mit

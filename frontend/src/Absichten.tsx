@@ -486,12 +486,23 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
             Und nur, wenn es einen gibt. „Gebraucht unbekannt" an jedem der
             rund 350 Wünsche wäre Lärm – die Kachelzeile lässt auch sonst weg,
             was leer ist (Herkunft, Jahr). Wo der Preis eine Spalte ist, in
-            der Lückenansicht, steht „unbekannt" weiterhin ausgeschrieben. */}
-        {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.preisCents !== null && (
-          <>
-            {' · '}Gebraucht <Preis {...gebrauchtpreis(e.preisCents, e.preisAnbieter, e.preisUrl)} />
-          </>
-        )}
+            der Lückenansicht, steht „unbekannt" weiterhin ausgeschrieben.
+
+            Die eine Ausnahme ist ein verworfenes Angebot (Stufe 20h): Dann
+            steht „unbekannt" WEIL du entschieden hast, und ohne die Zeile
+            gäbe es hier keinen Weg zurück. */}
+        {(e.art === 'kauf' || e.art === 'wunsch') &&
+          e.status === 'offen' &&
+          (e.preisCents !== null || e.preisVerworfen > 0) && (
+            <>
+              {' · '}Gebraucht{' '}
+              <Preis
+                {...gebrauchtpreis(e.preisCents, e.preisAnbieter, e.preisUrl, e.preisItemId, e.preisVerworfen)}
+                releaseId={e.releaseId}
+                onGeaendert={() => void liste.laden()}
+              />
+            </>
+          )}
         {/* Der Store-Preis steht daneben, nicht dazwischen: „Gebraucht 12,77 €"
             und „Digital 19,99 €" sind zwei Aussagen und werden nie zu einer
             verrechnet (Abschnitt 6). Auch er nur, wenn es einen gibt – aus

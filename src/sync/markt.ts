@@ -1,5 +1,5 @@
 import type { Repositories } from "../db";
-import type { AngebotJeKanal } from "../db/markt";
+import type { AngebotJeKanal, AngezeigtesAngebot, ZuPruefen } from "../db/markt";
 import { EbayAuthError, EbayKonfigError, EbayRateError, meldungFuer, type EbayClient } from "../ebay/client";
 import { guenstigstesGeprueft, type MarktKanal } from "../domain/markt";
 import { vorbereiten } from "../domain/scan-titel";
@@ -55,15 +55,84 @@ export async function marktSchritt(
 	const ziele = await repos.markt.zuPruefen(n);
 	if (ziele.length === 0) return leer({ status: "erfolg" });
 
+	const stand = await portion(repos, ebay, ziele);
+	// `weiter` kommt aus der Portionsgroesse, nicht aus einem Zaehler: Eine
+	// volle Portion heisst, dass wahrscheinlich mehr wartet - eine halbe, dass
+	// der Bestand durch ist. Das kostet nichts, und der naechste Aufruf
+	// korrigiert sich ohnehin selbst.
+	const nochOffen = await repos.markt.offeneAnzahl();
+	return stand.meldung === undefined
+		? { ...zahlen(stand), status: "erfolg", nochOffen, weiter: ziele.length === n }
+		: { ...zahlen(stand), status: "fehler", nochOffen, weiter: false, meldung: stand.meldung };
+}
+
+/**
+ * EIN Release jetzt fragen - der Neuabruf nach einem Verwerfen (Stufe 20h).
+ *
+ * DERSELBE Pfad wie im Cron, nicht ein zweiter: `portion` traegt den
+ * Titelabgleich, die Sperrliste und `ergebnisSchreiben` samt Protokoll. Ein
+ * eigener Weg wuerde die Nebenwirkungen des Schritts nicht erben - und "die
+ * Nebenwirkung gehoert an den Schritt, nicht an seinen Auslöser" (CLAUDE.md).
+ *
+ * `nochOffen` bleibt 0 und `weiter` false: Beides beantwortet die Frage "wie
+ * weit ist der Bestand", und die stellt hier niemand. Der Zaehler haette
+ * 430 Zeilen gelesen, um sie nicht zu beantworten.
+ *
+ * null heisst: Release nicht gefunden.
+ */
+export async function einesPruefen(
+	repos: Repositories,
+	ebay: EbayClient,
+	releaseId: number,
+): Promise<(MarktErgebnis & { preis: AngezeigtesAngebot | null }) | null> {
+	if (!ebay.konfiguriert()) {
+		return {
+			...leer({ status: "fehler", meldung: new EbayKonfigError("eBay-Zugangsdaten sind nicht hinterlegt.").message }),
+			preis: null,
+		};
+	}
+	const ziel = await repos.markt.eines(releaseId);
+	if (ziel === null) return null;
+	const stand = await portion(repos, ebay, [ziel]);
+	return {
+		...zahlen(stand),
+		status: stand.meldung === undefined ? "erfolg" : "fehler",
+		nochOffen: 0,
+		weiter: false,
+		...(stand.meldung === undefined ? {} : { meldung: stand.meldung }),
+		preis: stand.preis,
+	};
+}
+
+/** Was eine Portion erreicht hat; `meldung` gesetzt heisst: Ratenlimit oder Zugang. */
+type Portionsstand = {
+	geprueft: number;
+	mitPreis: number;
+	discBelegt: number;
+	ohneAngebot: number;
+	/** Das zuletzt geschriebene Angebot - fuer die Antwort des Einzelabrufs. */
+	preis: AngezeigtesAngebot | null;
+	meldung?: string;
+};
+
+const zahlen = (s: Portionsstand) => ({
+	geprueft: s.geprueft,
+	mitPreis: s.mitPreis,
+	discBelegt: s.discBelegt,
+	ohneAngebot: s.ohneAngebot,
+});
+
+async function portion(repos: Repositories, ebay: EbayClient, ziele: readonly ZuPruefen[]): Promise<Portionsstand> {
 	// Die Sammlung EINMAL zerlegen, nicht je Angebot: 479 Spiele x 20
 	// Angebote x 10 Releases waeren sonst Zehntausende Zerlegungen in einem
 	// Aufruf (CPU-Grenze, CLAUDE.md).
 	const sammlung = vorbereiten(await repos.games.alleTitel());
+	// Und die Sperrliste EINMAL je Portion, nicht je Release - dieselbe
+	// Begruendung: Der Bestand wird einmal vorbereitet, nicht je Eingabe
+	// (Stufe 20h). Hoechstens 20 Binds, weit innerhalb der 100-Bind-Grenze.
+	const verworfen = await repos.markt.verworfeneJeRelease(ziele.map((z) => z.releaseId));
 
-	let geprueft = 0;
-	let mitPreis = 0;
-	let discBelegt = 0;
-	let ohneAngebot = 0;
+	const stand: Portionsstand = { geprueft: 0, mitPreis: 0, discBelegt: 0, ohneAngebot: 0, preis: null };
 	for (const ziel of ziele) {
 		let rohangebote = 0;
 		const angebote: AngebotJeKanal = {};
@@ -77,33 +146,28 @@ export async function marktSchritt(
 					roh,
 					{ gameId: ziel.gameId, titel: ziel.titel, plattform: ziel.plattform },
 					sammlung,
+					verworfen.get(ziel.releaseId),
 				);
 			}
 		} catch (fehler) {
 			// Ratenlimit oder Zugang: Der Lauf endet sauber, das Geprueffte
 			// bleibt stehen, der Rest ist morgen wieder fällig.
 			if (fehler instanceof EbayRateError || fehler instanceof EbayAuthError) {
-				const offen = await repos.markt.offeneAnzahl();
-				return { status: "fehler", geprueft, mitPreis, discBelegt, ohneAngebot, nochOffen: offen, weiter: false, meldung: meldungFuer(fehler) };
+				return { ...stand, meldung: meldungFuer(fehler) };
 			}
 			// Ein einzelner Fehlschlag darf die Portion nicht kosten: Dieses
 			// Release bleibt ungestempelt und kommt beim naechsten Aufruf wieder.
 			continue;
 		}
 
-		const { discBelegt: belegt, preisCents } = await repos.markt.ergebnisSchreiben(ziel, angebote, rohangebote);
-		geprueft++;
-		if (preisCents !== null) mitPreis++;
-		if (belegt) discBelegt++;
-		if (rohangebote === 0) ohneAngebot++;
+		const { discBelegt, preis } = await repos.markt.ergebnisSchreiben(ziel, angebote, rohangebote);
+		stand.geprueft++;
+		stand.preis = preis;
+		if (preis !== null) stand.mitPreis++;
+		if (discBelegt) stand.discBelegt++;
+		if (rohangebote === 0) stand.ohneAngebot++;
 	}
-
-	// `weiter` kommt aus der Portionsgroesse, nicht aus einem Zaehler: Eine
-	// volle Portion heisst, dass wahrscheinlich mehr wartet - eine halbe, dass
-	// der Bestand durch ist. Das kostet nichts, und der naechste Aufruf
-	// korrigiert sich ohnehin selbst.
-	const offen = await repos.markt.offeneAnzahl();
-	return { status: "erfolg", geprueft, mitPreis, discBelegt, ohneAngebot, nochOffen: offen, weiter: ziele.length === n };
+	return stand;
 }
 
 function leer(teil: { status: "erfolg" | "fehler"; meldung?: string }): MarktErgebnis {

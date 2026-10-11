@@ -1,8 +1,11 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
+import { createApp } from "../src/index";
 import { createRepositories } from "../src/db";
-import { titelSchluessel } from "../src/domain/titel";
 import { erstelleEbayClient } from "../src/ebay/client";
+import { erstellePsnClient } from "../src/psn/client";
+import { fakeFetch } from "./psn-fake";
+import { titelSchluessel } from "../src/domain/titel";
 import { marktSchritt } from "../src/sync/markt";
 
 /**
@@ -18,7 +21,13 @@ const repos = () => createRepositories(env.DB, env.NPSSO_KEY);
 /** Die URLs, die der Client gebaut hat - fuer die Pruefung der Kodierung. */
 let gerufen: string[] = [];
 
-type Angebot = { title: string; price: { value: string; currency: string }; condition?: string; seller?: { username: string } };
+type Angebot = {
+	title: string;
+	price: { value: string; currency: string };
+	condition?: string;
+	seller?: { username: string };
+	legacyItemId?: string;
+};
 
 /**
  * eBay-Fake auf der fetch-Ebene, nicht auf der Client-Ebene: Nur so wird die
@@ -39,11 +48,19 @@ function ebayMit(jeKanal: { haendler?: Angebot[]; markt?: Angebot[] }) {
 	return erstelleEbayClient({ clientId: "id", clientSecret: { offenlegen: () => "geheim" } as never }, hole as typeof fetch);
 }
 
-const angebot = (title: string, euro: string, verkaeufer?: string): Angebot => ({
+/**
+ * Jede Testzeile traegt eine Kennung (Stufe 20h) - ohne sie waere der Filter
+ * nie wirklich geprueft. Sie wird aus dem Preis gebildet, damit zwei Angebote
+ * im selben Fall verschiedene haben, ohne dass jeder Aufruf sie nennen muss.
+ */
+const kennung = (euro: string) => `11${euro.replace(".", "").padStart(10, "0")}`;
+
+const angebot = (title: string, euro: string, verkaeufer?: string, itemId?: string | null): Angebot => ({
 	title,
 	price: { value: euro, currency: "EUR" },
 	condition: "Gut",
 	...(verkaeufer ? { seller: { username: verkaeufer } } : {}),
+	...(itemId === null ? {} : { legacyItemId: itemId ?? kennung(euro) }),
 });
 
 /** Ein Spiel mit einem Release, das in v_luecken auftaucht: gespielt, keine Disc im Regal. */
@@ -84,7 +101,7 @@ const fristAbgelaufen = async () =>
 const verlauf = async (releaseId: number, kanal?: string) =>
 	(
 		await env.DB.prepare(
-			"SELECT kanal, source, price_cents FROM price_snapshot WHERE release_id = ?" +
+			"SELECT kanal, source, price_cents, ebay_item_id FROM price_snapshot WHERE release_id = ?" +
 				(kanal ? " AND kanal = ?" : "") +
 				" ORDER BY id",
 		)
@@ -94,7 +111,7 @@ const verlauf = async (releaseId: number, kanal?: string) =>
 
 describe("marktSchritt", () => {
 	beforeEach(async () => {
-		for (const t of ["price_snapshot", "market_offer", "game_event", "trophy_progress", "release", "game"]) {
+		for (const t of ["price_snapshot", "market_offer_verworfen", "market_offer", "game_event", "trophy_progress", "release", "game"]) {
 			await env.DB.prepare(`DELETE FROM ${t}`).run();
 		}
 		gerufen = [];
@@ -243,5 +260,212 @@ describe("marktSchritt", () => {
 		const e = await marktSchritt(repos(), erstelleEbayClient(null));
 		expect(e.status).toBe("fehler");
 		expect(e.geprueft).toBe(0);
+	});
+});
+
+/**
+ * Angebotskorrektur (Stufe 20h, Abschnitt 6).
+ *
+ * Der Entwurf traegt, WENN diese drei Dinge zusammen gelten: Der Verlauf
+ * verliert keinen Punkt, das naechste Angebot kommt von selbst nach, und die
+ * Ruecknahme stellt den Stand her. Deshalb laeuft der Test ueber die ROUTEN -
+ * dort sitzt der Neuabruf, und er ist der Teil, der sonst stillschweigend
+ * fehlen koennte.
+ */
+describe("POST /api/sync/markt/verwerfen", () => {
+	const psnStumm = () => erstellePsnClient(fakeFetch([]).fetch);
+	const igdbEgal = () => ({ konfiguriert: () => false }) as never;
+	const app = (jeKanal: { haendler?: Angebot[]; markt?: Angebot[] }) => {
+		const ebay = ebayMit(jeKanal);
+		return createApp(psnStumm, igdbEgal, () => ebay);
+	};
+	const sende = (a: ReturnType<typeof createApp>, pfad: string, koerper: unknown) =>
+		a.request(
+			pfad,
+			{ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(koerper) },
+			env,
+		);
+
+	const sperrliste = async () =>
+		(await env.DB.prepare("SELECT release_id, ebay_item_id, titel, preis_cents FROM market_offer_verworfen ORDER BY ebay_item_id").all())
+			.results;
+
+	beforeEach(async () => {
+		for (const t of ["price_snapshot", "market_offer_verworfen", "market_offer", "game_event", "trophy_progress", "release", "game"]) {
+			await env.DB.prepare(`DELETE FROM ${t}`).run();
+		}
+		gerufen = [];
+	});
+
+	/** Der erste Lauf, damit ein Angebot ueberhaupt dasteht. */
+	async function ersterLauf(jeKanal: { haendler?: Angebot[]; markt?: Angebot[] }) {
+		await luecke(1, "Bloodborne");
+		await marktSchritt(repos(), ebayMit(jeKanal));
+	}
+
+	it("nimmt das naechstguenstigste und laesst die alten Punkte stehen", async () => {
+		const billig = angebot("Bloodborne PS4", "6.98");
+		const teurer = angebot("Bloodborne PS4 Spiel", "12.99");
+		await ersterLauf({ markt: [billig, teurer] });
+		expect(await verlauf(1, "markt")).toMatchObject([{ price_cents: 698, ebay_item_id: kennung("6.98") }]);
+
+		// Nach dem Verwerfen liefert eBay dieselben zwei Angebote - das
+		// verworfene faellt beim Abgleich heraus, nicht in der Antwort.
+		const a = app({ markt: [billig, teurer] });
+		const antwort = await sende(a, "/api/sync/markt/verwerfen", { releaseId: 1, itemId: kennung("6.98") });
+		expect(antwort.status).toBe(200);
+		const daten = (await antwort.json()) as { preis: { preisCents: number } | null; verworfene: unknown[] };
+		// Die Antwort nennt den neuen Preis, damit die Liste ihn sofort zeigt.
+		expect(daten.preis).toMatchObject({ preisCents: 1299 });
+		expect(daten.verworfene).toHaveLength(1);
+
+		// Die Sperrliste traegt Titel und Preis - aus der eigenen Zeile, nicht
+		// aus dem Browser (Entscheidung des Nutzers vom 09.10.2026).
+		expect(await sperrliste()).toMatchObject([
+			{ release_id: 1, ebay_item_id: kennung("6.98"), titel: "Bloodborne PS4", preis_cents: 698 },
+		]);
+
+		// Das Angebot in der Tabelle ist das Ersatzangebot ...
+		expect(await angebote()).toMatchObject([{ kanal: "markt", price_cents: 1299, in_stock: 1 }]);
+		// ... und der Verlauf hat einen Punkt DAZU, keinen verloren: Nichts
+		// wird geloescht, der alte Punkt ist nur gestrichen, WEIL seine
+		// Kennung auf der Sperrliste steht (Migration 0033).
+		expect(await verlauf(1, "markt")).toMatchObject([
+			{ price_cents: 698, ebay_item_id: kennung("6.98") },
+			{ price_cents: 1299, ebay_item_id: kennung("12.99") },
+		]);
+	});
+
+	it("stellt mit der Ruecknahme den Stand her", async () => {
+		const billig = angebot("Bloodborne PS4", "6.98");
+		const teurer = angebot("Bloodborne PS4 Spiel", "12.99");
+		await ersterLauf({ markt: [billig, teurer] });
+		await sende(app({ markt: [billig, teurer] }), "/api/sync/markt/verwerfen", { releaseId: 1, itemId: kennung("6.98") });
+
+		const antwort = await sende(app({ markt: [billig, teurer] }), "/api/sync/markt/verwerfen/ruecknahme", {
+			releaseId: 1,
+			itemId: kennung("6.98"),
+		});
+		expect(antwort.status).toBe(200);
+		expect(await sperrliste()).toEqual([]);
+		// Der Neuabruf gehoert dazu: Ohne ihn stuende die Liste bis zur
+		// naechsten Nacht auf dem Ersatzangebot.
+		expect((await antwort.json() as { preis: { preisCents: number } }).preis).toMatchObject({ preisCents: 698 });
+		expect(await angebote()).toMatchObject([{ kanal: "markt", price_cents: 698, in_stock: 1 }]);
+	});
+
+	it("setzt in_stock auf 0, wenn das verworfene das einzige Angebot war", async () => {
+		const einziges = angebot("Bloodborne PS4", "6.98");
+		await ersterLauf({ markt: [einziges] });
+
+		await sende(app({ markt: [einziges] }), "/api/sync/markt/verwerfen", { releaseId: 1, itemId: kennung("6.98") });
+		// Der Preis BLEIBT STEHEN, nur in_stock faellt: "zuletzt gesehen fuer
+		// 6,98" ist mehr als nichts, und v_luecken liest nur in_stock = 1.
+		expect(await angebote()).toMatchObject([{ kanal: "markt", price_cents: 698, in_stock: 0 }]);
+		const z = await env.DB.prepare("SELECT bester_gebrauchtpreis_cents AS p, gebrauchtpreis_verworfen AS v FROM v_luecken WHERE release_id = 1")
+			.first<{ p: number | null; v: number }>();
+		// In der Oberflaeche heisst das "unbekannt" - und die Zahl daneben
+		// sagt, dass es daran liegt.
+		expect(z).toMatchObject({ p: null, v: 1 });
+	});
+
+	it("fasst ein bestehendes ja NIE an - ein Verwerfen setzt es nicht zurueck", async () => {
+		const einziges = angebot("Bloodborne PS4", "6.98");
+		await luecke(1, "Bloodborne");
+		await marktSchritt(repos(), ebayMit({ markt: [einziges] }));
+		// Der erste Lauf hat 'ja' gesetzt (Quelle ebay).
+		expect(await release(1)).toMatchObject({ s: "ja", q: "ebay" });
+
+		await sende(app({ markt: [einziges] }), "/api/sync/markt/verwerfen", { releaseId: 1, itemId: kennung("6.98") });
+		// Kein Angebot mehr - und trotzdem bleibt 'ja' stehen. Ein 'nein'
+		// setzt ausschliesslich der Nutzer von Hand (Abschnitt 3).
+		expect(await release(1)).toMatchObject({ s: "ja", q: "ebay" });
+	});
+
+	it("protokolliert beide Richtungen mit Quelle nutzer und Detail ebay", async () => {
+		const einziges = angebot("Bloodborne PS4", "6.98");
+		await ersterLauf({ markt: [einziges] });
+		await sende(app({ markt: [einziges] }), "/api/sync/markt/verwerfen", { releaseId: 1, itemId: kennung("6.98") });
+		await sende(app({ markt: [einziges] }), "/api/sync/markt/verwerfen/ruecknahme", { releaseId: 1, itemId: kennung("6.98") });
+
+		const zeilen = (
+			await env.DB.prepare(
+				"SELECT source, kind, label, old_value, new_value, detail FROM game_event WHERE kind = 'angebot_verworfen' ORDER BY id",
+			).all()
+		).results;
+		// Die Richtung steht in den Werten: Verwerfen nennt das Angebot als
+		// new_value, die Ruecknahme als old_value.
+		expect(zeilen).toMatchObject([
+			{ source: "nutzer", label: "Bloodborne (PS4)", old_value: null, new_value: "Bloodborne PS4 (6,98 €)", detail: "ebay" },
+			{ source: "nutzer", label: "Bloodborne (PS4)", old_value: "Bloodborne PS4 (6,98 €)", new_value: null, detail: "ebay" },
+		]);
+	});
+
+	it("antwortet 409, wenn der Nachtlauf das Angebot inzwischen ersetzt hat", async () => {
+		await ersterLauf({ markt: [angebot("Bloodborne PS4", "6.98")] });
+		const antwort = await sende(app({ markt: [] }), "/api/sync/markt/verwerfen", { releaseId: 1, itemId: "110000000999" });
+		expect(antwort.status).toBe(409);
+		// Nichts geschrieben - lieber nichts als das falsche verwerfen.
+		expect(await sperrliste()).toEqual([]);
+	});
+
+	it("antwortet 404, wenn nichts zurueckzunehmen ist", async () => {
+		await ersterLauf({ markt: [angebot("Bloodborne PS4", "6.98")] });
+		const antwort = await sende(app({ markt: [] }), "/api/sync/markt/verwerfen/ruecknahme", { releaseId: 1, itemId: "110000000999" });
+		expect(antwort.status).toBe(404);
+	});
+
+	it("weist eine Kennung ab, die keine ist - an ihr haengt, was uebergangen wird", async () => {
+		await ersterLauf({ markt: [angebot("Bloodborne PS4", "6.98")] });
+		for (const koerper of [{ releaseId: 1 }, { releaseId: 1, itemId: "v1|123|0" }, { releaseId: 0, itemId: "123" }]) {
+			expect((await sende(app({ markt: [] }), "/api/sync/markt/verwerfen", koerper)).status).toBe(400);
+		}
+		expect(await sperrliste()).toEqual([]);
+	});
+
+	it("nennt die Sperrliste fuer das Punktmenue", async () => {
+		const einziges = angebot("Bloodborne PS4", "6.98");
+		await ersterLauf({ markt: [einziges] });
+		await sende(app({ markt: [einziges] }), "/api/sync/markt/verwerfen", { releaseId: 1, itemId: kennung("6.98") });
+
+		const antwort = await app({ markt: [] }).request("/api/sync/markt/verwerfen/1", undefined, env);
+		expect(antwort.status).toBe(200);
+		expect((await antwort.json() as { verworfene: unknown[] }).verworfene).toMatchObject([
+			{ itemId: kennung("6.98"), titel: "Bloodborne PS4", preisCents: 698 },
+		]);
+	});
+
+	/**
+	 * Scheitert der Neuabruf, fehlt `preis` GANZ - und das ist nicht dasselbe
+	 * wie `preis: null` (CLAUDE.md: fehlender Schluessel und ausdrueckliches
+	 * null sind zwei Dinge). Die Entscheidung steht trotzdem fest.
+	 */
+	it("laesst preis weg, wenn eBay nicht antwortet - und verwirft trotzdem", async () => {
+		const einziges = angebot("Bloodborne PS4", "6.98");
+		await ersterLauf({ markt: [einziges] });
+
+		const kaputt = erstelleEbayClient({ clientId: "id", clientSecret: { offenlegen: () => "geheim" } as never }, (async (
+			eingabe: RequestInfo | URL,
+		) => {
+			if (String(eingabe).includes("oauth2/token")) return Response.json({ access_token: "t", expires_in: 7200 });
+			return new Response("{}", { status: 429 });
+		}) as typeof fetch);
+		const a = createApp(psnStumm, igdbEgal, () => kaputt);
+		const antwort = await sende(a, "/api/sync/markt/verwerfen", { releaseId: 1, itemId: kennung("6.98") });
+
+		expect(antwort.status).toBe(200);
+		const daten = (await antwort.json()) as Record<string, unknown>;
+		expect("preis" in daten).toBe(false);
+		expect(daten.meldung).toBeTruthy();
+		// Geschrieben wurde trotzdem: Die Entscheidung haengt nicht an eBay.
+		expect(await sperrliste()).toHaveLength(1);
+	});
+
+	it("bleibt ohne Zugangsdaten bei 503 - die uebrige Anwendung laeuft weiter", async () => {
+		await ersterLauf({ markt: [angebot("Bloodborne PS4", "6.98")] });
+		const ohne = createApp(psnStumm, igdbEgal, () => erstelleEbayClient(null));
+		expect((await sende(ohne, "/api/sync/markt/verwerfen", { releaseId: 1, itemId: kennung("6.98") })).status).toBe(503);
+		expect((await sende(ohne, "/api/sync/markt/verwerfen/ruecknahme", { releaseId: 1, itemId: kennung("6.98") })).status).toBe(503);
+		expect(await sperrliste()).toEqual([]);
 	});
 });

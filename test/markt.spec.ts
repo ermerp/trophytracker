@@ -20,12 +20,18 @@ import { vorbereiten } from "../src/domain/scan-titel";
  * Spielnamen und oeffentliche eBay-Angebotstexte, keine Nutzerdaten.
  */
 
-const angebot = (titel: string, preisCents: number, verkaeufer: string | null = null): MarktAngebot => ({
+const angebot = (
+	titel: string,
+	preisCents: number,
+	verkaeufer: string | null = null,
+	itemId: string | null = "110000000001",
+): MarktAngebot => ({
 	titel,
 	preisCents,
 	zustand: "Gut",
 	verkaeufer,
 	url: null,
+	itemId,
 });
 
 /** Eine kleine Sammlung aus den Titeln, die in der Messung aneinandergerieten. */
@@ -197,6 +203,62 @@ describe("guenstigstesGeprueft", () => {
 
 	it("verwirft eine falsch getaggte Plattform, auch wenn der Titel passt", () => {
 		expect(guenstigstesGeprueft([angebot("Bloodborne PS3", 1099)], ziel(10, "Bloodborne"), SAMMLUNG)).toBeNull();
+	});
+
+	/**
+	 * Die Sperrliste (Stufe 20h). Der Fall des Nutzers vom 02.10.2026:
+	 * "11-11: Memories Retold" fuer 6,98 EUR mit "Nur Disc" im Angebotstitel -
+	 * der Titelabgleich sieht darin keinen Widerspruch, der Mensch sofort.
+	 */
+	it("ueberspringt ein verworfenes Angebot und nimmt das nextguenstigste", () => {
+		const billig = angebot("Bloodborne PS4", 698, null, "110000000042");
+		const teurer = angebot("Bloodborne PS4 Spiel", 1299, null, "110000000043");
+		// Ohne Sperrliste gewinnt das billige.
+		expect(guenstigstesGeprueft([billig, teurer], ziel(10, "Bloodborne"), SAMMLUNG)?.angebot.preisCents).toBe(698);
+		// Mit ihm auf der Liste wird das naechste gueltige von selbst das
+		// guenstigste - es braucht keine Sonderlogik.
+		const treffer = guenstigstesGeprueft(
+			[billig, teurer],
+			ziel(10, "Bloodborne"),
+			SAMMLUNG,
+			new Set(["110000000042"]),
+		);
+		expect(treffer?.angebot.preisCents).toBe(1299);
+		expect(treffer?.angebot.itemId).toBe("110000000043");
+	});
+
+	it("liefert null, wenn das einzige Angebot verworfen ist - der Preis wird unbekannt", () => {
+		expect(
+			guenstigstesGeprueft(
+				[angebot("Bloodborne PS4", 698, null, "110000000042")],
+				ziel(10, "Bloodborne"),
+				SAMMLUNG,
+				new Set(["110000000042"]),
+			),
+		).toBeNull();
+	});
+
+	it("laesst ein Angebot ohne Kennung waehlbar - gueltig, nur nicht verwerfbar", () => {
+		const treffer = guenstigstesGeprueft(
+			[angebot("Bloodborne PS4", 698, null, null)],
+			ziel(10, "Bloodborne"),
+			SAMMLUNG,
+			new Set(["110000000042"]),
+		);
+		expect(treffer?.angebot.preisCents).toBe(698);
+		expect(treffer?.angebot.itemId).toBeNull();
+	});
+
+	/**
+	 * Die Sperrliste ist JE RELEASE, nicht global (Migration 0033): Gemessen
+	 * am 09.10.2026 sind 20 der 370 Angebotszeilen der Produktion dieselbe
+	 * Kennung fuer ZWEI Releases. Hier wirkt sie nur, wenn sie uebergeben
+	 * wird - die Menge kommt je Release aus `verworfeneJeRelease`.
+	 */
+	it("wirkt nur mit der Liste des eigenen Releases", () => {
+		const a = [angebot("Bloodborne PS4", 698, null, "110000000042")];
+		// Dieselbe Kennung, aber die Liste eines anderen Releases: unberuehrt.
+		expect(guenstigstesGeprueft(a, ziel(10, "Bloodborne"), SAMMLUNG, new Set(["110000000099"]))?.angebot.preisCents).toBe(698);
 	});
 
 	it("nennt den Haendler als Anbieter, sonst eBay", () => {

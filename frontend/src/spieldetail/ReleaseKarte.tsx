@@ -13,6 +13,7 @@ import {
   type ErfasstAntwort,
 } from '../api'
 import { PlattformChip, TrophaeenStufen, zustandsFarbe } from '../SpielTeile'
+import { Preis } from '../Preis'
 import { StorePreis } from '../StorePreis'
 import { Trophaeenliste } from '../Trophaeenliste'
 import { Zeichen } from '../Symbole'
@@ -38,6 +39,7 @@ export function ReleaseKarte({
   tue,
   erfassen,
   onLoeschen,
+  onGeaendert,
 }: {
   release: Release
   spiel: Spiel
@@ -45,6 +47,8 @@ export function ReleaseKarte({
   tue: (aktion: () => Promise<unknown>, erfolg?: string) => Promise<void>
   erfassen: (aktion: () => Promise<ErfasstAntwort>, erfolg: string) => Promise<void>
   onLoeschen: () => void
+  /** Neu laden, nachdem ein Angebot verworfen oder zurueckgenommen wurde (Stufe 20h). */
+  onGeaendert: () => void
 }) {
   const [menue, setMenue] = useState(false)
   const [zustand, setZustand] = useState(false)
@@ -177,13 +181,26 @@ export function ReleaseKarte({
           Pflicht – die Zahl ist eine Forderung, kein Wert (Abschnitt 6). */}
       {!disc && r.markt && (
         <p className="still">
-          {r.markt.preisCents !== null ? (
+          {r.markt.preisCents !== null || r.markt.verworfen > 0 ? (
             <>
-              Gebraucht: {gebrauchtpreisText(r.markt.preisCents, r.markt.anbieter)}
-              {r.markt.zustand && ` (${r.markt.zustand})`}
+              {/* DIESELBE Komponente wie in Lücken, Kaufliste und Absichten
+                  (Stufe 20h): Sie trägt den Link auf das Angebot und das
+                  Punktmenü zum Verwerfen. Vorher stand der Satz hier ein
+                  zweites Mal – vier Vorkommen, zwei Fassungen. */}
+              Gebraucht:{' '}
+              <Preis
+                text={gebrauchtpreisText(r.markt.preisCents, r.markt.anbieter)}
+                url={r.markt.preisCents === null ? null : r.markt.url}
+                releaseId={r.id}
+                itemId={r.markt.preisCents === null ? null : r.markt.itemId}
+                verworfen={r.markt.verworfen}
+                ohneAngebot={r.markt.preisCents === null}
+                onGeaendert={onGeaendert}
+              />
+              {r.markt.zustand && r.markt.preisCents !== null && ` (${r.markt.zustand})`}
               {/* Eigene Zeile statt „· Angebot ansehen" hinter dem Preis: Bei
                   360 px brach die Zeile dort um und begann mit dem Trennpunkt. */}
-              {r.markt.url && (
+              {r.markt.preisCents !== null && r.markt.url && (
                 <>
                   <br />
                   <a href={r.markt.url} target="_blank" rel="noreferrer noopener">Angebot ansehen</a>

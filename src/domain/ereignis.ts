@@ -50,6 +50,7 @@ export const EREIGNIS_ARTEN = [
 	"igdb_geloest",
 	"igdb_abgelehnt",
 	"erschienen",
+	"angebot_verworfen",
 ] as const;
 export type EreignisArt = (typeof EREIGNIS_ARTEN)[number];
 
@@ -246,6 +247,16 @@ export function beschreibeEreignis(e: Ereignis): string {
 			return "Als „gibt es bei IGDB nicht“ vermerkt";
 		case "erschienen":
 			return "Erschienen (war angekündigt)";
+		/**
+		 * Angebotskorrektur (Stufe 20h). EINE Art fuer beide Richtungen, und
+		 * die Richtung steht in den Werten: Das Verwerfen nennt das Angebot
+		 * als `new_value`, die Ruecknahme als `old_value` - dieselbe Form wie
+		 * bei jedem Uebergang, nur dass die eine Seite leer ist.
+		 */
+		case "angebot_verworfen":
+			return e.new_value === null
+				? mitDetail(`Verworfenes Angebot zurückgenommen: ${wert(e.old_value)}`, e.detail)
+				: mitDetail(`Angebot verworfen: ${wert(e.new_value)}`, e.detail);
 	}
 }
 

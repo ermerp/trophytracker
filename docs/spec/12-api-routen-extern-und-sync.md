@@ -58,6 +58,20 @@ POST   /api/sync/markt                eine Portion Gebrauchtpreise (20 Releases,
                                       eBay-Zugangsdaten, 502 bei Ratenlimit; { status, geprueft, mitPreis,
                                       discBelegt, ohneAngebot, nochOffen, weiter }
 GET    /api/sync/markt                { zugangsdaten, mitPreis, geprueft, ohneAngebot, offen }
+POST   /api/sync/markt/verwerfen      Body: { releaseId, itemId } – das Angebot kommt auf die Sperrliste des
+                                      Releases (Stufe 20h), danach derselbe Neuabruf wie im Cron.
+                                      { verworfene[], preis } – 409, wenn der Nachtlauf das Angebot inzwischen
+                                      ersetzt hat (statt stillschweigend das falsche zu verwerfen), 400 bei
+                                      unbrauchbarer Kennung, 503 ohne eBay-Zugangsdaten.
+                                      SCHEITERT DER NEUABRUF, FEHLT `preis` GANZ und `meldung` sagt warum –
+                                      das ist nicht `preis: null` ("kein Angebot"); verworfen ist trotzdem
+POST   /api/sync/markt/verwerfen/ruecknahme
+                                      Body: { releaseId, itemId } – Zeile aus der Sperrliste, derselbe
+                                      Neuabruf; 404, wenn dort nichts steht. Der Preis kommt zurueck, sofern
+                                      eBay das Angebot noch fuehrt (6)
+GET    /api/sync/markt/verwerfen/:releaseId
+                                      { verworfene[] } mit itemId, titel, preisCents, verworfenAm – fuer die
+                                      Tafel am Preis; die Listen tragen nur die Anzahl
 POST   /api/sync/store                eine Portion Store-Preise (10 Releases, Stufe 21); KEIN 503-Pfad -
                                       der Store braucht keine Zugangsdaten; { status, geprueft, mitPreis,
                                       imAngebot, imPlusKatalog, zugeordnet, ohneTreffer, nochOffen,

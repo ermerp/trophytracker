@@ -368,6 +368,7 @@ export function Spieldetail() {
               tue={tue}
               erfassen={erfassen}
               onLoeschen={() => releaseLoeschen(r)}
+              onGeaendert={() => void laden()}
             />
           ))}
 

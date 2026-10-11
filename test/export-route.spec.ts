@@ -69,7 +69,7 @@ describe("GET /api/export/backup.json", () => {
 		expect(unbekannt, "neue Tabelle weder in EXPORT_TABELLEN noch in NICHT_EXPORTIERT").toEqual([]);
 	});
 
-	it("liefert alle 19 Fachtabellen", async () => {
+	it("liefert alle 20 Fachtabellen", async () => {
 		const antwort = await hole("/api/export/backup.json");
 		expect(antwort.status).toBe(200);
 		const daten = (await antwort.json()) as { tabellen: Record<string, unknown[]> };

@@ -46,6 +46,12 @@ export const EXPORT_TABELLEN = [
 	"ean_mapping",
 	"unresolved_scan",
 	"market_offer",
+	// Die Sperrliste der verworfenen Angebote (Migration 0033). Sie wird
+	// exportiert, weil sie eine ENTSCHEIDUNG DES NUTZERS haelt, die kein Sync
+	// zurueckbringt - genau das Kriterium, mit dem game_event exportiert wird
+	// (14.2). Ohne sie waeren nach einer Wiederherstellung alle verworfenen
+	// Angebote wieder die guenstigsten.
+	"market_offer_verworfen",
 	"price_snapshot",
 	"app_setting",
 	"psn_sync_run",

@@ -2,29 +2,31 @@
 
 ## 16. Umsetzungsreihenfolge – die offenen Teile von Stufe 20
 
-Drei Teile stehen offen. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
+Drei Teile standen offen, einer davon (20h) ist gebaut. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
 Messung von sechs vollständigen Tagen im täglichen Takt; was trotzdem offen bleibt, steht
 unten ausdrücklich als offen.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 09.10.2026): **20h**, dann **20f**, dann
 **20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
+20h ist am 11.10.2026 abgenommen; **als Nächstes 20f**.
 
-#### 20h – Angebotskorrektur (die nächste Teilstufe)
+#### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 
-Ein untaugliches Angebot lässt sich verwerfen; das Angebot wird dauerhaft übergangen, seine
-Punkte verschwinden aus dem Verlauf, und das nächstgünstigste wird sofort nachgeladen. Idee
-des Nutzers vom 02.10.2026; sein Beispiel war *11-11: Memories Retold* für 6,98 € mit „Nur
-Disc" im Angebotstitel. Dieselbe Regel wie bei Zuordnungen – was halb- oder vollautomatisch
-entsteht, muss sich zurücknehmen lassen (CLAUDE.md) –, nur bisher nicht für Preise.
+Ein untaugliches Angebot lässt sich verwerfen und das Verwerfen zurücknehmen. Idee des Nutzers
+vom 02.10.2026; sein Beispiel war *11-11: Memories Retold* für 6,98 € mit „Nur Disc" im
+Angebotstitel. Gebaut wie geplant – Migration 0033, Sperrliste je Release statt Löschen, Filter
+in `guenstigstesGeprueft`, zwei Routen plus eine Leseroute für die Tafel. **Der Stand steht in
+[6](06-marktdaten.md), [7.3](07-3-ebay.md), [12](12-api-routen-extern-und-sync.md) und
+[8.5](08-5-aenderungsprotokoll.md)**; der Bauplan ist damit aufgegangen und entfallen.
 
-**Herausgelöst aus 20g und vorgezogen** (09.10.2026). Drei gemessene Gründe: Jeder Tag
-schreibt **157 Punkte** ohne Angebotskennung, die später nicht mehr zuzuordnen sind; **13 %**
-der Markttreffer liegen unter der Hälfte des Händlerpreises und sind damit Kandidaten für ein
-untaugliches Angebot ([7.3](07-3-ebay.md)); und der Allzeittief-Alarm aus 20g würde genau
-dieses Muster als Meldung erben.
+**Zwei Abweichungen vom Bauplan**, beide Entscheidungen des Nutzers vom 11.10.2026: Die
+Sperrliste trägt `titel` und `preis_cents` mit (ohne sie könnte die Rücknahme nur eine Zahl
+nennen), und die Rücknahme steht im Punktmenü **aller vier Ansichten** statt als Zusatzzeile
+nur im Spieldetail. Dazu eine dritte, technische: Die Routen heißen `/api/sync/markt/verwerfen`
+– `src/api/markt.ts` hängt unter `/api/sync`, der Bauplan nannte den Pfad ohne dieses Präfix.
 
-**Der vollständige Bauplan steht in [16.3](16-3-stufe-20h.md)** – Migration, Filter, Routen,
-Oberfläche, Tests und Abnahme, so festgehalten, dass eine neue Sitzung danach bauen kann.
+**Was das Rückgängig nicht kann**, steht in [6](06-marktdaten.md): Ist das verworfene Angebot
+inzwischen verkauft, holt es auch die Rücknahme nicht zurück.
 
 #### 20f – Preisverlauf als Diagramm
 
@@ -125,7 +127,7 @@ Cron-Fenster dazu), oder ob er auf zwei Tage geht (dann halbiert sich die Punktd
 **Ungeklärt, als Befund notiert:** `rows_read_24h` stand am 09.10.2026 bei **1 212 977**.
 Über einer Million ohne Import heisst laut CLAUDE.md „stimmt etwas nicht". Der gerechnete
 Leerlauf einer Nacht ist 80 784, die arbeitenden Aufrufe erklären rund 60 000 weitere
-(`markt` 24 × 940, `store` 10 × 791, `jahre` 18 060) – der Rest ist **nicht erklärt**. Das
+(`markt` 24 × 940 – seit 20h 1 000 –, `store` 10 × 791, `jahre` 18 060) – der Rest ist **nicht erklärt**. Das
 Fenster ist rollierend und enthielt einen Arbeitstag mit Deploy-Prüfungen; das ist eine
 Vermutung, keine Messung. Gehört einmal eigens angesehen, blockiert aber keine Teilstufe.
 

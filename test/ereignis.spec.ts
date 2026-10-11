@@ -40,6 +40,23 @@ describe("beschreibeEreignis", () => {
 		}
 	});
 
+	/**
+	 * Angebotskorrektur (Stufe 20h): EINE Art fuer beide Richtungen, und die
+	 * Richtung steht in den Werten. Die Schleife oben prueft nur den Fall mit
+	 * `new_value` - der leere Fall braucht seinen eigenen Test, sonst stuende
+	 * dort "Angebot verworfen: leer".
+	 */
+	it("unterscheidet Verwerfen und Ruecknahme am gesetzten Wert", () => {
+		expect(
+			beschreibeEreignis(ereignis({ kind: "angebot_verworfen", new_value: "11-11: Memories Retold (6,98 €)", detail: "ebay" })),
+		).toBe("Angebot verworfen: 11-11: Memories Retold (6,98 €) (ebay)");
+		expect(
+			beschreibeEreignis(
+				ereignis({ kind: "angebot_verworfen", old_value: "11-11: Memories Retold (6,98 €)", new_value: null, detail: "ebay" }),
+			),
+		).toBe("Verworfenes Angebot zurückgenommen: 11-11: Memories Retold (6,98 €) (ebay)");
+	});
+
 	it("uebersetzt Statuswerte und nennt alt → neu", () => {
 		expect(beschreibeEreignis(ereignis({ kind: "status_geaendert", old_value: "am_spielen", new_value: "durchgespielt" }))).toBe(
 			"Status: am Spielen → durchgespielt",

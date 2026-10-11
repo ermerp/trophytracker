@@ -55,6 +55,10 @@ export type Release = {
     anbieter: string | null
     zustand: string | null
     url: string | null
+    /** eBays Angebotskennung (Stufe 20h); null heißt: nicht verwerfbar. */
+    itemId: string | null
+    /** Wie viele Angebote hier verworfen sind. */
+    verworfen: number
   } | null
   /**
    * Store-Preis (Stufe 21); null heißt: noch nie gefragt. `befund` sagt,

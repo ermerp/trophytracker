@@ -2,7 +2,7 @@
 
 ## 16. Umsetzungsreihenfolge – die finalen Stufen
 
-Fünf Stufen zum Abschluss, **bewusst ohne Nummer** (Entscheidung des Nutzers vom 02.10.2026): Es ist offen, ob weitere Funktionsstufen dazukommen. Sie laufen in dieser Reihenfolge, nachdem die offenen Teile von Stufe 20 abgeschlossen sind ([16.2](16-2-offene-stufen.md), [16.3](16-3-stufe-20h.md)); die Nummern 1–5 gelten nur innerhalb dieses Blocks.
+Fünf Stufen zum Abschluss, **bewusst ohne Nummer** (Entscheidung des Nutzers vom 02.10.2026): Es ist offen, ob weitere Funktionsstufen dazukommen. Sie laufen in dieser Reihenfolge, nachdem die offenen Teile von Stufe 20 abgeschlossen sind ([16.2](16-2-offene-stufen.md)); die Nummern 1–5 gelten nur innerhalb dieses Blocks.
 
 **Warum diese Reihenfolge.** Der erste Entwurf stellte die Oberflächenprüfung vor die Finalisierung der Sammlung. Der Nutzer hat eingewandt, dass ihm dann das Material fehlt – und das sticht. Die 22 Ansichten zerfallen nämlich in zwei Gruppen, die **entgegengesetzte** Datenlagen brauchen:
 

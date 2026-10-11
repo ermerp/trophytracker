@@ -58,7 +58,6 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 16 | [16-umsetzung.md](16-umsetzung.md) | Übersicht Umsetzungsreihenfolge |
 | 16 | [16-1-abgeschlossene-stufen.md](16-1-abgeschlossene-stufen.md) | eine Zeile je abgeschlossener Stufe |
 | 16 | [16-2-offene-stufen.md](16-2-offene-stufen.md) | die offenen Teile von Stufe 20: 20h, 20f, 20g |
-| 16 | [16-3-stufe-20h.md](16-3-stufe-20h.md) | Bauplan der nächsten Teilstufe 20h (Angebotskorrektur) |
 | 16 | [16-4-finale-stufen.md](16-4-finale-stufen.md) | die fünf finalen Stufen |
 | 17 | [17-risiken.md](17-risiken.md) | bekannte Risiken und wie damit umgegangen wird |
 

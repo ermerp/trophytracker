@@ -40,6 +40,10 @@ export type KaufKandidatZeile = {
 	gebrauchtpreis_anbieter: string | null;
 	/** Link auf das Angebot; kann bis zu einer Auffrischung alt sein (Stufe 20e). */
 	gebrauchtpreis_url: string | null;
+	/** eBays Angebotskennung - was der Verwerfen-Knopf verwirft (Stufe 20h); null heisst: nicht verwerfbar. */
+	gebrauchtpreis_item_id: string | null;
+	/** Wie viele Angebote fuer dieses Release verworfen sind (Stufe 20h). */
+	gebrauchtpreis_verworfen: number;
 };
 
 /** Eine Zeile aus v_erscheint_bald (Stufe 15): vorgemerkt, noch nicht erschienen. */
@@ -98,6 +102,10 @@ export type PlanZeile = {
 	preis_cents: number | null;
 	preis_anbieter: string | null;
 	preis_url: string | null;
+	/** eBays Angebotskennung - was der Verwerfen-Knopf verwirft (Stufe 20h). */
+	preis_item_id: string | null;
+	/** Wie viele Angebote fuer dieses Release verworfen sind (Stufe 20h). */
+	preis_verworfen: number;
 	/**
 	 * Store-Preis am Eintrag (Stufe 21). Eigene Spalten, nie mit dem
 	 * Gebrauchtpreis verrechnet (Abschnitt 6) - "neu digital" und "gebraucht
@@ -156,6 +164,11 @@ export const PLAN_AUSWAHL =
 	"COALESCE(mh.price_cents, mm.price_cents) AS preis_cents, " +
 	"COALESCE(mh.anbieter, mm.anbieter) AS preis_anbieter, " +
 	"COALESCE(mh.url, mm.url) AS preis_url, " +
+	"COALESCE(mh.ebay_item_id, mm.ebay_item_id) AS preis_item_id, " +
+	// Ein korrelierter COUNT ueber den Primaerschluessel der Sperrliste
+	// (Stufe 20h) - kein neuer Join. Er sagt, dass es etwas zurueckzunehmen
+	// gibt; die Titel holt erst die aufgeklappte Tafel.
+	"(SELECT COUNT(*) FROM market_offer_verworfen v WHERE v.release_id = pe.release_id) AS preis_verworfen, " +
 	// Der Store-Preis kommt aus `release r`, das hier schon LEFT JOINed ist -
 	// also keine zusaetzliche gelesene Zeile (gemessen in
 	// test/lesekosten.spec.ts).
@@ -463,7 +476,8 @@ export class PlanRepository {
 		const { results } = await this.db
 			.prepare(
 				"SELECT quelle, plan_id, release_id, game_id, title, platform, cover_url, critic_score, is_favorite, " +
-					"bester_gebrauchtpreis_cents, gebrauchtpreis_anbieter, gebrauchtpreis_url " +
+					"bester_gebrauchtpreis_cents, gebrauchtpreis_anbieter, gebrauchtpreis_url, " +
+					"gebrauchtpreis_item_id, gebrauchtpreis_verworfen " +
 					"FROM v_kaufkandidaten ORDER BY quelle, title, platform",
 			)
 			.all<KaufKandidatZeile>();

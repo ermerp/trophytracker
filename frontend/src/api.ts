@@ -121,8 +121,33 @@ export const gebrauchtpreisText = (cents: number | null, anbieter: string | null
  * oder wenn das gespeicherte verschwunden ist, bevor die nächste Auffrischung
  * lief; dann steht der Preis ohne Link da.
  */
-export function gebrauchtpreis(cents: number | null, anbieter: string | null, url: string | null) {
-  return { text: gebrauchtpreisText(cents, anbieter), url: cents === null ? null : url }
+export function gebrauchtpreis(
+  cents: number | null,
+  anbieter: string | null,
+  url: string | null,
+  itemId: string | null = null,
+  verworfen = 0,
+) {
+  return {
+    text: gebrauchtpreisText(cents, anbieter),
+    url: cents === null ? null : url,
+    // Ohne Preis gibt es kein Angebot, das zu verwerfen wäre – aber sehr wohl
+    // etwas zurückzunehmen: Genau dann steht dort „unbekannt", WEIL alles
+    // verworfen ist (Stufe 20h).
+    itemId: cents === null ? null : itemId,
+    verworfen,
+    // „Kein Angebot" und „Angebot ohne Kennung" sind zwei Dinge, und die
+    // Tafel sagt zu beiden etwas anderes (Stufe 20h).
+    ohneAngebot: cents === null,
+  }
+}
+
+/** Eine Zeile der Sperrliste (Stufe 20h): was verworfen wurde, und für wie viel. */
+export type VerworfenesAngebot = {
+  itemId: string
+  titel: string
+  preisCents: number
+  verworfenAm: string
 }
 
 /**
@@ -349,6 +374,10 @@ export type PlanEintrag = {
   preisAnbieter: string | null
   /** Link auf das Angebot; kann bis zu einer Auffrischung alt sein. */
   preisUrl: string | null
+  /** eBays Angebotskennung (Stufe 20h); null heißt: nicht verwerfbar. */
+  preisItemId: string | null
+  /** Wie viele Angebote hier verworfen sind. */
+  preisVerworfen: number
   /** Disc oder digitale Berechtigung am Release – der Eintrag ist damit eigentlich erfüllt. */
   imBesitz: boolean
   /** Store-Preis (Stufe 21); null heißt „nicht gefragt oder kein Kaufknopf". */
@@ -430,6 +459,10 @@ export type KaufKandidat = {
   /** Wer das Angebot stellt – 'rebuy', 'medimops' oder 'eBay' (Stufe 20). */
   gebrauchtpreisAnbieter: string | null
   gebrauchtpreisUrl: string | null
+  /** eBays Angebotskennung (Stufe 20h); null heißt: nicht verwerfbar. */
+  gebrauchtpreisItemId: string | null
+  /** Wie viele Angebote hier verworfen sind. */
+  gebrauchtpreisVerworfen: number
 }
 
 /** Vorgemerkter, noch nicht erschienener Titel aus v_erscheint_bald (Use Case 11). */
