@@ -343,6 +343,15 @@ betrifft.
 → Regel: Eine Zahl, auf der eine Entscheidung ruhen soll, wird **vor** der Frage
 gemessen.
 
+**11.10.2026 – der Hinweis, mit dem der Nutzer nichts anfangen konnte.** Zum
+Abschluss von 20f hiess es unter „Was du jetzt tun kannst": ein Spieldetail
+öffnen, „am besten bei einem Release mit Store- *und* Gebrauchtpreis". Alle drei
+Reihen tragen aber nur **12 von 490** Releases; der Nutzer suchte und fand
+keines. Die Stelle war längst bekannt: Release 475 war in der Planung als
+Beispiel mit drei Reihen gemessen worden und stand so auch im Prototyp.
+→ Regel: Wer dem Nutzer sagt, wo er etwas ansehen soll, nennt die Stelle, nicht
+ihre Beschreibung.
+
 ---
 
 ## Migrationen, Export, Sicherung
