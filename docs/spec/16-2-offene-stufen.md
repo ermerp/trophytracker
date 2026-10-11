@@ -2,13 +2,13 @@
 
 ## 16. Umsetzungsreihenfolge – die offenen Teile von Stufe 20
 
-Drei Teile standen offen, zwei davon (20h und 20f) sind gebaut. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
+Drei Teile standen offen, zwei davon (20h und 20f) sind abgenommen. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
 Messung von sechs vollständigen Tagen im täglichen Takt; was trotzdem offen bleibt, steht
 unten ausdrücklich als offen.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 09.10.2026): **20h**, dann **20f**, dann
 **20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
-20h und 20f sind am 11.10.2026 gebaut; **als Nächstes 20g**.
+20h und 20f sind am 11.10.2026 abgenommen; **als Nächstes 20g** – dort ist alles entschieden außer der relativen Regel, die ab dem 03.11.2026 messbar wird.
 
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 
