@@ -10,6 +10,7 @@ import { BesitzRepository } from "./besitz";
 import { OwnershipRepository } from "./ownership";
 import { PlanRepository } from "./plan";
 import { PlayStatusRepository } from "./play-status";
+import { PreiseRepository } from "./preise";
 import { ReviewRepository } from "./review";
 import { ScanRepository } from "./scan";
 import { StatsRepository } from "./stats";
@@ -52,6 +53,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		review: new ReviewRepository(db, playStatus, kopplung, events),
 		scan: new ScanRepository(db),
 		stats: new StatsRepository(db),
+		preise: new PreiseRepository(db),
 		export: new ExportRepository(db),
 		wishlistImport: new WishlistImportRepository(db),
 	};

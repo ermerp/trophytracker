@@ -17,6 +17,7 @@ import { Preis } from '../Preis'
 import { StorePreis } from '../StorePreis'
 import { Trophaeenliste } from '../Trophaeenliste'
 import { Zeichen } from '../Symbole'
+import { Preisverlauf } from './Preisverlauf'
 import { spielzeitText } from '../spielzeit'
 import { BesitzKnopf } from './BesitzKnopf'
 import { QuellenTafel } from './QuellenTafel'
@@ -253,6 +254,11 @@ export function ReleaseKarte({
           )}
         </p>
       )}
+
+      {/* Der Verlauf beider Kanäle, zugeklappt (Stufe 20f). Er steht direkt
+          unter den Preisen, zu denen er gehört, und lädt erst beim Öffnen:
+          225 von 490 Releases haben gar keine Punkte (11.10.2026). */}
+      <Preisverlauf releaseId={r.id} />
 
       {zustand && (
         <ZustandTafel

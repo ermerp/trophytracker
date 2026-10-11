@@ -281,10 +281,31 @@ for (let i = 1; i <= ANZAHL; i++) {
 				`'EUR', 1, 'https://example.invalid/h${i}', '${kennung(i, "h")}', datetime('now'), ${i});`,
 		);
 	}
+	// Der Preisverlauf, den das Diagramm aus 20f liest. Zwei Dinge muessen
+	// hier stimmen, sonst bleibt das Diagramm im Bild leer:
+	//   * `kanal` ist gesetzt - Punkte ohne Kanal laesst das Diagramm weg,
+	//   * und die Punkte liegen auf verschiedenen TAGEN, sonst fallen sie in
+	//     einen Eimer zusammen.
+	// Ein Punkt vor 40 Tagen bleibt stehen: Er faellt ueber die Tagesstufe
+	// hinaus und zeigt, dass die Treppe auch ueber eine Luecke laeuft.
+	const reihe = [];
+	for (const [tage, versatz] of [[12, 250], [9, 180], [7, 120], [5, 140], [3, 60], [1, 0]]) {
+		reihe.push(
+			`(${i}, 'gebraucht', 'markt', 'ebay', 'Gut', ${marktCents + versatz + (i % 5) * 20}, 'EUR', ` +
+				`'${kennung(i, "m")}', datetime('now', '-${tage} days'))`,
+		);
+		// Die Haendlerreihe rueckt nur um Cents - genau das unterscheidet sie
+		// im Bild von der springenden Marktreihe (7.3).
+		if (rest === 0) {
+			reihe.push(
+				`(${i}, 'gebraucht', 'haendler', '${i % 8 === 0 ? "medimops" : "rebuy"}', 'Sehr gut', ` +
+					`${marktCents + 300 + (i % 700) + tage * 3}, 'EUR', '${kennung(i, "h")}', datetime('now', '-${tage} days'))`,
+			);
+		}
+	}
 	s(
-		"INSERT INTO price_snapshot (release_id, channel, source, condition, price_cents, currency, ebay_item_id, captured_at) " +
-			`VALUES (${i}, 'gebraucht', 'ebay', 'Gut', ${marktCents + 250}, 'EUR', '${kennung(i, "m")}', datetime('now', '-40 days')), ` +
-			`(${i}, 'gebraucht', 'ebay', 'Gut', ${marktCents}, 'EUR', '${kennung(i, "m")}', datetime('now', '-2 days'));`,
+		"INSERT INTO price_snapshot (release_id, channel, kanal, source, condition, price_cents, currency, ebay_item_id, captured_at) " +
+			`VALUES ${reihe.join(", ")};`,
 	);
 
 	// Verworfene Angebote (Stufe 20h). Drei Faelle, damit im Bild alle drei
@@ -339,6 +360,25 @@ s(
 		"store_plus = CASE WHEN id % 7 = 4 THEN 1 ELSE 0 END, " +
 		"store_geprueft_am = datetime('now', '-' || (id % 3) || ' days') " +
 		"WHERE EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = release.id AND pe.status = 'offen');",
+);
+
+// Der Store-Verlauf (`kanal` bleibt leer, `channel` trennt ihn). Drei Punkte
+// je Release mit Preis, der mittlere ist eine Rabattaktion - der Store
+// bewegt sich selten und dann tief (gemessen: Median 80 %, 7.3).
+s(
+	"INSERT INTO price_snapshot (release_id, channel, source, price_cents, is_sale, currency, captured_at) " +
+		"SELECT id, 'psn_store', 'psn', store_base_price_cents, 0, 'EUR', datetime('now', '-12 days') " +
+		"FROM release WHERE store_price_cents IS NOT NULL;",
+);
+s(
+	"INSERT INTO price_snapshot (release_id, channel, source, price_cents, is_sale, currency, captured_at) " +
+		"SELECT id, 'psn_store', 'psn', CAST(store_base_price_cents * 0.35 AS INTEGER), 1, 'EUR', datetime('now', '-6 days') " +
+		"FROM release WHERE store_price_cents IS NOT NULL;",
+);
+s(
+	"INSERT INTO price_snapshot (release_id, channel, source, price_cents, is_sale, currency, captured_at) " +
+		"SELECT id, 'psn_store', 'psn', store_price_cents, store_is_sale, 'EUR', datetime('now', '-2 days') " +
+		"FROM release WHERE store_price_cents IS NOT NULL;",
 );
 
 for (let i = 1; i <= ANZAHL; i += 3) {

@@ -412,6 +412,9 @@ describe("Dichtheitsprüfung", () => {
 				body: JSON.stringify({ releaseId: 1, itemId: "110000000001" }),
 			}),
 			await ruf(app, "/api/sync/markt/verwerfen/1"),
+			// Der Preisverlauf (Stufe 20f): die eine lesende Route auf price_snapshot.
+			await ruf(app, "/api/releases/1/preise"),
+			await ruf(app, "/api/releases/0/preise"),
 			await ruf(app, "/api/backup/status"),
 			await ruf(app, "/api/backup/vermerk", {
 				method: "POST",

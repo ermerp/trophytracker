@@ -93,6 +93,11 @@ GET    /api/feed                      Dashboard-Feed aus ZWEI Quellen (Stufe 19b
                                       kein Blättern. Trophäenzeilen erst, wenn die Erstbefüllung durch ist
 GET    /api/releases/:id/trophaeen    die Trophäen EINES Release mit ihren Gruppen (Stufe 19b);
                                       je Release, nicht je Spiel – zwei Fassungen haben zwei Listen
+GET    /api/releases/:id/preise       der Preisverlauf EINES Release fürs Diagramm (Stufe 20f): { bis, punkte[] }
+                                      mit reihe (haendler|markt|store), stand, preisCents und quelle. Die EINZIGE
+                                      lesende Route auf price_snapshot. Verdichtet beim Lesen (Tag bis 90 Tage,
+                                      davor Woche), ohne die Punkte verworfener Angebote (20h); `bis` ist der
+                                      Stand des SERVERS. Unbekannte Id: leere Liste, kein 404
 GET    /api/stats/jahre               Trophäen je Jahr (Stufe 19b). Eigene Route, weil die Auswertung
                                       18 060 Zeilen liest: vergangene Jahre aus app_setting, das
                                       laufende live

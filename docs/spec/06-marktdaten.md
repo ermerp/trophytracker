@@ -107,7 +107,7 @@ nicht speichern"). Drei Folgen:
   zurück. Keine Kopie, keine Sonderbehandlung.
 - `price_snapshot` bleibt reine anhängende Historie — dieselbe Eigenschaft, auf der die
   Entscheidung „Verdichtung nur beim Lesen" ruht.
-- **Das Diagramm (20f) und der Alarm (20g) müssen den Filter beide anwenden.** Das ist die
+- **Das Diagramm (20f) wendet den Filter an, der Alarm (20g) muss es ebenso.** Das ist die
   eine Stelle, an der dieser Entwurf teurer ist als ein `DELETE`; dafür ist es ein Lookup über
   `release_id` auf eine Tabelle mit wenigen Zeilen (gemessen: 60 gelesene Zeilen für eine
   Portion von 20 Releases).
@@ -117,6 +117,45 @@ das verworfene das einzige Angebot, setzt er `in_stock = 0`, und der Preis steht
 „unbekannt" da. Die Rücknahme holt ihn zurück, **sofern eBay das Angebot noch führt** — ist es
 inzwischen verkauft, bleibt es fort. Das ist keine Lücke im Rückgängig, sondern die Grenze
 einer Fremdquelle: Ein Preis, den niemand mehr anbietet, würde sonst erfunden.
+
+### Der Verlauf als Diagramm (Stufe 20f)
+
+`GET /api/releases/:id/preise` ([12](12-api-routen-extern-und-sync.md)) ist die **einzige**
+lesende Route auf `price_snapshot`; bis Stufe 20f wurde die Tabelle nur geschrieben und
+exportiert. Sie liefert eine flache Liste von Punkten und `bis`, den Zeitstempel des
+**Servers** – die letzte Stufe der Treppe läuft bis dorthin, und eine falsch gestellte Uhr des
+Geräts zöge sie sonst in die Zukunft.
+
+**Gezeichnet wird eine Treppe, keine Linie von Punkt zu Punkt** (Entscheidung des Nutzers vom
+11.10.2026): Geschrieben wird nur bei Änderung, zwischen zwei Punkten gilt der alte Preis
+weiter. Deshalb liefert ein Eimer den **letzten** Stand, nicht sein Tief – was im SQL daran
+hängt, dass `MAX(captured_at)` das **einzige** min/max-Aggregat ist. Nur dann garantiert
+SQLite, dass die nackten Spalten aus eben dieser Zeile stammen; ein zweites Aggregat
+verfälscht die Treppe still (nachgewiesen am 11.10.2026, indem der Defekt absichtlich
+eingebaut wurde).
+
+**Ein Diagramm je Kanal, übereinander**, mit gemeinsamer Zeit- und eigener Preisachse. Mit
+einer gemeinsamen Preisachse wurden Händler und Markt zu einem flachen Strich am unteren Rand,
+sobald der Store weit darüber liegt (12,16 € gegen 69,99 € bei *Tales of Arise*) – im
+Prototyp vom 11.10.2026 gesehen, nicht im Code. Händler und Markt teilen sich eine Achse:
+derselbe Kanal, sie sollen vergleichbar liegen.
+
+**Der Filter der verworfenen Angebote hat zwei Zweige.** Der erste trifft die Angebotskennung.
+Der zweite ist ein begrenzter Rückfall: Ein Punkt **ohne** Kennung im Kanal `gebraucht` wird
+gestrichen, wenn sein Preis einem verworfenen Preis desselben Releases gleicht. Ohne ihn
+bliebe genau der Fall stehen, der Stufe 20h ausgelöst hat – `ebay_item_id` kam mit Migration
+0033 ohne Backfill, die **1 383 Punkte davor tragen keine Kennung** (4 von 4 danach tragen
+eine). Am 11.10.2026 trifft der zweite Zweig **genau einen Punkt**. **Restrisiko, ausdrücklich:**
+Ein Altpunkt mit zufällig gleichem Preis aus einem anderen Angebot verschwindet mit. Als
+Lesebedingung ist der Zweig jederzeit zurücknehmbar; trägt jeder neue Punkt eine Kennung, kann
+er ohne Verlust entfallen.
+
+**Verdichtet wird beim Lesen**, in SQL: tageweise innerhalb von 90 Tagen, davor auf den Montag
+der Woche. Beide Stufen liefern ein Datum als Schlüssel. Gemessen am 11.10.2026 ist die
+Verdichtung **noch untätig** – die größte Reihe hat 7 Punkte, im Mittel sind es 2,06 über 672
+Reihen –; die Wochenstufe greift erstmals im Januar 2027. Lesekosten: **1 129 Zeilen** für ein
+Release mit 450 Punkten und einer Sperrliste von 40 Zeilen, **2 Zeilen** für ein Release ohne
+Punkte (`test/lesekosten.spec.ts`). Die Route läuft nur im Spieldetail, auf Klick, nie im Cron.
 
 Die beiden Kanäle sind nicht vergleichbar und dürfen in der Oberfläche nie zu einem Wert verrechnet werden. Store-Preis heisst "so viel kostet es neu digital", Gebrauchtpreis heisst "so viel verlangt Händler X gerade für die Disc". Beide nebeneinander anzeigen, mit Kanalbezeichnung.
 

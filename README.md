@@ -15,9 +15,8 @@ Die vollständige Spezifikation steht in [`docs/spec/`](docs/spec/README.md).
 ## Stand
 
 **Alle Funktionsstufen sind durch; Stufe 21 ist am 08.10.2026 abgenommen.** Offen
-sind nur noch zwei Nachträge zu den Preisen (20f Preisverlauf als Diagramm, 20g
-Preisalarm – beide warten auf eine Entscheidung) und die fünf finalen Stufen:
-Sammlung finalisieren, Oberfläche und Bedienbarkeit, Refactoring,
+ist nur noch ein Nachtrag zu den Preisen (20g Preisalarm) und die fünf finalen
+Stufen: Sammlung finalisieren, Oberfläche und Bedienbarkeit, Refactoring,
 Wiederherstellungsprobe, Außendarstellung. Die Einzelheiten stehen in
 [Abschnitt 16](docs/spec/16-umsetzung.md), die Fassungsgeschichte in
 [`docs/changelog.md`](docs/changelog.md).
@@ -53,6 +52,7 @@ erfasste Discs, nächtliche Läufe seit dem 20.09.2026.
 | Kaufliste | Kandidaten aus belegten Lücken und offenen Wünschen; ein Wunsch kommt als **Kopie**, der Wunsch bleibt offen | [5](docs/spec/05-absichten.md) |
 | Erscheint bald | Unveröffentlichte Titel, `angekuendigt → erschienen` täglich im Cron | [8.4](docs/spec/08-4-unveroeffentlicht.md) |
 | Gebrauchtpreise | Zwei eBay-Suchen je Release (Händler, Markt), Titelabgleich Pflicht, als Link aufs Angebot, sortierbar; ein untaugliches Angebot lässt sich verwerfen und zurücknehmen | [7.3](docs/spec/07-3-ebay.md) |
+| Preisverlauf | Diagramm je Release im Spieldetail: eine Treppe je Kanal (Händler, Markt, Store), verdichtet beim Lesen, verworfene Angebote bleiben draußen | [6](docs/spec/06-marktdaten.md) |
 | Store-Preise | Neupreis der digitalen Fassung aus der gerenderten Produktseite, „im PS-Plus-Katalog", Angebote mit Grundpreis | [7.4](docs/spec/07-4-store-preise.md) |
 | Spielzeit und digitaler Besitz | Aus PSN ergänzt, nie importiert; `kauf` schlägt `plus`, PS+ ist eine Momentaufnahme | [7.7](docs/spec/07-7-psn-weitere-daten.md) |
 | Einzeltrophäen | 18 355 Trophäen mit Seltenheit, Stufe und Fortschrittszähler; Liste je Release, Level und Jahre im Dashboard | [7.7](docs/spec/07-7-einzeltrophaeen.md) |

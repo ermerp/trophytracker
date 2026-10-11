@@ -118,3 +118,24 @@ export const releaseTrophaeenRoutes = new Hono<AppEnv>().get("/:id/trophaeen", a
 		})),
 	});
 });
+
+/**
+ * Der Preisverlauf eines Release als Diagramm (Stufe 20f, Abschnitt 6).
+ *
+ * Kein 404 bei unbekannter Id: Ein Release ohne Punkte ist eine gueltige,
+ * leere Antwort - am 11.10.2026 haben 265 von 490 Releases ueberhaupt
+ * Punkte, "noch keine" ist der haeufigere Fall.
+ *
+ * `bis` kommt vom Server, nicht aus dem Browser: Die letzte Stufe der Treppe
+ * laeuft bis heute, und eine falsch gestellte Uhr des Geraets zoege sie
+ * sonst in die Zukunft.
+ */
+export const releasePreiseRoutes = new Hono<AppEnv>().get("/:id/preise", async (c) => {
+	const id = Number(c.req.param("id"));
+	if (!Number.isInteger(id) || id <= 0) return c.json({ fehler: "Ungültige Id." }, 400);
+
+	return c.json({
+		bis: new Date().toISOString().slice(0, 19).replace("T", " "),
+		punkte: await c.var.repos.preise.verlauf(id),
+	});
+});

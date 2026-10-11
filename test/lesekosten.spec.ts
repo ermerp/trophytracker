@@ -4,6 +4,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
 import { CRON_PSN, CRON_WARTUNG, cronFenster } from "../src/sync/cron";
 import { EXPORT_ORDNUNG, EXPORT_TABELLEN } from "../src/db/export";
+import { VERLAUF_SQL } from "../src/db/preise";
 import {
 	LETZTES_PLATIN_SQL,
 	LISTEN_SQL,
@@ -1273,6 +1274,73 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL"),
 			env.DB.prepare("DELETE FROM psn_raw_response"),
 			env.DB.prepare("DELETE FROM psn_sync_run"),
+		]);
+	});
+
+	/**
+	 * Der Preisverlauf des Diagramms (Stufe 20f).
+	 *
+	 * Gemessen wird gegen den Stand in EINEM JAHR, nicht gegen den von
+	 * heute: Am 11.10.2026 hat die groesste Reihe 7 Punkte, bei 157 neuen
+	 * Zeilen je Tag ueber 366 Reihen sind es in einem Jahr rund 150 je
+	 * Reihe (Abschnitt 6). Die Verdichtung aendert daran nichts - sie
+	 * verkleinert die ANTWORT, nicht die gelesenen Zeilen.
+	 */
+	it("misst den Preisverlauf eines Release (Stufe 20f)", async () => {
+		await env.DB.prepare("DELETE FROM price_snapshot").run();
+		await env.DB.prepare("DELETE FROM market_offer_verworfen").run();
+		// Drei Reihen à 150 Punkte an EINEM Release - der Stand in einem Jahr.
+		// Dazu Punkte an 40 weiteren Releases, damit der Index etwas zu
+		// trennen hat und die Messung nicht nur eine leere Tabelle sieht.
+		const punkte: D1PreparedStatement[] = [];
+		for (let t = 0; t < 150; t++) {
+			for (const [kanal, channel] of [["haendler", "gebraucht"], ["markt", "gebraucht"], [null, "psn_store"]] as const) {
+				punkte.push(
+					env.DB.prepare(
+						"INSERT INTO price_snapshot (release_id, channel, kanal, source, price_cents, ebay_item_id, captured_at) " +
+							"VALUES (1, ?, ?, 'ebay', ?, ?, datetime('now', '-' || ? || ' days'))",
+					).bind(channel, kanal, 1_000 + t, kanal === null ? null : `11${1_000_000 + t}`, t * 2),
+				);
+			}
+		}
+		for (let i = 2; i <= 41; i++) {
+			punkte.push(
+				env.DB.prepare(
+					"INSERT INTO price_snapshot (release_id, channel, kanal, source, price_cents, captured_at) " +
+						"VALUES (?, 'gebraucht', 'markt', 'ebay', 999, datetime('now', '-1 days'))",
+				).bind(i),
+			);
+		}
+		for (let i = 0; i < punkte.length; i += 200) await env.DB.batch(punkte.slice(i, i + 200));
+		// Eine Sperrliste, die weit ueber dem liegt, was nach Monaten zu
+		// erwarten ist - am 11.10.2026 stehen dort zwei Zeilen.
+		const sperren: D1PreparedStatement[] = [];
+		for (let i = 0; i < 40; i++) {
+			sperren.push(
+				env.DB.prepare(
+					"INSERT INTO market_offer_verworfen (release_id, ebay_item_id, titel, preis_cents, verworfen_am) " +
+						"VALUES (1, ?, 'Nur Disc', ?, datetime('now'))",
+				).bind(`99${1_000_000 + i}`, 500 + i),
+			);
+		}
+		await env.DB.batch(sperren);
+
+		const verlauf = await zeilenGelesen(VERLAUF_SQL, 1);
+		const verlaufLeer = await zeilenGelesen(VERLAUF_SQL, 4711);
+		console.info({ verlauf, verlaufLeer });
+
+		// 450 Punkte, und je Punkt zwei Index-Lookups auf die Sperrliste.
+		// Heute gegen die Produktion gemessen: 38 Zeilen fuer das Release
+		// mit den meisten Punkten (12 Punkte in 3 Reihen). Die Route wird
+		// nur im Spieldetail aufgerufen, auf Klick, nicht im Cron.
+		expect(verlauf).toBeLessThan(2_500);
+		// Ein Release ohne Punkte darf nichts kosten - das ist der haeufigere
+		// Fall (225 von 490 am 11.10.2026).
+		expect(verlaufLeer).toBeLessThan(20);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM price_snapshot"),
+			env.DB.prepare("DELETE FROM market_offer_verworfen"),
 		]);
 	});
 
