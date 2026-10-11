@@ -515,8 +515,19 @@
   stroke-width: 2;
 }
 
-/* Das Trefferfeld ist unsichtbar und deutlich größer als der Punkt. */
+/* Die Stufe als Tastaturziel: unsichtbar breiter Strich über der sichtbaren
+   Linie, damit der Fokusrahmen die ganze Stufe umfasst. Mausereignisse nimmt
+   sie nicht an – die liegen auf der Wählfläche darüber. */
 .preissvg .ziel {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 20;
+  stroke-linecap: butt;
+  pointer-events: none;
+}
+
+/* Tippen wählt die nächstliegende Kurve, nicht ein Feld um einen Punkt. */
+.preissvg .waehlflaeche {
   fill: transparent;
   cursor: pointer;
 }

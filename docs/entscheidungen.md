@@ -223,5 +223,15 @@ Was in 20f und 20g noch offen ist, steht dort: [16.2](spec/16-2-offene-stufen.md
 |---|---|---|
 | 11.10.2026 | **Inline-SVG statt einer Diagramm-Bibliothek.** Der Umfang ist klein (drei Reihen, nach einem Jahr rund 130 Punkte, kein Zoom), und eine Canvas-Bibliothek kennt keine CSS-Variablen – die Tokenfarben müssten über `getComputedStyle` ausgelesen werden | [6](spec/06-marktdaten.md) |
 | 11.10.2026 | **Die Reihen werden als Treppe gezeichnet, nicht als Linie von Punkt zu Punkt.** Geschrieben wird nur bei Änderung; dazwischen gilt der alte Preis weiter, und die letzte Stufe läuft bis heute | [6](spec/06-marktdaten.md) |
-| 11.10.2026 | **Antippen eines Punkts zeigt Preis und Datum** – auf dem Handy gibt es kein Hover. Der Wert steht in einer festen Zeile über dem Diagramm, nicht in einer schwebenden Tafel | [13.1](spec/13-1-ansichten.md) |
+| 11.10.2026 | **Antippen zeigt Preis und Datum** – auf dem Handy gibt es kein Hover. Der Wert steht in einer festen Zeile über dem Diagramm, nicht in einer schwebenden Tafel. **Gewählt wird die nächstliegende Kurve, nicht ein Punkt** (nachgeschärft am selben Tag): Ein Punkt ist 3,5 px breit, und ein Trefferfeld je Stufe verdeckt die dichtere von zwei Reihen | [13.1](spec/13-1-ansichten.md) |
 | 11.10.2026 | **Farbsatz ohne Gold** (Händler hellblau, Markt grün, Store violett). Gold ist der einzige Akzent und gehört Favoritenstern, 100 % und Platin – nicht einer Preisreihe | [13.3](spec/13-3-gestaltung-und-pwa.md) |
+
+## Stufe 20g, 11.10.2026 – drei Entscheidungen zum Preisalarm
+
+Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spec/16-2-offene-stufen.md) seit dem 09.10.2026 offen führte.
+
+| Datum | Entscheidung | Abschnitt |
+|---|---|---|
+| 11.10.2026 | **`unbekannt` ohne Gebrauchtreihe fällt in den Store-Zweig**, und zwar **zur Lesezeit** bestimmt: Sobald eine Gebrauchtreihe besteht oder die Disc-Fassung `ja` ist, gilt der Gebrauchtzweig. So alarmiert ein Eintrag auf dem einzigen Kanal, den er hat, und wechselt von selbst mit – ohne gespeicherte Zuordnung, die veralten könnte | [16.2](spec/16-2-offene-stufen.md) |
+| 11.10.2026 | **Meldungen werden durch Antippen quittiert. Keine Sperrfrist, sondern höchstens eine offene Meldung je Reihe:** Ein tieferes Tief aktualisiert die offene Meldung, statt eine neue anzulegen. Die absolute Schwelle meldet beim Unterschreiten und wird erst wieder scharf, wenn der Preis darüber zurückgeht | [16.2](spec/16-2-offene-stufen.md) |
+| 11.10.2026 | **Stammt ein gemeldetes Tief aus einem später verworfenen Angebot (20h), entfällt die Meldung** – und der danach tiefste Punkt löst **keine** neue aus: Er stand schon da, als verworfen wurde, und eine Korrektur soll nichts Neues melden | [16.2](spec/16-2-offene-stufen.md) |

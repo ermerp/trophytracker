@@ -59,14 +59,18 @@ Die Glocke in der Kopfzeile meldet einen Preis, der zur Absicht passt.
 
 **Der Kanal folgt der Absicht** (Entscheidung des Nutzers vom 09.10.2026) – für Alarm *und*
 Anzeige: Disc-Fassung `ja` → Gebrauchtpreis, `nein` oder „physisch nicht gewünscht"
-([5.3](05-3-luecke-verwerfen.md)) → Store-Preis, `unbekannt` → beide anzeigen, **nicht**
-alarmieren. Reichweite am 09.10.2026 über die 60 Releases mit offener Kauf- oder
+([5.3](05-3-luecke-verwerfen.md)) → Store-Preis, `unbekannt` → beide anzeigen. **Welcher Zweig
+bei `unbekannt` alarmiert, entscheidet sich zur LESEZEIT** (Entscheidung des Nutzers vom
+11.10.2026): Sobald eine Gebrauchtreihe besteht oder die Disc-Fassung auf `ja` steht, gilt der
+Gebrauchtzweig; sonst der Store-Zweig. Damit alarmiert ein Eintrag auf dem einzigen Kanal, den
+er hat, statt auf keinem – und er wechselt von selbst mit, wenn eBay später doch etwas findet.
+Keine gespeicherte Zuordnung, die veralten könnte („Berechnetes nicht speichern"). Reichweite am 09.10.2026 über die 60 Releases mit offener Kauf- oder
 Wunschabsicht: **48 mit `ja`** (alle mit Gebrauchtreihe), **12 mit `unbekannt`**, **0 mit
 `nein`** und 0 mit verworfenem Lücken-Kauf. Der Store-Zweig ist damit heute leer und füllt
 sich in der finalen Stufe 1, wo 113 der 157 offenen Releases den Befund „eBay kennt kein
 Angebot" tragen; gebaut wird er trotzdem mit, sonst erbt ihn später niemand.
 
-**Zwei Regeln, beide entschieden:**
+**Zwei Auslöser, beide entschieden:**
 
 1. **Absolut** – eine Schwelle je offener Absicht. Das Feld bleibt **leer**, nie vorbelegt
    (Abschnitt 3): 29 der 41 Reihen auf der Wunschliste stehen schon unter 15 €, eine globale
@@ -89,6 +93,22 @@ Zeitpunkt, an dem sich etwas ändern kann, er kennt den neuen Punkt schon, und �
 Nebenwirkung gehört an den Schritt, nicht an seinen Auslöser" (CLAUDE.md). Das Wartungsfenster
 trägt keinen 16. Schritt ([10.1](10-1-cron.md)).
 
+**Wie eine Meldung lebt** (Entscheidung des Nutzers vom 11.10.2026):
+
+- **Quittiert wird durch Antippen.** Ohne Quittung stünde dasselbe Tief jede Nacht erneut da.
+- **Keine Sperrfrist, sondern höchstens eine offene Meldung je Reihe.** Ein tieferes Tief
+  **aktualisiert** die offene Meldung, statt eine zweite anzulegen – ein Preis, der in drei
+  Nächten dreimal fällt, meldet einmal mit dem tiefsten Stand. Das ist die Antwort auf
+  dieselbe Frage, die eine Sperrfrist lösen sollte, ohne eine Frist zu erfinden, die niemand
+  gemessen hat.
+- **Die absolute Schwelle meldet beim Unterschreiten** und wird erst wieder scharf, wenn der
+  Preis über die Schwelle zurückgeht. Sonst meldete ein Eintrag, der dauerhaft darunter
+  liegt, jede Nacht.
+- **Stammt ein gemeldetes Tief aus einem später verworfenen Angebot (20h), entfällt die
+  Meldung** – mit `price_snapshot.ebay_item_id` ist der Punkt eindeutig. **Der danach tiefste
+  Punkt löst keine neue aus:** Er stand schon da, als der Nutzer das Angebot verwarf, und eine
+  Korrektur soll nichts Neues melden.
+
 **Offen, ausdrücklich:**
 
 - **Die relative Regel** („20 % unter dem 30-Tage-Median") ist **nicht entschieden** und
@@ -97,16 +117,6 @@ trägt keinen 16. Schritt ([10.1](10-1-cron.md)).
   des Preises – geschrieben wird nur bei Änderung, also wiegen Tage mit Bewegung schwerer.
   Richtig gerechnet braucht es eine Treppenfunktion (letzten Wert fortschreiben) oder eine
   bewusst in Kauf genommene Verzerrung.
-- **Ob `unbekannt` ohne jede Gebrauchtreihe in den Store-Zweig fällt.** Tendenz des Nutzers
-  vom 09.10.2026: **ja, Store-Zweig.** Es betrifft 12 der 60 offenen Einträge: Sie haben
-  keine Gebrauchtreihe – deshalb sind sie unbekannt, eBay kennt dort nichts –, aber alle zwölf
-  haben einen Store-Preis. „Beide anzeigen, nicht alarmieren" heißt dort also, dass der
-  einzige vorhandene Kanal nichts auslöst. Entschieden wird es, wenn 20g geplant wird.
-- **Quittierung und Sperrfrist.** Ohne Quittung stünde dasselbe Tief jede Nacht erneut da;
-  ohne Sperrfrist meldet ein Preis, der in drei Nächten dreimal fällt, dreimal. Hängt am
-  Entwurf der Glocke.
-- **Ob ein Allzeittief aus einem später verworfenen Angebot (20h) seine Meldung rückwirkend
-  verliert.** Technisch trägt es: Mit `price_snapshot.ebay_item_id` ist der Punkt eindeutig.
 
 #### Offen, bevor der grosse Wunschlisten-Import kommt
 
