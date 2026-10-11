@@ -508,6 +508,25 @@ gebaut – beides wäre in keinem Test aufgefallen.
 
 ---
 
+## Zweimal dieselbe Korrektur von Hand ist ein Muster
+
+**11.10.2026 – „ich habe gleich mehrfach verworfen".** Stufe 20h war seit
+einer Stunde live, als der Nutzer das nebenbei erwähnte. Beide Angebote, die
+er verworfen hatte, trugen „Nur Disc" im Titel. Erst diese Bemerkung war der
+Anlass, den Bestand zu durchsuchen – dort standen **9 von 355 Angeboten
+(2,5 %)** mit demselben Muster, alle im Marktkanal. Die Zahl war vom ersten
+Tag an messbar; gefehlt hat nicht die Messung, sondern der Anlass.
+
+Daraus wurde 20h-b, und dabei zeigte sich, dass die naheliegende Lösung
+falsch gewesen wäre: „Nur Disc" in `KEIN_DATENTRAEGER` hätte auch den
+Disc-Nachweis gekostet – eine lose Disc belegt die Disc-Fassung besonders
+gut. Zwei Listen und zwei Antworten statt einer.
+
+→ Regel: Eine Korrektur, die der Nutzer zweimal von Hand vornimmt, ist ein
+Befund und wird gemessen.
+
+---
+
 ## Ein Bauplan ist eine Behauptung über den Code
 
 **11.10.2026 – „ist schon die eine Stelle für alle vier Vorkommen".** So stand es

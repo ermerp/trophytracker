@@ -129,7 +129,11 @@ Cron-Fenster dazu), oder ob er auf zwei Tage geht (dann halbiert sich die Punktd
 Leerlauf einer Nacht ist 80 784, die arbeitenden Aufrufe erklären rund 60 000 weitere
 (`markt` 24 × 940 – seit 20h 1 000 –, `store` 10 × 791, `jahre` 18 060) – der Rest ist **nicht erklärt**. Das
 Fenster ist rollierend und enthielt einen Arbeitstag mit Deploy-Prüfungen; das ist eine
-Vermutung, keine Messung. Gehört einmal eigens angesehen, blockiert aber keine Teilstufe.
+Vermutung, keine Messung – und **eine, die am 11.10.2026 nicht trug:** An dem Tag liefen zwei
+Deploys samt Produktionsprüfungen, und der Zähler stand bei **282 512**. Deploy-Betrieb allein
+erklärt die Million also nicht; näher liegt die Messsitzung des 09.10. selbst, die über sechs
+Tage Preisverlauf und alle Releases gelesen hat. Gehört einmal eigens angesehen, blockiert
+aber keine Teilstufe.
 
 **Die fünf finalen Stufen** – die Sammlung finalisieren, Oberfläche, Refactoring
 (abgetragen), Wiederherstellungsprobe, Außendarstellung – stehen in
