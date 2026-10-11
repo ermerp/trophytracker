@@ -134,6 +134,13 @@ SQLite, dass die nackten Spalten aus eben dieser Zeile stammen; ein zweites Aggr
 verfälscht die Treppe still (nachgewiesen am 11.10.2026, indem der Defekt absichtlich
 eingebaut wurde).
 
+**Angetippt wird die Kurve, nicht der Punkt** (Rückmeldung des Nutzers vom 11.10.2026): Ein
+Tippen in die Fläche wählt die **nächstliegende** Reihe an dieser Stelle und setzt ihren Preis
+und ihr Datum in die Wertzeile. Ein Trefferfeld je Punkt wäre 3,5 px breit gewesen, und ein
+Trefferfeld je Stufe hätte die dichtere der beiden Gebrauchtreihen verdeckt – bei *Assassin's
+Creed Odyssey* liegen Händler und Markt an drei Tagen exakt übereinander. Die Stufen bleiben
+als **Tastaturziele** erreichbar, je Stufe der Zeitraum, in dem der Preis galt.
+
 **Ein Diagramm je Kanal, übereinander**, mit gemeinsamer Zeit- und eigener Preisachse. Mit
 einer gemeinsamen Preisachse wurden Händler und Markt zu einem flachen Strich am unteren Rand,
 sobald der Store weit darüber liegt (12,16 € gegen 69,99 € bei *Tales of Arise*) – im

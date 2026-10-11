@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { alsDatum, anfrage, datumMitJahr, euro, kurzesDatum } from '../api'
 import { Zeichen } from '../Symbole'
 
@@ -76,6 +76,20 @@ function masse(punkte: Punkt[], breite: number, x0: number, x1: number, mitZeita
   }
 }
 
+/**
+ * Die Stufe EINES Punkts: der senkrechte Anstieg auf seinen Preis und die
+ * Waagerechte, solange er gilt – bis zum nächsten Punkt, sonst bis heute.
+ * Das ist zugleich sein Trefferfeld: Angeklickt wird die Linie, nicht der
+ * Punkt (Rückmeldung des Nutzers vom 11.10.2026).
+ */
+function stufe(punkte: Punkt[], i: number, m: Masse, x1: number) {
+  const p = punkte[i]
+  const x = m.x(zeit(p.stand))
+  const bis = i + 1 < punkte.length ? m.x(zeit(punkte[i + 1].stand)) : m.x(x1)
+  const vorher = i > 0 ? m.y(punkte[i - 1].preisCents) : m.y(p.preisCents)
+  return `M ${x.toFixed(1)} ${vorher.toFixed(1)} V ${m.y(p.preisCents).toFixed(1)} H ${bis.toFixed(1)}`
+}
+
 /** Waagerecht bis zum neuen Datum, dann senkrecht auf den neuen Preis – und zuletzt bis heute. */
 function treppe(punkte: Punkt[], m: Masse, x1: number) {
   let d = `M ${m.x(zeit(punkte[0].stand)).toFixed(1)} ${m.y(punkte[0].preisCents).toFixed(1)}`
@@ -83,6 +97,36 @@ function treppe(punkte: Punkt[], m: Masse, x1: number) {
     d += ` H ${m.x(zeit(p.stand)).toFixed(1)} V ${m.y(p.preisCents).toFixed(1)}`
   }
   return d + ` H ${m.x(x1).toFixed(1)}`
+}
+
+/**
+ * Welcher Punkt zu einem Tippen gehoert: In jeder Reihe die Stufe suchen, die
+ * den Zeitpunkt enthaelt, und davon die naechste nehmen.
+ *
+ * Warum nicht einfach ein Trefferfeld je Stufe: Haendler und Markt liegen oft
+ * dicht beieinander und bei *Assassin's Creed Odyssey* an drei Tagen exakt
+ * uebereinander - ein 20 px breiter Strich der einen Reihe verdeckt die
+ * andere dann vollstaendig. So gewinnt immer die Kurve, die naeher liegt, und
+ * die ganze Flaeche ist antippbar statt nur die Linie selbst.
+ */
+function naechsterPunkt(punkte: Punkt[], reihen: Reihe[], m: Masse, zx: number, zy: number) {
+  let beste: Punkt | null = null
+  let abstand = Infinity
+  for (const reihe of reihen) {
+    const eigene = punkte
+      .filter((p) => p.reihe === reihe)
+      .sort((a, b) => zeit(a.stand) - zeit(b.stand))
+    // Die letzte Stufe, die bei oder vor dem getippten Zeitpunkt beginnt;
+    // links vom ersten Punkt gilt der erste.
+    let treffer = eigene[0]
+    for (const p of eigene) if (m.x(zeit(p.stand)) <= zx) treffer = p
+    const d = Math.abs(m.y(treffer.preisCents) - zy)
+    if (d < abstand) {
+      abstand = d
+      beste = treffer
+    }
+  }
+  return beste
 }
 
 function Diagramm({
@@ -134,7 +178,7 @@ function Diagramm({
         return (
           <g key={reihe} className={`r-${reihe}`}>
             <path className="treppe" d={treppe(eigene, m, x1)} />
-            {eigene.map((p) => (
+            {eigene.map((p, i) => (
               <g key={p.stand}>
                 <circle
                   className={gewaehlt === p ? 'punkt gewaehlt' : 'punkt'}
@@ -142,17 +186,16 @@ function Diagramm({
                   cy={m.y(p.preisCents)}
                   r={3.5}
                 />
-                {/* Eigenes Trefferfeld um den Punkt: 3,5 px wären auf dem
-                    Handy nicht zu treffen. */}
-                <circle
+                {/* Die Stufe ist das TASTATURZIEL – der Zeitraum, in dem der
+                    Preis galt, nicht der 3,5 px breite Punkt. Das Zeigen
+                    uebernimmt die Flaeche darueber, deshalb nimmt dieser
+                    Pfad keine Mausereignisse an. */}
+                <path
                   className="ziel"
-                  cx={m.x(zeit(p.stand))}
-                  cy={m.y(p.preisCents)}
-                  r={13}
+                  d={stufe(eigene, i, m, x1)}
                   role="button"
                   tabIndex={0}
                   aria-label={`${NAME[p.reihe]} ${datumMitJahr(p.stand)}: ${euro(p.preisCents)}`}
-                  onClick={() => onWaehlen(p)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
@@ -165,6 +208,27 @@ function Diagramm({
           </g>
         )
       })}
+      {/* Zuletzt und ueber allem: die Flaeche, die das Tippen aufnimmt. */}
+      <rect
+        className="waehlflaeche"
+        x={LINKS}
+        y={0}
+        width={Math.max(0, breite - LINKS - RECHTS)}
+        height={m.hoehe}
+        onClick={(e) => {
+          const kasten = e.currentTarget.ownerSVGElement?.getBoundingClientRect()
+          if (!kasten || kasten.width === 0) return
+          const faktor = breite / kasten.width
+          const gewaehlter = naechsterPunkt(
+            punkte,
+            reihen,
+            m,
+            (e.clientX - kasten.left) * faktor,
+            (e.clientY - kasten.top) * faktor,
+          )
+          if (gewaehlter) onWaehlen(gewaehlter)
+        }}
+      />
     </svg>
   )
 }
@@ -199,7 +263,6 @@ export function Preisverlauf({ releaseId }: { releaseId: number }) {
     return () => beobachter.disconnect()
   }, [offen, daten])
 
-  useEffect(() => setGewaehlt(null), [releaseId])
 
   const punkte = daten?.punkte ?? []
   const kanaele = [...new Set(punkte.map((p) => KANAL[p.reihe]))]
