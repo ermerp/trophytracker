@@ -2,13 +2,13 @@
 
 ## 16. Umsetzungsreihenfolge – die offenen Teile von Stufe 20
 
-Drei Teile standen offen, einer davon (20h) ist gebaut. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
+Drei Teile standen offen, zwei davon (20h und 20f) sind gebaut. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
 Messung von sechs vollständigen Tagen im täglichen Takt; was trotzdem offen bleibt, steht
 unten ausdrücklich als offen.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 09.10.2026): **20h**, dann **20f**, dann
 **20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
-20h ist am 11.10.2026 abgenommen; **als Nächstes 20f**.
+20h und 20f sind am 11.10.2026 gebaut; **als Nächstes 20g**.
 
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 
@@ -28,32 +28,30 @@ nur im Spieldetail. Dazu eine dritte, technische: Die Routen heißen `/api/sync/
 **Was das Rückgängig nicht kann**, steht in [6](06-marktdaten.md): Ist das verworfene Angebot
 inzwischen verkauft, holt es auch die Rücknahme nicht zurück.
 
-#### 20f – Preisverlauf als Diagramm
+#### 20f – Preisverlauf als Diagramm (**abgeschlossen am 11.10.2026**)
 
-**Preisverlauf als Diagramm** (wie Idealo oder SteamDB), zwei getrennte Reihen je Release — die ruhige Händlerkurve und die springende Marktkurve; der Store-Preis ist seit Stufe 21 der dritte Kanal, der nach Abschnitt 6 **nie** mit dem Gebrauchtpreis verrechnet werden darf.
+Je Release ein Diagramm im Spieldetail, zugeklappt, mit drei getrennten Reihen – Händler,
+Markt, Store –, die nach Abschnitt 6 nie verrechnet werden. Gebaut ohne Migration: Die
+Leseroute trägt `idx_price_release`, und die Verdichtung beim Lesen braucht keine neue Spalte.
+**Der Stand steht in [6](06-marktdaten.md), [12](12-api-routen-extern-und-sync.md) und
+[13.1](13-1-ansichten.md)**; der Bauplan ist damit aufgegangen und entfallen.
 
-**Gebraucht wird dafür erst eine Leseroute:** `price_snapshot` wird heute nur geschrieben (`src/db/store.ts`, `src/db/markt.ts`) und exportiert – keine Route liest es. Der Routenkatalog in [12](12-api-routen-extern-und-sync.md) führt sie deshalb nicht; sie kommt mit dieser Stufe dazu. Sie **filtert die Punkte verworfener Angebote aus** (20h) – das ist die Bedingung beim Lesen, die dort an die Stelle eines Löschens tritt.
+**Vier Entscheidungen des Nutzers vom 11.10.2026**: Inline-SVG statt einer Diagramm-Bibliothek;
+die Reihen als **Treppe**, deren letzte Stufe bis heute läuft; **Antippen** statt Hover, weil
+es auf dem Handy keines gibt; und Farbsatz **ohne Gold** – der Akzent bleibt Favoritenstern,
+100 % und Platin.
 
-**Verdichtet wird nur beim Lesen** (Entscheidung des Nutzers vom 09.10.2026). Der Bestand
-bleibt vollständig; die Leseroute liefert je Reihe höchstens rund 120 Punkte – tageweise im
-nahen Bereich, wochenweise weiter hinten, gerechnet in SQL. Begründung und Zahlen:
-
-- Ein Diagramm auf 360 px kann keine 365 Punkte zeigen; die Verdichtung beim Lesen löst
-  **das** Problem, das 20f tatsächlich hat.
-- Der Speicher ist das kleinere Problem: **7,3 MB im Jahr** gegen 2,2 MB mit Verdichtung beim
-  Schreiben ([6](06-marktdaten.md)). Für D1 ist beides belanglos; es zählt, dass der
-  wöchentliche Dump den Zuwachs dauerhaft in die Historie des Backup-Repositorys trägt
-  ([14.2](14-backup-export.md)).
-- Verdichten beim Schreiben ist **jederzeit nachholbar** und die einzige der drei Varianten,
-  die Daten unumkehrbar vernichtet. Sie hätte heute auf sechs Tagen Messung entschieden
-  werden müssen und bräuchte einen täglichen Cron-Schritt dort, wo das Wartungsfenster am
-  engsten ist ([10.1](10-1-cron.md)), plus einen Index auf `captured_at`.
+**Zwei Befunde aus dem Prototyp**, die der Bauplan nicht hatte: Eine gemeinsame Preisachse
+quetscht Händler und Markt platt, sobald der Store weit darüber liegt – es gibt deshalb **ein
+Diagramm je Kanal**; und am Desktop braucht die Fläche mehr Höhe (120 statt 84 px), sonst läuft
+die Treppe als flacher Strich durch die Breite.
 
 **Offen, ausdrücklich:** Die Verdichtung **beim Schreiben** wird **im Januar 2027 neu
-aufgerufen** – dann liegen rund zehnmal so viele Punkte vor. Vorschlag war „Tageswerte 90
-Tage, danach ein Wert je Woche"; zur zweiten Frage, welcher Wert je Woche überlebt (Minimum,
-Median, letzter), ist nichts entschieden. Kommt sie, gehört sie in ein **drittes
-Cron-Fenster** – drei der fünf erlaubten Einträge sind frei.
+aufgerufen** – dann liegen rund zehnmal so viele Punkte vor, und erst dann greift überhaupt die
+Wochenstufe der Leseverdichtung. Vorschlag war „Tageswerte 90 Tage, danach ein Wert je Woche";
+zur zweiten Frage, welcher Wert je Woche überlebt (Minimum, Median, letzter), ist nichts
+entschieden. Kommt sie, gehört sie in ein **drittes Cron-Fenster** – drei der fünf erlaubten
+Einträge sind frei.
 
 #### 20g – Preisalarm
 

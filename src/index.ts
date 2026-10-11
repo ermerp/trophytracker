@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { deviationRoutes } from "./api/deviations";
 import { eventRoutes } from "./api/events";
-import { feedRoutes, releaseTrophaeenRoutes } from "./api/feed";
+import { feedRoutes, releasePreiseRoutes, releaseTrophaeenRoutes } from "./api/feed";
 import { backupRoutes, exportRoutes } from "./api/export";
 import { digitalEntitlementRoutes, physicalCopyRoutes } from "./api/ownership";
 import { igdbRoutes, unmatchedRoutes } from "./api/igdb";
@@ -72,6 +72,7 @@ export function createApp(
 	app.route("/api/trophies", trophyRoutes);
 	app.route("/api/feed", feedRoutes);
 	app.route("/api/releases", releaseTrophaeenRoutes);
+	app.route("/api/releases", releasePreiseRoutes);
 	app.route("/api/zuordnung", zuordnungRoutes);
 	app.route("/api/games", gameRoutes);
 	app.route("/api/releases", releaseRoutes);

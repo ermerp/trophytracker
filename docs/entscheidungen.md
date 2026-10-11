@@ -216,3 +216,12 @@ Was in 20f und 20g noch offen ist, steht dort: [16.2](spec/16-2-offene-stufen.md
 | 11.10.2026 | **Die Rücknahme steht im Punktmenü aller vier Ansichten**, nicht als Zusatzzeile nur im Spieldetail (so der Bauplan). Das Menü gibt es überall schon; eine fünfte Angabe in einer Zeile, die auf 360 px voll ist, hätte es nicht gegeben | [7.3](spec/07-3-ebay.md) |
 | 11.10.2026 | **Ein loser Datenträger wird automatisch übergangen – aber nur beim Preis.** Nicht in `KEIN_DATENTRAEGER` aufnehmen: Das hätte auch den Disc-Nachweis gekostet, und eine lose Disc belegt die Disc-Fassung besonders gut. Stattdessen zwei Antworten aus `guenstigstesGeprueft` | [7.3](spec/07-3-ebay.md) |
 | 11.10.2026 | **Die Sperrliste trägt `titel` und `preis_cents` mit.** Ohne sie könnte die Rücknahme nur eine Zahl nennen – die eBay-Kennung allein ist nicht lesbar, und „zurücknehmen", ohne zu sagen, was zurückkommt, ist keine Korrektur | [6](spec/06-marktdaten.md) |
+
+## Stufe 20f, 11.10.2026 – vier Entscheidungen zum Preisverlauf
+
+| Datum | Entscheidung | Abschnitt |
+|---|---|---|
+| 11.10.2026 | **Inline-SVG statt einer Diagramm-Bibliothek.** Der Umfang ist klein (drei Reihen, nach einem Jahr rund 130 Punkte, kein Zoom), und eine Canvas-Bibliothek kennt keine CSS-Variablen – die Tokenfarben müssten über `getComputedStyle` ausgelesen werden | [6](spec/06-marktdaten.md) |
+| 11.10.2026 | **Die Reihen werden als Treppe gezeichnet, nicht als Linie von Punkt zu Punkt.** Geschrieben wird nur bei Änderung; dazwischen gilt der alte Preis weiter, und die letzte Stufe läuft bis heute | [6](spec/06-marktdaten.md) |
+| 11.10.2026 | **Antippen eines Punkts zeigt Preis und Datum** – auf dem Handy gibt es kein Hover. Der Wert steht in einer festen Zeile über dem Diagramm, nicht in einer schwebenden Tafel | [13.1](spec/13-1-ansichten.md) |
+| 11.10.2026 | **Farbsatz ohne Gold** (Händler hellblau, Markt grün, Store violett). Gold ist der einzige Akzent und gehört Favoritenstern, 100 % und Platin – nicht einer Preisreihe | [13.3](spec/13-3-gestaltung-und-pwa.md) |

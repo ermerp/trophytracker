@@ -433,6 +433,134 @@
 
 /* --- Desktop: Releases nebeneinander, Verlauf daneben --- */
 
+/* --- Preisverlauf (Stufe 20f) --------------------------------------------
+   Ein Diagramm je Kanal, übereinander, mit gemeinsamer Zeit- und eigener
+   Preisachse. Die Reihenfarbe steht EINMAL je Reihe als `color`; Strich und
+   Punktfläche nehmen sie über `currentColor`. Im Prototyp stand sie auf
+   `stroke` und `fill` zugleich – dann gewinnt die Füllung gegen das
+   `fill: none` der Treppe, und aus der Kurve wird eine Fläche. */
+
+.preisverlauf {
+  margin-top: var(--a3);
+  padding-top: var(--a3);
+  border-top: 1px solid var(--linie);
+}
+
+.preisverlauf .wertzeile {
+  display: flex;
+  align-items: baseline;
+  gap: var(--a2);
+  margin: 0 0 var(--a1);
+  min-height: 1.5rem;
+}
+
+.preisverlauf .wertzeile .preis {
+  font-family: var(--schrift-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.preisverlauf .wertzeile .reihename {
+  font-size: 0.8rem;
+}
+
+.preisverlauf .wertzeile .wann {
+  color: var(--text-still);
+  font-size: 0.8rem;
+}
+
+.preisverlauf .kanalname {
+  margin: var(--a2) 0 0;
+  font-family: var(--schrift-display);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+.preissvg {
+  display: block;
+  width: 100%;
+}
+
+.preissvg .netz {
+  stroke: var(--linie);
+  stroke-width: 1;
+}
+
+.preissvg .achse {
+  fill: var(--text-still);
+  font-family: var(--schrift);
+  font-size: 0.65rem;
+}
+
+.preissvg .treppe {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.preissvg .punkt {
+  fill: currentColor;
+  stroke: var(--flaeche);
+  stroke-width: 1.5;
+}
+
+.preissvg .punkt.gewaehlt {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+/* Das Trefferfeld ist unsichtbar und deutlich größer als der Punkt. */
+.preissvg .ziel {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.preissvg .ziel:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.preislegende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a1) var(--a3);
+  list-style: none;
+  padding: 0;
+  margin: var(--a2) 0 0;
+}
+
+.preislegende li {
+  display: flex;
+  align-items: center;
+  gap: var(--a1);
+  font-size: 0.75rem;
+}
+
+.preislegende i {
+  width: 0.75rem;
+  border-top: 2px solid currentColor;
+}
+
+/* Gold bleibt frei (Entscheidung des Nutzers vom 11.10.2026): Der Akzent
+   gehört Favoritenstern, 100 % und Platin, nicht einer Preisreihe. */
+.preisverlauf .r-haendler {
+  color: var(--troph-platin);
+}
+
+.preisverlauf .r-markt {
+  color: var(--st-am_spielen);
+}
+
+.preisverlauf .r-store {
+  color: var(--st-unentschieden);
+}
+
 @media (min-width: 48rem) {
   .detail {
     max-width: 62rem;
