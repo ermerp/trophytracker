@@ -119,13 +119,37 @@ auch den Leerlauf – 12 von 36 Wartungsaufrufen am 10.10., 35 am 11.10. (dort s
 PSN-Fenster), 15 bis 33 an jedem Tag danach. Am 16.10. lief es von 08:05 an wieder. Ausgelöst
 wurde jeder Aufruf; es fehlte keiner.
 
+**Wohin die CPU geht** – gemessen am 16.10.2026 in einem eigenen Messworker ohne Produktionsdaten
+(Stufe 18h): der echte Code der Anwendung, einmal mit abgespielten D1-Antworten, einmal gegen
+eine Wegwerf-D1 mit dem Produktionsschema und nachgebautem Bestand in Produktionsgröße.
+**Nicht das Rechnen ist teuer, sondern der D1-Aufruf:**
+
+| | ohne D1 | mit echter D1 | Produktion | D1-Aufrufe |
+|---|---|---|---|---|
+| Leerlauf Wartung | 1,0 ms | 6,8 ms | 12–18 ms | 10 |
+| Leerlauf PSN | 1,2 ms | 7,5 ms | 15–20 ms | 16 |
+| Spielzeit, 200 Titel | 6,3 ms | 170 ms | 200–250 ms | 217 |
+| Gebrauchtpreise, 20 Releases | 34 ms | 94 ms | 125–170 ms | 24 |
+
+Eine einfache Abfrage kostet **0,35–0,45 ms**, eine des echten Codes rund **0,7 ms**; je
+zurückgegebener Zeile ≈ 0,001 ms (1 000 Zeilen in einer Abfrage: 2,3 ms). **Ein Batch mit 100
+Anweisungen kostet 1,9–2,5 ms**, 100 einzelne Abfragen 35–45 – je Anweisung ein Zwanzigstel. Start
+der Instanz, Scheduled-Einstieg und Observability fallen nicht ins Gewicht: Ein kalter Cron-Aufruf
+mit dem vollen Bündel und einem `INSERT` kostet 1,6 ms (P50), das Laden des Bündels 0,57 ms, und mit
+eingeschalteter Observability kosten 100 Abfragen 46 statt 45 ms. Netz: Eine Antwort von 73 KB
+am Stück (`.text()`) kostet ≈ 0,4 ms, **als Strom gelesen ≈ 3 ms** – so liest der Store seine
+Seiten. **Der Marktschritt ist der einzige, bei dem auch das Rechnen zählt** (34 von 94 ms): Ein lokales Profil (Node, echte Titel, nachgebaute eBay-Antworten von 30 KiB) legt es in die Titelzerlegung (`worteAus`, 30–40 % Eigenzeit), den Sammlungsabgleich (rund 20 %) und das JSON-Parsen (rund 15 %). Die verbleibende Lücke zur Produktion (rund ein Drittel) ist nicht zugeordnet; echte
+Fremdantworten (eBay, Sony) fehlten in der Messung.
+
+**Keine warme Instanz:** Von 28 Cron-Aufrufen im Minutentakt traf **keiner** eine Instanz, die
+schon einen Aufruf hinter sich hatte. Etwas auf Modulebene zwischen Cron-Aufrufen zu halten –
+etwa die vorbereitete Sammlung des Marktschritts – bringt deshalb nichts; im Fünf-Minuten-Takt
+der Produktion erst recht nicht.
+
 **Ungeklärt:** warum der Gebrauchtpreis-Aufruf am 10.10. um 07:00 von rund 70 auf rund 140 ms
 sprang – an dem Tag gab es keinen Deploy; am 13.10. kosteten die frühen Aufrufe 68 ms, die späten
-138. Ein lokales Profil (Node, echte Titel, nachgebaute eBay-Antworten von 30 KiB) legt die Zeit
-in die Titelzerlegung (`worteAus`, 30–40 % Eigenzeit) und den Sammlungsabgleich (rund 20 %), das
-JSON-Parsen in rund 15 %. **Ob der Free Tier mit kleineren Portionen trägt** und welche Schritte
-sich nicht unter 10 ms bringen lassen, ist offen ([16.2](16-2-offene-stufen.md)); der Bezahlplan
-ist ausgeschlossen (Entscheidung des Nutzers vom 16.10.2026).
+138. Was daraus für jeden Schritt folgt und was zu entscheiden ist: [16.2](16-2-offene-stufen.md).
+Der Bezahlplan ist ausgeschlossen (Entscheidung des Nutzers vom 16.10.2026).
 
 Seit Stufe 18g hinterlässt ein so abgebrochener Aufruf eine Spur – die Marke „begonnen",
 [10-1-cron-verlauf.md](10-1-cron-verlauf.md).
