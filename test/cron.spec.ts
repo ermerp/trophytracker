@@ -2,7 +2,9 @@ import { env } from "cloudflare:test";
 import { storeOhne } from "./store-fake";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createRepositories } from "../src/db";
-import { haengerMeldung } from "../src/db/sync";
+import { haengerMeldung, verdichte, VERWAIST_NACH_MS } from "../src/db/sync";
+import { createScheduled } from "../src/index";
+import { createExecutionContext } from "cloudflare:test";
 // Als Text eingebettet: Der Workers-Test-Runtime hat kein Dateisystem.
 import wranglerRoh from "../wrangler.jsonc?raw";
 import { erstelleEbayClient } from "../src/ebay/client";
@@ -22,6 +24,7 @@ import {
 	ROHANTWORTEN_LAEUFE,
 } from "../src/sync/cron";
 import { FEHLVERSUCHE_HOECHSTENS } from "../src/sync/run";
+import { fakeEbay } from "./ebay-fake";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
 import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophaeenRegeln, trophySeite } from "./psn-fake";
 
@@ -195,7 +198,7 @@ beforeEach(async () => {
 	await env.DB.batch([
 		env.DB.prepare("DELETE FROM game_event"),
 		// Der Verlauf lebt in app_setting und ueberdauert sonst den Test.
-		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'psn_spielzeit_stand', 'psn_besitz_stand')"),
+		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_begonnen', 'trophaeen_jahre', 'psn_spielzeit_stand', 'psn_besitz_stand')"),
 		env.DB.prepare("DELETE FROM psn_raw_response"),
 		env.DB.prepare("DELETE FROM psn_sync_run"),
 		env.DB.prepare("DELETE FROM psn_credentials"),
@@ -608,6 +611,172 @@ describe("cronSchritt", () => {
 		expect(await r.sync.cronVerlauf()).toEqual(["2026-09-27 03:00–03:10 cron: sync ×3 sync=laufend/abruf offset=200"]);
 	});
 
+	describe("Marke begonnen (Stufe 18g)", () => {
+		const um = (minuten: number) => new Date(Date.parse("2026-10-16T06:30:00Z") + minuten * 60_000);
+		const marke = async () =>
+			(await env.DB.prepare("SELECT value FROM app_setting WHERE key = 'cron_begonnen'").first<{ value: string }>())?.value ?? null;
+
+		it("ein Aufruf mit Ausgang nimmt seine Marke wieder weg", async () => {
+			const r = repos();
+			const m = await r.sync.cronBeginnen(um(0), "wartung");
+			expect(await marke()).toBe(m.wert);
+			await r.sync.cronAusgangVermerken("2026-10-16 06:30", "cron: nichts bereich=wartung", m);
+
+			expect(await marke()).toBeNull();
+			expect(await r.sync.cronVerlauf()).toEqual(["2026-10-16 06:30 cron: nichts bereich=wartung"]);
+		});
+
+		it("der naechste regulaere Aufruf meldet einen Aufruf ohne Ausgang - unter seiner eigenen Zeile", async () => {
+			const r = repos();
+			await r.sync.cronAusgangVermerken("2026-10-16 06:25", "cron: markt bereich=wartung geprueft=20");
+			await r.sync.cronBeginnen(um(0), "wartung"); // stirbt an der CPU-Grenze
+
+			const m = await r.sync.cronBeginnen(um(5), "wartung");
+			expect(m.verwaist).toEqual({ anzahl: 1, von: "2026-10-16 06:30", bis: "2026-10-16 06:30", bereich: "wartung" });
+			await r.sync.cronAusgangVermerken("2026-10-16 06:35", "cron: markt bereich=wartung geprueft=20", m);
+
+			// Die beiden Marktzeilen werden NICHT verdichtet: Zwischen ihnen
+			// liegt ein Aufruf, und genau den darf keine Zeile verschlucken.
+			expect(await r.sync.cronVerlauf()).toEqual([
+				"2026-10-16 06:35 cron: markt bereich=wartung geprueft=20",
+				"2026-10-16 06:30 cron: ohne_ausgang bereich=wartung",
+				"2026-10-16 06:25 cron: markt bereich=wartung geprueft=20",
+			]);
+			expect(await marke()).toBeNull();
+		});
+
+		it("die doppelte Ausloesung eine Minute spaeter ist kein Aufruf ohne Ausgang", async () => {
+			const r = repos();
+			const erster = await r.sync.cronBeginnen(um(0), "psn");
+			const zweiter = await r.sync.cronBeginnen(um(1), "psn");
+			expect(zweiter.verwaist).toBeNull();
+
+			// Der erste endet zuerst und darf die Marke des zweiten nicht wegnehmen.
+			await r.sync.cronAusgangVermerken("2026-10-16 06:30", "cron: nichts bereich=psn", erster);
+			expect(await marke()).toBe(zweiter.wert);
+			await r.sync.cronAusgangVermerken("2026-10-16 06:31", "cron: nichts bereich=psn", zweiter);
+
+			expect(await marke()).toBeNull();
+			expect((await r.sync.cronVerlauf()).join("\n")).not.toContain("ohne_ausgang");
+		});
+
+		it("die Grenze liegt bei zwei Minuten", async () => {
+			const r = repos();
+			await r.sync.cronBeginnen(um(0), "wartung");
+			const knapp = await r.sync.cronBeginnen(new Date(um(0).getTime() + VERWAIST_NACH_MS - 1), "wartung");
+			expect(knapp.verwaist).toBeNull();
+
+			await env.DB.prepare("DELETE FROM app_setting WHERE key = 'cron_begonnen'").run();
+			await r.sync.cronBeginnen(um(0), "wartung");
+			const genau = await r.sync.cronBeginnen(new Date(um(0).getTime() + VERWAIST_NACH_MS), "wartung");
+			expect(genau.verwaist?.anzahl).toBe(1);
+		});
+
+		it("eine Kette toter Aufrufe erscheint als eine Zeile mit ihrer Zahl, nicht als einer", async () => {
+			// Solange die CPU-Grenze greift, stirbt auch der Aufruf, der melden
+			// wuerde - die Marke traegt die Kette weiter (der 16.10.2026: 18
+			// Aufrufe von 06:30 bis 08:00).
+			const r = repos();
+			for (let i = 0; i < 3; i++) await r.sync.cronBeginnen(um(i * 5), "wartung");
+			const m = await r.sync.cronBeginnen(um(15), "wartung");
+			await r.sync.cronAusgangVermerken("2026-10-16 06:45", "cron: nichts bereich=wartung", m);
+
+			expect(await r.sync.cronVerlauf()).toEqual([
+				"2026-10-16 06:45 cron: nichts bereich=wartung",
+				"2026-10-16 06:30–06:40 cron: ohne_ausgang ×3 bereich=wartung",
+			]);
+		});
+
+		it("eine Kette ueber die Fenstergrenze nennt beide Bereiche", async () => {
+			const r = repos();
+			await r.sync.cronBeginnen(new Date("2026-10-16T05:55:00Z"), "psn");
+			await r.sync.cronBeginnen(new Date("2026-10-16T06:00:00Z"), "wartung");
+			const m = await r.sync.cronBeginnen(new Date("2026-10-16T06:05:00Z"), "wartung");
+			await r.sync.cronAusgangVermerken("2026-10-16 06:05", "cron: nichts bereich=wartung", m);
+
+			expect((await r.sync.cronVerlauf())[1]).toBe("2026-10-16 05:55–06:00 cron: ohne_ausgang ×2 bereich=psn→wartung");
+		});
+
+		it("ein Absturz mit Ausnahme zaehlt als Ausgang und meldet die Kette mit", async () => {
+			const r = repos();
+			await r.sync.cronBeginnen(um(0), "wartung");
+			const m = await r.sync.cronBeginnen(um(5), "wartung");
+			await r.sync.cronAusgangVermerken("2026-10-16 06:35", "cron: abgebrochen", m);
+
+			expect(await r.sync.cronVerlauf()).toEqual([
+				"2026-10-16 06:35 cron: abgebrochen",
+				"2026-10-16 06:30 cron: ohne_ausgang bereich=wartung",
+			]);
+			expect(await marke()).toBeNull();
+		});
+
+		it("eine Zeile ohne Ausgang wird nie verdichtet, auch nicht mit ihresgleichen", () => {
+			// Ueber den Verlauf erreicht man das nicht - zwischen zwei solchen
+			// Zeilen steht immer ein Ausgang. Die Sperre haelt trotzdem, falls
+			// sich das je aendert: Ein toter Aufruf ist kein Leerlauf.
+			const zeile = (z: string) => `2026-10-16 ${z} cron: ohne_ausgang bereich=wartung`;
+			expect(verdichte(zeile("06:30"), zeile("06:35"))).toBeNull();
+		});
+
+		it("der Einstieg setzt die Marke vor der Arbeit und meldet den toten Vorgaenger", async () => {
+			// Durch `scheduled`, nicht nur durchs Repository: Die Marke nuetzt
+			// nur, wenn der Einstieg sie wirklich als Erstes setzt.
+			await repos().sync.cronBeginnen(new Date(Date.now() - 5 * 60_000), "wartung");
+			const ereignis = { scheduledTime: Date.now(), cron: CRON_WARTUNG, noRetry() {} };
+			await createScheduled(psnStumm, () => igdbOhne(), () => ebayOhne(), () => storeOhne())(ereignis, env, createExecutionContext());
+
+			const verlauf = await repos().sync.cronVerlauf();
+			expect(verlauf).toHaveLength(2);
+			expect(verlauf[0]).toMatch(/ cron: nichts bereich=wartung$/);
+			expect(verlauf[1]).toMatch(/ cron: ohne_ausgang bereich=wartung$/);
+			expect(await marke()).toBeNull();
+		});
+	});
+
+	describe("Reihenfolge der Wartung (Stufe 18g)", () => {
+		it("Tagesarbeiten vor IGDB und Markt - was das Fenster fuellen kann, kommt zuletzt", async () => {
+			// Alles zugleich faellig: eine erspielte Trophaee (Jahre), ein Lauf
+			// zu viel (Aufraeumen), ein Spiel ohne IGDB-Stand (Auffrischen) und
+			// ein Release auf einer offenen Absicht (Markt).
+			await spielMitIgdb(1, 101, null);
+			await env.DB.batch([
+				env.DB.prepare(
+					"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, progress_pct, synced_at) " +
+						"VALUES ('NPWR00001_00', 'trophy', 'Spiel 1', 'PS4', 10, datetime('now'))",
+				),
+				env.DB.prepare(
+					"INSERT INTO trophy (np_communication_id, trophy_id, grade, name, earned, earned_at) " +
+						"VALUES ('NPWR00001_00', 1, 'bronze', 'Erfunden', 1, '2026-10-01T12:00:00Z')",
+				),
+				env.DB.prepare(
+					"INSERT INTO plan_entry (kind, release_id, origin, status) SELECT 'wunsch', id, 'manuell', 'offen' FROM release WHERE game_id = 1",
+				),
+			]);
+			for (let i = 0; i < ROHANTWORTEN_LAEUFE + 1; i++) {
+				const { results } = await env.DB.prepare(
+					"INSERT INTO psn_sync_run (started_at, status, next_offset) VALUES (datetime('now'), 'erfolg', 0) RETURNING id",
+				).all<{ id: number }>();
+				await env.DB.prepare(
+					"INSERT INTO psn_raw_response (sync_run_id, endpoint, payload, fetched_at, normalized_at) VALUES (?, '/x', '[]', datetime('now'), datetime('now'))",
+				)
+					.bind(results[0].id)
+					.run();
+			}
+			const igdb = fakeIgdb([[spielRoh({ id: 101 })]]).client;
+			const ebay = fakeEbay([[]]).client;
+			const schritt = async () =>
+				(await cronSchritt(repos(), psnStumm(), igdb, ebay, storeOhne(), { bereich: "wartung", heute: HEUTE })).getan;
+
+			expect([await schritt(), await schritt(), await schritt(), await schritt(), await schritt()]).toEqual([
+				"jahre",
+				"aufraeumen",
+				"igdb_auffrischen",
+				"markt",
+				"nichts",
+			]);
+		});
+	});
+
 	describe("zwei Fenster (Stufe 18e)", () => {
 		it("die Ausdruecke im Code und in wrangler.jsonc sagen dasselbe", () => {
 			// Vorher standen die Werte hier woertlich - der Test haette eine
@@ -930,7 +1099,7 @@ describe("cronSchritt", () => {
 		expect((await seitenJeLauf()).map((z) => z.sync_run_id)).not.toContain(waise);
 	});
 
-	it("der Cron raeumt auf, wenn sonst nichts zu tun ist - und nur dann", async () => {
+	it("der Cron raeumt auf, solange es etwas zu loeschen gibt - und faellt dann durch", async () => {
 		for (let i = 0; i < ROHANTWORTEN_LAEUFE + 1; i++) await lauf("erfolg", 5, true);
 
 		const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne(), storeOhne());

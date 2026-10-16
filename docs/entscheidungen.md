@@ -235,3 +235,13 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 11.10.2026 | **`unbekannt` ohne Gebrauchtreihe fällt in den Store-Zweig**, und zwar **zur Lesezeit** bestimmt: Sobald eine Gebrauchtreihe besteht oder die Disc-Fassung `ja` ist, gilt der Gebrauchtzweig. So alarmiert ein Eintrag auf dem einzigen Kanal, den er hat, und wechselt von selbst mit – ohne gespeicherte Zuordnung, die veralten könnte | [16.2](spec/16-2-offene-stufen.md) |
 | 11.10.2026 | **Meldungen werden durch Antippen quittiert. Keine Sperrfrist, sondern höchstens eine offene Meldung je Reihe:** Ein tieferes Tief aktualisiert die offene Meldung, statt eine neue anzulegen. Die absolute Schwelle meldet beim Unterschreiten und wird erst wieder scharf, wenn der Preis darüber zurückgeht | [16.2](spec/16-2-offene-stufen.md) |
 | 11.10.2026 | **Stammt ein gemeldetes Tief aus einem später verworfenen Angebot (20h), entfällt die Meldung** – und der danach tiefste Punkt löst **keine** neue aus: Er stand schon da, als verworfen wurde, und eine Korrektur soll nichts Neues melden | [16.2](spec/16-2-offene-stufen.md) |
+
+## Stufe 18g und die CPU-Grenze, 16.10.2026
+
+| Datum | Entscheidung | Abschnitt |
+|---|---|---|
+| 16.10.2026 | **Kein Bezahlplan, die Anwendung bleibt auf dem Free Tier** – auch nachdem gemessen ist, dass kein Cron-Schritt unter 10 ms CPU bleibt | [10.1](spec/10-1-cron.md) |
+| 16.10.2026 | **Die Marke „begonnen" wird unabhängig von der Ursache gebaut:** Sie ändert kein Verhalten, sie macht nur sichtbar, was spurlos verschwindet. **Verwaist ab zwei Minuten** – der nächste reguläre Aufruf kommt nach fünf Minuten und muss sie sicher erkennen, die doppelte Auslösung lag eine Minute auseinander | [10.1](spec/10-1-cron-verlauf.md) |
+| 16.10.2026 | **`offen` in der Marktzeile zählt nur Releases der Auswahl** (gebaut als „in der Auswahl fällig", weil „in der Auswahl ungestempelt" dauerhaft 0 wäre) | [10.1](spec/10-1-cron-schritte.md) |
+| 16.10.2026 | **Erst messen, dann über eine Verlagerung in GitHub Actions entscheiden:** Leerlauf, kleinste Arbeitseinheit je Schritt, Cron je Minute. Gemessen wird in einem **eigenen Worker ohne D1 und ohne Secrets**, nicht als Vorschau-Version des Produktions-Workers (die hätte alle Routen, die Produktions-D1 und alle Secrets, und ob Access die Vorschau-Adressen schützt, ist nicht sicher); Code auf eigenem Branch, der Worker wird danach gelöscht | [16.2](spec/16-2-offene-stufen.md) |
+| 16.10.2026 | **Bestätigt sich der Abgleich als Ursache, richtet sich die Behebung an „Abgleiche bereiten den Bestand einmal vor" aus** – Index einmal je Aufruf statt jedes Angebot gegen alle Spiele –, in einem eigenen Nachtrag | [16.2](spec/16-2-offene-stufen.md) |

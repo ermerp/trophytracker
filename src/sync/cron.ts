@@ -31,8 +31,8 @@ import { eineListe, jahreSchritt, levelSchritt, type ListenErgebnis } from "./tr
  *   aufraeumen, Sync-Schritt, Spielzeit, Kaufliste. Alles, was Sony anfasst,
  *   und damit alles, was viele Aufrufe braucht.
  * - `wartung` (alle fuenf Minuten 06:00-08:59 UTC, 36 Aufrufe): erschienene
- *   Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, alte Rohantworten.
- *   Nichts davon fasst PSN an.
+ *   Titel freigeben, Trophaeen je Jahr, alte Rohantworten, IGDB-Auffrischen,
+ *   Disc-Fassungen, Gebrauchtpreise. Nichts davon fasst PSN an.
  *
  * Der Grund ist gemessen: Eine Nacht mit Kaufliste braucht elf Aufrufe fuer
  * den Sync, zwei fuer die Spielzeit, fuenfzehn fuer die Kaufliste und - nach
@@ -268,7 +268,32 @@ export async function cronSchritt(
 		//    Rechenarbeit und protokolliert selbst.
 		basis.erschienen = await repos.games.erschieneneFreigeben();
 
-		// 7./8. IGDB nur mit Zugang; ohne bleibt es ruhig.
+		// 7./8. Die beiden Tagesarbeiten ZUERST (Stufe 18g): Trophaeen je Jahr
+		//      und das Aufraeumen der Rohantworten. Beide sind einmal am Tag
+		//      mit einem Aufruf erledigt und ruhen danach; sie kosten das
+		//      Fenster also genau zwei Aufrufe. Bis 18g standen sie ganz
+		//      hinten, "damit sie keinen Aufruf belegen, in dem echte Arbeit
+		//      wartet" - das hielt nur, solange der Schritt davor sicher fertig
+		//      wurde. Vom 11. bis 16.10.2026 fuellte der Marktschritt das
+		//      Fenster (und starb an der CPU-Grenze), und beide liefen keinen
+		//      einzigen Tag: Jahre auf dem Stand vom 10.10., neun Laeufe
+		//      Rohantworten statt drei. Regel (10.1): Was einmal am Tag mit
+		//      einem Aufruf erledigt ist, steht vor dem, was das Fenster
+		//      fuellen kann.
+		//
+		//      Jahre: 18 060 gelesene Zeilen sind fuer die Startseite zu teuer
+		//      (Abschnitt 2); hier stoeren sie niemanden, und das Dashboard
+		//      liest danach eine Zeile aus app_setting.
+		const jahre = await jahreSchritt(repos, heute);
+		if (jahre) return { ...basis, getan: "jahre", jahre: jahre.jahre.length };
+
+		//      Aufraeumen: ein einzelnes DELETE ueber einen Index. Es kehrt nur
+		//      zurueck, wenn es etwas geloescht hat - einmal je neuem Lauf -,
+		//      sonst faellt der Aufruf zur naechsten Arbeit durch.
+		const geloescht = await repos.sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE);
+		if (geloescht > 0) return { ...basis, getan: "aufraeumen", geloescht };
+
+		// 9./10. IGDB nur mit Zugang; ohne bleibt es ruhig.
 		//
 		// In try/catch, weil eine Ausnahme hier bisher den ganzen Aufruf riss:
 		// Der Sync lief dann zwar, aber alles danach fiel still aus, und von
@@ -285,12 +310,12 @@ export async function cronSchritt(
 			}
 		}
 
-		// 9. Gebrauchtpreise und Disc-Nachweis aus eBay (7.3, Stufe 20).
-		//    Hier und nicht im PSN-Fenster: Der Schritt fasst Sony nicht an.
-		//    Eigenes try/catch aus demselben Grund wie bei IGDB (18b) - und
-		//    zwanzig Releases sind vierzig Fremdanfragen, also zehn unter den
-		//    50 je Aufruf (Stufe 20e). Vor den beiden billigen Schritten, damit
-		//    die nicht einen Aufruf belegen, in dem noch echte Arbeit wartet.
+		// 11. Gebrauchtpreise und Disc-Nachweis aus eBay (7.3, Stufe 20).
+		//     Hier und nicht im PSN-Fenster: Der Schritt fasst Sony nicht an.
+		//     Eigenes try/catch aus demselben Grund wie bei IGDB (18b) - und
+		//     zwanzig Releases sind vierzig Fremdanfragen, also zehn unter den
+		//     50 je Aufruf (Stufe 20e). Als letzter, weil er als einziger das
+		//     Fenster fuellen kann.
 		if (ebay.konfiguriert()) {
 			try {
 				const markt = await marktSchritt(repos, ebay);
@@ -299,21 +324,6 @@ export async function cronSchritt(
 				return { ...basis, getan: "nichts", meldung: ebayMeldung(fehler) };
 			}
 		}
-
-		// 10. Sonst die Trophäen je Jahr durchrechnen - einmal am Tag, im
-		//     billigen Fenster. 18 060 gelesene Zeilen sind für die Startseite
-		//     zu teuer (Abschnitt 2); hier stören sie niemanden, und das
-		//     Dashboard liest danach eine Zeile aus app_setting.
-		const jahre = await jahreSchritt(repos, heute);
-		if (jahre) return { ...basis, getan: "jahre", jahre: jahre.jahre.length };
-
-		// 11. Aufraeumen: Rohantworten, die niemand mehr braucht. Ein einzelnes
-		//     DELETE ueber einen Index - die leichteste Arbeit der Reihenfolge
-		//     und deshalb ganz hinten. Sie belegt einen Aufruf, der sonst
-		//     "nichts" tut, und niemals denselben wie eine schwere Arbeit: Jeder
-		//     Schritt davor kehrt bei Erfolg sofort zurueck (CPU-Grenze, 10.1).
-		const geloescht = await repos.sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE);
-		if (geloescht > 0) return { ...basis, getan: "aufraeumen", geloescht };
 	}
 
 	return { ...basis, getan: "nichts" };

@@ -31,8 +31,10 @@ Der Einstieg ist `scheduled` in `src/index.ts`, die Logik `cronSchritt` in `src/
 eine reine Funktion über Repositories und Clients, gegen die lokale D1 getestet (`test/cron.spec.ts`).
 
 **Ein Aufruf, eine schwere Arbeit** – die 10-ms-CPU-Grenze gilt auch für Cron-Aufrufe
-(Abschnitt 2); ein Aufruf schafft eine Seite holen (≈ 3 ms) **oder** eine Seite auswerten
-(5–7 ms), nicht beides. Jeder Aufruf tut deshalb genau **eines** und hört dann auf. **Die
+(Abschnitt 2). Jeder Aufruf tut deshalb genau **eines** und hört dann auf. Dass er damit
+**unter** der Grenze bleibt, war eine Annahme – bis hier stand, ein Aufruf schaffe „eine Seite
+holen (≈ 3 ms) **oder** eine Seite auswerten (5–7 ms)". Gemessen ist eine Größenordnung mehr,
+siehe „Was ein Aufruf wirklich an CPU kostet" unten. **Die
 fünfzehn Schritte in ihrer Reihenfolge, jeder mit seiner Begründung, stehen in
 [10-1-cron-schritte.md](10-1-cron-schritte.md)** – 1 bis 8 gehören dem PSN-Fenster, 9 bis 15
 der Wartung.
@@ -74,14 +76,19 @@ Einträge sind frei.
 
 Die Lesekosten sinken mit der Aufteilung, weil jedes Fenster nur noch seine eigenen Abfragen
 liest: Die drei teuren (erschienene Titel, IGDB-Auswahl, Disc-Auswahl) laufen nicht mehr im
-PSN-Fenster mit. Gemessen in `test/lesekosten.spec.ts` bei 430 Listen: ein Leerlauf im PSN-Fenster
-liest **15** Zeilen (`psn_sync_run`) plus vier für die Store-Auswahl seit 21b, einer in der Wartung
-**2 226** – weit unter dem Tagesbudget von fünf Millionen.
+PSN-Fenster mit. Gemessen in `test/lesekosten.spec.ts` bei 430 Listen (Stand 16.10.2026, Stufe
+18g): ein Leerlauf im PSN-Fenster liest **20** Zeilen (`psn_sync_run`, die Store-Auswahl, Marke und
+Verlauf), einer in der Wartung **2 659** – weit unter dem Tagesbudget von fünf Millionen. Bis 18g
+standen hier 15 + 4 und **2 226**: Die Summe zählte die Auswahl des Marktschritts nicht mit (430
+Zeilen, obwohl nichts fällig ist), ebenso wenig Verlauf und Jahre-Stand – gemessen war die
+Abfrage, nicht der Aufruf.
 
-**Der Leerlauf einer Nacht summiert sich auf rund 80 800 Zeilen** (19 × 36 + 2 226 × 36) –
-gerechnet aus den gemessenen Einzelkosten, nicht frisch über 24 Stunden gemessen; die letzte
-24-Stunden-Messung (116 040 Zeilen am 01.10.2026, 15.4) liegt vor der Erweiterung des
-Wartungsfensters.
+**Der Leerlauf einer Nacht summiert sich auf rund 96 400 Zeilen** (20 × 36 + 2 659 × 36; bis 18g
+gerechnet 80 784) – aus den gemessenen Einzelkosten, nicht frisch über 24 Stunden gemessen. Die
+letzte 24-Stunden-Messung ohne Import: **216 950** gelesene und **2 977** geschriebene Zeilen
+am 16.10.2026, in einer Woche mit abgebrochenen Wartungsaufrufen (unten); die vorige, 116 040 am
+01.10.2026 (15.4), liegt vor der Erweiterung des Wartungsfensters. Die Marke aus 18g schreibt zwei
+Zeilen je Aufruf, **144** je Nacht.
 
 **Der Leerlauf ist aber nicht die Nacht.** Die *arbeitenden* Aufrufe kosten mehr: Der
 Spielzeit-Schritt allein las über einen Titelabgleich ohne Index rund **145 000** Zeilen je Nacht,
@@ -89,6 +96,39 @@ die wöchentliche Kaufliste rund **350 000** (Abschnitt 2, Migration 0025); eine
 gut **200 000**, und zusammen mit einer Arbeitssitzung ergab das am 28.09.2026 **1 335 628**
 gelesene Zeilen in 24 Stunden. Seit dem Index sind es je Abgleich vier statt 480. **Eine Messung,
 die nur den Leerlauf zählt, beschreibt nicht die Nacht** ([lehren.md](../lehren.md)).
+
+### Was ein Aufruf wirklich an CPU kostet
+
+Gemessen am 16.10.2026 über Cloudflares Analytics (`workersInvocationsScheduled`, eine Zeile je
+Cron-Aufruf, Aufbewahrung 90 Tage), für 863 Aufrufe vom 05. bis 16.10.2026 – nicht geschätzt:
+
+| Arbeit | CPU je Aufruf |
+|---|---|
+| Leerlauf | 12–20 ms |
+| Sync, eine Seite holen oder auswerten | 13–30 ms |
+| Store-Preise, zehn Releases | 90–110 ms |
+| Spielzeit, eine Seite | 200–250 ms |
+| Gebrauchtpreise, zwanzig Releases | 62–72 ms bis 08.10., 86 am 09.10., rund 140 ab 10.10. 07:00 |
+
+**Kein einziger Schritt bleibt unter 10 ms, auch der Leerlauf nicht.** Dass es trotzdem lief,
+liegt an einer Duldung: Cloudflare gesteht Workern, die die Grenze *selten* überschreiten, eine
+nicht bezifferte Flexibilität zu; bei dauerhafter Überschreitung wird abgebrochen. Beobachtet:
+Bis zum 09.10. wurde jeder Aufruf geduldet. Ab dem 10.10. bricht die Laufzeit nach einer Folge
+schwerer Aufrufe für ein bis vier Stunden **jeden** Aufruf bei genau 10,0 ms ab (`exceededResources`),
+auch den Leerlauf – 12 von 36 Wartungsaufrufen am 10.10., 35 am 11.10. (dort schon ab 05:25 im
+PSN-Fenster), 15 bis 33 an jedem Tag danach. Am 16.10. lief es von 08:05 an wieder. Ausgelöst
+wurde jeder Aufruf; es fehlte keiner.
+
+**Ungeklärt:** warum der Gebrauchtpreis-Aufruf am 10.10. um 07:00 von rund 70 auf rund 140 ms
+sprang – an dem Tag gab es keinen Deploy; am 13.10. kosteten die frühen Aufrufe 68 ms, die späten
+138. Ein lokales Profil (Node, echte Titel, nachgebaute eBay-Antworten von 30 KiB) legt die Zeit
+in die Titelzerlegung (`worteAus`, 30–40 % Eigenzeit) und den Sammlungsabgleich (rund 20 %), das
+JSON-Parsen in rund 15 %. **Ob der Free Tier mit kleineren Portionen trägt** und welche Schritte
+sich nicht unter 10 ms bringen lassen, ist offen ([16.2](16-2-offene-stufen.md)); der Bezahlplan
+ist ausgeschlossen (Entscheidung des Nutzers vom 16.10.2026).
+
+Seit Stufe 18g hinterlässt ein so abgebrochener Aufruf eine Spur – die Marke „begonnen",
+[10-1-cron-verlauf.md](10-1-cron-verlauf.md).
 
 **Wie eine Nacht nachträglich lesbar ist** – `cron_verlauf`, die Verdichtung und der
 örtliche Aufruf: [10-1-cron-verlauf.md](10-1-cron-verlauf.md).

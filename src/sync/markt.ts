@@ -60,7 +60,7 @@ export async function marktSchritt(
 	// volle Portion heisst, dass wahrscheinlich mehr wartet - eine halbe, dass
 	// der Bestand durch ist. Das kostet nichts, und der naechste Aufruf
 	// korrigiert sich ohnehin selbst.
-	const nochOffen = await repos.markt.offeneAnzahl();
+	const nochOffen = await repos.markt.faelligeAnzahl();
 	return stand.meldung === undefined
 		? { ...zahlen(stand), status: "erfolg", nochOffen, weiter: ziele.length === n }
 		: { ...zahlen(stand), status: "fehler", nochOffen, weiter: false, meldung: stand.meldung };

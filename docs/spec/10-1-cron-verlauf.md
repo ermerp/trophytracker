@@ -8,7 +8,35 @@ Log-Zeile mit Zahlen und festen Texten (`cronLogzeile`; die Meldungen sind schon
 `app_setting` unter `cron_verlauf`, wo die letzten zwanzig stehen** (Migration 0022, verdichtet seit
 Stufe 18d). Das ist kein Gespeichertes, das sich berechnen ließe: **Worker-Logs sind nur live
 einsehbar**, ein schweigender Nachtschritt wäre am Morgen sonst nicht zu klären. Auch ein Absturz
-wird vermerkt („cron: abgebrochen").
+mit Ausnahme wird vermerkt („cron: abgebrochen") – **ein Abbruch durch die Laufzeit nicht**: An
+der CPU-Grenze endet der Aufruf, bevor das `catch` läuft.
+
+**Die Marke „begonnen" (Stufe 18g)** schließt diese Lücke, ohne Verhalten zu ändern. Jeder Aufruf
+setzt als Erstes `cron_begonnen` in `app_setting` (Zeit, Bereich), und erst der vermerkte Ausgang
+nimmt sie im **selben Batch** wie die Verlaufszeile wieder weg – getrennt geschrieben, bliebe eine
+Marke stehen, wenn der Aufruf dazwischen stirbt. Findet ein Aufruf eine Marke, die **zwei Minuten
+oder älter** ist, ist ihr Aufruf ohne Ausgang geblieben (Entscheidung des Nutzers vom 16.10.2026:
+Der nächste reguläre Aufruf kommt nach fünf Minuten und muss sie sicher erkennen; die doppelte
+Auslösung vom 16.10.2026 lag eine Minute auseinander und darf es nicht). Eine jüngere Marke wird
+überschrieben, aber weder gemeldet noch geerbt, und jeder Aufruf löscht nur **seine eigene**
+Marke, damit ein gleichzeitig laufender zweiter nicht die des ersten wegnimmt.
+
+Gemeldet wird nicht sofort, sondern **mit dem nächsten vermerkten Ausgang**: Solange die
+CPU-Grenze greift, stirbt auch der Aufruf, der melden würde. Die neue Marke trägt die Kette
+deshalb weiter, und der erste Aufruf, der durchkommt, schreibt sie unter seine eigene Zeile:
+
+```
+2026-10-16 08:05 cron: markt bereich=wartung markt=erfolg geprueft=20 …
+2026-10-16 06:30–08:00 cron: ohne_ausgang ×18 bereich=wartung
+2026-10-16 06:05–06:25 cron: markt ×5 bereich=wartung …
+```
+
+So hätte der Morgen des 16.10.2026 ausgesehen; tatsächlich stand dort `markt ×16 06:06–08:56`, und
+die 18 abgebrochenen Aufrufe dazwischen waren unsichtbar. Die Zeiten sind die **Anfänge der
+verwaisten Aufrufe**, nicht die des meldenden. Eine Kette über die Fenstergrenze nennt beide
+Bereiche (`bereich=psn→wartung`). Eine `ohne_ausgang`-Zeile wird nie verdichtet – wie eine
+Zeile mit `meldung=` ist sie kein Leerlauf –, und die Zeile zwischen zwei Ketten trennt sie ohnehin.
+Kosten: zwei geschriebene und eine gelesene Zeile je Aufruf, **144** geschriebene je Nacht.
 
 **Was die Zeile nennt, muss sich bewegen.** Eine Fortschrittszahl, die in jedem Aufruf gleich
 lautet, ist keine. Die Sync-Zeile nennt deshalb in der Abrufphase den `offset`, in der
@@ -53,7 +81,8 @@ beide Tests leiten sie daraus ab. Der Anlass war ein Befund – als Stufe 20e da
 `*/5 6-8` erweiterte, rechneten `test/cron.spec.ts` und `test/lesekosten.spec.ts` als Literal
 weiter mit 24 und prüften zwölf Aufrufe zu wenig. Seit der Umstellung (09.10.2026) simuliert die
 Nacht 72 statt 60 Aufrufe und verdichtet sie auf 8 Zeilen; die Nachtsumme der gelesenen Zeilen
-stieg von 54 072 auf **80 784** und bleibt unter der Grenze von 100 000.
+stieg von 54 072 auf **80 784** und bleibt unter der Grenze von 100 000 – seit 18g, mit allen
+Abfragen eines Leerlaufs gezählt, **96 444** ([10-1-cron.md](10-1-cron.md)).
 
 Drei Regeln halten die Zeile ehrlich: Verdichtet wird **nur bei gleicher Feldfolge** – wechselt der
 Sync von `offset` auf `offen`, beginnt eine neue Zeile, genau dort, wo auch ein Mensch trennen

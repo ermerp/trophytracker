@@ -117,6 +117,27 @@ describe("marktSchritt", () => {
 		gerufen = [];
 	});
 
+	it("offen zaehlt, was in der Auswahl faellig ist - nicht, was nie gefragt wird (Stufe 18g)", async () => {
+		await luecke(1, "Bloodborne");
+		await luecke(2, "Killzone 3");
+		await luecke(3, "Uncharted 2");
+		// Ausserhalb der Auswahl: nie gestempelt, nie gefragt. Bis 18g zaehlte
+		// genau so etwas als "offen" - 59 Releases, jede Nacht dieselbe Zahl.
+		await luecke(4, "Gravity Rush", "nein");
+
+		const erster = await marktSchritt(repos(), ebayMit({}), 2);
+		expect(erster.geprueft).toBe(2);
+		expect(erster.nochOffen).toBe(1);
+
+		const zweiter = await marktSchritt(repos(), ebayMit({}), 2);
+		expect(zweiter.geprueft).toBe(1);
+		expect(zweiter.nochOffen).toBe(0);
+
+		// Ein Tag spaeter ist ein gepruefter Release wieder faellig.
+		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-2 days') WHERE id = 1").run();
+		expect(await repos().markt.faelligeAnzahl()).toBe(1);
+	});
+
 	it("kodiert Filter und Aspekt - unkodiert wuerde eBay sie stillschweigend ignorieren", async () => {
 		await luecke(1, "Bloodborne");
 		await marktSchritt(repos(), ebayMit({}));

@@ -18,6 +18,7 @@ import { storeRoutes } from "./api/store";
 import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
+import type { CronMarke } from "./db/sync";
 import { erstelleEbayClient, zugangAus as ebayZugangAus, type EbayClient } from "./ebay/client";
 import { erstelleUpcitemdbClient, type UpcitemdbClient } from "./ean/upcitemdb";
 import { erstelleIgdbClient, zugangAus, type IgdbClient } from "./igdb/client";
@@ -144,12 +145,16 @@ export function createScheduled(
 			return;
 		}
 		const repos = createRepositories(env.DB, env.NPSSO_KEY);
+		// Welcher der beiden Eintraege gerufen hat, steht im Ereignis
+		// (Stufe 18e): das PSN-Fenster oder das Wartungsfenster. Ein
+		// unbekannter Ausdruck - etwa nach einer Aenderung an
+		// wrangler.jsonc - macht alles, statt still die Haelfte zu lassen.
+		const bereich = bereichFuerAusdruck(event.cron);
+		let marke: CronMarke | undefined;
 		try {
-			// Welcher der beiden Eintraege gerufen hat, steht im Ereignis
-			// (Stufe 18e): das PSN-Fenster oder das Wartungsfenster. Ein
-			// unbekannter Ausdruck - etwa nach einer Aenderung an
-			// wrangler.jsonc - macht alles, statt still die Haelfte zu lassen.
-			const bereich = bereichFuerAusdruck(event.cron);
+			// Als Erstes, vor jeder Arbeit (Stufe 18g): Stirbt dieser Aufruf an
+			// der CPU-Grenze, meldet ihn der naechste, der durchkommt.
+			marke = await repos.sync.cronBeginnen(new Date(), bereich);
 			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env), ebayFactory(env), storeFactory(), {
 				bereich,
 			});
@@ -161,12 +166,12 @@ export function createScheduled(
 			// unterscheiden, ob er scheiterte oder nichts zu tun fand. Aufrufe
 			// ohne Wirkung werden dabei verdichtet, damit die zwanzig leeren am
 			// Ende der Nacht nicht die Arbeit davor verdraengen (Stufe 18d).
-			await repos.sync.cronAusgangVermerken(zeitstempel(), zeile);
+			await repos.sync.cronAusgangVermerken(zeitstempel(), zeile, marke);
 		} catch (fehler) {
 			// Ein Absturz darf nicht spurlos bleiben. Nur eigene Texte, kein
 			// Fremdtext - der koennte ein Geheimnis zitieren.
 			console.log("cron: abgebrochen");
-			await repos.sync.cronAusgangVermerken(zeitstempel(), "cron: abgebrochen").catch(() => {});
+			await repos.sync.cronAusgangVermerken(zeitstempel(), "cron: abgebrochen", marke).catch(() => {});
 			throw fehler;
 		}
 	};

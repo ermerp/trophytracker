@@ -5,6 +5,7 @@ import { EREIGNIS_AUSWAHL } from "../src/db/events";
 import { CRON_PSN, CRON_WARTUNG, cronFenster } from "../src/sync/cron";
 import { EXPORT_ORDNUNG, EXPORT_TABELLEN } from "../src/db/export";
 import { VERLAUF_SQL } from "../src/db/preise";
+import { FAELLIG_IN_AUSWAHL } from "../src/db/markt";
 import {
 	LETZTES_PLATIN_SQL,
 	LISTEN_SQL,
@@ -634,15 +635,16 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Zeilen fuer zehn Releases - die View rechnete die Preis-Unterabfragen
 		// fuer alle 430 Zeilen aus, nur um Ids zu liefern. Jetzt ueber
 		// idx_release_markt mit Abbruch nach LIMIT.
+		//
+		// Seit Stufe 18g mit DER Bedingung des Codes statt einer Abschrift:
+		// Die Abschrift stand noch auf der 14-Tage-Frist aus Stufe 20, waehrend
+		// der Code seit 20e taeglich fragt - gemessen wurde also eine Abfrage,
+		// die so nie lief. Und mit zwanzig je Aufruf, nicht zehn.
 		const auswahl = await zeilenGelesen(
 			"SELECT r.id, r.game_id, g.title, r.platform, r.physical_release_status " +
 				"FROM release r JOIN game g ON g.id = r.game_id " +
-				"WHERE (r.markt_geprueft_am IS NULL OR r.markt_geprueft_am < datetime('now', '-14 days')) " +
-				"AND ((r.physical_release_status IN ('ja', 'unbekannt') " +
-				"AND EXISTS (SELECT 1 FROM trophy_progress t WHERE t.release_id = r.id AND t.progress_pct > 0) " +
-				"AND NOT EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)) " +
-				"OR EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = r.id AND pe.status = 'offen')) " +
-				"ORDER BY r.markt_geprueft_am, r.id LIMIT 10",
+				FAELLIG_IN_AUSWAHL +
+				"ORDER BY r.markt_geprueft_am, r.id LIMIT 20",
 		);
 		// Der Schreibpfad eines Releases: UPSERT je Kanal, Verlauf nur bei
 		// Aenderung, Protokoll und Stempel - alles in einem Batch.
@@ -701,6 +703,11 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// braucht. Die vier Zaehler von `stand()` kosteten 1 549 Zeilen - drei
 		// Viertel eines ganzen Aufrufs fuer eine Anzeigezahl.
 		const stand = await zeilenGelesen("SELECT COUNT(*) AS n FROM release WHERE markt_geprueft_am IS NULL");
+		// Seit Stufe 18g zaehlt die Verlaufszeile das FAELLIGE in der Auswahl
+		// (`faelligeAnzahl`). Die Kosten wachsen mit dem Faelligen: gemessen
+		// im teuersten Fall (alles faellig, der erste Aufruf der Nacht) und
+		// im Leerlauf (nichts faellig, jeder Aufruf danach).
+		const faelligVoll = await zeilenGelesen("SELECT COUNT(*) AS n FROM release r " + FAELLIG_IN_AUSWAHL);
 		const standVoll = await zeilenGelesen(
 			"SELECT (SELECT COUNT(*) FROM market_offer WHERE source = 'ebay' AND in_stock = 1) AS mitPreis, " +
 				"(SELECT COUNT(*) FROM release WHERE markt_geprueft_am IS NOT NULL) AS geprueft, " +
@@ -717,13 +724,27 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const absichtenMitPreis = await zeilenGelesen(`${PLAN_AUSWAHL}WHERE pe.kind = ? AND pe.status = ?`, "kauf", "offen");
 		await env.DB.prepare("DELETE FROM plan_entry").run();
 
-		const jeAufruf = auswahl + sammlung + sperrliste + schreibkosten * 10 + stand;
+		// Der Leerlauf des Schritts: alles gestempelt, nichts faellig. So laeuft
+		// jeder Wartungsaufruf nach getaner Arbeit - bis zu 36-mal je Nacht.
+		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now')").run();
+		const auswahlLeer = await zeilenGelesen(
+			"SELECT r.id FROM release r JOIN game g ON g.id = r.game_id " + FAELLIG_IN_AUSWAHL + "ORDER BY r.markt_geprueft_am, r.id LIMIT 20",
+		);
+		const faelligLeer = await zeilenGelesen("SELECT COUNT(*) AS n FROM release r " + FAELLIG_IN_AUSWAHL);
+		const zuschnitt = (
+			await env.DB.prepare(
+				"SELECT COUNT(*) AS n FROM release r " + FAELLIG_IN_AUSWAHL.replace("WHERE (r.markt_geprueft_am IS NULL OR", "WHERE (1 OR"),
+			).first<{ n: number }>()
+		)?.n;
+
+		const jeAufruf = auswahl + sammlung + sperrliste + schreibkosten * 20 + faelligVoll;
 		// Der Einzelabruf nach einem Verwerfen: dieselbe Portion mit EINEM
 		// Release, ohne den Zaehler fuer die Verlaufszeile.
 		const verwerfenRoute = tafel + kennungspruefung + eines + sammlung + sperrliste + schreibkosten;
 		console.info({
 			luecken, auswahl, sammlung, sperrliste, tafel, kennungspruefung, eines,
 			stand, standVoll, schreibkosten, jeAufruf, verwerfenRoute, absichtenMitPreis,
+			faelligVoll, faelligLeer, auswahlLeer, zuschnitt,
 		});
 
 		// Vor Stufe 20 las dieselbe Abfrage 2 620 Zeilen mit leerer
@@ -739,7 +760,15 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Zeilen, mit dem Sperrlisten-Lookup aus Stufe 20h bei 1 000 - die 60
 		// Zeilen sind der Lookup, und er laeuft 24-mal je Nacht mit: 1 440
 		// Zeilen je Nacht gegen ein Tageskontingent von 5 Millionen.
-		expect(jeAufruf).toBeLessThan(1_100);
+		//
+		// Seit Stufe 18g 1 514 im teuersten Aufruf: zwanzig Schreibpfade statt
+		// der zehn, mit denen die Summe seit 20e falsch rechnete, und der
+		// Zaehler des Faelligen (864 bei allem faellig) statt der 430 fuer
+		// "nie gestempelt". Ueber die Nacht gleicht sich das aus: Das Faellige
+		// sinkt von 431 auf 0, im Mittel sind es rund 430 Zeilen je Aufruf -
+		// dieselbe Summe wie vorher, nur eine Zahl, die sich bewegt.
+		expect(jeAufruf).toBeLessThan(1_600);
+		expect(faelligLeer).toBeLessThan(10);
 		// Der Lookup selbst: 20 Index-Treffer auf eine Sperrliste von 40
 		// Zeilen, kein Scan. In der Produktion steht dort heute nichts, die
 		// 40 sind das Mehrfache des Erwarteten.
@@ -1186,6 +1215,13 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		await env.DB.batch([
 			env.DB.prepare("UPDATE game SET igdb_id = id + 1000, igdb_synced_at = datetime('now')"),
 			env.DB.prepare("UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb'"),
+			// Auch der Marktschritt hat nichts zu tun: alles heute gestempelt.
+			env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now')"),
+			// Die drei Einstellungen, die jeder Aufruf liest, stehen in der
+			// Produktion immer da - ohne sie laesen sie hier null Zeilen.
+			env.DB.prepare(
+				"INSERT OR REPLACE INTO app_setting (key, value) VALUES ('cron_begonnen', '{}'), ('cron_verlauf', ''), ('trophaeen_jahre', '{}')",
+			),
 			env.DB.prepare("DELETE FROM psn_sync_run"),
 			...Array.from({ length: 5 }, (_, i) =>
 				env.DB.prepare(
@@ -1233,6 +1269,32 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			 AND (normalized_at IS NOT NULL OR sync_run_id IN (SELECT id FROM psn_sync_run WHERE status = 'fehler'))`,
 		);
 
+		// Was bis Stufe 18g in dieser Summe FEHLTE, obwohl jeder Leerlauf es
+		// liest: die Auswahl des Marktschritts (er steht seit 20e im Fenster und
+		// muss sie lesen, um "nichts faellig" festzustellen), den Verlauf, an
+		// den jeder Aufruf seine Zeile haengt, und den Jahre-Stand. Dazu kommt
+		// mit 18g die Marke. "Gemessen wird die Route, nicht die Abfrage."
+		const marktAuswahl = await zeilenGelesen(
+			"SELECT r.id FROM release r JOIN game g ON g.id = r.game_id " + FAELLIG_IN_AUSWAHL + "ORDER BY r.markt_geprueft_am, r.id LIMIT 20",
+		);
+		const einstellung = (key: string) => zeilenGelesen("SELECT value FROM app_setting WHERE key = ?", key);
+		const marke = await einstellung("cron_begonnen");
+		const verlauf = await einstellung("cron_verlauf");
+		const jahreStand = await einstellung("trophaeen_jahre");
+		// Und was die Marke SCHREIBT - die Schreibgrenze von 100 000 Zeilen am
+		// Tag ist die engere (CLAUDE.md): setzen bei jedem Aufruf, wegnehmen im
+		// Batch mit der Verlaufszeile.
+		const setzen = await env.DB.prepare(
+			"INSERT INTO app_setting (key, value) VALUES ('cron_begonnen', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+		)
+			.bind('{"am":"x"}')
+			.run();
+		const wegnehmen = await env.DB.prepare("DELETE FROM app_setting WHERE key = 'cron_begonnen' AND value = ?").bind('{"am":"x"}').run();
+		const markeGeschrieben = (setzen.meta.rows_written ?? 0) + (wegnehmen.meta.rows_written ?? 0);
+		const markeJeNacht = markeGeschrieben * (cronFenster(CRON_PSN).aufrufe + cronFenster(CRON_WARTUNG).aufrufe);
+		expect(markeJeNacht).toBeLessThan(1_000);
+		await env.DB.prepare("INSERT OR REPLACE INTO app_setting (key, value) VALUES ('cron_begonnen', '{}')").run();
+
 		// Seit Stufe 21 laeuft im PSN-Fenster als achter Schritt die Auswahl
 		// der Store-Preise mit - auch im Leerlauf, weil sie erst ihre eigene
 		// Abfrage braucht, um "nichts zu tun" festzustellen. Genau hier sass
@@ -1253,10 +1315,10 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// eigenen Abfragen. Wie oft jedes laeuft, sagt sein Cron-Ausdruck -
 		// hier stand die Zahl bis zur Stufe "Refactoring" doppelt und fiel
 		// bei der Erweiterung auf drei Stunden zurueck (10.1).
-		const leerlaufPsn = haenger + laufend + heutige + storeAuswahl;
-		const leerlaufWartung = erschienen + auffrischen + disc + aufraeumen;
+		const leerlaufPsn = marke + haenger + laufend + heutige + storeAuswahl + verlauf;
+		const leerlaufWartung = marke + erschienen + jahreStand + aufraeumen + auffrischen + disc + marktAuswahl + verlauf;
 		const nacht = leerlaufPsn * cronFenster(CRON_PSN).aufrufe + leerlaufWartung * cronFenster(CRON_WARTUNG).aufrufe;
-		console.info({ erschienen, haenger, laufend, heutige, storeAuswahl, auffrischen, disc, aufraeumen, leerlaufPsn, leerlaufWartung, nacht });
+		console.info({ erschienen, haenger, laufend, heutige, storeAuswahl, auffrischen, disc, aufraeumen, marktAuswahl, marke, verlauf, jahreStand, markeGeschrieben, markeJeNacht, leerlaufPsn, leerlaufWartung, nacht });
 
 		// Gemessen bis Stufe 18d: 2 241 Zeilen in einem Aufruf, der alles tat -
 		// game zweimal (erschienen, auffrischen), game mit release je Spiel fuer
@@ -1265,15 +1327,25 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Aufteilung in 18e nimmt dem PSN-Fenster die drei teuren Abfragen: Es
 		// liest nur noch psn_sync_run. Beide Haelften zusammen bleiben weit
 		// unter dem Tagesbudget von fuenf Millionen.
+		//
+		// Seit Stufe 18g zaehlt die Summe auch, was vorher fehlte: Die
+		// Marktauswahl allein liest im Leerlauf 430 Zeilen - SQLite geht fuer
+		// `ORDER BY markt_geprueft_am` den ganzen Index entlang, waehrend der
+		// Zaehler mit derselben Bedingung eine Zeile liest. Seit 20e lief das
+		// in jedem Wartungsaufruf mit und stand in keiner Messung. Die Nacht
+		// steigt damit von gerechneten 80 784 auf rund 96 000, gemessen am
+		// 16.10.2026; die Marktauswahl selbst ist ein Fall fuer den
+		// Behebungs-Nachtrag zum Markt (10.1).
 		expect(leerlaufPsn).toBeLessThan(100);
-		expect(leerlaufWartung).toBeLessThan(2_500);
+		expect(leerlaufWartung).toBeLessThan(2_800);
 		expect(nacht).toBeLessThan(100_000);
 
 		await env.DB.batch([
 			env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_synced_at = NULL"),
-			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL"),
+			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, markt_geprueft_am = NULL"),
 			env.DB.prepare("DELETE FROM psn_raw_response"),
 			env.DB.prepare("DELETE FROM psn_sync_run"),
+			env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_begonnen', 'cron_verlauf', 'trophaeen_jahre')"),
 		]);
 	});
 

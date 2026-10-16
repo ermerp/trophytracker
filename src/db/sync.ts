@@ -49,6 +49,63 @@ const SCHLUESSEL_CRON = "cron_verlauf";
 const CRON_VERLAUF_LAENGE = 20;
 
 /**
+ * Die Marke "begonnen" (Stufe 18g): Jeder Aufruf setzt sie zuerst, und erst
+ * der vermerkte Ausgang nimmt sie wieder weg.
+ *
+ * Warum: Ein Aufruf, den die Laufzeit an der CPU-Grenze beendet, erreicht
+ * weder den Verlauf noch das `catch` in `scheduled`. Vom 10. bis 16.10.2026
+ * starben so taeglich 12 bis 35 Wartungsaufrufe ohne jede Zeile, und am
+ * Morgen sah das aus wie "nichts zu tun" (lehren.md). Die Marke aendert kein
+ * Verhalten, sie macht nur sichtbar, was vorher spurlos verschwand.
+ */
+const SCHLUESSEL_BEGONNEN = "cron_begonnen";
+
+/**
+ * Ab wann eine Marke als verwaist gilt. Zwei Minuten (Entscheidung des
+ * Nutzers vom 16.10.2026): Der naechste regulaere Aufruf kommt nach fuenf
+ * Minuten und muss sie sicher erkennen, die doppelte Ausloesung vom
+ * 16.10.2026 lag eine Minute auseinander und darf es nicht. Ein Aufruf
+ * dauert Sekunden, nicht Minuten.
+ */
+export const VERWAIST_NACH_MS = 2 * 60_000;
+
+/** Aufrufe ohne Ausgang, die eine Marke seit dem letzten vermerkten Ausgang mitfuehrt. */
+type Verwaist = { anzahl: number; von: string; bis: string; bereich: string };
+
+type MarkenInhalt = { am: string; bereich: string; verwaist?: Verwaist };
+
+/**
+ * Die eigene Marke eines Aufrufs. `wert` ist der gespeicherte Text: Nur er
+ * wird beim Ausgang geloescht, damit ein gleichzeitig laufender zweiter
+ * Aufruf nicht die Marke des anderen wegnimmt.
+ */
+export type CronMarke = { wert: string; verwaist: Verwaist | null };
+
+/** "2026-10-16T06:35:00.000Z" -> "2026-10-16 06:35" - das Format des Verlaufs. */
+const verlaufszeit = (iso: string) => iso.slice(0, 16).replace("T", " ");
+
+function markeLesen(roh: string | null): MarkenInhalt | null {
+	if (!roh) return null;
+	try {
+		const m = JSON.parse(roh) as MarkenInhalt;
+		return typeof m?.am === "string" && !Number.isNaN(Date.parse(m.am)) ? m : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Die Verlaufszeile fuer Aufrufe ohne Ausgang:
+ * "2026-10-16 06:35–07:55 cron: ohne_ausgang ×17 bereich=wartung".
+ * Die Zeiten sind die Anfaenge der verwaisten Aufrufe, nicht die des
+ * meldenden.
+ */
+function verwaistZeile(v: Verwaist): string {
+	const spanne = v.bis === v.von ? v.von : `${v.von}–${v.bis.slice(11)}`;
+	return `${spanne} cron: ohne_ausgang${v.anzahl > 1 ? ` ×${v.anzahl}` : ""} bereich=${v.bereich}`;
+}
+
+/**
  * Eine gespeicherte Verlaufszeile, einzeln oder bereits verdichtet:
  * "2026-09-23 04:16 cron: nichts", "2026-09-23 04:16–05:56 cron: nichts ×21"
  * oder "2026-09-27 03:00–03:10 cron: sync ×3 offset=0→200".
@@ -111,6 +168,11 @@ export function verdichte(vorherige: string, neue: string): string | null {
 	if (a.felder.length !== b.felder.length) return null;
 	if (a.felder.some(([k], i) => k !== b.felder[i][0])) return null;
 	if (a.felder.some(([k]) => k === "meldung") || b.felder.some(([k]) => k === "meldung")) return null;
+	// Aufrufe ohne Ausgang sind ebenso wenig Leerlauf (Stufe 18g). Die Zeile
+	// zaehlt sie schon selbst; zwei solche Zeilen haben immer einen
+	// vermerkten Ausgang zwischen sich, und den darf keine Verdichtung
+	// verschlucken.
+	if (a.arbeit === "ohne_ausgang" || b.arbeit === "ohne_ausgang") return null;
 	// Der Bereich ist keine Fortschrittszahl, sondern sagt, WER gerufen hat:
 	// Ueber die Fenstergrenze hinweg wird nicht verdichtet, sonst stuende da
 	// "nichts ×36 bereich=psn→wartung" und man wuesste von keinem der beiden
@@ -374,20 +436,71 @@ export class SyncRepository {
 	 * verdichtet, statt die Nacht aus dem Verlauf zu draengen (Stufe 18d fuer
 	 * den Leerlauf, 18e fuer jede Arbeit). Ein Lebenszeichen bleibt so oder so
 	 * stehen: Die verdichtete Zeile traegt die Zeit des juengsten Aufrufs.
+	 *
+	 * Mit `marke` (Stufe 18g) kommen davor die Aufrufe ohne Ausgang, die die
+	 * Marke mitfuehrt, in den Verlauf - und die eigene Marke geht im SELBEN
+	 * Batch weg. Schreiben und Wegnehmen in zwei Aufrufen liesse eine Marke
+	 * stehen, wenn der Aufruf dazwischen stirbt, und der naechste meldete
+	 * einen Aufruf als verwaist, dessen Ausgang laengst im Verlauf steht.
 	 */
-	async cronAusgangVermerken(zeitstempel: string, zeile: string): Promise<void> {
-		const bisher = await this.cronVerlauf();
+	async cronAusgangVermerken(zeitstempel: string, zeile: string, marke?: CronMarke): Promise<void> {
+		const gelesen = await this.cronVerlauf();
+		const bisher = marke?.verwaist ? [verwaistZeile(marke.verwaist), ...gelesen] : gelesen;
 		const neue = `${zeitstempel} ${zeile}`;
 		const verdichtet = bisher[0] ? verdichte(bisher[0], neue) : null;
 		const alle = verdichtet ? [verdichtet, ...bisher.slice(1)] : [neue, ...bisher];
 		const wert = alle.slice(0, CRON_VERLAUF_LAENGE).join("\n");
-		await this.db
+		const verlauf = this.db
 			.prepare(
 				"INSERT INTO app_setting (key, value) VALUES (?, ?) " +
 					"ON CONFLICT(key) DO UPDATE SET value = excluded.value",
 			)
-			.bind(SCHLUESSEL_CRON, wert)
-			.run();
+			.bind(SCHLUESSEL_CRON, wert);
+		if (!marke) {
+			await verlauf.run();
+			return;
+		}
+		await this.db.batch([
+			verlauf,
+			this.db.prepare("DELETE FROM app_setting WHERE key = ? AND value = ?").bind(SCHLUESSEL_BEGONNEN, marke.wert),
+		]);
+	}
+
+	/**
+	 * Die Marke "begonnen" setzen (Stufe 18g) - als Erstes in jedem Aufruf.
+	 *
+	 * Liegt noch eine Marke, ist der Aufruf, der sie setzte, ohne Ausgang
+	 * geblieben - wenn sie aelter als `VERWAIST_NACH_MS` ist. Gemeldet wird
+	 * er dann NICHT sofort, sondern von der neuen Marke weitergetragen und
+	 * erst mit dem naechsten vermerkten Ausgang geschrieben: Solange die
+	 * CPU-Grenze greift, stirbt der meldende Aufruf genauso, und eine Kette
+	 * von achtzehn toten Aufrufen (16.10.2026, 06:30 bis 08:00) erschiene sonst als einer.
+	 *
+	 * Eine junge Marke stammt von einem Aufruf, der gerade noch laeuft (die
+	 * doppelte Ausloesung vom 16.10.2026, eine Minute auseinander). Sie wird
+	 * ueberschrieben, aber nicht gemeldet und nicht geerbt.
+	 */
+	async cronBeginnen(jetzt: Date, bereich: string): Promise<CronMarke> {
+		const alt = markeLesen(await this.fortschritt(SCHLUESSEL_BEGONNEN));
+		let verwaist: Verwaist | null = null;
+		if (alt && jetzt.getTime() - Date.parse(alt.am) >= VERWAIST_NACH_MS) {
+			const zeit = verlaufszeit(alt.am);
+			// Eine Kette ueber die Fenstergrenze nennt beide Bereiche, statt
+			// die fruehen Aufrufe dem spaeteren Fenster zuzuschreiben.
+			const anfang = alt.verwaist?.bereich.split("→")[0];
+			verwaist = alt.verwaist
+				? {
+						anzahl: alt.verwaist.anzahl + 1,
+						von: alt.verwaist.von,
+						bis: zeit,
+						bereich: anfang === alt.bereich ? alt.bereich : `${anfang}→${alt.bereich}`,
+					}
+				: { anzahl: 1, von: zeit, bis: zeit, bereich: alt.bereich };
+		}
+		const inhalt: MarkenInhalt = { am: jetzt.toISOString(), bereich, ...(verwaist ? { verwaist } : {}) };
+		const wert = JSON.stringify(inhalt);
+		await this.fortschrittSetzenWert(SCHLUESSEL_BEGONNEN, wert);
+		return { wert, verwaist };
 	}
 
 	/** Die letzten Cron-Ausgaenge, neueste zuerst - fuer die Einstellungen. */
