@@ -943,8 +943,10 @@ und wie sich eine Zuordnung zurücknehmen lässt, steht in
 Alles läuft im **Free Tier**: Worker-Anfragen, D1-Speicher und die gelesenen
 Zeilen liegen Größenordnungen unter den Grenzen. Die **72 Cron-Aufrufe je Nacht**
 (zwei Einträge von fünf erlaubten) zählen als Anfragen und lesen im Leerlauf
-rund 80 800 Zeilen; eine Nacht mit Arbeit liegt bei gut 200 000 von fünf
-Millionen. **Die engere Grenze ist das Schreiben** – 100 000 Zeilen am Tag,
+rund 96 400 Zeilen; eine Nacht mit Arbeit liegt bei gut 200 000 von fünf
+Millionen. **Knapp ist dagegen die CPU:** Kein Cron-Schritt bleibt unter den 10 ms je
+Aufruf, die der Free Tier erlaubt, und seit dem 10.10.2026 bricht Cloudflare solche
+Aufrufe zeitweise ab ([Abschnitt 10.1](docs/spec/10-1-cron.md)). **Die engere Grenze ist das Schreiben** – 100 000 Zeilen am Tag,
 sobald eine Stufe den Bestand einmal durchschreibt. Ein Zahlungsmittel ist nicht
 hinterlegt; Cloudflare kann den Free Tier nicht automatisch verlassen.
 Einzelheiten und Messwerte: [Abschnitt 15.4](docs/spec/15-repository-deployment.md).

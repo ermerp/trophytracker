@@ -27,6 +27,19 @@ import type { EventRepository } from "./events";
  */
 export const MARKT_FRIST_TAGE = 1;
 
+/**
+ * Welche Releases JETZT gefragt werden - die eine Bedingung fuer Auswahl und
+ * Zaehlung (Stufe 18g). Steht einmal, damit die Zahl in der Verlaufszeile
+ * nie etwas anderes zaehlt als das, was der naechste Aufruf nimmt. Warum
+ * ausgeschrieben statt ueber `v_luecken`: siehe `zuPruefen`.
+ */
+export const FAELLIG_IN_AUSWAHL =
+	`WHERE (r.markt_geprueft_am IS NULL OR r.markt_geprueft_am < datetime('now', '-${MARKT_FRIST_TAGE} days')) ` +
+	"AND ((r.physical_release_status IN ('ja', 'unbekannt') " +
+	"AND EXISTS (SELECT 1 FROM trophy_progress t WHERE t.release_id = r.id AND t.progress_pct > 0) " +
+	"AND NOT EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)) " +
+	"OR EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = r.id AND pe.status = 'offen')) ";
+
 export type ZuPruefen = {
 	releaseId: number;
 	gameId: number;
@@ -108,11 +121,7 @@ export class MarktRepository {
 				"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
 					"r.physical_release_status AS discFassung " +
 					"FROM release r JOIN game g ON g.id = r.game_id " +
-					`WHERE (r.markt_geprueft_am IS NULL OR r.markt_geprueft_am < datetime('now', '-${MARKT_FRIST_TAGE} days')) ` +
-					"AND ((r.physical_release_status IN ('ja', 'unbekannt') " +
-					"AND EXISTS (SELECT 1 FROM trophy_progress t WHERE t.release_id = r.id AND t.progress_pct > 0) " +
-					"AND NOT EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)) " +
-					"OR EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = r.id AND pe.status = 'offen')) " +
+					FAELLIG_IN_AUSWAHL +
 					"ORDER BY r.markt_geprueft_am, r.id LIMIT ?",
 			)
 			.bind(limit)
@@ -410,18 +419,26 @@ export class MarktRepository {
 	}
 
 	/**
-	 * Wie viele Releases noch nie gefragt wurden - EINE Abfrage ueber
-	 * idx_release_markt, nicht die vier Zaehler von `stand()`.
+	 * Wie viele Releases der Auswahl JETZT faellig sind - die Zahl `offen` in
+	 * der Verlaufszeile (Stufe 18g).
 	 *
-	 * Gemessen am 02.10.2026: Ein Cron-Aufruf des Schritts las 2 059 Zeilen,
-	 * davon **1 549 allein fuer `stand()`** - drei Viertel der Kosten fuer
-	 * eine Zahl, die nur in der Verlaufszeile steht. Dieselbe Form wie der
-	 * `COUNT(*)` in der Feed-Route am 01.10.2026, nur kleiner. `stand()`
-	 * bleibt fuer die Einstellungen, wo alle vier Zahlen gebraucht werden.
+	 * Bis 18g zaehlte sie Releases ohne jeden Stempel im GANZEN Bestand, und
+	 * das waren genau die 59 ausserhalb der Auswahl, die nie gefragt werden:
+	 * `offen=59` in jeder Zeile jeder Nacht, waehrend der Schritt seine
+	 * Arbeit vom 11. bis 16.10.2026 nicht mehr schaffte. Nur auf die Auswahl
+	 * zu beschraenken haette 0 ergeben, ebenso unbewegt - in der Auswahl ist
+	 * nach dem ersten Durchlauf alles gestempelt. Was sich bewegt, ist
+	 * "faellig": dieselbe Bedingung wie `zuPruefen`, gezaehlt statt begrenzt.
+	 *
+	 * Die Kosten wachsen mit der Zahl des Faelligen, nicht mit dem Bestand:
+	 * Ueber idx_release_markt liest die Abfrage nur den faelligen Bereich und
+	 * je Zeile die Unterabfragen (test/lesekosten.spec.ts). Der Fehler aus
+	 * Stufe 20 - `stand()` mit 1 549 Zeilen fuer eine Zahl der Verlaufszeile -
+	 * steht im Kopf von `stand()`.
 	 */
-	async offeneAnzahl(): Promise<number> {
+	async faelligeAnzahl(): Promise<number> {
 		const z = await this.db
-			.prepare("SELECT COUNT(*) AS n FROM release WHERE markt_geprueft_am IS NULL")
+			.prepare("SELECT COUNT(*) AS n FROM release r " + FAELLIG_IN_AUSWAHL)
 			.first<{ n: number }>();
 		return z?.n ?? 0;
 	}
@@ -433,6 +450,12 @@ export class MarktRepository {
 	 * Haendler- als auch der Marktkanal, stehen zwei Zeilen zu einem Release.
 	 * Die erste Fassung zaehlte die Zeilen und meldete nach dem ersten
 	 * Durchlauf 323, wo 239 Releases einen Preis hatten.
+	 *
+	 * Nur fuer die Einstellungen, nie fuer die Verlaufszeile: Gemessen am
+	 * 02.10.2026 las ein Cron-Aufruf des Schritts 2 059 Zeilen, davon
+	 * **1 549 allein fuer `stand()`** - drei Viertel der Kosten fuer eine
+	 * Zahl, die nur in der Verlaufszeile stand. Dieselbe Form wie der
+	 * `COUNT(*)` in der Feed-Route am 01.10.2026, nur kleiner.
 	 */
 	async stand(): Promise<{ mitPreis: number; geprueft: number; ohneAngebot: number; offen: number }> {
 		const z = await this.db

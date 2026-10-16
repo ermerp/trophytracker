@@ -588,3 +588,42 @@ Zwei Lehren:
    Ausgangszahl.** Der erste Lauf in `test/` zählte 52 Fehler, ein Lauf gegen
    den unberührten Stand in einem eigenen `git worktree` 102. Berichtet wurde
    zuerst die falsche Zahl.
+
+## Die CPU-Grenze war geduldet, nicht eingehalten
+
+**10. bis 16.10.2026 – eine Woche Wartung mit Lücken, und der Verlauf sah aus wie
+„nichts zu tun".** Ab dem 11.10. lief der Jahre-Schritt an keinem Tag mehr,
+`psn_raw_response` wuchs auf neun Läufe statt drei, und der Gebrauchtpreis-Schritt
+schaffte seine 431 Releases nicht mehr; am 11.10. lief er gar nicht. Im Verlauf stand
+davon nichts: Am 16.10. zeigte er `markt ×16 06:06–08:56`, und dass dazwischen
+**18 Aufrufe** fehlten, fiel erst am Abgleich mit den Stempeln in `release` auf – ein
+Aufruf um 06:30 hatte 12 statt 20 Releases gestempelt und keine Zeile hinterlassen.
+
+Die erste Vermutung lautete „nicht ausgelöst". Die Analytics widerlegten sie: 863 von
+864 Aufrufen waren da, die fehlenden mit `exceededResources` bei genau 10,0 ms. Und sie
+zeigten mehr, als gesucht war: **Auch die erfolgreichen Aufrufe lagen weit über
+10 ms** – Leerlauf 12–20, Spielzeit 200–250, Gebrauchtpreise bis 170 –, und zwar seit
+Beginn der Messung am 05.10. Die Spezifikation führte seit Stufe 18 „Seite holen
+≈ 3 ms, auswerten 5–7 ms"; diese Zahlen waren nie gegen Cloudflare gemessen. Gelaufen
+ist es, weil Cloudflare seltene Überschreitungen duldet. Ab dem 10.10. – der
+Marktaufruf sprang an dem Tag ohne Deploy von rund 70 auf 140 ms – wurde die Duldung
+für Stunden ausgesetzt, und dann starb jeder Aufruf, auch der Leerlauf.
+
+Drei Lehren:
+
+1. **Was eine Laufzeit duldet, ist keine Einhaltung.** Eine Grenze, die nur bei
+   dauerhafter Überschreitung greift, beweist mit jedem durchgelaufenen Aufruf nichts.
+   Gemessen wird an der Quelle (`workersInvocationsScheduled`: eine Zeile je Aufruf
+   mit CPU-Zeit und Status), nicht am Ausbleiben von Fehlern.
+2. **Ein Abbruch durch die Laufzeit erreicht kein `catch`.** „Auch ein Absturz wird
+   vermerkt" galt nur für Ausnahmen. Eine Spur, die überlebt, muss **vor** der Arbeit
+   geschrieben werden (Marke „begonnen", 18g).
+3. **Eine Zahl in der Verlaufszeile, die sich nie bewegt, verdeckt den Stillstand.**
+   `offen=59` stand in jeder Marktzeile jeder Nacht – es waren die Releases außerhalb
+   der Auswahl. Dieselbe Lehre wie 18d, an einer Zeile, die jünger ist als die Lehre.
+
+Nebenbei: Die Lesekosten-Messung des Leerlaufs zählte die Auswahl des Marktschritts
+nicht mit (**430 Zeilen** je Aufruf, obwohl nichts fällig ist) und rechnete den
+Schreibpfad mit zehn statt zwanzig Releases. Und die Auswahl dort war eine Abschrift
+mit der 14-Tage-Frist aus Stufe 20, während der Code täglich fragt – seit 18g misst der
+Test mit der Bedingung des Codes.

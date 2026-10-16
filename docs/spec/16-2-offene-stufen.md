@@ -10,6 +10,8 @@ unten ausdrücklich als offen.
 **20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
 20h und 20f sind am 11.10.2026 abgenommen; **als Nächstes 20g** – dort ist alles entschieden außer der relativen Regel, die ab dem 03.11.2026 messbar wird.
 
+**Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt (unten, „Offen: die CPU-Grenze"). Wann 20g folgt, ist danach zu entscheiden.
+
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 
 Ein untaugliches Angebot lässt sich verwerfen und das Verwerfen zurücknehmen. Idee des Nutzers
@@ -142,6 +144,35 @@ Deploys samt Produktionsprüfungen, und der Zähler stand bei **282 512**. Deplo
 erklärt die Million also nicht; näher liegt die Messsitzung des 09.10. selbst, die über sechs
 Tage Preisverlauf und alle Releases gelesen hat. Gehört einmal eigens angesehen, blockiert
 aber keine Teilstufe.
+
+#### Offen: die CPU-Grenze
+
+Seit dem 10.10.2026 bricht die Laufzeit Cron-Aufrufe an der 10-ms-Grenze ab; **kein Schritt bleibt
+darunter**, auch der Leerlauf nicht ([10.1](10-1-cron.md), „Was ein Aufruf wirklich an CPU
+kostet"). Der Bezahlplan ist ausgeschlossen (Entscheidung des Nutzers vom 16.10.2026). In dieser
+Reihenfolge, **erst messen, dann bauen**:
+
+1. **Der Leerlauf (12–20 ms):** wofür die CPU draufgeht – Start der Instanz, Verdichten des
+   Verlaufs, JSON in `app_setting`, Routing – und ob er unter rund 5 ms kommt. Er ist die
+   Untergrenze: Solange sie über 10 ms liegt, passt keine Arbeitseinheit.
+2. **Je Schritt die kleinste Arbeitseinheit und ihre CPU-Zeit:** Markt und Store je Release,
+   Spielzeit und Sync je Seite, und ob PSN kleinere Seiten erlaubt.
+3. **Cron je Minute statt alle fünf Minuten:** wie viele Aufrufe das gäbe und was die Free-Grenzen
+   dazu sagen. Hilft nur, wenn jeder einzelne Aufruf unter 10 ms bleibt.
+
+Gemessen wird auf Cloudflare, nicht nur in Node: in einem **eigenen Worker** ohne D1-Binding und
+ohne Secrets, nur mit Messrouten auf nachgebauten Eingaben, Code auf eigenem Branch, nach der
+Messung gelöscht (Entscheidung des Nutzers vom 16.10.2026). Ergebnis je Schritt: trägt mit
+kleinerer Portion, trägt nur mit Cron je Minute, oder trägt nicht – **erst dann wird über eine
+Verlagerung in GitHub Actions entschieden.** Dort ist vorab zu prüfen, ob PSN die Adressen von
+GitHub abweist, wie es für die Kaufliste und Cloudflares Adressen vermutet wird (7.7).
+
+**Danach, als eigener Nachtrag: der Marktschritt.** Bestätigt sich der Abgleich als Ursache, wird
+er an der Regel „Abgleiche bereiten den Bestand einmal vor" ausgerichtet – Titel einmal zerlegen
+statt je Prüfung, ein Wortindex je Aufruf statt jedes Angebot gegen alle Spiele (Vorgabe des
+Nutzers vom 16.10.2026). Dazu gehört die **Auswahl, die im Leerlauf 430 Zeilen liest** (10.1,
+Schritt 14). Derselbe Fehler wie bei `offen` steckt in der Store-Zeile: `offen` zählt dort Releases
+ohne Stempel mit Produkt-Id im ganzen Bestand, nicht das Fällige – nicht angefasst, notiert.
 
 **Die fünf finalen Stufen** – die Sammlung finalisieren, Oberfläche, Refactoring
 (abgetragen), Wiederherstellungsprobe, Außendarstellung – stehen in

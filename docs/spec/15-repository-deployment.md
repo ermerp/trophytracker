@@ -128,8 +128,10 @@ sind die Grenzen ohnehin um Größenordnungen entfernt: ein Sitz von 50, und ein
 Trophäen-Sync erzeugt einige hundert Anfragen, nicht hunderttausend. Die 72 Cron-Aufrufe je
 Nacht (10.1, zwei Einträge von fünf erlaubten) zählen als Anfragen. **Gemessen am 01.10.2026:
 116 040 gelesene und 799 geschriebene Zeilen in 24 Stunden**; die Rechnung aus den Einzelkosten
-liegt heute bei rund 80 800 im Leerlauf (10.1), und die 24-Stunden-Messung liegt vor der
-Erweiterung des Wartungsfensters. Von den beiden Grenzen ist die **Schreibgrenze** die
+liegt seit Stufe 18g bei rund 96 400 im Leerlauf (10.1, vorher ohne Marktauswahl gerechnet
+80 800); gemessen am 16.10.2026: **216 950 gelesene und 2 977 geschriebene Zeilen** in 24 Stunden,
+ohne Import. **Die CPU-Grenze je Aufruf dagegen hält kein Cron-Schritt ein** (10.1, „Was ein
+Aufruf wirklich an CPU kostet"). Von den beiden Grenzen ist die **Schreibgrenze** die
 engere, sobald eine Stufe den Bestand einmal durchschreibt: Stufe 19b käme mit 18 355 Trophäen
 auf rund 37 000 Schreibungen (7.7).
 
