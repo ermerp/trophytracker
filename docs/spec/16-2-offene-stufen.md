@@ -186,7 +186,7 @@ Adressen von GitHub abweist, wie es für die Kaufliste und Cloudflares Adressen 
 **Die Reihenfolge der Nachträge** (Entscheidung des Nutzers vom 16.10.2026), jeder einzeln
 zurücknehmbar und einzeln gemessen: **18i** Token-Erneuerung im PSN-Leerlauf (gebaut, 10.1
 Schritt 7) → **18j** Ablauf: ein Lese- und ein Schreib-Batch je Cron-Aufruf, gemessen am Leerlauf,
-mit der Regel in CLAUDE.md → **18k** Spielzeit mit `IN`-Listen und **18l** Store-Leser (ein
+nach der Regel in CLAUDE.md (CPU-Grenze) → **18k** Spielzeit mit `IN`-Listen und **18l** Store-Leser (ein
 Release je Aufruf, Bytes sammeln und einmal dekodieren statt je Stück zu suchen; ganz am Stück
 wäre bei 380 KB bis 1,4 MB je Seite teurer) – beide in derselben Nacht, aber eine Nacht nach 18j,
 damit ihre Wirkung nicht mit der Grundlast vermischt → nachmessen → **20i** Markt. Erst mit den

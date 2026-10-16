@@ -635,5 +635,13 @@ der Leerlauf rechnet 1 ms, die Spielzeit für 200 Titel 6 ms – und der **D1-Au
 rund 0,7 ms je Abfrage, 217 Abfragen für eine Spielzeit-Seite, 170 ms. Ein Batch mit 100
 Anweisungen kostete 2 ms, 100 einzelne Abfragen 35–45. Die Lesekosten-Messung zählt Zeilen und
 sah davon nichts: Zeilen sind fast umsonst (1 000 in einer Abfrage: 2,3 ms), Aufrufe nicht.
-→ Regel-Kandidat: Ein Schritt im Cron wird an seiner **Zahl der D1-Aufrufe** gemessen, nicht nur an
-den gelesenen Zeilen und der Rechenarbeit.
+→ Regel in CLAUDE.md (CPU-Grenze): Gezählt wird nicht die Arbeit, sondern die D1-Aufrufe je
+Cron-Aufruf.
+
+**16.10.2026 – vorgeschlagen war, in einer Vorschau-Version des Produktions-Workers zu messen.**
+Sie hätte alle Routen, die Produktions-D1 und alle Secrets getragen, und ob Access die
+Vorschau-Adressen schützt, war nicht geprüft. Der Nutzer hat es abgelehnt; gemessen wurde in einem
+eigenen Worker ohne Bindungen, dann mit einer Wegwerf-D1, beide danach gelöscht. Der Ersatz war
+nicht schlechter: Der Leerlauf ließ sich daraus in Rechnen, D1-Aufrufe und Start zerlegen, was in
+der Produktion gar nicht ginge.
+→ Regel in CLAUDE.md (Arbeitsweise, „Auch ein GET kann schreiben").

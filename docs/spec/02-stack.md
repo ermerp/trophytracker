@@ -19,7 +19,7 @@
 
 Migrations über Wrangler D1 Migrations. Repository auf GitHub, die Deploy-Action baut und deployt bei Push auf `main`.
 
-**Hinweis zur CPU-Grenze:** Der Free Tier begrenzt auf 10 ms CPU pro Aufruf. D1-Abfragen und Netzwerk-Wartezeit zählen nicht mit, nur Rechenzeit im Worker selbst. Die zusätzlichen Views sind daher unkritisch. Kritisch bleibt ausschliesslich das Parsen grosser Fremddaten – siehe 7.3.
+**Hinweis zur CPU-Grenze:** Der Free Tier begrenzt auf 10 ms CPU pro Aufruf. Die Wartezeit auf D1 und Netz zählt nicht mit, **jeder D1-Aufruf selbst aber schon** – rund 0,7 ms, mehr als das meiste Rechnen; ein Batch kostet je Anweisung ein Zwanzigstel, eine zurückgegebene Zeile fast nichts (gemessen am 16.10.2026, [10.1](10-1-cron.md)). Views sind deshalb unkritisch, viele einzelne Abfragen nicht. Teuer sind daneben große Fremdantworten, vor allem als Strom gelesen (7.3, 7.4).
 
 **Hinweis zur Zeilenlese-Grenze:** D1 zählt gelesene Zeilen – gescannte, nicht zurückgegebene – und
 der Free Tier erlaubt 5 Millionen am Tag. Ist die Grenze erreicht, antwortet jede Abfrage aus dem
