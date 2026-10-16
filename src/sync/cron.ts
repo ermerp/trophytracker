@@ -234,8 +234,10 @@ export async function cronSchritt(
 				//    wenn nichts mehr zu fuellen ist: ein einzelner Abruf, der
 				//    niemals einen Aufruf kostet, den die Erstbefuellung
 				//    braucht.
-				const { accessToken } = await sitzungBesorgen(repos, psn);
-				const level = await levelSchritt(repos, psn, accessToken, heute);
+				//    Die Sitzung holt der Schritt erst, wenn das Level faellig ist
+				//    (Stufe 18i) - vorher erneuerte jeder Leerlauf das Token.
+				const token = async () => (await sitzungBesorgen(repos, psn)).accessToken;
+				const level = await levelSchritt(repos, psn, token, heute);
 				if (level) return { ...basis, getan: "level", level: level.level };
 			} catch (fehler) {
 				// Ein abgelaufener Zugang oder ein PSN-Ausfall darf die Nacht

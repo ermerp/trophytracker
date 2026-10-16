@@ -183,11 +183,14 @@ die je Aufruf unter 10 ms bleiben** – also erst nach den Änderungen oben.
 Wortindex als Zeile, oder GitHub Actions. Für GitHub Actions ist vorab zu prüfen, ob PSN die
 Adressen von GitHub abweist, wie es für die Kaufliste und Cloudflares Adressen vermutet wird (7.7).
 
-**Vorgemerkt als eigener kleiner Nachtrag (Wunsch des Nutzers vom 16.10.2026):** Der PSN-Leerlauf
-erneuert bei **jedem** Aufruf das Token bei Sony und schreibt es zurück, weil `sitzungBesorgen`
-vor der Prüfung läuft, ob das Trophäen-Level heute schon geholt ist (10.1, Schritt 7). Das sind
-rund zwanzig Anfragen an eine inoffizielle Schnittstelle je Nacht, die nichts holen, und drei
-D1-Aufrufe je Leerlauf. Die Prüfung gehört vor die Sitzung.
+**Die Reihenfolge der Nachträge** (Entscheidung des Nutzers vom 16.10.2026), jeder einzeln
+zurücknehmbar und einzeln gemessen: **18i** Token-Erneuerung im PSN-Leerlauf (gebaut, 10.1
+Schritt 7) → **18j** Ablauf: ein Lese- und ein Schreib-Batch je Cron-Aufruf, gemessen am Leerlauf,
+mit der Regel in CLAUDE.md → **18k** Spielzeit mit `IN`-Listen und **18l** Store-Leser (ein
+Release je Aufruf, Bytes sammeln und einmal dekodieren statt je Stück zu suchen; ganz am Stück
+wäre bei 380 KB bis 1,4 MB je Seite teurer) – beide in derselben Nacht, aber eine Nacht nach 18j,
+damit ihre Wirkung nicht mit der Grundlast vermischt → nachmessen → **20i** Markt. Erst mit den
+Zahlen aus 20i entscheidet der Nutzer zwischen Wortindex-Zeile, Cron je Minute und GitHub Actions.
 
 **Danach, als eigener Nachtrag: der Marktschritt** – an der Regel „Abgleiche bereiten den Bestand
 einmal vor" ausgerichtet: Titel einmal zerlegen statt je Prüfung, ein Wortindex je Aufruf statt

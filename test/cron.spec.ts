@@ -198,7 +198,7 @@ beforeEach(async () => {
 	await env.DB.batch([
 		env.DB.prepare("DELETE FROM game_event"),
 		// Der Verlauf lebt in app_setting und ueberdauert sonst den Test.
-		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_begonnen', 'trophaeen_jahre', 'psn_spielzeit_stand', 'psn_besitz_stand')"),
+		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_begonnen', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand')"),
 		env.DB.prepare("DELETE FROM psn_raw_response"),
 		env.DB.prepare("DELETE FROM psn_sync_run"),
 		env.DB.prepare("DELETE FROM psn_credentials"),
@@ -609,6 +609,34 @@ describe("cronSchritt", () => {
 		}
 
 		expect(await r.sync.cronVerlauf()).toEqual(["2026-09-27 03:00–03:10 cron: sync ×3 sync=laufend/abruf offset=200"]);
+	});
+
+	it("ein PSN-Leerlauf erneuert kein Token, wenn das Level von heute ist (Stufe 18i)", async () => {
+		// Alles getan: Sync von heute, Spielzeit und Kaufliste durch, nichts zu
+		// fuellen, Level von heute. Bis 18i holte der Aufruf trotzdem eine
+		// Sitzung - eine Anfrage an Sony und ein neu verschluesseltes Token.
+		const r = repos();
+		await r.credentials.npssoSpeichern(new Geheimnis("npsso-test"));
+		await r.credentials.refreshTokenSpeichern(new Geheimnis("refresh-test"), new Date(Date.now() + 30 * 86_400_000).toISOString());
+		await env.DB.prepare(
+			"INSERT INTO psn_sync_run (started_at, finished_at, status, next_offset, started_by) VALUES (datetime('now'), datetime('now'), 'erfolg', 0, 'cron')",
+		).run();
+		const setting = env.DB.prepare("INSERT INTO app_setting (key, value) VALUES (?, ?)");
+		await env.DB.batch([
+			setting.bind("psn_spielzeit_stand", `${HEUTE}:-1`),
+			setting.bind("psn_besitz_stand", JSON.stringify({ fertigAm: HEUTE })),
+			setting.bind("trophaeen_level", JSON.stringify({ level: 514, punkte: 1, bisNaechstes: 1, prozent: 1, standAm: HEUTE })),
+		]);
+		const token = async () =>
+			(await env.DB.prepare("SELECT refresh_ciphertext AS c FROM psn_credentials WHERE id = 1").first<{ c: string }>())?.c;
+		const vorher = await token();
+		const { psn, aufrufe } = psnMit(10);
+
+		const e = await cronSchritt(r, psn, igdbOhne(), ebayOhne(), storeOhne(), { bereich: "psn", heute: HEUTE });
+
+		expect(e.getan).toBe("nichts");
+		expect(aufrufe.filter((a) => /oauth/.test(a.url))).toHaveLength(0);
+		expect(await token()).toBe(vorher);
 	});
 
 	describe("Marke begonnen (Stufe 18g)", () => {

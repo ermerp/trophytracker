@@ -143,17 +143,26 @@ export async function trophaeenPortion(
  *
  * Ein einzelner Abruf, der nichts blockiert: Schlaegt er fehl, bleibt der
  * alte Stand stehen und die Anwendung zeigt ihn weiter (Abschnitt 17).
+ *
+ * Das Token kommt als FUNKTION, nicht als Wert (Stufe 18i): Erst wenn das
+ * Level heute noch fehlt, wird eine Sitzung geholt. Bis dahin holten beide
+ * Aufrufer - Cron und Portionsknopf - die Sitzung vorher, und jeder
+ * PSN-Leerlauf erneuerte damit das Token bei Sony und schrieb es zurueck,
+ * rund zwanzigmal je Nacht und fuer nichts: drei D1-Aufrufe und eine Anfrage
+ * an eine inoffizielle Schnittstelle (10.1, gemessen in Stufe 18h). Die
+ * Pruefung gehoert an den Schritt, nicht an seine Aufrufer - sonst erbt ein
+ * dritter Weg sie wieder nicht.
  */
 export async function levelSchritt(
 	repos: Repositories,
 	psn: PsnClient,
-	accessToken: Geheimnis,
+	token: () => Promise<Geheimnis>,
 	heute: string,
 ): Promise<LevelStand | null> {
 	const vorhanden = await levelStand(repos);
 	if (vorhanden?.standAm === heute) return null;
 
-	const roh = await psn.holeTrophySummary(accessToken);
+	const roh = await psn.holeTrophySummary(await token());
 	if (!roh || typeof roh.trophyLevel !== "number") return null;
 
 	const punkte = roh.trophyPoint ?? 0;
