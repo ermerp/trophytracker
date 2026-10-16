@@ -148,8 +148,8 @@ export const psnRoutes = new Hono<AppEnv>()
 		 * Cron holt (Rueckmeldung des Nutzers).
 		 */
 		if (vorher.offen === 0) {
-			const { accessToken } = await sitzungBesorgen(c.var.repos, c.var.psn);
-			const level = await levelSchritt(c.var.repos, c.var.psn, accessToken, heute);
+			const token = async () => (await sitzungBesorgen(c.var.repos, c.var.psn)).accessToken;
+			const level = await levelSchritt(c.var.repos, c.var.psn, token, heute);
 			await jahreSchritt(c.var.repos, heute);
 			return c.json({
 				listen: 0,

@@ -43,6 +43,7 @@ wurde, steht in [`entscheidungen.md`](../entscheidungen.md); was dabei
 | 18f | Wiederholung auch für den Spielzeit-Schritt: der Offset bleibt stehen, drei Anläufe (10.1) | – | – |
 | 18g | Der Cron hinterlässt eine Spur, auch wenn ihn die CPU-Grenze abbricht: Marke „begonnen", Tagesarbeiten vor dem Marktschritt, `offen` zählt das Fällige der Auswahl (10.1) | – | – |
 | 18h | CPU-Messung in einem eigenen Messworker und einer Wegwerf-D1, beide danach gelöscht: Die CPU geht in die D1-Aufrufe, nicht ins Rechnen; keine warme Instanz für Cron-Aufrufe (10.1, 16.2) | – | – |
+| 18i | Der PSN-Leerlauf erneuert kein Token mehr: `levelSchritt` holt die Sitzung erst, wenn das Level fällig ist – für Cron und Portionsknopf (10.1) | – | – |
 | 19 | Oberfläche: Gestaltungslinie „Vitrine" mit Tokens, vier Symbole in der Leiste, Reiter, Chips, Startseite `/start` (13) | – | – |
 | 19a | Dashboard an der Stelle der Startseite: `GET /api/stats`, Warnung und Information getrennt, Glocke (13) | – | 27.09.2026 |
 | 19b | Einzeltrophäen je Spiel: Definition, Stand, Seltenheit mit Stufe, Fortschrittszähler, Gruppen, Trophäen-Level; Erstbefüllung nachts plus Portionsknopf (7.7) | 0027 | 02.10.2026 |

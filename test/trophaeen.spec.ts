@@ -301,14 +301,32 @@ describe("Fuellschritt", () => {
 
 	it("holt das Level hoechstens einmal am Tag", async () => {
 		const { client, aufrufe } = psn();
-		const { accessToken } = await (await import("../src/sync/run")).sitzungBesorgen(repos(), client);
+		const { sitzungBesorgen } = await import("../src/sync/run");
+		const token = async () => (await sitzungBesorgen(repos(), client)).accessToken;
 
-		const erst = await levelSchritt(repos(), client, accessToken, HEUTE);
+		const erst = await levelSchritt(repos(), client, token, HEUTE);
 		expect(erst).toMatchObject({ level: 514, punkte: 310_380, bisNaechstes: 1_560, prozent: 13 });
 
-		const zweit = await levelSchritt(repos(), client, accessToken, HEUTE);
+		const zweit = await levelSchritt(repos(), client, token, HEUTE);
 		expect(zweit).toBeNull();
 		expect(aufrufe.filter((a) => /trophySummary/.test(a.url))).toHaveLength(1);
+	});
+
+	it("holt keine Sitzung, wenn das Level von heute ist (Stufe 18i)", async () => {
+		const { client, aufrufe } = psn();
+		const { sitzungBesorgen } = await import("../src/sync/run");
+		await levelSchritt(repos(), client, async () => (await sitzungBesorgen(repos(), client)).accessToken, HEUTE);
+		const tokenAbrufe = aufrufe.filter((a) => /oauth\/token/.test(a.url)).length;
+
+		let gefragt = 0;
+		const zweit = await levelSchritt(repos(), client, async () => {
+			gefragt++;
+			return (await sitzungBesorgen(repos(), client)).accessToken;
+		}, HEUTE);
+
+		expect(zweit).toBeNull();
+		expect(gefragt).toBe(0);
+		expect(aufrufe.filter((a) => /oauth\/token/.test(a.url))).toHaveLength(tokenAbrufe);
 	});
 });
 

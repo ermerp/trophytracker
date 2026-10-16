@@ -54,7 +54,12 @@ Jeder Aufruf tut in dieser Reihenfolge genau **eines** und hört dann auf – wa
    Zeilen je Aufruf im Dauerbetrieb, 15 480 je Nacht.
 7. Sonst das **Trophäen-Level** (`trophySummary`), höchstens einmal am Tag und nur, wenn nichts
    mehr zu füllen ist: ein einzelner Abruf, der nie einen Aufruf kostet, den die Erstbefüllung
-   braucht. Schlägt er fehl, bleibt der alte Stand stehen.
+   braucht. Schlägt er fehl, bleibt der alte Stand stehen. **Die Sitzung holt der Schritt selbst,
+   und erst, wenn das Level heute noch fehlt** (Stufe 18i): `levelSchritt` bekommt statt des Tokens
+   eine Funktion, die es holt. Bis dahin holten Cron und Portionsknopf die Sitzung vorher, und jeder
+   PSN-Leerlauf erneuerte das Token bei Sony und schrieb es zurück – rund zwanzigmal je Nacht, drei
+   D1-Aufrufe und eine Anfrage an eine inoffizielle Schnittstelle, die nichts holte (gefunden in der
+   Messung 18h).
 8. Sonst **Store-Preise** (7.4, Stufe 21) – zehn Releases je Aufruf, täglich. Steht im PSN-Fenster,
    aber **ausserhalb der Zugangsprüfung**: Es ist Sonys Schnittstelle, sie braucht aber kein Token,
    und ein abgelaufenes NPSSO darf die Preise nicht stilllegen. Ganz hinten in der PSN-Kette, damit
