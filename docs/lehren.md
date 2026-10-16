@@ -627,3 +627,13 @@ nicht mit (**430 Zeilen** je Aufruf, obwohl nichts fällig ist) und rechnete den
 Schreibpfad mit zehn statt zwanzig Releases. Und die Auswahl dort war eine Abschrift
 mit der 14-Tage-Frist aus Stufe 20, während der Code täglich fragt – seit 18g misst der
 Test mit der Bedingung des Codes.
+
+**16.10.2026 (Stufe 18h) – gespart wurde an der falschen Stelle.** Seit Stufe 18 war die
+10-ms-Grenze eine Grenze für **Rechenarbeit**: eine Seite holen *oder* auswerten, Sammlung einmal
+vorbereiten, Portionen nach Fremdanfragen schneiden. Gemessen ist, dass das Rechnen klein ist –
+der Leerlauf rechnet 1 ms, die Spielzeit für 200 Titel 6 ms – und der **D1-Aufruf** der Posten:
+rund 0,7 ms je Abfrage, 217 Abfragen für eine Spielzeit-Seite, 170 ms. Ein Batch mit 100
+Anweisungen kostete 2 ms, 100 einzelne Abfragen 35–45. Die Lesekosten-Messung zählt Zeilen und
+sah davon nichts: Zeilen sind fast umsonst (1 000 in einer Abfrage: 2,3 ms), Aufrufe nicht.
+→ Regel-Kandidat: Ein Schritt im Cron wird an seiner **Zahl der D1-Aufrufe** gemessen, nicht nur an
+den gelesenen Zeilen und der Rechenarbeit.
