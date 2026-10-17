@@ -1,6 +1,7 @@
 import { quelleAusMatch, type EreignisQuelle } from "../domain/ereignis";
 import type { IgdbKandidat, IgdbMetadaten } from "../domain/igdb";
 import { anzeigeTitel, titelSchluessel, type Plattform } from "../domain/titel";
+import { eins, einzeln, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 
 export type UngeprueftesSpiel = {
@@ -234,6 +235,11 @@ export class IgdbRepository {
 	 * Binds (Zeilenlese-Regel).
 	 */
 	async zumAuffrischen(n: number, mindestAlterTage = 0): Promise<Array<{ id: number; igdb_id: number }>> {
+		return einzeln(this.db, this.zumAuffrischenBaustein(n, mindestAlterTage));
+	}
+
+	/** Dieselbe Auswahl als Baustein - fuer den Lage-Batch des Cron (Stufe 18j). */
+	zumAuffrischenBaustein(n: number, mindestAlterTage = 0): Baustein<Array<{ id: number; igdb_id: number }>> {
 		// Der Modifier steht als Text im Statement, nicht als Bind - Zahl aus
 		// einer Konstanten, nie aus einer Eingabe (CLAUDE.md). Stufe 18b hatte
 		// das angekuendigt, aber nur in der Zaehlabfrage der Statusanzeige
@@ -244,15 +250,14 @@ export class IgdbRepository {
 			mindestAlterTage > 0
 				? `AND (igdb_synced_at IS NULL OR igdb_synced_at < datetime('now', '-${Math.trunc(mindestAlterTage)} days')) `
 				: "";
-		const { results } = await this.db
+		const statement = this.db
 			.prepare(
 				"SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL " +
 					frist +
 					"ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT ?",
 			)
-			.bind(n)
-			.all<{ id: number; igdb_id: number }>();
-		return results;
+			.bind(n);
+		return eins(statement, (e) => zeilen<{ id: number; igdb_id: number }>(e));
 	}
 
 	/**
@@ -268,11 +273,17 @@ export class IgdbRepository {
 		"AND (r.physical_checked_at IS NULL OR r.physical_checked_at < datetime('now', '-30 days')))";
 
 	async zurDiscPruefung(n: number): Promise<Array<{ id: number; igdb_id: number }>> {
-		const { results } = await this.db
-			.prepare(`SELECT g.id, g.igdb_id FROM game g WHERE ${IgdbRepository.DISC_OFFEN} ORDER BY g.id LIMIT ?`)
-			.bind(n)
-			.all<{ id: number; igdb_id: number }>();
-		return results;
+		return einzeln(this.db, this.zurDiscPruefungBaustein(n));
+	}
+
+	/** Dieselbe Auswahl als Baustein - fuer den Lage-Batch des Cron (Stufe 18j). */
+	zurDiscPruefungBaustein(n: number): Baustein<Array<{ id: number; igdb_id: number }>> {
+		return eins(
+			this.db
+				.prepare(`SELECT g.id, g.igdb_id FROM game g WHERE ${IgdbRepository.DISC_OFFEN} ORDER BY g.id LIMIT ?`)
+				.bind(n),
+			(e) => zeilen<{ id: number; igdb_id: number }>(e),
+		);
 	}
 
 	/**

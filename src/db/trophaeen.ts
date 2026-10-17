@@ -1,4 +1,5 @@
 import type { GruppeZeile, TrophaeeZeile } from "../domain/trophaee";
+import { eins, einzeln, zeilen, type Baustein } from "./baustein";
 
 /** Eine Liste, die der Fuellschritt als Naechstes holen soll. */
 export type ZuFuellen = { npCommunicationId: string; npServiceName: string };
@@ -26,6 +27,17 @@ export type TrophaeeAnzeige = {
 const ZAEHLERSUMME =
 	"(earned_bronze + earned_silver + earned_gold + earned_platinum + " +
 	"defined_bronze + defined_silver + defined_gold + defined_platinum)";
+
+/**
+ * Die Auswahl der offenen Listen (Stufe 18j, Migration 0034): zwei
+ * Teilabfragen statt eines OR, jede auf ihrem Teilindex. Exportiert, damit
+ * der Test den Abfrageplan DIESER Abfrage prueft und keiner Abschrift.
+ */
+export const ZU_FUELLEN_SQL =
+	"SELECT np_communication_id, np_service_name FROM trophy_progress WHERE trophies_synced_at IS NULL " +
+	"UNION SELECT np_communication_id, np_service_name FROM trophy_progress " +
+	`WHERE trophies_synced_sum <> ${ZAEHLERSUMME} ` +
+	"ORDER BY np_communication_id LIMIT ?";
 
 /**
  * Hoechstens sechs Trophaeen je INSERT: D1 erlaubt 100 gebundene Werte je
@@ -96,18 +108,26 @@ export class TrophaeenRepository {
 	 * und ein Abbruch genau dort weitermacht, wo er aufgehoert hat.
 	 */
 	async naechsteZumFuellen(limit: number): Promise<ZuFuellen[]> {
-		const { results } = await this.db
-			.prepare(
-				"SELECT np_communication_id, np_service_name FROM trophy_progress " +
-					`WHERE trophies_synced_at IS NULL OR trophies_synced_sum <> ${ZAEHLERSUMME} ` +
-					"ORDER BY np_communication_id LIMIT ?",
-			)
-			.bind(limit)
-			.all<{ np_communication_id: string; np_service_name: string }>();
-		return results.map((r) => ({
-			npCommunicationId: r.np_communication_id,
-			npServiceName: r.np_service_name,
-		}));
+		return einzeln(this.db, this.naechsteZumFuellenBaustein(limit));
+	}
+
+	/**
+	 * Dieselbe Auswahl als Baustein - fuer den Lage-Batch des Cron (Stufe 18j).
+	 *
+	 * Die beiden Faelle stehen als UNION zweier Teilabfragen da, nicht als OR:
+	 * Jede trifft ihren Teilindex aus Migration 0034, und im Leerlauf sind
+	 * beide leer. Mit OR las die Abfrage die ganze Tabelle, rund 430 Zeilen in
+	 * jedem PSN-Leerlauf (Befund vom 17.10.2026). Die Bedingungen muessen
+	 * woertlich denen der Indizes entsprechen.
+	 */
+	naechsteZumFuellenBaustein(limit: number): Baustein<ZuFuellen[]> {
+		const statement = this.db.prepare(ZU_FUELLEN_SQL).bind(limit);
+		return eins(statement, (e) =>
+			zeilen<{ np_communication_id: string; np_service_name: string }>(e).map((r) => ({
+				npCommunicationId: r.np_communication_id,
+				npServiceName: r.np_service_name,
+			})),
+		);
 	}
 
 	/**

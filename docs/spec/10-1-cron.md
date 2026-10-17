@@ -39,6 +39,36 @@ fünfzehn Schritte in ihrer Reihenfolge, jeder mit seiner Begründung, stehen in
 [10-1-cron-schritte.md](10-1-cron-schritte.md)** – 1 bis 8 gehören dem PSN-Fenster, 9 bis 15
 der Wartung.
 
+**Ein Lese- und ein Schreib-Batch (Stufe 18j).** Gezählt wird nicht die Arbeit, sondern die
+D1-Aufrufe: In 18h kostete ein Aufruf rund 0,7 ms CPU, eine Anweisung in einem Batch ein Zwanzigstel
+davon (unten). Bis 18j fragte jeder Aufruf seine Lage Schritt für Schritt ab – zehn D1-Aufrufe im
+Leerlauf der Wartung, 16 im PSN-Fenster. Seither:
+
+1. **Der Lage-Batch** (`CronLageRepository`, `src/db/cron-lage.ts`) liest in **einer** Transaktion
+   alles, was die Entscheidung braucht, und erledigt dabei, was vor jeder Arbeit stehen muss: die
+   Marke „begonnen" ([10-1-cron-verlauf.md](10-1-cron-verlauf.md)), die Hänger, und in der Wartung
+   die beiden Daueraufgaben Freigabe und Aufräumen. Die Reihenfolge der Anweisungen ist im Code
+   begründet – Marke zuerst, Hänger vor „läuft ein Lauf?".
+2. `entscheide(lage)` wählt rein und ohne D1 die fälligen Schritte in der Reihenfolge von
+   [10-1-cron-schritte.md](10-1-cron-schritte.md); der Schritt bekommt seine Auswahl übergeben.
+3. **Der Ausgangs-Batch** schreibt Verlaufszeile, Fakten (`cron_stand`) und das Wegräumen der Marken.
+
+Ein Leerlauf sind damit **zwei** D1-Aufrufe; `test/cron-lage.spec.ts` zählt sie über eine D1, die
+ihre Aufrufe zählt (`test/d1-zaehler.ts`). Was ein arbeitender Schritt in sich abfragt, bleibt bis
+18k, 18l und 20i, wie es ist.
+
+**Scheitert eine Anweisung des Lage-Batchs, scheitert er ganz** – auch die Marke wird nicht gesetzt,
+gearbeitet wird nichts, und der Aufruf schreibt „cron: abgebrochen". Halb geschehen ist dann nichts.
+Der Preis: Scheitert eine Anweisung dauerhaft (etwa ein Schema, das nach einem Deploy nicht passt),
+steht die ganze Automatik, nicht nur ihr Schritt, und D1 sagt nicht verlässlich, welche Anweisung es
+war. Bewusst so gelassen – für diese Anweisungen gibt es keinen Fehler, der eine allein trifft, und
+der Verlauf zeigt den Stillstand ab dem ersten Aufruf.
+
+**Knopf und Cron sehen dieselbe Auswahl** (Vorgabe des Nutzers vom 17.10.2026, die Lehre aus 18e):
+Jede Auswahl ist ein *Baustein* (`src/db/baustein.ts`) – Anweisung plus Auswertung – im Repository.
+Die Repository-Methode, die die Portionsknöpfe in den Einstellungen rufen, führt ihn allein aus;
+der Lage-Batch fügt denselben Baustein ein. Eine zweite Fassung der Abfrage gibt es nicht.
+
 Die elf Sync-Aufrufe bei 431 Titeln sind fünf Seiten holen, fünf auswerten und der Abschluss.
 
 **Die Auffrisch-Last kommt in Schüben, nicht gleichmäßig.** „Ein bis zwei Aufrufe für IGDB" gilt
@@ -76,19 +106,24 @@ Einträge sind frei.
 
 Die Lesekosten sinken mit der Aufteilung, weil jedes Fenster nur noch seine eigenen Abfragen
 liest: Die drei teuren (erschienene Titel, IGDB-Auswahl, Disc-Auswahl) laufen nicht mehr im
-PSN-Fenster mit. Gemessen in `test/lesekosten.spec.ts` bei 430 Listen (Stand 16.10.2026, Stufe
-18g): ein Leerlauf im PSN-Fenster liest **20** Zeilen (`psn_sync_run`, die Store-Auswahl, Marke und
-Verlauf), einer in der Wartung **2 659** – weit unter dem Tagesbudget von fünf Millionen. Bis 18g
-standen hier 15 + 4 und **2 226**: Die Summe zählte die Auswahl des Marktschritts nicht mit (430
-Zeilen, obwohl nichts fällig ist), ebenso wenig Verlauf und Jahre-Stand – gemessen war die
-Abfrage, nicht der Aufruf.
+PSN-Fenster mit. **Gemessen wird seit Stufe 18j der ganze Aufruf durch den echten Einstieg**, mit
+eingerichtetem PSN-Zugang und einer D1, die `meta.rows_read` aller Anweisungen summiert
+(`test/lesekosten.spec.ts`, 430 Listen, Stand 17.10.2026): ein Leerlauf im PSN-Fenster liest **42**
+Zeilen, einer in der Wartung **2 218** – weit unter dem Tagesbudget von fünf Millionen.
 
-**Der Leerlauf einer Nacht summiert sich auf rund 96 400 Zeilen** (20 × 36 + 2 659 × 36; bis 18g
-gerechnet 80 784) – aus den gemessenen Einzelkosten, nicht frisch über 24 Stunden gemessen. Die
-letzte 24-Stunden-Messung ohne Import: **216 950** gelesene und **2 977** geschriebene Zeilen
-am 16.10.2026, in einer Woche mit abgebrochenen Wartungsaufrufen (unten); die vorige, 116 040 am
-01.10.2026 (15.4), liegt vor der Erweiterung des Wartungsfensters. Die Marke aus 18g schreibt zwei
-Zeilen je Aufruf, **144** je Nacht.
+Bis dahin war die Summe aus nachgebauten Einzelabfragen zusammengesetzt und lag zweimal daneben;
+als Aufruf gemessen, stand die Wartung vor Migration 0034 bei **3 075** statt der geführten 2 659
+([lehren.md](../lehren.md), 17.10.2026).
+
+**Der Leerlauf einer Nacht summiert sich auf rund 81 400 Zeilen** (42 × 36 + 2 218 × 36; bis 18j
+gerechnet 96 444, bis 18g 80 784) – aus den gemessenen Einzelkosten, nicht frisch über 24 Stunden
+gemessen. Geschrieben werden je Aufruf fünf Zeilen (Marke setzen und wegräumen, Verlauf, Stand),
+**360** je Nacht. Gemessen über 24 Stunden ohne Import: **216 950** gelesene und **2 977**
+geschriebene Zeilen am 16.10.2026, in einer Woche mit abgebrochenen Wartungsaufrufen (unten);
+**325 631** und **3 537** am 17.10.2026 um 12:17 UTC, davon die Nacht – die erste vollständige
+Wartung seit dem 10.10. – rund **178 600** gelesene (PSN 32 900, Wartung 145 700, zugeordnet je
+Abfrage über die D1-Analytics `d1QueriesAdaptiveGroups`); die vorige Messung, 116 040 am 01.10.2026
+(15.4), liegt vor der Erweiterung des Wartungsfensters.
 
 **Der Leerlauf ist aber nicht die Nacht.** Die *arbeitenden* Aufrufe kosten mehr: Der
 Spielzeit-Schritt allein las über einen Titelabgleich ohne Index rund **145 000** Zeilen je Nacht,
@@ -113,7 +148,8 @@ Cron-Aufruf, Aufbewahrung 90 Tage), für 863 Aufrufe vom 05. bis 16.10.2026 – 
 **Kein einziger Schritt bleibt unter 10 ms, auch der Leerlauf nicht.** Dass es trotzdem lief,
 liegt an einer Duldung: Cloudflare gesteht Workern, die die Grenze *selten* überschreiten, eine
 nicht bezifferte Flexibilität zu; bei dauerhafter Überschreitung wird abgebrochen. Beobachtet:
-Bis zum 09.10. wurde jeder Aufruf geduldet. Ab dem 10.10. bricht die Laufzeit nach einer Folge
+Vom 05. bis 09.10. wurde jeder Aufruf geduldet – am **04.10.**, vor dem Messzeitraum, brachen
+schon 22 Wartungsaufrufe ab (nachgemessen am 17.10.2026). Ab dem 10.10. bricht die Laufzeit nach einer Folge
 schwerer Aufrufe für ein bis vier Stunden **jeden** Aufruf bei genau 10,0 ms ab (`exceededResources`),
 auch den Leerlauf – 12 von 36 Wartungsaufrufen am 10.10., 35 am 11.10. (dort schon ab 05:25 im
 PSN-Fenster), 15 bis 33 an jedem Tag danach. Am 16.10. lief es von 08:05 an wieder. Ausgelöst
@@ -146,9 +182,27 @@ schon einen Aufruf hinter sich hatte. Etwas auf Modulebene zwischen Cron-Aufrufe
 etwa die vorbereitete Sammlung des Marktschritts – bringt deshalb nichts; im Fünf-Minuten-Takt
 der Produktion erst recht nicht.
 
-**Ungeklärt:** warum der Gebrauchtpreis-Aufruf am 10.10. um 07:00 von rund 70 auf rund 140 ms
-sprang – an dem Tag gab es keinen Deploy; am 13.10. kosteten die frühen Aufrufe 68 ms, die späten
-138. Was daraus für jeden Schritt folgt und was zu entscheiden ist: [16.2](16-2-offene-stufen.md).
+**Der Standort zählt mit** (nachgemessen am 17.10.2026 über `workersInvocationsAdaptive`, das je
+Aufruf das Rechenzentrum nennt, `coloCode`). Der „Sprung am 10.10." war kein Sprung des Marktschritts
+um 07:00: Er lag schon vor dem Sync um 03:00 und traf **jeden** Schritt, und er fällt mit einem
+Umzug des Crons zusammen:
+
+| Nächte | Standort des Crons | Sync | Spielzeit | Gebrauchtpreise |
+|---|---|---|---|---|
+| 04.–08.10. | Newark (EWR), jede Nacht | ~10 ms | 115–150 ms | ~68 ms |
+| 10.–16.10. | **Singapur (SIN), jeder Aufruf** | 16–17 ms | 200–250 ms | ~140 ms |
+| 17.10. | verstreut über die USA (ATL, EWR, IAD, ORD, LAX, SJC …) | 15 ms | 100–124 ms | 97 ms |
+
+Die D1 liegt in Osteuropa (EEUR). Das ist eine **Korrelation, keine belegte Ursache**, und sie
+erklärt nicht alles: Am 13.10. lief jeder Aufruf in Singapur, und trotzdem kosteten die frühen
+Gebrauchtpreis-Aufrufe 68 ms, die späten 138. Innerhalb der einen Nacht zum 17.10. streute der
+PSN-Leerlauf je Standort um rund 5 ms (EWR 11,4–12,5, ATL und IAD 15–18) – **mehr, als ein
+einzelner Nachtrag bewirkt**. Für die Messungen heißt das: **Nächte nur je Standort vergleichen**
+([lehren.md](../lehren.md)). Gemessen wird dafür `workersInvocationsAdaptive` je Minute (im
+Fünf-Minuten-Takt ist ein Wert ein Aufruf); `workersInvocationsScheduled` war am 17.10.2026 seit dem
+Vortag 09:00 leer, und Adaptive ist eine Stichprobe – in der Nacht zum 17.10. fehlte dort einer von
+72 Aufrufen. Ob sich der Standort festlegen lässt, wird nach 18j bis 18l recherchiert. Was daraus
+für jeden Schritt folgt und was zu entscheiden ist: [16.2](16-2-cpu-und-betrieb.md).
 Der Bezahlplan ist ausgeschlossen (Entscheidung des Nutzers vom 16.10.2026).
 
 Seit Stufe 18g hinterlässt ein so abgebrochener Aufruf eine Spur – die Marke „begonnen",

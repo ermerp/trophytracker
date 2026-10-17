@@ -2,6 +2,7 @@ import { quelleAusMatch, type EreignisQuelle } from "../domain/ereignis";
 import type { TrophyEintrag } from "../domain/gruppen";
 import type { PlayStatus } from "../domain/play-status";
 import { SUCHE_SQL, suchbar, titelSchluessel, type Plattform } from "../domain/titel";
+import { einzeln, geaendert, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 
 export type ZuOrdnenderRelease = {
@@ -829,16 +830,27 @@ aeenliste haengt
 	 * das Datum ohnehin selbst.
 	 */
 	async erschieneneFreigeben(): Promise<number> {
-		const [, ergebnis] = await this.db.batch([
-			this.events.insertSelect(
-				"SELECT 'igdb', id, NULL, title, 'erschienen', 'release_status', 'angekuendigt', 'erschienen', release_date " +
-					"FROM game WHERE release_status = 'angekuendigt' AND release_date <= date('now')",
-			),
-			this.db.prepare(
-				"UPDATE game SET release_status = 'erschienen' WHERE release_status = 'angekuendigt' AND release_date <= date('now')",
-			),
-		]);
-		return ergebnis.meta.changes ?? 0;
+		return einzeln(this.db, this.erschieneneFreigebenBaustein());
+	}
+
+	/**
+	 * Dasselbe als Baustein - fuer den Lage-Batch der Wartung (Stufe 18j).
+	 * Zwei Anweisungen, das Protokoll vor dem UPDATE mit derselben Bedingung
+	 * (8.5); gezaehlt wird nur das UPDATE, nie die Summe ueber beide.
+	 */
+	erschieneneFreigebenBaustein(): Baustein<number> {
+		return {
+			anweisungen: [
+				this.events.insertSelect(
+					"SELECT 'igdb', id, NULL, title, 'erschienen', 'release_status', 'angekuendigt', 'erschienen', release_date " +
+						"FROM game WHERE release_status = 'angekuendigt' AND release_date <= date('now')",
+				),
+				this.db.prepare(
+					"UPDATE game SET release_status = 'erschienen' WHERE release_status = 'angekuendigt' AND release_date <= date('now')",
+				),
+			],
+			lesen: ([, update]) => geaendert(update),
+		};
 	}
 
 	async spielExistiert(id: number): Promise<boolean> {

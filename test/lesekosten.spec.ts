@@ -3,6 +3,19 @@ import { PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
 import { CRON_PSN, CRON_WARTUNG, cronFenster } from "../src/sync/cron";
+import { createExecutionContext } from "cloudflare:test";
+import { createRepositories } from "../src/db";
+import { Geheimnis } from "../src/domain/secret";
+import { erstelleEbayClient } from "../src/ebay/client";
+import { createScheduled } from "../src/index";
+import { erstellePsnClient } from "../src/psn/client";
+import { zaehlendeDb } from "./d1-zaehler";
+import { fakeIgdb } from "./igdb-fake";
+import { fakeFetch } from "./psn-fake";
+import { storeOhne } from "./store-fake";
+
+/** Das UTC-Datum, mit dem die Staende als "heute" gelten. */
+const HEUTE_UTC = new Date().toISOString().slice(0, 10);
 import { EXPORT_ORDNUNG, EXPORT_TABELLEN } from "../src/db/export";
 import { VERLAUF_SQL } from "../src/db/preise";
 import { FAELLIG_IN_AUSWAHL } from "../src/db/markt";
@@ -1217,10 +1230,30 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb'"),
 			// Auch der Marktschritt hat nichts zu tun: alles heute gestempelt.
 			env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now')"),
-			// Die drei Einstellungen, die jeder Aufruf liest, stehen in der
-			// Produktion immer da - ohne sie laesen sie hier null Zeilen.
+			// Store, Einzeltrophaeen: alles gestempelt, nichts offen (Stufe 18j -
+			// bis dahin lief die Messung ohne Zugang und kam gar nicht bis zu den
+			// Einzeltrophaeen; die lasen in der Produktion 430 Zeilen je Aufruf).
+			env.DB.prepare("UPDATE release SET store_geprueft_am = datetime('now')"),
 			env.DB.prepare(
-				"INSERT OR REPLACE INTO app_setting (key, value) VALUES ('cron_begonnen', '{}'), ('cron_verlauf', ''), ('trophaeen_jahre', '{}')",
+				"UPDATE trophy_progress SET trophies_synced_at = datetime('now'), trophies_synced_sum = " +
+					"earned_bronze + earned_silver + earned_gold + earned_platinum + defined_bronze + defined_silver + defined_gold + defined_platinum",
+			),
+			// Die Einstellungen, die jeder Aufruf liest, stehen in der Produktion
+			// immer da - ohne sie laesen sie hier null Zeilen. Alle Staende von
+			// heute: Die Kette hat ihre Arbeit getan.
+			env.DB.prepare("INSERT OR REPLACE INTO app_setting (key, value) VALUES (?, ?), (?, ?), (?, ?), (?, ?), (?, ?), (?, ?)").bind(
+				"cron_verlauf",
+				"",
+				"cron_stand",
+				"{}",
+				"trophaeen_jahre",
+				JSON.stringify({ standAm: HEUTE_UTC, jahre: [] }),
+				"trophaeen_level",
+				JSON.stringify({ level: 1, punkte: 1, bisNaechstes: 1, prozent: 1, standAm: HEUTE_UTC }),
+				"psn_spielzeit_stand",
+				`${HEUTE_UTC}:-1`,
+				"psn_besitz_stand",
+				JSON.stringify({ fertigAm: HEUTE_UTC }),
 			),
 			env.DB.prepare("DELETE FROM psn_sync_run"),
 			...Array.from({ length: 5 }, (_, i) =>
@@ -1241,111 +1274,72 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			),
 		);
 
-		const erschienen = await zeilenGelesen(
-			"SELECT id FROM game WHERE release_status = 'angekuendigt' AND release_date <= date('now')",
-		);
-		const haenger = await zeilenGelesen(
-			`SELECT id FROM psn_sync_run WHERE status = 'laufend' AND MAX(started_at, COALESCE((SELECT MAX(MAX(r.fetched_at, COALESCE(r.normalized_at, '')))
-			 FROM psn_raw_response r WHERE r.sync_run_id = psn_sync_run.id), '')) < datetime('now', '-3 hours')`,
-		);
-		const laufend = await zeilenGelesen("SELECT * FROM psn_sync_run WHERE status = 'laufend' ORDER BY id DESC LIMIT 1");
-		const heutige = await zeilenGelesen("SELECT * FROM psn_sync_run WHERE started_at >= ? ORDER BY id", new Date().toISOString().slice(0, 10));
-		const auffrischen = await zeilenGelesen(
-			`SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL AND (igdb_synced_at IS NULL OR igdb_synced_at < datetime('now', '-7 days'))
-			 ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT 50`,
-		);
-		const disc = await zeilenGelesen(
-			`SELECT g.id, g.igdb_id FROM game g WHERE g.igdb_id IS NOT NULL AND EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id
-			 AND r.physical_release_status = 'unbekannt'
-			 AND (r.physical_checked_at IS NULL OR r.physical_checked_at < datetime('now', '-30 days'))) ORDER BY g.id LIMIT 50`,
-		);
-		// Der Aufraeumschritt (Stufe 18d) laeuft in jedem Leerlauf der Wartung
-		// mit. Als SELECT gemessen, weil zeilenGelesen kein DELETE ausfuehren
-		// soll - dieselbe Bedingung, derselbe Plan. Die zweite Haelfte der
-		// Bedingung kam mit Stufe 18e dazu (die Waisen gescheiterter Laeufe).
-		const aufraeumen = await zeilenGelesen(
-			`SELECT id FROM psn_raw_response WHERE sync_run_id NOT IN
-			 (SELECT sync_run_id FROM psn_raw_response GROUP BY sync_run_id ORDER BY sync_run_id DESC LIMIT 3)
-			 AND (normalized_at IS NOT NULL OR sync_run_id IN (SELECT id FROM psn_sync_run WHERE status = 'fehler'))`,
-		);
+		// Mit Zugang, sonst kaeme der PSN-Leerlauf nicht bis Spielzeit, Kaufliste,
+		// Einzeltrophaeen und Level.
+		await createRepositories(env.DB, env.NPSSO_KEY).credentials.npssoSpeichern(new Geheimnis("npsso-test"));
 
-		// Was bis Stufe 18g in dieser Summe FEHLTE, obwohl jeder Leerlauf es
-		// liest: die Auswahl des Marktschritts (er steht seit 20e im Fenster und
-		// muss sie lesen, um "nichts faellig" festzustellen), den Verlauf, an
-		// den jeder Aufruf seine Zeile haengt, und den Jahre-Stand. Dazu kommt
-		// mit 18g die Marke. "Gemessen wird die Route, nicht die Abfrage."
-		const marktAuswahl = await zeilenGelesen(
-			"SELECT r.id FROM release r JOIN game g ON g.id = r.game_id " + FAELLIG_IN_AUSWAHL + "ORDER BY r.markt_geprueft_am, r.id LIMIT 20",
-		);
-		const einstellung = (key: string) => zeilenGelesen("SELECT value FROM app_setting WHERE key = ?", key);
-		const marke = await einstellung("cron_begonnen");
-		const verlauf = await einstellung("cron_verlauf");
-		const jahreStand = await einstellung("trophaeen_jahre");
-		// Und was die Marke SCHREIBT - die Schreibgrenze von 100 000 Zeilen am
-		// Tag ist die engere (CLAUDE.md): setzen bei jedem Aufruf, wegnehmen im
-		// Batch mit der Verlaufszeile.
-		const setzen = await env.DB.prepare(
-			"INSERT INTO app_setting (key, value) VALUES ('cron_begonnen', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-		)
-			.bind('{"am":"x"}')
-			.run();
-		const wegnehmen = await env.DB.prepare("DELETE FROM app_setting WHERE key = 'cron_begonnen' AND value = ?").bind('{"am":"x"}').run();
-		const markeGeschrieben = (setzen.meta.rows_written ?? 0) + (wegnehmen.meta.rows_written ?? 0);
-		const markeJeNacht = markeGeschrieben * (cronFenster(CRON_PSN).aufrufe + cronFenster(CRON_WARTUNG).aufrufe);
-		expect(markeJeNacht).toBeLessThan(1_000);
-		await env.DB.prepare("INSERT OR REPLACE INTO app_setting (key, value) VALUES ('cron_begonnen', '{}')").run();
+		// Seit Stufe 18j durch den ECHTEN Einstieg gemessen, mit einer D1, die
+		// `meta.rows_read` aller Anweisungen summiert - nicht als Summe
+		// nachgebauter Einzelabfragen. Die Summe fehlte bis 18g die
+		// Marktauswahl, bis 18j die Einzeltrophaeen; beide liefen in jedem
+		// Leerlauf mit. "Gemessen wird die Route, nicht die Abfrage."
+		const aufruf = async (cron: string) => {
+			const zaehler = zaehlendeDb(env.DB);
+			await createScheduled(
+				() => erstellePsnClient(fakeFetch([]).fetch),
+				() => fakeIgdb([[]], { zugang: null }).client,
+				() => erstelleEbayClient(null),
+				() => storeOhne(),
+			)({ scheduledTime: Date.now(), cron, noRetry() {} }, { ...env, DB: zaehler.db }, createExecutionContext());
+			return { aufrufe: zaehler.aufrufe(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
+		};
+		// Der erste Wartungsaufruf der Nacht raeumt die Rohantworten der aelteren
+		// Laeufe ab (geloescht=10) - das ist Arbeit. Gemessen wird der danach.
+		await aufruf(CRON_WARTUNG);
+		const psn = await aufruf(CRON_PSN);
+		const wartung = await aufruf(CRON_WARTUNG);
+		const verlauf = await createRepositories(env.DB, env.NPSSO_KEY).sync.cronVerlauf();
+		// Beide waren wirklich Leerlauf - sonst misst die Zahl etwas anderes.
+		expect(verlauf.slice(0, 2).map((z) => z.replace(/^\S+ \S+ /, ""))).toEqual([
+			"cron: nichts bereich=wartung",
+			"cron: nichts bereich=psn",
+		]);
 
-		// Seit Stufe 21 laeuft im PSN-Fenster als achter Schritt die Auswahl
-		// der Store-Preise mit - auch im Leerlauf, weil sie erst ihre eigene
-		// Abfrage braucht, um "nichts zu tun" festzustellen. Genau hier sass
-		// der Befund aus 21b: Mit `EXISTS(...) OR physical_release_status =
-		// 'nein'` las sie **430** Zeilen, weil die zweite Haelfte keinen
-		// Index hatte - 36-mal je Nacht. Mit der CTE und dem Teilindex aus
-		// Migration 0032 sind es vier.
-		const storeAuswahl = await zeilenGelesen(
-			"WITH ziele(id) AS (SELECT pe.release_id FROM plan_entry pe WHERE pe.status = 'offen' AND pe.release_id IS NOT NULL " +
-				"UNION SELECT id FROM release WHERE physical_release_status = 'nein') " +
-				"SELECT r.id FROM ziele z JOIN release r ON r.id = z.id JOIN game g ON g.id = r.game_id " +
-				"WHERE (r.store_geprueft_am IS NULL OR r.store_geprueft_am < datetime('now', '-1 days')) " +
-				"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') " +
-				"ORDER BY r.store_geprueft_am, r.id LIMIT 10",
-		);
-
-		// Seit Stufe 18e sind es zwei Fenster, und jedes liest nur seine
-		// eigenen Abfragen. Wie oft jedes laeuft, sagt sein Cron-Ausdruck -
-		// hier stand die Zahl bis zur Stufe "Refactoring" doppelt und fiel
-		// bei der Erweiterung auf drei Stunden zurueck (10.1).
-		const leerlaufPsn = marke + haenger + laufend + heutige + storeAuswahl + verlauf;
-		const leerlaufWartung = marke + erschienen + jahreStand + aufraeumen + auffrischen + disc + marktAuswahl + verlauf;
+		const leerlaufPsn = psn.gelesen;
+		const leerlaufWartung = wartung.gelesen;
 		const nacht = leerlaufPsn * cronFenster(CRON_PSN).aufrufe + leerlaufWartung * cronFenster(CRON_WARTUNG).aufrufe;
-		console.info({ erschienen, haenger, laufend, heutige, storeAuswahl, auffrischen, disc, aufraeumen, marktAuswahl, marke, verlauf, jahreStand, markeGeschrieben, markeJeNacht, leerlaufPsn, leerlaufWartung, nacht });
+		// Geschrieben wird je Aufruf: Marke setzen, Verlauf, Marke weg, Stand -
+		// die Schreibgrenze von 100 000 Zeilen am Tag ist die engere (CLAUDE.md).
+		const geschriebenJeNacht =
+			psn.geschrieben * cronFenster(CRON_PSN).aufrufe + wartung.geschrieben * cronFenster(CRON_WARTUNG).aufrufe;
+		console.info({ psn, wartung, leerlaufPsn, leerlaufWartung, nacht, geschriebenJeNacht });
 
-		// Gemessen bis Stufe 18d: 2 241 Zeilen in einem Aufruf, der alles tat -
-		// game zweimal (erschienen, auffrischen), game mit release je Spiel fuer
-		// die Disc-Auswahl (1 289), psn_sync_run dreimal (5 Zeilen) und der
-		// Aufraeumschritt mit 76 Zeilen ueber die 25 Rohantworten. Die
-		// Aufteilung in 18e nimmt dem PSN-Fenster die drei teuren Abfragen: Es
-		// liest nur noch psn_sync_run. Beide Haelften zusammen bleiben weit
-		// unter dem Tagesbudget von fuenf Millionen.
-		//
-		// Seit Stufe 18g zaehlt die Summe auch, was vorher fehlte: Die
-		// Marktauswahl allein liest im Leerlauf 430 Zeilen - SQLite geht fuer
-		// `ORDER BY markt_geprueft_am` den ganzen Index entlang, waehrend der
-		// Zaehler mit derselben Bedingung eine Zeile liest. Seit 20e lief das
-		// in jedem Wartungsaufruf mit und stand in keiner Messung. Die Nacht
-		// steigt damit von gerechneten 80 784 auf rund 96 000, gemessen am
-		// 16.10.2026; die Marktauswahl selbst ist ein Fall fuer den
-		// Behebungs-Nachtrag zum Markt (10.1).
+		// Zwei D1-Aufrufe je Leerlauf: der Lage-Batch und der Ausgang (18j).
+		expect(psn.aufrufe).toBe(2);
+		expect(wartung.aufrufe).toBe(2);
+		// Gemessen bis Stufe 18d: 2 241 Zeilen in einem Aufruf, der alles tat;
+		// die Aufteilung in 18e nahm dem PSN-Fenster die drei teuren Abfragen.
+		// Seit 18g zaehlt die Summe die Marktauswahl mit (430 Zeilen, obwohl
+		// nichts faellig ist - ein Fall fuer den Markt-Nachtrag 20i), seit 18j
+		// den PSN-Leerlauf mit Zugang, und die Einzeltrophaeen-Auswahl liest
+		// ueber die Teilindizes aus Migration 0034 nichts mehr.
 		expect(leerlaufPsn).toBeLessThan(100);
 		expect(leerlaufWartung).toBeLessThan(2_800);
 		expect(nacht).toBeLessThan(100_000);
+		expect(geschriebenJeNacht).toBeLessThan(1_000);
 
 		await env.DB.batch([
 			env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_synced_at = NULL"),
 			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, markt_geprueft_am = NULL"),
 			env.DB.prepare("DELETE FROM psn_raw_response"),
 			env.DB.prepare("DELETE FROM psn_sync_run"),
-			env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_begonnen', 'cron_verlauf', 'trophaeen_jahre')"),
+			env.DB.prepare(
+				"DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand')",
+			),
+			env.DB.prepare("DELETE FROM app_setting WHERE key >= 'cron_begonnen' AND key < 'cron_begonnen;'"),
+			env.DB.prepare("DELETE FROM psn_credentials"),
+			env.DB.prepare("UPDATE release SET store_geprueft_am = NULL"),
+			env.DB.prepare("UPDATE trophy_progress SET trophies_synced_at = NULL, trophies_synced_sum = NULL"),
 		]);
 	});
 

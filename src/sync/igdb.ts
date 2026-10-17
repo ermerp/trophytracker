@@ -196,8 +196,10 @@ export async function igdbAuffrischSchritt(
 	igdb: IgdbClient,
 	n = AUFFRISCHEN_JE_AUFRUF,
 	mindestAlterTage = 0,
+	// Vom Lage-Batch des Cron gelesen (Stufe 18j), sonst selbst - dieselbe Auswahl.
+	vorgelesen?: Array<{ id: number; igdb_id: number }>,
 ): Promise<AuffrischErgebnis> {
-	const spiele = await repos.igdb.zumAuffrischen(n, mindestAlterTage);
+	const spiele = vorgelesen ?? (await repos.igdb.zumAuffrischen(n, mindestAlterTage));
 	if (spiele.length === 0) return { status: "erfolg", angefragt: 0, aktualisiert: 0 };
 
 	try {
@@ -247,8 +249,9 @@ export async function igdbPhysischSchritt(
 	repos: Repositories,
 	igdb: IgdbClient,
 	n = AUFFRISCHEN_JE_AUFRUF,
+	vorgelesen?: Array<{ id: number; igdb_id: number }>,
 ): Promise<PhysischErgebnis> {
-	const spiele = await repos.igdb.zurDiscPruefung(n);
+	const spiele = vorgelesen ?? (await repos.igdb.zurDiscPruefung(n));
 	if (spiele.length === 0) return { status: "erfolg", angefragt: 0, gesetzt: 0, nochOffen: 0, weiter: false };
 
 	try {

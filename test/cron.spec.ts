@@ -198,7 +198,10 @@ beforeEach(async () => {
 	await env.DB.batch([
 		env.DB.prepare("DELETE FROM game_event"),
 		// Der Verlauf lebt in app_setting und ueberdauert sonst den Test.
-		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_begonnen', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand')"),
+		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand')"),
+		// Die Marken liegen seit 18j als eine Zeile je Aufruf im Bereich
+		// `cron_begonnen` bis `cron_begonnen;` (auch die im alten Format).
+		env.DB.prepare("DELETE FROM app_setting WHERE key >= 'cron_begonnen' AND key < 'cron_begonnen;'"),
 		env.DB.prepare("DELETE FROM psn_raw_response"),
 		env.DB.prepare("DELETE FROM psn_sync_run"),
 		env.DB.prepare("DELETE FROM psn_credentials"),
@@ -641,16 +644,21 @@ describe("cronSchritt", () => {
 
 	describe("Marke begonnen (Stufe 18g)", () => {
 		const um = (minuten: number) => new Date(Date.parse("2026-10-16T06:30:00Z") + minuten * 60_000);
-		const marke = async () =>
-			(await env.DB.prepare("SELECT value FROM app_setting WHERE key = 'cron_begonnen'").first<{ value: string }>())?.value ?? null;
+		/** Die liegenden Marken, als Schluessel - seit 18j eine Zeile je Aufruf. */
+		const marken = async () =>
+			(
+				await env.DB.prepare(
+					"SELECT key FROM app_setting WHERE key >= 'cron_begonnen' AND key < 'cron_begonnen;' ORDER BY key",
+				).all<{ key: string }>()
+			).results.map((z) => z.key);
 
 		it("ein Aufruf mit Ausgang nimmt seine Marke wieder weg", async () => {
 			const r = repos();
 			const m = await r.sync.cronBeginnen(um(0), "wartung");
-			expect(await marke()).toBe(m.wert);
+			expect(await marken()).toEqual([m.schluessel]);
 			await r.sync.cronAusgangVermerken("2026-10-16 06:30", "cron: nichts bereich=wartung", m);
 
-			expect(await marke()).toBeNull();
+			expect(await marken()).toEqual([]);
 			expect(await r.sync.cronVerlauf()).toEqual(["2026-10-16 06:30 cron: nichts bereich=wartung"]);
 		});
 
@@ -670,7 +678,7 @@ describe("cronSchritt", () => {
 				"2026-10-16 06:30 cron: ohne_ausgang bereich=wartung",
 				"2026-10-16 06:25 cron: markt bereich=wartung geprueft=20",
 			]);
-			expect(await marke()).toBeNull();
+			expect(await marken()).toEqual([]);
 		});
 
 		it("die doppelte Ausloesung eine Minute spaeter ist kein Aufruf ohne Ausgang", async () => {
@@ -681,10 +689,10 @@ describe("cronSchritt", () => {
 
 			// Der erste endet zuerst und darf die Marke des zweiten nicht wegnehmen.
 			await r.sync.cronAusgangVermerken("2026-10-16 06:30", "cron: nichts bereich=psn", erster);
-			expect(await marke()).toBe(zweiter.wert);
+			expect(await marken()).toEqual([zweiter.schluessel]);
 			await r.sync.cronAusgangVermerken("2026-10-16 06:31", "cron: nichts bereich=psn", zweiter);
 
-			expect(await marke()).toBeNull();
+			expect(await marken()).toEqual([]);
 			expect((await r.sync.cronVerlauf()).join("\n")).not.toContain("ohne_ausgang");
 		});
 
@@ -694,7 +702,7 @@ describe("cronSchritt", () => {
 			const knapp = await r.sync.cronBeginnen(new Date(um(0).getTime() + VERWAIST_NACH_MS - 1), "wartung");
 			expect(knapp.verwaist).toBeNull();
 
-			await env.DB.prepare("DELETE FROM app_setting WHERE key = 'cron_begonnen'").run();
+			await env.DB.prepare("DELETE FROM app_setting WHERE key >= 'cron_begonnen' AND key < 'cron_begonnen;'").run();
 			await r.sync.cronBeginnen(um(0), "wartung");
 			const genau = await r.sync.cronBeginnen(new Date(um(0).getTime() + VERWAIST_NACH_MS), "wartung");
 			expect(genau.verwaist?.anzahl).toBe(1);
@@ -735,7 +743,7 @@ describe("cronSchritt", () => {
 				"2026-10-16 06:35 cron: abgebrochen",
 				"2026-10-16 06:30 cron: ohne_ausgang bereich=wartung",
 			]);
-			expect(await marke()).toBeNull();
+			expect(await marken()).toEqual([]);
 		});
 
 		it("eine Zeile ohne Ausgang wird nie verdichtet, auch nicht mit ihresgleichen", () => {
@@ -757,7 +765,7 @@ describe("cronSchritt", () => {
 			expect(verlauf).toHaveLength(2);
 			expect(verlauf[0]).toMatch(/ cron: nichts bereich=wartung$/);
 			expect(verlauf[1]).toMatch(/ cron: ohne_ausgang bereich=wartung$/);
-			expect(await marke()).toBeNull();
+			expect(await marken()).toEqual([]);
 		});
 	});
 
@@ -795,13 +803,11 @@ describe("cronSchritt", () => {
 			const schritt = async () =>
 				(await cronSchritt(repos(), psnStumm(), igdb, ebay, storeOhne(), { bereich: "wartung", heute: HEUTE })).getan;
 
-			expect([await schritt(), await schritt(), await schritt(), await schritt(), await schritt()]).toEqual([
-				"jahre",
-				"aufraeumen",
-				"igdb_auffrischen",
-				"markt",
-				"nichts",
-			]);
+			// Aufraeumen ist seit 18j kein eigener Schritt mehr, sondern geschieht
+			// im Lage-Batch jedes Wartungsaufrufs - hier also schon im ersten.
+			const erster = await cronSchritt(repos(), psnStumm(), igdb, ebay, storeOhne(), { bereich: "wartung", heute: HEUTE });
+			expect([erster.getan, erster.geloescht]).toEqual(["jahre", 1]);
+			expect([await schritt(), await schritt(), await schritt()]).toEqual(["igdb_auffrischen", "markt", "nichts"]);
 		});
 	});
 
@@ -1127,16 +1133,21 @@ describe("cronSchritt", () => {
 		expect((await seitenJeLauf()).map((z) => z.sync_run_id)).not.toContain(waise);
 	});
 
-	it("der Cron raeumt auf, solange es etwas zu loeschen gibt - und faellt dann durch", async () => {
+	it("jeder Wartungsaufruf raeumt auf und nennt es nur, wenn er etwas loeschte (Stufe 18j)", async () => {
+		// Seit 18j eine Daueraufgabe im Lage-Batch statt eines eigenen Schritts
+		// (Entscheidung des Nutzers vom 17.10.2026): Der Aufruf tut trotzdem
+		// seine Arbeit, und die Zeile traegt `geloescht=` daneben.
 		for (let i = 0; i < ROHANTWORTEN_LAEUFE + 1; i++) await lauf("erfolg", 5, true);
 
-		const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne(), storeOhne());
-		expect(e.getan).toBe("aufraeumen");
+		const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne(), storeOhne(), { bereich: "wartung" });
+		expect(e.getan).toBe("nichts");
 		expect(e.geloescht).toBe(5);
-		expect(cronLogzeile(e)).toContain("geloescht=5");
+		expect(cronLogzeile(e)).toBe("cron: nichts bereich=wartung geloescht=5");
 
-		// Nichts mehr zu loeschen: Der naechste Aufruf faellt auf "nichts".
-		expect((await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne(), storeOhne())).getan).toBe("nichts");
+		// Nichts mehr zu loeschen: Die Zeile schweigt davon.
+		const danach = await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne(), storeOhne(), { bereich: "wartung" });
+		expect(danach.geloescht).toBeUndefined();
+		expect(cronLogzeile(danach)).toBe("cron: nichts bereich=wartung");
 	});
 
 	it("die Logzeile nennt nur Zahlen und feste Texte", () => {

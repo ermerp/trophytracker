@@ -1,4 +1,5 @@
 import { CredentialsRepository } from "./credentials";
+import { CronLageRepository } from "./cron-lage";
 import { EventRepository } from "./events";
 import { ExportRepository } from "./export";
 import { GamesRepository } from "./games";
@@ -34,16 +35,26 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 	const playStatus = new PlayStatusRepository(db, events);
 	const plan = new PlanRepository(db, events);
 	const kopplung = new Kopplung(db, plan, playStatus, events);
+	const credentials = new CredentialsRepository(db, npssoKey);
+	const sync = new SyncRepository(db);
+	const trophaeen = new TrophaeenRepository(db);
+	const games = new GamesRepository(db, events);
+	const igdb = new IgdbRepository(db, events);
+	const markt = new MarktRepository(db, events);
+	const store = new StoreRepository(db, events);
 	return {
-		credentials: new CredentialsRepository(db, npssoKey),
-		sync: new SyncRepository(db),
+		credentials,
+		sync,
 		trophies: new TrophiesRepository(db, events),
-		trophaeen: new TrophaeenRepository(db),
-		games: new GamesRepository(db, events),
+		trophaeen,
+		games,
 		gaps: new GapsRepository(db),
-		igdb: new IgdbRepository(db, events),
-		markt: new MarktRepository(db, events),
-		store: new StoreRepository(db, events),
+		igdb,
+		markt,
+		store,
+		// Die Lage eines Cron-Aufrufs in einem Batch (Stufe 18j) - aus den
+		// Bausteinen derselben Repositories, die die Knoepfe einzeln benutzen.
+		cronLage: new CronLageRepository(db, { sync, credentials, trophaeen, store, games, igdb, markt }),
 		ownership: new OwnershipRepository(db, events),
 		besitz: new BesitzRepository(db, events),
 		plan,

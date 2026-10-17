@@ -1,3 +1,5 @@
+import { eins, einzeln, ersteZeile, geaendert, zeilen, type Baustein } from "./baustein";
+
 export type SyncStatus = "laufend" | "erfolg" | "fehler";
 
 export type SyncPhase = "abruf" | "normalisierung";
@@ -57,8 +59,35 @@ const CRON_VERLAUF_LAENGE = 20;
  * starben so taeglich 12 bis 35 Wartungsaufrufe ohne jede Zeile, und am
  * Morgen sah das aus wie "nichts zu tun" (lehren.md). Die Marke aendert kein
  * Verhalten, sie macht nur sichtbar, was vorher spurlos verschwand.
+ *
+ * **Seit Stufe 18j eine Zeile je Aufruf** unter `cron_begonnen:<Zeit>:<Bereich>`
+ * (Entscheidung des Nutzers vom 17.10.2026). Bis dahin war es EIN Schluessel,
+ * den jeder Aufruf erst lesen musste, um die Kette der Toten in die neue Marke
+ * zu tragen - Lesen, Rechnen, Schreiben, also zwei D1-Aufrufe vor jeder
+ * Arbeit. Mit einer Zeile je Aufruf ist die Kette einfach die Menge der
+ * liegengebliebenen Zeilen: Lesen und Setzen stehen in einem Batch, und der
+ * Ausgang loescht, was er gemeldet hat. Die Zeit vorn im Schluessel ordnet
+ * die Zeilen; gelesen wird ueber einen Schluesselbereich, damit der
+ * Primaerschluessel greift (kein LIKE).
+ *
+ * Der Bereich beginnt bei `cron_begonnen` selbst: Damit liest er auch die
+ * Marke im alten Format, die ein Aufruf des alten Workers waehrend des Deploys
+ * hinterlassen haben kann, und meldet sie mit.
  */
-const SCHLUESSEL_BEGONNEN = "cron_begonnen";
+const MARKE_PRAEFIX = "cron_begonnen";
+const MARKE_VON = MARKE_PRAEFIX;
+/** `;` folgt in der Zeichentabelle direkt auf `:` - das Ende des Bereichs. */
+const MARKE_BIS = `${MARKE_PRAEFIX};`;
+
+/**
+ * Hoechstens so viele Marken bleiben liegen. Zweihundert sind knapp drei
+ * Naechte, in denen KEIN Aufruf durchkam. Was darueber hinausgeht, entfernt
+ * der Lage-Batch - nicht still: Die neue Marke traegt dann `gekappt`, und die
+ * Zeile, die die Kette meldet, sagt es (`gekappt=ja`), weil ihr Anfang dann
+ * fehlt (Vorgabe des Nutzers vom 17.10.2026: app_setting soll nicht still
+ * wachsen, und es soll nichts unbemerkt verschwinden).
+ */
+export const MARKEN_HOECHSTENS = 200;
 
 /**
  * Ab wann eine Marke als verwaist gilt. Zwei Minuten (Entscheidung des
@@ -69,17 +98,23 @@ const SCHLUESSEL_BEGONNEN = "cron_begonnen";
  */
 export const VERWAIST_NACH_MS = 2 * 60_000;
 
-/** Aufrufe ohne Ausgang, die eine Marke seit dem letzten vermerkten Ausgang mitfuehrt. */
-type Verwaist = { anzahl: number; von: string; bis: string; bereich: string };
+/** Aufrufe ohne Ausgang, die seit dem letzten vermerkten Ausgang liegengeblieben sind. */
+export type Verwaist = { anzahl: number; von: string; bis: string; bereich: string; gekappt?: boolean };
 
-type MarkenInhalt = { am: string; bereich: string; verwaist?: Verwaist };
+/** Inhalt einer Marke. `verwaist` traegt nur das alte Format (bis 18j). */
+type MarkenInhalt = { am: string; bereich: string; gekappt?: number | boolean; verwaist?: Verwaist };
 
 /**
- * Die eigene Marke eines Aufrufs. `wert` ist der gespeicherte Text: Nur er
- * wird beim Ausgang geloescht, damit ein gleichzeitig laufender zweiter
- * Aufruf nicht die Marke des anderen wegnimmt.
+ * Die eigene Marke eines Aufrufs. Geloescht wird beim Ausgang nur der eigene
+ * Schluessel und die gemeldeten verwaisten - eine junge Marke eines
+ * gleichzeitig laufenden zweiten Aufrufs bleibt stehen.
  */
-export type CronMarke = { wert: string; verwaist: Verwaist | null };
+export type CronMarke = {
+	schluessel: string;
+	verwaist: Verwaist | null;
+	/** Der juengste Schluessel der gemeldeten Kette - bis dahin loescht der Ausgang. */
+	verwaistBis: string | null;
+};
 
 /** "2026-10-16T06:35:00.000Z" -> "2026-10-16 06:35" - das Format des Verlaufs. */
 const verlaufszeit = (iso: string) => iso.slice(0, 16).replace("T", " ");
@@ -95,6 +130,47 @@ function markeLesen(roh: string | null): MarkenInhalt | null {
 }
 
 /**
+ * Aus den gelesenen Marken die Kette der Toten (Stufe 18j). Rein, ohne D1.
+ *
+ * Verwaist ist, was zwei Minuten oder aelter ist; eine juengere Marke stammt
+ * von einem Aufruf, der gerade noch laeuft, und wird weder gemeldet noch
+ * angefasst. Die Zeilen kommen nach Schluessel, also nach Zeit geordnet.
+ */
+export function ketteAus(
+	marken: ReadonlyArray<{ key: string; value: string }>,
+	jetzt: Date,
+): { verwaist: Verwaist | null; verwaistBis: string | null } {
+	let anzahl = 0;
+	let von = "";
+	let bis = "";
+	let gekappt = false;
+	let anfang: string | null = null;
+	let ende: string | null = null;
+	let verwaistBis: string | null = null;
+	for (const { key, value } of marken) {
+		const m = markeLesen(value);
+		// Eine unlesbare Marke ist trotzdem ein Aufruf ohne Ausgang - sie zaehlt
+		// und wird mit weggeraeumt, statt fuer immer liegenzubleiben.
+		if (m && jetzt.getTime() - Date.parse(m.am) < VERWAIST_NACH_MS) continue;
+		const zeit = m ? verlaufszeit(m.am) : bis;
+		const bereich = m?.bereich ?? "unbekannt";
+		// Das alte Format (bis 18j) trug seine Kette in sich.
+		const mitgebracht = m?.verwaist;
+		anzahl += 1 + (mitgebracht?.anzahl ?? 0);
+		if (von === "") von = mitgebracht?.von ?? zeit;
+		bis = zeit;
+		anfang ??= mitgebracht?.bereich.split("→")[0] ?? bereich;
+		ende = bereich;
+		if (m?.gekappt || mitgebracht?.gekappt) gekappt = true;
+		verwaistBis = key;
+	}
+	if (anzahl === 0) return { verwaist: null, verwaistBis: null };
+	const verwaist: Verwaist = { anzahl, von, bis, bereich: anfang === ende ? (ende ?? "") : `${anfang}→${ende}` };
+	if (gekappt) verwaist.gekappt = true;
+	return { verwaist, verwaistBis };
+}
+
+/**
  * Die Verlaufszeile fuer Aufrufe ohne Ausgang:
  * "2026-10-16 06:35–07:55 cron: ohne_ausgang ×17 bereich=wartung".
  * Die Zeiten sind die Anfaenge der verwaisten Aufrufe, nicht die des
@@ -102,7 +178,49 @@ function markeLesen(roh: string | null): MarkenInhalt | null {
  */
 function verwaistZeile(v: Verwaist): string {
 	const spanne = v.bis === v.von ? v.von : `${v.von}–${v.bis.slice(11)}`;
-	return `${spanne} cron: ohne_ausgang${v.anzahl > 1 ? ` ×${v.anzahl}` : ""} bereich=${v.bereich}`;
+	const kappung = v.gekappt ? " gekappt=ja" : "";
+	return `${spanne} cron: ohne_ausgang${v.anzahl > 1 ? ` ×${v.anzahl}` : ""} bereich=${v.bereich}${kappung}`;
+}
+
+/**
+ * Was der Ausgang eines Aufrufs als Zahlen hinterlaesst (Stufe 18j) - die
+ * Fakten fuer die Betriebswarnungen der naechsten Stufe (16.2). Das Urteil
+ * ("ist das schlimm?") entsteht beim Lesen; hier steht nur, was war. Bis
+ * dahin stand es ausschliesslich als Text in `cron_verlauf`, und Text ist
+ * Anzeige, kein Datum.
+ */
+export type CronFakt = {
+	/** Zeitstempel des Ausgangs, UTC wie im Verlauf. */
+	am: string;
+	getan: string;
+	/** Ob der Aufruf eine Meldung trug - ein Fehler, kein Leerlauf. */
+	meldung: boolean;
+	/** Der Rest des Schritts nach diesem Aufruf, wo es einen gibt (Markt, Store). */
+	offen?: number;
+};
+
+/** Der ganze Stand unter `cron_stand`: der letzte Ausgang je Bereich und die letzte gemeldete Kette. */
+export type CronStand = Partial<Record<string, CronFakt>> & {
+	ohneAusgang?: Verwaist & { gemeldetAm: string };
+};
+
+const SCHLUESSEL_STAND = "cron_stand";
+
+/** Die Schluessel, die der Lage-Batch aus app_setting mitliest. */
+export const CRON_SCHLUESSEL = { verlauf: SCHLUESSEL_CRON, stand: SCHLUESSEL_STAND } as const;
+
+/** Der gespeicherte Verlauf als Zeilen. */
+export const verlaufAus = (roh: string | undefined | null): string[] =>
+	roh ? roh.split("\n").filter((l) => l !== "") : [];
+
+function standAus(roh: string | undefined | null): CronStand {
+	if (!roh) return {};
+	try {
+		const s = JSON.parse(roh) as CronStand;
+		return s && typeof s === "object" ? s : {};
+	} catch {
+		return {};
+	}
 }
 
 /**
@@ -208,9 +326,15 @@ export class SyncRepository {
 	constructor(private readonly db: D1Database) {}
 
 	async laufenderLauf(): Promise<SyncLauf | null> {
-		return this.db
-			.prepare("SELECT * FROM psn_sync_run WHERE status = 'laufend' ORDER BY id DESC LIMIT 1")
-			.first<SyncLauf>();
+		return einzeln(this.db, this.laufenderLaufBaustein());
+	}
+
+	/** Dasselbe als Baustein - fuer den Lage-Batch des Cron (Stufe 18j). */
+	laufenderLaufBaustein(): Baustein<SyncLauf | null> {
+		return eins(
+			this.db.prepare("SELECT * FROM psn_sync_run WHERE status = 'laufend' ORDER BY id DESC LIMIT 1"),
+			(e) => ersteZeile<SyncLauf>(e),
+		);
 	}
 
 	/** Der juengste Lauf - mit `ausloeser` nur der juengste dieses Ausloesers (Stufe 18). */
@@ -232,11 +356,15 @@ export class SyncRepository {
 	 * faellig ist (Abschnitt 10.1). Wenige Zeilen: ein bis zwei je Tag.
 	 */
 	async laeufeSeit(datum: string): Promise<SyncLauf[]> {
-		const { results } = await this.db
-			.prepare("SELECT * FROM psn_sync_run WHERE started_at >= ? ORDER BY id")
-			.bind(datum)
-			.all<SyncLauf>();
-		return results;
+		return einzeln(this.db, this.laeufeSeitBaustein(datum));
+	}
+
+	/** Dasselbe als Baustein - fuer den Lage-Batch des Cron (Stufe 18j). */
+	laeufeSeitBaustein(datum: string): Baustein<SyncLauf[]> {
+		return eins(
+			this.db.prepare("SELECT * FROM psn_sync_run WHERE started_at >= ? ORDER BY id").bind(datum),
+			(e) => zeilen<SyncLauf>(e),
+		);
 	}
 
 	async starten(ausloeser: SyncAusloeser = "nutzer"): Promise<SyncLauf> {
@@ -268,18 +396,24 @@ export class SyncRepository {
 	 * wird fortgesetzt. Rueckgabe: Anzahl abgebrochener Laeufe.
 	 */
 	async haengendeAbbrechen(stunden: number): Promise<number> {
+		return einzeln(this.db, this.haengendeAbbrechenBaustein(stunden));
+	}
+
+	/** Dasselbe als Baustein - fuer den Lage-Batch des PSN-Fensters (Stufe 18j). */
+	haengendeAbbrechenBaustein(stunden: number): Baustein<number> {
 		// Der Modifier steht als Text im Statement, nicht als Bind: Zahl aus
 		// einer Konstanten, nie aus einer Eingabe (CLAUDE.md, Stufe 18d).
 		const frist = `datetime('now', '-${Math.trunc(stunden)} hours')`;
-		const ergebnis = await this.db
-			.prepare(
-				"UPDATE psn_sync_run SET status = 'fehler', finished_at = datetime('now'), error_message = ? " +
-					"WHERE status = 'laufend' AND MAX(started_at, COALESCE((SELECT MAX(MAX(r.fetched_at, COALESCE(r.normalized_at, ''))) " +
-					`FROM psn_raw_response r WHERE r.sync_run_id = psn_sync_run.id), '')) < ${frist}`,
-			)
-			.bind(haengerMeldung(stunden))
-			.run();
-		return ergebnis.meta.changes ?? 0;
+		return eins(
+			this.db
+				.prepare(
+					"UPDATE psn_sync_run SET status = 'fehler', finished_at = datetime('now'), error_message = ? " +
+						"WHERE status = 'laufend' AND MAX(started_at, COALESCE((SELECT MAX(MAX(r.fetched_at, COALESCE(r.normalized_at, ''))) " +
+						`FROM psn_raw_response r WHERE r.sync_run_id = psn_sync_run.id), '')) < ${frist}`,
+				)
+				.bind(haengerMeldung(stunden)),
+			geaendert,
+		);
 	}
 
 	/**
@@ -307,7 +441,16 @@ export class SyncRepository {
 	 * Zuordnung - nur Fremddaten, die jederzeit neu abrufbar sind (8.5).
 	 */
 	async rohantwortenAufraeumen(laeufe: number): Promise<number> {
-		const ergebnis = await this.db
+		return einzeln(this.db, this.rohantwortenAufraeumenBaustein(laeufe));
+	}
+
+	/**
+	 * Dasselbe als Baustein. Seit Stufe 18j steht es im Lage-Batch JEDES
+	 * Wartungsaufrufs, statt ein eigener Schritt zu sein - das DELETE lief im
+	 * Leerlauf ohnehin jedes Mal, nur als eigener D1-Aufruf.
+	 */
+	rohantwortenAufraeumenBaustein(laeufe: number): Baustein<number> {
+		const anweisung = this.db
 			.prepare(
 				"DELETE FROM psn_raw_response WHERE sync_run_id NOT IN " +
 					"(SELECT sync_run_id FROM psn_raw_response GROUP BY sync_run_id ORDER BY sync_run_id DESC LIMIT ?) " +
@@ -323,9 +466,8 @@ export class SyncRepository {
 					"AND (normalized_at IS NOT NULL OR sync_run_id IN " +
 					"(SELECT id FROM psn_sync_run WHERE status = 'fehler'))",
 			)
-			.bind(laeufe)
-			.run();
-		return ergebnis.meta.changes ?? 0;
+			.bind(laeufe);
+		return eins(anweisung, geaendert);
 	}
 
 	/** Eine Rohantwort unveraendert ablegen. */
@@ -412,11 +554,20 @@ export class SyncRepository {
 	 * und der Sicherungsstand.
 	 */
 	async fortschritt(schluessel: string): Promise<string | null> {
-		const z = await this.db
-			.prepare("SELECT value FROM app_setting WHERE key = ?")
-			.bind(schluessel)
-			.first<{ value: string }>();
-		return z?.value ?? null;
+		return (await einzeln(this.db, this.einstellungenBaustein([schluessel]))).get(schluessel) ?? null;
+	}
+
+	/**
+	 * Mehrere Werte aus app_setting in einer Anweisung (Stufe 18j) - der Cron
+	 * liest Verlauf, Stand und die Fortschritte der Schritte zusammen. Ein
+	 * Schluessel ohne Zeile fehlt in der Map.
+	 */
+	einstellungenBaustein(schluessel: readonly string[]): Baustein<Map<string, string>> {
+		const platzhalter = schluessel.map(() => "?").join(",");
+		return eins(
+			this.db.prepare(`SELECT key, value FROM app_setting WHERE key IN (${platzhalter})`).bind(...schluessel),
+			(e) => new Map(zeilen<{ key: string; value: string }>(e).map((z) => [z.key, z.value])),
+		);
 	}
 
 	async fortschrittSetzenWert(schluessel: string, wert: string): Promise<void> {
@@ -430,86 +581,136 @@ export class SyncRepository {
 	}
 
 	/**
-	 * Den Ausgang eines Cron-Aufrufs festhalten (nur Zahlen und feste Texte).
+	 * Den Ausgang eines Cron-Aufrufs festhalten (nur Zahlen und feste Texte) -
+	 * der Schreib-Batch jedes Aufrufs (Stufe 18j).
 	 *
 	 * Folgt er einem Aufruf derselben Arbeit, werden beide zu einer Zeile
 	 * verdichtet, statt die Nacht aus dem Verlauf zu draengen (Stufe 18d fuer
 	 * den Leerlauf, 18e fuer jede Arbeit). Ein Lebenszeichen bleibt so oder so
 	 * stehen: Die verdichtete Zeile traegt die Zeit des juengsten Aufrufs.
 	 *
-	 * Mit `marke` (Stufe 18g) kommen davor die Aufrufe ohne Ausgang, die die
-	 * Marke mitfuehrt, in den Verlauf - und die eigene Marke geht im SELBEN
-	 * Batch weg. Schreiben und Wegnehmen in zwei Aufrufen liesse eine Marke
-	 * stehen, wenn der Aufruf dazwischen stirbt, und der naechste meldete
-	 * einen Aufruf als verwaist, dessen Ausgang laengst im Verlauf steht.
+	 * Mit `marke` (Stufe 18g) kommen davor die Aufrufe ohne Ausgang in den
+	 * Verlauf, und im SELBEN Batch gehen die eigene Marke und die gemeldeten
+	 * weg. Getrennt geschrieben, bliebe eine Marke stehen, wenn der Aufruf
+	 * dazwischen stirbt, und der naechste meldete einen Aufruf als verwaist,
+	 * dessen Ausgang laengst im Verlauf steht.
+	 *
+	 * `verlauf` ist der Verlauf, wie ihn der Lage-Batch gelesen hat; fehlt er -
+	 * im `catch`, wenn schon die Lage scheiterte -, wird er hier gelesen. `fakt`
+	 * landet unter `cron_stand` beim eigenen Bereich, ohne den Stand vorher zu
+	 * lesen: `json_set` fuegt ihn ein, und ein unlesbarer Stand wird ersetzt,
+	 * statt den ganzen Batch und damit die Verlaufszeile zu reissen.
 	 */
-	async cronAusgangVermerken(zeitstempel: string, zeile: string, marke?: CronMarke): Promise<void> {
-		const gelesen = await this.cronVerlauf();
+	async cronAusgangVermerken(
+		zeitstempel: string,
+		zeile: string,
+		marke?: CronMarke,
+		optionen: { verlauf?: string[]; fakt?: { bereich: string; wert: CronFakt } } = {},
+	): Promise<void> {
+		const gelesen = optionen.verlauf ?? (await this.cronVerlauf());
 		const bisher = marke?.verwaist ? [verwaistZeile(marke.verwaist), ...gelesen] : gelesen;
 		const neue = `${zeitstempel} ${zeile}`;
 		const verdichtet = bisher[0] ? verdichte(bisher[0], neue) : null;
 		const alle = verdichtet ? [verdichtet, ...bisher.slice(1)] : [neue, ...bisher];
 		const wert = alle.slice(0, CRON_VERLAUF_LAENGE).join("\n");
-		const verlauf = this.db
-			.prepare(
-				"INSERT INTO app_setting (key, value) VALUES (?, ?) " +
-					"ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-			)
-			.bind(SCHLUESSEL_CRON, wert);
-		if (!marke) {
-			await verlauf.run();
-			return;
+		const anweisungen: D1PreparedStatement[] = [
+			this.db
+				.prepare(
+					"INSERT INTO app_setting (key, value) VALUES (?, ?) " +
+						"ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+				)
+				.bind(SCHLUESSEL_CRON, wert),
+		];
+		if (marke) {
+			anweisungen.push(this.db.prepare("DELETE FROM app_setting WHERE key = ?").bind(marke.schluessel));
+			if (marke.verwaistBis !== null) {
+				// Die gemeldete Kette als Bereich: Sie reicht vom Anfang bis zur
+				// juengsten verwaisten Marke. Alles danach ist juenger als zwei
+				// Minuten - ein laufender Aufruf - und bleibt stehen.
+				anweisungen.push(
+					this.db
+						.prepare("DELETE FROM app_setting WHERE key >= ? AND key <= ?")
+						.bind(MARKE_VON, marke.verwaistBis),
+				);
+			}
 		}
-		await this.db.batch([
-			verlauf,
-			this.db.prepare("DELETE FROM app_setting WHERE key = ? AND value = ?").bind(SCHLUESSEL_BEGONNEN, marke.wert),
-		]);
+		const stand: Array<[string, string]> = [];
+		if (optionen.fakt) stand.push([`$.${optionen.fakt.bereich}`, JSON.stringify(optionen.fakt.wert)]);
+		if (marke?.verwaist) {
+			stand.push(["$.ohneAusgang", JSON.stringify({ ...marke.verwaist, gemeldetAm: zeitstempel })]);
+		}
+		if (stand.length > 0) {
+			const pfade = stand.map(() => "?, json(?)").join(", ");
+			const werte = stand.flat();
+			anweisungen.push(
+				this.db
+					.prepare(
+						`INSERT INTO app_setting (key, value) VALUES (?, json_set('{}', ${pfade})) ` +
+							"ON CONFLICT(key) DO UPDATE SET value = CASE WHEN json_valid(value) " +
+							`THEN json_set(value, ${pfade}) ELSE json_set('{}', ${pfade}) END`,
+					)
+					.bind(SCHLUESSEL_STAND, ...werte, ...werte, ...werte),
+			);
+		}
+		await this.db.batch(anweisungen);
 	}
 
 	/**
-	 * Die Marke "begonnen" setzen (Stufe 18g) - als Erstes in jedem Aufruf.
+	 * Die Marke "begonnen" setzen (Stufe 18g) - als Baustein fuer den Anfang
+	 * des Lage-Batchs (Stufe 18j). Drei Anweisungen in fester Reihenfolge:
 	 *
-	 * Liegt noch eine Marke, ist der Aufruf, der sie setzte, ohne Ausgang
-	 * geblieben - wenn sie aelter als `VERWAIST_NACH_MS` ist. Gemeldet wird
-	 * er dann NICHT sofort, sondern von der neuen Marke weitergetragen und
-	 * erst mit dem naechsten vermerkten Ausgang geschrieben: Solange die
-	 * CPU-Grenze greift, stirbt der meldende Aufruf genauso, und eine Kette
-	 * von achtzehn toten Aufrufen (16.10.2026, 06:30 bis 08:00) erschiene sonst als einer.
+	 * 1. die vorhandenen Marken LESEN - vor dem Setzen, sonst laese der Aufruf
+	 *    seine eigene mit;
+	 * 2. die eigene SETZEN, mit `gekappt`, wenn schon MARKEN_HOECHSTENS
+	 *    liegen und die dritte gleich etwas entfernt;
+	 * 3. ueber MARKEN_HOECHSTENS hinaus die AELTESTEN entfernen.
 	 *
-	 * Eine junge Marke stammt von einem Aufruf, der gerade noch laeuft (die
-	 * doppelte Ausloesung vom 16.10.2026, eine Minute auseinander). Sie wird
-	 * ueberschrieben, aber nicht gemeldet und nicht geerbt.
+	 * Gemeldet wird die Kette nicht hier, sondern mit dem naechsten vermerkten
+	 * Ausgang: Solange die CPU-Grenze greift, stirbt der meldende Aufruf
+	 * genauso - die liegengebliebenen Zeilen SIND die Kette, und der erste
+	 * Aufruf, der durchkommt, schreibt sie (der 16.10.2026: achtzehn tote
+	 * Aufrufe von 06:30 bis 08:00).
 	 */
+	cronBeginnenBaustein(jetzt: Date, bereich: string): Baustein<CronMarke> {
+		const am = jetzt.toISOString();
+		const schluessel = `${MARKE_PRAEFIX}:${am}:${bereich}`;
+		const bereichSql = "key >= ? AND key < ?";
+		return {
+			anweisungen: [
+				this.db
+					.prepare(`SELECT key, value FROM app_setting WHERE ${bereichSql} ORDER BY key`)
+					.bind(MARKE_VON, MARKE_BIS),
+				this.db
+					.prepare(
+						"INSERT INTO app_setting (key, value) VALUES (?, json_object('am', ?, 'bereich', ?, 'gekappt', " +
+							`(SELECT COUNT(*) FROM app_setting WHERE ${bereichSql}) >= ${MARKEN_HOECHSTENS})) ` +
+							"ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+					)
+					.bind(schluessel, am, bereich, MARKE_VON, MARKE_BIS),
+				this.db
+					.prepare(
+						`DELETE FROM app_setting WHERE ${bereichSql} AND key < (SELECT key FROM app_setting WHERE ${bereichSql} ` +
+							`ORDER BY key DESC LIMIT 1 OFFSET ${MARKEN_HOECHSTENS - 1})`,
+					)
+					.bind(MARKE_VON, MARKE_BIS, MARKE_VON, MARKE_BIS),
+			],
+			lesen: ([marken]) => ({ schluessel, ...ketteAus(zeilen<{ key: string; value: string }>(marken), jetzt) }),
+		};
+	}
+
+	/** Die Marke allein setzen - fuer Tests und den Fall ohne Lage. */
 	async cronBeginnen(jetzt: Date, bereich: string): Promise<CronMarke> {
-		const alt = markeLesen(await this.fortschritt(SCHLUESSEL_BEGONNEN));
-		let verwaist: Verwaist | null = null;
-		if (alt && jetzt.getTime() - Date.parse(alt.am) >= VERWAIST_NACH_MS) {
-			const zeit = verlaufszeit(alt.am);
-			// Eine Kette ueber die Fenstergrenze nennt beide Bereiche, statt
-			// die fruehen Aufrufe dem spaeteren Fenster zuzuschreiben.
-			const anfang = alt.verwaist?.bereich.split("→")[0];
-			verwaist = alt.verwaist
-				? {
-						anzahl: alt.verwaist.anzahl + 1,
-						von: alt.verwaist.von,
-						bis: zeit,
-						bereich: anfang === alt.bereich ? alt.bereich : `${anfang}→${alt.bereich}`,
-					}
-				: { anzahl: 1, von: zeit, bis: zeit, bereich: alt.bereich };
-		}
-		const inhalt: MarkenInhalt = { am: jetzt.toISOString(), bereich, ...(verwaist ? { verwaist } : {}) };
-		const wert = JSON.stringify(inhalt);
-		await this.fortschrittSetzenWert(SCHLUESSEL_BEGONNEN, wert);
-		return { wert, verwaist };
+		return einzeln(this.db, this.cronBeginnenBaustein(jetzt, bereich));
 	}
 
 	/** Die letzten Cron-Ausgaenge, neueste zuerst - fuer die Einstellungen. */
 	async cronVerlauf(): Promise<string[]> {
-		const z = await this.db
-			.prepare("SELECT value FROM app_setting WHERE key = ?")
-			.bind(SCHLUESSEL_CRON)
-			.first<{ value: string }>();
-		return z?.value ? z.value.split("\n").filter((l) => l !== "") : [];
+		return verlaufAus((await einzeln(this.db, this.einstellungenBaustein([SCHLUESSEL_CRON]))).get(SCHLUESSEL_CRON));
+	}
+
+	/** Der Stand unter `cron_stand` (Stufe 18j), oder ein leerer. */
+	async cronStand(): Promise<CronStand> {
+		return standAus((await einzeln(this.db, this.einstellungenBaustein([SCHLUESSEL_STAND]))).get(SCHLUESSEL_STAND));
 	}
 
 	async letzterErfolgreicherLauf(): Promise<SyncLauf | null> {
