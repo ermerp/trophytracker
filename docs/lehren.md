@@ -673,3 +673,13 @@ Anweisungen summiert, mit eingerichtetem Zugang; beide Abfragen bekamen einen Te
 → Wer den Aufruf misst, misst ihn **in dem Zustand, in dem er in der Produktion läuft** – mit Zugang,
 mit allen Ständen von heute –, sonst fällt ein Zweig weg, ohne dass etwas scheitert (Regel in
 CLAUDE.md, Zeilenlesegrenze, geschärft).
+
+**17.10.2026 (Stufe 18j) – der Bauplan bündelte den Cron und vergaß den Knopf.** Der Plan legte
+alle Auswahlen in einen Lage-Batch des Cron. Die Portionsknöpfe in den Einstellungen brauchen
+dieselben Auswahlen und hätten weiter ihre eigenen Abfragen gelesen – zwei Fassungen derselben
+Frage, die still auseinanderlaufen, genau der Fall aus 18e. Der Nutzer hat es vor dem Bau
+ergänzt; gebaut ist jede Auswahl als Baustein, den das Repository allein ausführt und der
+Lage-Batch einfügt. Im selben Plan standen Schreibzugriffe (Marke, Hänger, Freigabe, Aufräumen)
+in einem Batch, der „Lese-Batch" hieß, ohne zu sagen, was beim Scheitern einer Anweisung geschieht –
+auch das kam vom Nutzer: Reihenfolge festlegen, Scheitern benennen.
+→ Regeln in CLAUDE.md (CPU-Grenze: Baustein; Batch als Transaktion, geschärft).
