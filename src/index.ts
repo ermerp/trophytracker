@@ -18,13 +18,14 @@ import { storeRoutes } from "./api/store";
 import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
-import type { CronMarke } from "./db/sync";
+import type { CronLage } from "./db/cron-lage";
 import { erstelleEbayClient, zugangAus as ebayZugangAus, type EbayClient } from "./ebay/client";
 import { erstelleUpcitemdbClient, type UpcitemdbClient } from "./ean/upcitemdb";
 import { erstelleIgdbClient, zugangAus, type IgdbClient } from "./igdb/client";
 import { erstellePsnClient, type PsnClient } from "./psn/client";
 import { erstelleStoreClient, type StoreClient } from "./psn/store";
-import { bereichFuerAusdruck, cronLogzeile, cronSchritt } from "./sync/cron";
+import { heuteIso } from "./domain/igdb";
+import { bereichFuerAusdruck, cronFakt, cronLogzeile, cronSchritt, lageLesen } from "./sync/cron";
 import type { AppEnv } from "./types";
 
 /**
@@ -150,28 +151,43 @@ export function createScheduled(
 		// unbekannter Ausdruck - etwa nach einer Aenderung an
 		// wrangler.jsonc - macht alles, statt still die Haelfte zu lassen.
 		const bereich = bereichFuerAusdruck(event.cron);
-		let marke: CronMarke | undefined;
+		const heute = heuteIso();
+		let lage: CronLage | undefined;
 		try {
-			// Als Erstes, vor jeder Arbeit (Stufe 18g): Stirbt dieser Aufruf an
-			// der CPU-Grenze, meldet ihn der naechste, der durchkommt.
-			marke = await repos.sync.cronBeginnen(new Date(), bereich);
+			// Als Erstes, vor jeder Arbeit: der Lage-Batch (Stufe 18j). Er setzt
+			// die Marke "begonnen" (18g) und liest alles, was die Entscheidung
+			// braucht - stirbt dieser Aufruf danach an der CPU-Grenze, meldet ihn
+			// der naechste, der durchkommt.
+			lage = await lageLesen(repos, bereich, heute, new Date());
 			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env), ebayFactory(env), storeFactory(), {
 				bereich,
+				heute,
+				lage,
 			});
 			const zeile = cronLogzeile(ergebnis);
 			console.log(zeile);
 			// Der Cron ist der einzige Schreiber ohne Zuschauer, und Worker-Logs
 			// sind nur live zu sehen. Deshalb bleibt sein Ausgang auch in der
-			// Datenbank stehen (Stufe 18b) - sonst laesst sich am Morgen nicht
-			// unterscheiden, ob er scheiterte oder nichts zu tun fand. Aufrufe
-			// ohne Wirkung werden dabei verdichtet, damit die zwanzig leeren am
-			// Ende der Nacht nicht die Arbeit davor verdraengen (Stufe 18d).
-			await repos.sync.cronAusgangVermerken(zeitstempel(), zeile, marke);
+			// Datenbank stehen (Stufe 18b) - der zweite und letzte Batch des
+			// Aufrufs, mit den Zahlen fuer die Betriebswarnungen (18j).
+			const am = zeitstempel();
+			await repos.sync.cronAusgangVermerken(am, zeile, lage.marke, {
+				verlauf: lage.verlauf,
+				fakt: { bereich, wert: cronFakt(am, ergebnis) },
+			});
 		} catch (fehler) {
 			// Ein Absturz darf nicht spurlos bleiben. Nur eigene Texte, kein
-			// Fremdtext - der koennte ein Geheimnis zitieren.
+			// Fremdtext - der koennte ein Geheimnis zitieren. Scheiterte schon die
+			// Lage, gibt es weder Marke noch gelesenen Verlauf: Dann liest der
+			// Ausgang den Verlauf selbst.
 			console.log("cron: abgebrochen");
-			await repos.sync.cronAusgangVermerken(zeitstempel(), "cron: abgebrochen", marke).catch(() => {});
+			const am = zeitstempel();
+			await repos.sync
+				.cronAusgangVermerken(am, "cron: abgebrochen", lage?.marke, {
+					verlauf: lage?.verlauf,
+					fakt: { bereich, wert: { am, getan: "abgebrochen", meldung: true } },
+				})
+				.catch(() => {});
 			throw fehler;
 		}
 	};

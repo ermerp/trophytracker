@@ -60,8 +60,11 @@ export async function storeSchritt(
 	store: StoreClient,
 	igdb: IgdbClient,
 	n = RELEASES_JE_AUFRUF,
+	// Vom Lage-Batch des Cron gelesen (Stufe 18j) - mit DERSELBEN Auswahl wie
+	// der Knopf, der sie hier selbst liest (`zuPruefenBaustein`).
+	ziele?: ZuPruefen[],
 ): Promise<StoreSchrittErgebnis> {
-	return portion(repos, store, igdb, await repos.store.zuPruefen(n), n);
+	return portion(repos, store, igdb, ziele ?? (await repos.store.zuPruefen(n)), n);
 }
 
 /**

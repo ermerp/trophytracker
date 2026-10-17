@@ -10,7 +10,7 @@ unten ausdrücklich als offen.
 **20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
 20h und 20f sind am 11.10.2026 abgenommen; **als Nächstes 20g** – dort ist alles entschieden außer der relativen Regel, die ab dem 03.11.2026 messbar wird.
 
-**Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt (unten, „Offen: die CPU-Grenze"). Wann 20g folgt, ist danach zu entscheiden.
+**Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu seit 17.10.2026 die Betriebswarnungen. Wann 20g folgt, ist danach zu entscheiden.
 
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 
@@ -145,59 +145,10 @@ erklärt die Million also nicht; näher liegt die Messsitzung des 09.10. selbst,
 Tage Preisverlauf und alle Releases gelesen hat. Gehört einmal eigens angesehen, blockiert
 aber keine Teilstufe.
 
-#### Offen: die CPU-Grenze
+#### Offen: die CPU-Grenze, Betriebswarnungen, Nachtläufe bis 05:00 UTC
 
-Seit dem 10.10.2026 bricht die Laufzeit Cron-Aufrufe an der 10-ms-Grenze ab; kein Schritt bleibt
-darunter, auch der Leerlauf nicht. **Gemessen ist seit Stufe 18h, wohin die CPU geht: in die
-D1-Aufrufe** (rund 0,7 ms je Abfrage des echten Codes, ein Batch kostet je Anweisung ein
-Zwanzigstel), nicht ins Rechnen ([10.1](10-1-cron.md), „Was ein Aufruf wirklich an CPU kostet").
-Der Bezahlplan ist ausgeschlossen (Entscheidung des Nutzers vom 16.10.2026).
-
-**Was daraus je Schritt folgt** – gerechnet mit den gemessenen Einzelkosten, noch nicht gebaut:
-
-- **Leerlauf** (10 bzw. 16 Abfragen, 7–11 ms mit echter D1): unter 10 ms nur mit weniger
-  Abfragen. Den größten Einzelposten im PSN-Fenster nimmt der Nachtrag unten weg.
-- **Spielzeit** (217 Abfragen je Seite): der Abgleich je Titel als **ein Batch** statt 200
-  einzelner Abfragen; dann rund 5 ms D1 plus 6 ms Rechnen für 200 Titel. Die Seitengröße ist im
-  Code einstellbar (`GESPIELTE_JE_SEITE`); bei 100 Titeln läge eine Seite um 8 ms.
-- **Sync** (5–6 Abfragen, ein Batch mit 104 Anweisungen): rund 4 ms D1, 3 ms Rechnen, dazu die
-  echte Seite aus dem Netz – grenzwertig.
-- **Store** (je Release ein Batch, die Seite als Strom): rund 1 ms D1 plus 3 ms Lesen je Release;
-  **ein Release je Aufruf** trägt, zehn nicht. Am Stück zu lesen wäre billiger, aber dann wird die
-  ganze Seite geholt (380 KB bis 1,4 MB, 7.4).
-- **Gebrauchtpreise:** Die Grundlast eines Aufrufs (vier Abfragen, Sammlung laden und
-  vorbereiten) liegt schon bei 5–8 ms, jedes Release kostet 3–4 ms mehr (94 ms für 20 mit echter D1). **Trägt auch mit einem
-  Release je Aufruf nicht.** Die Sammlung auf Modulebene zu halten bringt nichts – **kein**
-  Cron-Aufruf traf in der Messung eine warme Instanz (0 von 28 im Minutentakt). Denkbar bleibt,
-  den vorbereiteten Wortindex **als eine Zeile** abzulegen (eine Abfrage statt 479 Titel zerlegen) –
-  das wäre Berechnetes, das gespeichert wird, und damit eine Entscheidung des Nutzers wie bei
-  „Trophäen je Jahr" (7.7). Sonst ist der Schritt der Kandidat für GitHub Actions.
-
-**Cron je Minute** (`* * * * *` ist erlaubt): 180 statt 36 Aufrufe je Fenster, je Konto sind fünf
-Einträge erlaubt, zwei sind belegt. Selbst wenn jeder Aufruf als Anfrage zählt, sind es rund 540
-am Tag gegen 100 000. Eine Änderung am Cron braucht bis zu 15 Minuten, bis sie wirkt. Der
-Leerlauf der Wartung läse dann rund 480 000 Zeilen je Nacht statt 96 000. **Es hilft nur Schritten,
-die je Aufruf unter 10 ms bleiben** – also erst nach den Änderungen oben.
-
-**Zu entscheiden:** je Schritt, welcher Weg – Abfragen bündeln, kleinere Portion mit Cron je Minute,
-Wortindex als Zeile, oder GitHub Actions. Für GitHub Actions ist vorab zu prüfen, ob PSN die
-Adressen von GitHub abweist, wie es für die Kaufliste und Cloudflares Adressen vermutet wird (7.7).
-
-**Die Reihenfolge der Nachträge** (Entscheidung des Nutzers vom 16.10.2026), jeder einzeln
-zurücknehmbar und einzeln gemessen: **18i** Token-Erneuerung im PSN-Leerlauf (gebaut, 10.1
-Schritt 7) → **18j** Ablauf: ein Lese- und ein Schreib-Batch je Cron-Aufruf, gemessen am Leerlauf,
-nach der Regel in CLAUDE.md (CPU-Grenze) → **18k** Spielzeit mit `IN`-Listen und **18l** Store-Leser (ein
-Release je Aufruf, Bytes sammeln und einmal dekodieren statt je Stück zu suchen; ganz am Stück
-wäre bei 380 KB bis 1,4 MB je Seite teurer) – beide in derselben Nacht, aber eine Nacht nach 18j,
-damit ihre Wirkung nicht mit der Grundlast vermischt → nachmessen → **20i** Markt. Erst mit den
-Zahlen aus 20i entscheidet der Nutzer zwischen Wortindex-Zeile, Cron je Minute und GitHub Actions.
-
-**Danach, als eigener Nachtrag: der Marktschritt** – an der Regel „Abgleiche bereiten den Bestand
-einmal vor" ausgerichtet: Titel einmal zerlegen statt je Prüfung, ein Wortindex je Aufruf statt
-jedes Angebot gegen alle Spiele (Vorgabe des Nutzers vom 16.10.2026). Dazu gehört die **Auswahl,
-die im Leerlauf 430 Zeilen liest** (10.1, Schritt 14). Derselbe Fehler wie bei `offen` steckt in
-der Store-Zeile: `offen` zählt dort Releases ohne Stempel mit Produkt-Id im ganzen Bestand, nicht
-das Fällige – nicht angefasst, notiert.
+Stehen in [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md): die Nachträge 18i bis 20i, die
+nächste Stufe nach 18j (Betriebswarnungen) und der offene Punkt nach 20i.
 
 **Die fünf finalen Stufen** – die Sammlung finalisieren, Oberfläche, Refactoring
 (abgetragen), Wiederherstellungsprobe, Außendarstellung – stehen in

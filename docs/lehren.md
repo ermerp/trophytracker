@@ -645,3 +645,31 @@ eigenen Worker ohne Bindungen, dann mit einer Wegwerf-D1, beide danach gelöscht
 nicht schlechter: Der Leerlauf ließ sich daraus in Rechnen, D1-Aufrufe und Start zerlegen, was in
 der Produktion gar nicht ginge.
 → Regel in CLAUDE.md (Arbeitsweise, „Auch ein GET kann schreiben").
+
+**17.10.2026 – der Sprung vom 10.10. war ein Umzug.** Seit 18g stand in 10.1, der
+Gebrauchtpreis-Aufruf sei am 10.10. um 07:00 ohne Deploy von rund 70 auf 140 ms gesprungen –
+ungeklärt. Die Auswertung der Nacht zum 17.10. sollte den Effekt von 18g und 18i zeigen und fand
+etwas anderes: `workersInvocationsAdaptive` nennt je Aufruf das Rechenzentrum, und vom 10. bis
+16.10. lief **jeder** Cron-Aufruf in Singapur, davor jede Nacht in Newark, am 17.10. verstreut über
+die USA. Der Sprung lag schon vor dem Sync um 03:00 und traf jeden Schritt (Sync 10 → 16 ms,
+Spielzeit 130 → 230). Innerhalb einer einzigen Nacht streute der PSN-Leerlauf je Standort um 5 ms –
+mehr, als 18i bewirken sollte. Dessen Wirkung ist deshalb nicht belegt: Am selben Standort (EWR) lag
+der Leerlauf mit Token-Erneuerung bei 10,4 ms, ohne bei 11,5.
+→ Nächte nur je Standort vergleichen (10.1); der Vergleich zweier Nächte ohne Standort ist keiner.
+Nebenbei: `workersInvocationsScheduled` war an diesem Morgen seit dem Vortag leer – die Regel nannte
+ihn als einzige Quelle. → Regel in CLAUDE.md (CPU-Grenze) ergänzt.
+
+**17.10.2026 (Stufe 18j) – die Messung des Leerlaufs war zum dritten Mal eine Abschrift.** Die
+Lesekosten des Leerlaufs standen in `test/lesekosten.spec.ts` als Summe nachgebauter Einzelabfragen.
+Bis 18g fehlte darin die Marktauswahl (430 Zeilen); 18g zog sie nach und schrieb die Regel „gemessen
+wird die Route". Die D1-Analytics der Nacht zum 17.10. zeigten je Abfrage, dass es wieder fehlte:
+Der PSN-Leerlauf las in der Produktion rund 430 Zeilen über die Einzeltrophäen-Auswahl – der Test
+lief ohne PSN-Zugang, und ohne Zugang kommt der Cron gar nicht bis zu diesem Schritt. Und die
+Freigabe erschienener Titel liest zweimal die ganze Tabelle (Protokoll und UPDATE), gezählt war
+einmal. Als echter Aufruf gemessen lag die Wartung bei 3 075 statt der geführten 2 659 Zeilen. Seit
+18j misst der Test den Aufruf durch den Einstieg mit einer D1, die `meta.rows_read` aller
+Anweisungen summiert, mit eingerichtetem Zugang; beide Abfragen bekamen einen Teilindex (Migration
+0034), und die Wartung liest 2 218.
+→ Wer den Aufruf misst, misst ihn **in dem Zustand, in dem er in der Produktion läuft** – mit Zugang,
+mit allen Ständen von heute –, sonst fällt ein Zweig weg, ohne dass etwas scheitert (Regel in
+CLAUDE.md, Zeilenlesegrenze, geschärft).

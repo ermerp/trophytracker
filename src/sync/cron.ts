@@ -1,8 +1,11 @@
 import type { Repositories } from "../db";
+import type { CronLage } from "../db/cron-lage";
+import type { CronFakt, SyncLauf } from "../db/sync";
 import { heuteIso } from "../domain/igdb";
 import type { IgdbClient } from "../igdb/client";
 import type { PsnClient } from "../psn/client";
 import {
+	AUFFRISCHEN_JE_AUFRUF,
 	igdbAuffrischSchritt,
 	igdbPhysischSchritt,
 	meldungFuer,
@@ -12,10 +15,19 @@ import {
 import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis } from "./besitz";
 import { meldungFuer as ebayMeldung, type EbayClient } from "../ebay/client";
 import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
-import { marktSchritt, type MarktErgebnis } from "./markt";
-import { storeSchritt, type StoreSchrittErgebnis } from "./store";
+import { marktSchritt, RELEASES_JE_AUFRUF as MARKT_JE_AUFRUF, type MarktErgebnis } from "./markt";
+import { RELEASES_JE_AUFRUF as STORE_JE_AUFRUF, storeSchritt, type StoreSchrittErgebnis } from "./store";
 import { meldungFuer as storeMeldung, type StoreClient } from "../psn/store";
-import { eineListe, jahreSchritt, levelSchritt, type ListenErgebnis } from "./trophaeen";
+import {
+	eineListe,
+	jahreSchritt,
+	jahreStandAus,
+	levelSchritt,
+	levelStandAus,
+	SCHLUESSEL_JAHRE,
+	SCHLUESSEL_LEVEL,
+	type ListenErgebnis,
+} from "./trophaeen";
 
 /**
  * Die naechtliche Automatik (Stufe 18, Abschnitt 10.1).
@@ -143,7 +155,6 @@ export type CronErgebnis = {
 		| "igdb_physisch"
 		| "markt"
 		| "store"
-		| "aufraeumen"
 		| "nichts";
 	/** angekuendigt -> erschienen (8.4), in jedem Aufruf. */
 	erschienen: number;
@@ -167,9 +178,91 @@ export type CronErgebnis = {
 	physisch?: PhysischErgebnis;
 };
 
+/** Was ein Schritt der Kette tun koennte - in der Reihenfolge von 10.1. */
+export type CronKandidat =
+	| "sync"
+	| "sync_starten"
+	| "spielzeit"
+	| "besitz"
+	| "trophaeen"
+	| "level"
+	| "store"
+	| "jahre"
+	| "igdb_auffrischen"
+	| "igdb_physisch"
+	| "markt";
+
+/** Die Schluessel aus app_setting, die die Entscheidung braucht. */
+export const CRON_STAENDE = [SCHLUESSEL_SPIELZEIT, SCHLUESSEL_BESITZ, SCHLUESSEL_LEVEL, SCHLUESSEL_JAHRE] as const;
+
+/**
+ * Welche Schritte faellig sind, in der Reihenfolge, in der sie versucht
+ * werden (Stufe 18j). Rein, ohne D1: Alles, was die Entscheidung braucht,
+ * steht in der Lage, die der eine Lese-Batch geholt hat.
+ *
+ * Eine Liste statt eines Schritts, weil ein faelliger Schritt trotzdem leer
+ * ausgehen kann - das Level, wenn PSN keines nennt; die Jahre, wenn es keine
+ * Trophaeen gibt; der Store, wenn keine Anfrage etwas pruefte. Dann versucht
+ * `cronSchritt` den naechsten, genau wie bis 18j die Kette der `if`s.
+ */
+export function entscheide(
+	lage: CronLage,
+	k: { heute: string; igdbKonfiguriert: boolean; ebayKonfiguriert: boolean },
+): CronKandidat[] {
+	const raus: CronKandidat[] = [];
+	const stand = (s: string) => lage.einstellungen.get(s) ?? null;
+	if (lage.psn) {
+		const { laufend, heutige, zugang, naechsteListe, storeZiele } = lage.psn;
+		// 2. Ein laufender Lauf wird fortgesetzt - und sonst nichts.
+		if (laufend) return ["sync"];
+		const mitZugang = zugang.eingerichtet && zugang.status !== "abgelaufen";
+		// 3. Ein Cron-Versuch je Nacht (Entscheidung des Nutzers vom 19.09.2026).
+		if (mitZugang && syncFaellig(heutige)) return ["sync_starten"];
+		if (mitZugang) {
+			if (spielzeitFaellig(stand(SCHLUESSEL_SPIELZEIT), k.heute)) raus.push("spielzeit");
+			if (besitzFaellig(besitzStandAus(stand(SCHLUESSEL_BESITZ)), k.heute)) raus.push("besitz");
+			if (naechsteListe) raus.push("trophaeen");
+			if (levelStandAus(stand(SCHLUESSEL_LEVEL))?.standAm !== k.heute) raus.push("level");
+		}
+		if (storeZiele.length > 0) raus.push("store");
+	}
+	if (lage.wartung) {
+		const { zumAuffrischen, zurDisc, marktZiele } = lage.wartung;
+		if (jahreStandAus(stand(SCHLUESSEL_JAHRE))?.standAm !== k.heute) raus.push("jahre");
+		if (k.igdbKonfiguriert && zumAuffrischen.length > 0) raus.push("igdb_auffrischen");
+		if (k.igdbKonfiguriert && zurDisc.length > 0) raus.push("igdb_physisch");
+		if (k.ebayKonfiguriert && marktZiele.length > 0) raus.push("markt");
+	}
+	return raus;
+}
+
+/** Die Lage fuer einen Aufruf lesen - ein D1-Aufruf, mit Marke nur vom Einstieg. */
+export function lageLesen(
+	repos: Repositories,
+	bereich: CronBereich,
+	heute: string,
+	marke?: Date,
+): Promise<CronLage> {
+	return repos.cronLage.lesen({
+		bereich,
+		heute,
+		marke,
+		schluessel: CRON_STAENDE,
+		haengtNachStunden: HAENGT_NACH_STUNDEN,
+		rohantwortenLaeufe: ROHANTWORTEN_LAEUFE,
+		storeJeAufruf: STORE_JE_AUFRUF,
+		marktJeAufruf: MARKT_JE_AUFRUF,
+		igdbJeAufruf: AUFFRISCHEN_JE_AUFRUF,
+		auffrischFristTage: AUFFRISCH_FRIST_TAGE,
+	});
+}
+
 /**
  * Ein Aufruf der Automatik. `heute` ist das UTC-Datum (YYYY-MM-DD) und nur
  * fuer Tests ueberschreibbar; `bereich` sagt, welcher Cron-Eintrag ruft.
+ *
+ * `lage` liest der Einstieg samt Marke (Stufe 18j); fehlt sie, liest der
+ * Schritt sie selbst, ohne Marke - so rufen ihn die Tests.
  */
 export async function cronSchritt(
 	repos: Repositories,
@@ -177,159 +270,151 @@ export async function cronSchritt(
 	igdb: IgdbClient,
 	ebay: EbayClient,
 	store: StoreClient,
-	optionen: { heute?: string; bereich?: CronBereich } = {},
+	optionen: { heute?: string; bereich?: CronBereich; lage?: CronLage } = {},
 ): Promise<CronErgebnis> {
 	const heute = optionen.heute ?? heuteIso();
 	const bereich = optionen.bereich ?? "alles";
-	const basis: Pick<CronErgebnis, "erschienen" | "abgebrochen" | "bereich"> = {
-		erschienen: 0,
-		abgebrochen: 0,
+	const lage = optionen.lage ?? (await lageLesen(repos, bereich, heute));
+	// Die Daueraufgaben sind im Lage-Batch schon geschehen: Haenger im
+	// PSN-Fenster, Freigabe und Aufraeumen in der Wartung. Sie stehen an der
+	// Zeile JEDES Aufrufs, wenn sie etwas getan haben (geloescht= seit 18j,
+	// Entscheidung des Nutzers vom 17.10.2026) - Aufraeumen ist kein eigener
+	// Schritt mehr.
+	const basis: Pick<CronErgebnis, "erschienen" | "abgebrochen" | "bereich" | "geloescht"> = {
+		erschienen: lage.wartung?.erschienen ?? 0,
+		abgebrochen: lage.psn?.abgebrochen ?? 0,
 		bereich,
+		...(lage.wartung?.geloescht ? { geloescht: lage.wartung.geloescht } : {}),
 	};
+	const stand = (s: string) => lage.einstellungen.get(s) ?? null;
 
-	// --- PSN: alles, was Sony anfasst --------------------------------------
-	if (bereich !== "wartung") {
-		// 1. Ein Lauf ohne Fortschritt seit einem ganzen Fenster blockiert
-		//    sonst jede Nacht - laufenderLauf() faende ihn immer wieder.
-		basis.abgebrochen = await repos.sync.haengendeAbbrechen(HAENGT_NACH_STUNDEN);
+	for (const kandidat of entscheide(lage, {
+		heute,
+		igdbKonfiguriert: igdb.konfiguriert(),
+		ebayKonfiguriert: ebay.konfiguriert(),
+	})) {
+		switch (kandidat) {
+			case "sync":
+				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn) };
+			case "sync_starten":
+				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron" }) };
 
-		// 2. Ein laufender Lauf wird fortgesetzt - auch einer vom Nutzer, und
-		//    auch einer, dessen letzter Aufruf an einer Seite scheiterte
-		//    (Stufe 18e: ein Abrufsfehler beendet den Lauf nicht mehr).
-		if (await repos.sync.laufenderLauf()) {
-			return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn) };
-		}
-
-		// 3. Ein Cron-Versuch je Nacht (Entscheidung des Nutzers vom
-		//    19.09.2026): nicht nach einem eigenen Lauf von heute, nicht nach
-		//    einem erfolgreichen Handabruf von heute - wohl aber nach einem
-		//    fehlgeschlagenen oder abgebrochenen Handlauf.
-		if (await syncFaellig(repos, heute)) {
-			return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron" }) };
-		}
-
-		// 4./5. Spielzeit und digitaler Besitz (7.7). Erst nach dem Sync: Die
-		//       Zuordnung laeuft ueber die Titel der Sammlung, und die sind
-		//       nach dem Sync auf dem neuesten Stand. Beide brauchen einen
-		//       Zugang - ohne NPSSO passiert hier nichts.
-		const zugang = await repos.credentials.anzeige();
-		if (zugang.eingerichtet && zugang.status !== "abgelaufen") {
-			try {
-				const spielzeit = await spielzeitLauf(repos, psn, heute);
-				if (spielzeit) return { ...basis, getan: "spielzeit", spielzeit };
-
-				const besitz = await besitzLauf(repos, psn, heute);
-				if (besitz) return { ...basis, getan: "besitz", besitz };
-
-				// 6. Einzeltrophaeen (7.7, Stufe 19b) - eine Liste je Aufruf.
-				//    Ganz hinten in der PSN-Kette, weil der Portionsknopf der
-				//    Hauptweg ist: Dieser Schritt ist das Netz fuer den Fall,
-				//    dass niemand drueckt, und die Nachfuehrung fuer Listen,
-				//    an denen sich etwas geaendert hat. Beides ist dieselbe
-				//    Auswahl (naechsteZumFuellen).
-				const trophaeen = await trophaeenLauf(repos, psn);
-				if (trophaeen) return { ...basis, getan: "trophaeen", trophaeen };
-
-				// 7. Das Trophaeen-Level, hoechstens einmal am Tag und nur,
-				//    wenn nichts mehr zu fuellen ist: ein einzelner Abruf, der
-				//    niemals einen Aufruf kostet, den die Erstbefuellung
-				//    braucht.
-				//    Die Sitzung holt der Schritt erst, wenn das Level faellig ist
-				//    (Stufe 18i) - vorher erneuerte jeder Leerlauf das Token.
-				const token = async () => (await sitzungBesorgen(repos, psn)).accessToken;
-				const level = await levelSchritt(repos, psn, token, heute);
-				if (level) return { ...basis, getan: "level", level: level.level };
-			} catch (fehler) {
-				// Ein abgelaufener Zugang oder ein PSN-Ausfall darf die Nacht
-				// nicht beenden - die Wartung laeuft in ihrem eigenen Fenster
-				// ohnehin weiter.
-				return { ...basis, getan: "nichts", meldung: "Der PSN-Abruf ist fehlgeschlagen." };
+			// 4.-7. Spielzeit, Kaufliste, Einzeltrophaeen, Level (7.7). Erst nach
+			//       dem Sync: Die Zuordnung laeuft ueber die Titel der Sammlung.
+			//       Ein abgelaufener Zugang oder ein PSN-Ausfall darf die Nacht
+			//       nicht beenden - die Wartung laeuft in ihrem Fenster weiter.
+			case "spielzeit":
+			case "besitz":
+			case "trophaeen":
+			case "level": {
+				try {
+					if (kandidat === "spielzeit") {
+						const spielzeit = await spielzeitLauf(repos, psn, heute, stand(SCHLUESSEL_SPIELZEIT));
+						if (spielzeit) return { ...basis, getan: "spielzeit", spielzeit };
+					} else if (kandidat === "besitz") {
+						const besitz = await besitzLauf(repos, psn, heute, {
+							gespeichert: besitzStandAus(stand(SCHLUESSEL_BESITZ)),
+						});
+						if (besitz) return { ...basis, getan: "besitz", besitz };
+					} else if (kandidat === "trophaeen") {
+						// Ganz hinten in der PSN-Kette, weil der Portionsknopf der
+						// Hauptweg ist: das Netz fuer den Fall, dass niemand drueckt
+						// (Stufe 19b). Dieselbe Auswahl wie der Knopf.
+						const liste = lage.psn?.naechsteListe;
+						if (liste) {
+							const { accessToken } = await sitzungBesorgen(repos, psn);
+							const trophaeen = await eineListe(repos, psn, accessToken, liste);
+							await zugangGeglueckt(repos);
+							return { ...basis, getan: "trophaeen", trophaeen };
+						}
+					} else {
+						// Die Sitzung holt der Schritt erst, wenn das Level faellig
+						// ist (Stufe 18i) - vorher erneuerte jeder Leerlauf das Token.
+						const token = async () => (await sitzungBesorgen(repos, psn)).accessToken;
+						const level = await levelSchritt(repos, psn, token, heute, levelStandAus(stand(SCHLUESSEL_LEVEL)));
+						if (level) return { ...basis, getan: "level", level: level.level };
+					}
+				} catch (fehler) {
+					return { ...basis, getan: "nichts", meldung: "Der PSN-Abruf ist fehlgeschlagen." };
+				}
+				break;
 			}
-		}
 
-		// 8. Store-Preise (7.4, Stufe 21). Im PSN-Fenster, weil es Sonys
-		//    Schnittstelle ist - aber AUSSERHALB der Zugangspruefung: Der
-		//    Store antwortet ohne Token, und ein abgelaufenes NPSSO darf die
-		//    Preise nicht stilllegen. Ganz hinten in der Kette und mit
-		//    eigenem try/catch, aus demselben Grund wie bei IGDB (18b): Der
-		//    Schritt darf keinen Aufruf belegen, den eine schwere Arbeit
-		//    braucht, und sein Ausfall nicht die Nacht kosten.
-		try {
-			const preise = await storeSchritt(repos, store, igdb);
-			if (preise.geprueft > 0 || preise.status === "fehler") {
-				return { ...basis, getan: "store", store: preise };
+			// 8. Store-Preise (7.4): ausserhalb der Zugangspruefung - der Store
+			//    antwortet ohne Token -, mit eigenem try/catch wie IGDB (18b).
+			case "store": {
+				try {
+					const preise = await storeSchritt(repos, store, igdb, STORE_JE_AUFRUF, lage.psn?.storeZiele);
+					if (preise.geprueft > 0 || preise.status === "fehler") {
+						return { ...basis, getan: "store", store: preise };
+					}
+				} catch (fehler) {
+					return { ...basis, getan: "nichts", meldung: storeMeldung(fehler) };
+				}
+				break;
 			}
-		} catch (fehler) {
-			return { ...basis, getan: "nichts", meldung: storeMeldung(fehler) };
-		}
-	}
 
-	// --- Wartung: nichts davon fasst PSN an ---------------------------------
-	if (bereich !== "psn") {
-		// 6. Der taegliche Statuswechsel aus 8.4 ist ein einzelner Batch ohne
-		//    Rechenarbeit und protokolliert selbst.
-		basis.erschienen = await repos.games.erschieneneFreigeben();
-
-		// 7./8. Die beiden Tagesarbeiten ZUERST (Stufe 18g): Trophaeen je Jahr
-		//      und das Aufraeumen der Rohantworten. Beide sind einmal am Tag
-		//      mit einem Aufruf erledigt und ruhen danach; sie kosten das
-		//      Fenster also genau zwei Aufrufe. Bis 18g standen sie ganz
-		//      hinten, "damit sie keinen Aufruf belegen, in dem echte Arbeit
-		//      wartet" - das hielt nur, solange der Schritt davor sicher fertig
-		//      wurde. Vom 11. bis 16.10.2026 fuellte der Marktschritt das
-		//      Fenster (und starb an der CPU-Grenze), und beide liefen keinen
-		//      einzigen Tag: Jahre auf dem Stand vom 10.10., neun Laeufe
-		//      Rohantworten statt drei. Regel (10.1): Was einmal am Tag mit
-		//      einem Aufruf erledigt ist, steht vor dem, was das Fenster
-		//      fuellen kann.
-		//
-		//      Jahre: 18 060 gelesene Zeilen sind fuer die Startseite zu teuer
-		//      (Abschnitt 2); hier stoeren sie niemanden, und das Dashboard
-		//      liest danach eine Zeile aus app_setting.
-		const jahre = await jahreSchritt(repos, heute);
-		if (jahre) return { ...basis, getan: "jahre", jahre: jahre.jahre.length };
-
-		//      Aufraeumen: ein einzelnes DELETE ueber einen Index. Es kehrt nur
-		//      zurueck, wenn es etwas geloescht hat - einmal je neuem Lauf -,
-		//      sonst faellt der Aufruf zur naechsten Arbeit durch.
-		const geloescht = await repos.sync.rohantwortenAufraeumen(ROHANTWORTEN_LAEUFE);
-		if (geloescht > 0) return { ...basis, getan: "aufraeumen", geloescht };
-
-		// 9./10. IGDB nur mit Zugang; ohne bleibt es ruhig.
-		//
-		// In try/catch, weil eine Ausnahme hier bisher den ganzen Aufruf riss:
-		// Der Sync lief dann zwar, aber alles danach fiel still aus, und von
-		// aussen war das nicht zu sehen (Stufe 18b).
-		if (igdb.konfiguriert()) {
-			try {
-				const auffrischen = await igdbAuffrischSchritt(repos, igdb, undefined, AUFFRISCH_FRIST_TAGE);
-				if (auffrischen.angefragt > 0) return { ...basis, getan: "igdb_auffrischen", auffrischen };
-
-				const physisch = await igdbPhysischSchritt(repos, igdb);
-				if (physisch.angefragt > 0) return { ...basis, getan: "igdb_physisch", physisch };
-			} catch (fehler) {
-				return { ...basis, getan: "nichts", meldung: meldungFuer(fehler) };
+			// 9. Trophaeen je Jahr ZUERST in der Wartung (Stufe 18g): Was einmal
+			//    am Tag mit einem Aufruf erledigt ist, steht vor dem, was das
+			//    Fenster fuellen kann. Vom 11. bis 16.10.2026 fuellte der
+			//    Marktschritt das Fenster, und die Jahre liefen keinen Tag.
+			case "jahre": {
+				const jahre = await jahreSchritt(repos, heute, jahreStandAus(stand(SCHLUESSEL_JAHRE)));
+				if (jahre) return { ...basis, getan: "jahre", jahre: jahre.jahre.length };
+				break;
 			}
-		}
 
-		// 11. Gebrauchtpreise und Disc-Nachweis aus eBay (7.3, Stufe 20).
-		//     Hier und nicht im PSN-Fenster: Der Schritt fasst Sony nicht an.
-		//     Eigenes try/catch aus demselben Grund wie bei IGDB (18b) - und
-		//     zwanzig Releases sind vierzig Fremdanfragen, also zehn unter den
-		//     50 je Aufruf (Stufe 20e). Als letzter, weil er als einziger das
-		//     Fenster fuellen kann.
-		if (ebay.konfiguriert()) {
-			try {
-				const markt = await marktSchritt(repos, ebay);
-				if (markt.geprueft > 0 || markt.status === "fehler") return { ...basis, getan: "markt", markt };
-			} catch (fehler) {
-				return { ...basis, getan: "nichts", meldung: ebayMeldung(fehler) };
+			// 10./11. IGDB nur mit Zugang, in try/catch: Eine Ausnahme riss
+			//         bis 18b den ganzen Aufruf.
+			case "igdb_auffrischen":
+			case "igdb_physisch": {
+				try {
+					if (kandidat === "igdb_auffrischen") {
+						const auffrischen = await igdbAuffrischSchritt(
+							repos,
+							igdb,
+							AUFFRISCHEN_JE_AUFRUF,
+							AUFFRISCH_FRIST_TAGE,
+							lage.wartung?.zumAuffrischen,
+						);
+						if (auffrischen.angefragt > 0) return { ...basis, getan: "igdb_auffrischen", auffrischen };
+					} else {
+						const physisch = await igdbPhysischSchritt(repos, igdb, AUFFRISCHEN_JE_AUFRUF, lage.wartung?.zurDisc);
+						if (physisch.angefragt > 0) return { ...basis, getan: "igdb_physisch", physisch };
+					}
+				} catch (fehler) {
+					return { ...basis, getan: "nichts", meldung: meldungFuer(fehler) };
+				}
+				break;
+			}
+
+			// 12. Gebrauchtpreise (7.3, Stufe 20) - als letzter, weil er als
+			//     einziger das Fenster fuellen kann.
+			case "markt": {
+				try {
+					const markt = await marktSchritt(repos, ebay, MARKT_JE_AUFRUF, lage.wartung?.marktZiele);
+					if (markt.geprueft > 0 || markt.status === "fehler") return { ...basis, getan: "markt", markt };
+				} catch (fehler) {
+					return { ...basis, getan: "nichts", meldung: ebayMeldung(fehler) };
+				}
+				break;
 			}
 		}
 	}
 
 	return { ...basis, getan: "nichts" };
 }
+
+/** Der Spielzeit-Stand "datum:offset[:versuche]", gelesen. */
+function spielzeitStand(stand: string | null, heute: string): { offset: number; bisher: number; faellig: boolean } {
+	const [tag, offsetRoh, versucheRoh] = (stand ?? "").split(":");
+	const vonHeute = tag === heute;
+	const offset = vonHeute ? Number(offsetRoh) : 0;
+	const bisher = vonHeute ? Number(versucheRoh ?? 0) || 0 : 0;
+	return { offset, bisher, faellig: !(vonHeute && offset < 0) };
+}
+
+const spielzeitFaellig = (stand: string | null, heute: string) => spielzeitStand(stand, heute).faellig;
 
 /**
  * Eine Seite Spielzeit, wenn heute noch nicht alles geholt wurde.
@@ -354,13 +439,14 @@ export async function cronSchritt(
  * setzt den Zaehler zurueck. Ein abgelehnter Token kommt hier nicht an: Den
  * wirft `sitzungBesorgen` als PsnAuthError, bevor der Schritt laeuft.
  */
-async function spielzeitLauf(repos: Repositories, psn: PsnClient, heute: string): Promise<SpielzeitErgebnis | null> {
-	const stand = await repos.sync.fortschritt(SCHLUESSEL_SPIELZEIT);
-	const [tag, offsetRoh, versucheRoh] = (stand ?? "").split(":");
-	const vonHeute = tag === heute;
-	const offset = vonHeute ? Number(offsetRoh) : 0;
-	const bisher = vonHeute ? Number(versucheRoh ?? 0) || 0 : 0;
-	if (vonHeute && offset < 0) return null;
+async function spielzeitLauf(
+	repos: Repositories,
+	psn: PsnClient,
+	heute: string,
+	stand: string | null,
+): Promise<SpielzeitErgebnis | null> {
+	const { offset, bisher, faellig } = spielzeitStand(stand, heute);
+	if (!faellig) return null;
 
 	const { accessToken } = await sitzungBesorgen(repos, psn);
 	const ergebnis = await spielzeitSchritt(repos, psn, accessToken, offset);
@@ -384,37 +470,33 @@ async function spielzeitLauf(repos: Repositories, psn: PsnClient, heute: string)
 	return ergebnis;
 }
 
-/**
- * Eine Liste Einzeltrophaeen, wenn eine offen ist. `null` heisst "nichts zu
- * tun" - dann ist der Bestand vollstaendig und nichts hat sich geaendert.
- *
- * Kein eigener Fehlversuchszaehler: Anders als bei Sync und Spielzeit haengt
- * hier kein Offset an einem Lauf, den ein Fehler verlieren koennte. Scheitert
- * der Abruf, wird nicht gestempelt, und derselbe Aufruf waehlt die Liste in
- * fuenf Minuten erneut - die Wiederholung ist die Auswahl selbst. Die
- * Ausnahme faengt `cronSchritt` ab, wie bei Spielzeit und Kaufliste.
- */
-async function trophaeenLauf(repos: Repositories, psn: PsnClient): Promise<ListenErgebnis | null> {
-	const [liste] = await repos.trophaeen.naechsteZumFuellen(1);
-	if (!liste) return null;
-	const { accessToken } = await sitzungBesorgen(repos, psn);
-	const ergebnis = await eineListe(repos, psn, accessToken, liste);
-	await zugangGeglueckt(repos);
-	return ergebnis;
-}
-
 /** Der Stand der Kaufliste in app_setting (Stufe 18c, `fehlerAm` seit 18e). */
 export type BesitzStand = { fertigAm?: string; fehlerAm?: string; start?: number; gesehen?: number[] };
 
 /** Was `GET /api/sync/status` ueber die Kaufliste sagt (Stufe 18e). */
 export async function besitzStand(repos: Repositories): Promise<BesitzStand> {
-	const stand = await repos.sync.fortschritt(SCHLUESSEL_BESITZ);
+	return besitzStandAus(await repos.sync.fortschritt(SCHLUESSEL_BESITZ));
+}
+
+/** Der gespeicherte Stand, gelesen - fuer Knopf, Status und Lage-Batch dieselbe Auswertung. */
+export function besitzStandAus(stand: string | null): BesitzStand {
 	if (!stand) return {};
 	try {
 		return JSON.parse(stand) as BesitzStand;
 	} catch {
 		return {};
 	}
+}
+
+/** Ob ein neuer oder fortgesetzter Durchlauf faellig ist. */
+function besitzFaellig(gespeichert: BesitzStand, heute: string, erzwingen = false): boolean {
+	const laeuft = typeof gespeichert.start === "number";
+	return (
+		laeuft ||
+		erzwingen ||
+		!gespeichert.fertigAm ||
+		tageSeit(gespeichert.fertigAm, heute) >= BESITZ_FRIST_TAGE
+	);
 }
 
 /**
@@ -444,19 +526,13 @@ export async function besitzLauf(
 	repos: Repositories,
 	psn: PsnClient,
 	heute: string,
-	optionen: { erzwingen?: boolean } = {},
+	// `gespeichert` hat der Cron im Lage-Batch gelesen (Stufe 18j); der Knopf
+	// liest selbst.
+	optionen: { erzwingen?: boolean; gespeichert?: BesitzStand } = {},
 ): Promise<BesitzErgebnis | null> {
-	const gespeichert = await besitzStand(repos);
-
+	const gespeichert = optionen.gespeichert ?? (await besitzStand(repos));
 	const laeuft = typeof gespeichert.start === "number";
-	if (
-		!laeuft &&
-		!optionen.erzwingen &&
-		gespeichert.fertigAm &&
-		tageSeit(gespeichert.fertigAm, heute) < BESITZ_FRIST_TAGE
-	) {
-		return null;
-	}
+	if (!besitzFaellig(gespeichert, heute, optionen.erzwingen)) return null;
 
 	const { accessToken } = await sitzungBesorgen(repos, psn);
 	const gesehen = laeuft ? (gespeichert.gesehen ?? []) : [];
@@ -499,15 +575,35 @@ function tageSeit(vorher: string, heute: string): number {
 	return Math.floor((b - a) / 86_400_000);
 }
 
-async function syncFaellig(repos: Repositories, heute: string): Promise<boolean> {
-	const zugang = await repos.credentials.anzeige();
-	// Ohne NPSSO oder mit abgelaufenem Zugang gar keinen Lauf anlegen - sonst
-	// stuende jede Nacht eine Fehlerzeile in der Historie. Ein neues NPSSO
-	// setzt den Status auf 'ok', dann geht es von allein weiter.
-	if (!zugang.eingerichtet || zugang.status === "abgelaufen") return false;
-
-	const heutige = await repos.sync.laeufeSeit(heute);
+/**
+ * Ein Cron-Versuch je Nacht: nicht nach einem eigenen Lauf von heute, nicht
+ * nach einem erfolgreichen Handabruf von heute - wohl aber nach einem
+ * fehlgeschlagenen oder abgebrochenen Handlauf. Ohne NPSSO oder mit
+ * abgelaufenem Zugang fragt `entscheide` gar nicht erst: Sonst stuende jede
+ * Nacht eine Fehlerzeile in der Historie.
+ */
+function syncFaellig(heutige: readonly SyncLauf[]): boolean {
 	return !heutige.some((l) => l.started_by === "cron" || l.status === "erfolg");
+}
+
+/**
+ * Die Zahlen eines Ausgangs fuer `cron_stand` (Stufe 18j). Nur was war - ob
+ * es schlimm ist, entscheiden die Betriebswarnungen beim Lesen (16.2).
+ * `offen` ist der Rest des Schritts nach diesem Aufruf, wo es einen gibt.
+ */
+export function cronFakt(am: string, e: CronErgebnis): CronFakt {
+	const meldung = Boolean(
+		e.meldung ||
+			e.sync?.meldung ||
+			e.spielzeit?.meldung ||
+			e.besitz?.meldung ||
+			e.markt?.meldung ||
+			e.store?.meldung ||
+			e.auffrischen?.meldung ||
+			e.physisch?.meldung,
+	);
+	const offen = e.markt?.nochOffen ?? e.store?.nochOffen;
+	return { am, getan: e.getan, meldung, ...(offen === undefined ? {} : { offen }) };
 }
 
 /**

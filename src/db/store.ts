@@ -1,5 +1,6 @@
 import { OHNE_WEBSTORE, type StoreBefund, type StoreErgebnis } from "../domain/store";
 import type { Plattform } from "../domain/titel";
+import { eins, einzeln, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 
 /**
@@ -98,7 +99,12 @@ export class StoreRepository {
 	 * dass nichts zu tun ist.
 	 */
 	async zuPruefen(limit: number): Promise<ZuPruefen[]> {
-		const { results } = await this.db
+		return einzeln(this.db, this.zuPruefenBaustein(limit));
+	}
+
+	/** Dieselbe Auswahl als Baustein - fuer den Lage-Batch des Cron (Stufe 18j). */
+	zuPruefenBaustein(limit: number): Baustein<ZuPruefen[]> {
+		const statement = this.db
 			.prepare(
 				"WITH ziele(id) AS (SELECT pe.release_id FROM plan_entry pe WHERE pe.status = 'offen' AND pe.release_id IS NOT NULL " +
 					"UNION SELECT id FROM release WHERE physical_release_status = 'nein') " +
@@ -109,9 +115,8 @@ export class StoreRepository {
 					"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') " +
 					"ORDER BY r.store_geprueft_am, r.id LIMIT ?",
 			)
-			.bind(limit)
-			.all<ZuPruefen>();
-		return results ?? [];
+			.bind(limit);
+		return eins(statement, (e) => zeilen<ZuPruefen>(e));
 	}
 
 	/** Welche Spiele der Portion noch keine Concept-Id haben oder eine alte Frage. */

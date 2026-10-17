@@ -1,5 +1,6 @@
 import { entschluesseln, verschluesseln } from "../domain/crypto";
 import { Geheimnis } from "../domain/secret";
+import { eins, einzeln, ersteZeile, type Baustein } from "./baustein";
 
 export type CredentialStatus = "ok" | "abgelaufen" | "fehler";
 
@@ -53,7 +54,17 @@ export class CredentialsRepository {
 	}
 
 	async anzeige(): Promise<CredentialAnzeige> {
-		const z = await this.zeile();
+		return einzeln(this.db, this.anzeigeBaustein());
+	}
+
+	/** Dieselbe Anzeige als Baustein - fuer den Lage-Batch des Cron (Stufe 18j). Ohne Klartext. */
+	anzeigeBaustein(): Baustein<CredentialAnzeige> {
+		return eins(this.db.prepare("SELECT * FROM psn_credentials WHERE id = 1"), (e) =>
+			CredentialsRepository.anzeigeAus(ersteZeile<Zeile>(e)),
+		);
+	}
+
+	private static anzeigeAus(z: Zeile | null): CredentialAnzeige {
 		if (!z) {
 			return {
 				eingerichtet: false,

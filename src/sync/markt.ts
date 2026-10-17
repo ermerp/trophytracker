@@ -48,11 +48,13 @@ export async function marktSchritt(
 	repos: Repositories,
 	ebay: EbayClient,
 	n = RELEASES_JE_AUFRUF,
+	// Vom Lage-Batch des Cron gelesen (Stufe 18j), sonst selbst - dieselbe Auswahl.
+	vorgelesen?: ZuPruefen[],
 ): Promise<MarktErgebnis> {
 	if (!ebay.konfiguriert()) {
 		return leer({ status: "fehler", meldung: new EbayKonfigError("eBay-Zugangsdaten sind nicht hinterlegt.").message });
 	}
-	const ziele = await repos.markt.zuPruefen(n);
+	const ziele = vorgelesen ?? (await repos.markt.zuPruefen(n));
 	if (ziele.length === 0) return leer({ status: "erfolg" });
 
 	const stand = await portion(repos, ebay, ziele);

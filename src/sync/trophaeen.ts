@@ -158,8 +158,11 @@ export async function levelSchritt(
 	psn: PsnClient,
 	token: () => Promise<Geheimnis>,
 	heute: string,
+	// Der Cron hat den Stand schon im Lage-Batch gelesen (Stufe 18j); fehlt
+	// das Argument, liest der Schritt selbst - der Weg des Knopfs.
+	gelesen?: LevelStand | null,
 ): Promise<LevelStand | null> {
-	const vorhanden = await levelStand(repos);
+	const vorhanden = gelesen === undefined ? await levelStand(repos) : gelesen;
 	if (vorhanden?.standAm === heute) return null;
 
 	const roh = await psn.holeTrophySummary(await token());
@@ -202,7 +205,11 @@ export async function knopfStand(repos: Repositories): Promise<KnopfStand | null
 }
 
 export async function levelStand(repos: Repositories): Promise<LevelStand | null> {
-	const roh = await repos.sync.fortschritt(SCHLUESSEL_LEVEL);
+	return levelStandAus(await repos.sync.fortschritt(SCHLUESSEL_LEVEL));
+}
+
+/** Der gespeicherte Level-Stand, gelesen - fuer Knopf und Lage-Batch dieselbe Auswertung. */
+export function levelStandAus(roh: string | null | undefined): LevelStand | null {
 	if (!roh) return null;
 	try {
 		return JSON.parse(roh) as LevelStand;
@@ -229,8 +236,13 @@ export type JahreStand = { standAm: string; jahre: Array<{ jahr: number; anzahl:
  * fehlt er, rechnet die Route einmal live: Es ist eine Beschleunigung, keine
  * Quelle.
  */
-export async function jahreSchritt(repos: Repositories, heute: string): Promise<JahreStand | null> {
-	const vorhanden = await jahreStand(repos);
+export async function jahreSchritt(
+	repos: Repositories,
+	heute: string,
+	// Wie beim Level: vom Lage-Batch gelesen (18j), sonst selbst.
+	gelesen?: JahreStand | null,
+): Promise<JahreStand | null> {
+	const vorhanden = gelesen === undefined ? await jahreStand(repos) : gelesen;
 	if (vorhanden?.standAm === heute) return null;
 
 	const jahre = (await repos.trophaeen.jahre()).map((j) => ({ jahr: Number(j.jahr), anzahl: j.anzahl }));
@@ -242,7 +254,11 @@ export async function jahreSchritt(repos: Repositories, heute: string): Promise<
 }
 
 export async function jahreStand(repos: Repositories): Promise<JahreStand | null> {
-	const roh = await repos.sync.fortschritt(SCHLUESSEL_JAHRE);
+	return jahreStandAus(await repos.sync.fortschritt(SCHLUESSEL_JAHRE));
+}
+
+/** Der gespeicherte Jahre-Stand, gelesen. */
+export function jahreStandAus(roh: string | null | undefined): JahreStand | null {
 	if (!roh) return null;
 	try {
 		const wert = JSON.parse(roh) as JahreStand;

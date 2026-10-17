@@ -12,14 +12,28 @@ mit Ausnahme wird vermerkt („cron: abgebrochen") – **ein Abbruch durch die L
 der CPU-Grenze endet der Aufruf, bevor das `catch` läuft.
 
 **Die Marke „begonnen" (Stufe 18g)** schließt diese Lücke, ohne Verhalten zu ändern. Jeder Aufruf
-setzt als Erstes `cron_begonnen` in `app_setting` (Zeit, Bereich), und erst der vermerkte Ausgang
+setzt als Erstes eine Marke in `app_setting` (Zeit, Bereich), und erst der vermerkte Ausgang
 nimmt sie im **selben Batch** wie die Verlaufszeile wieder weg – getrennt geschrieben, bliebe eine
-Marke stehen, wenn der Aufruf dazwischen stirbt. Findet ein Aufruf eine Marke, die **zwei Minuten
+Marke stehen, wenn der Aufruf dazwischen stirbt. **Seit Stufe 18j ist es eine Zeile je Aufruf**
+unter `cron_begonnen:<Zeit>:<Bereich>` (Entscheidung des Nutzers vom 17.10.2026): Bis dahin war es
+ein Schlüssel, den jeder Aufruf erst lesen musste, um die Kette der Toten in die neue Marke zu
+tragen – zwei D1-Aufrufe vor jeder Arbeit. Jetzt sind die liegengebliebenen Zeilen selbst die Kette;
+gelesen und gesetzt wird im Lage-Batch ([10-1-cron.md](10-1-cron.md)), gelesen über den
+Schlüsselbereich `cron_begonnen` bis `cron_begonnen;`, damit der Primärschlüssel greift (kein
+`LIKE`). Der Bereich schließt den alten Einzelschlüssel ein; eine Marke im alten Format wird samt
+ihrer mitgetragenen Kette gemeldet. Findet ein Aufruf eine Marke, die **zwei Minuten
 oder älter** ist, ist ihr Aufruf ohne Ausgang geblieben (Entscheidung des Nutzers vom 16.10.2026:
 Der nächste reguläre Aufruf kommt nach fünf Minuten und muss sie sicher erkennen; die doppelte
 Auslösung vom 16.10.2026 lag eine Minute auseinander und darf es nicht). Eine jüngere Marke wird
-überschrieben, aber weder gemeldet noch geerbt, und jeder Aufruf löscht nur **seine eigene**
-Marke, damit ein gleichzeitig laufender zweiter nicht die des ersten wegnimmt.
+weder gemeldet noch angefasst, und jeder Aufruf löscht nur **seine eigene** Marke und die gemeldeten,
+damit ein gleichzeitig laufender zweiter nicht die des ersten wegnimmt.
+
+**Wachsen kann die Menge nur, solange kein Aufruf durchkommt** – jeder vermerkte Ausgang räumt die
+gemeldete Kette weg, auch Marken, die älter als ein Tag sind: Sie werden gemeldet, nicht still
+entfernt (Vorgabe des Nutzers vom 17.10.2026). Für den Fall, dass gar keiner durchkommt, liegen
+höchstens **200** (knapp drei Nächte, `MARKEN_HOECHSTENS`); darüber entfernt der Lage-Batch die
+ältesten. Damit das nicht unbemerkt bleibt, trägt die Marke des kappenden Aufrufs `gekappt`, und die
+Zeile, die die Kette meldet, sagt `gekappt=ja` – ihr Anfang fehlt dann.
 
 Gemeldet wird nicht sofort, sondern **mit dem nächsten vermerkten Ausgang**: Solange die
 CPU-Grenze greift, stirbt auch der Aufruf, der melden würde. Die neue Marke trägt die Kette
@@ -36,7 +50,17 @@ die 18 abgebrochenen Aufrufe dazwischen waren unsichtbar. Die Zeiten sind die **
 verwaisten Aufrufe**, nicht die des meldenden. Eine Kette über die Fenstergrenze nennt beide
 Bereiche (`bereich=psn→wartung`). Eine `ohne_ausgang`-Zeile wird nie verdichtet – wie eine
 Zeile mit `meldung=` ist sie kein Leerlauf –, und die Zeile zwischen zwei Ketten trennt sie ohnehin.
-Kosten: zwei geschriebene und eine gelesene Zeile je Aufruf, **144** geschriebene je Nacht.
+Kosten seit 18j: fünf geschriebene Zeilen je Aufruf samt Verlauf und Stand, **360** je Nacht
+(`test/lesekosten.spec.ts`).
+
+**Die Fakten unter `cron_stand` (Stufe 18j).** Der Ausgangs-Batch legt neben der Textzeile Zahlen ab:
+je Bereich den letzten Ausgang (`am`, `getan`, `meldung` als Wahrheitswert, `offen` beim Markt und
+Store) und die zuletzt gemeldete Kette ohne Ausgang (`ohneAusgang`: Anzahl, von, bis, Bereich,
+`gemeldetAm`). Das ist die Grundlage der Betriebswarnungen ([16.2](16-2-cpu-und-betrieb.md)): **Die
+Fakten schreibt der Cron, das Urteil entsteht beim Lesen** – die Textzeile ist Anzeige, kein Datum,
+und sie zu zerlegen bräche beim nächsten Umbau. Geschrieben wird mit `json_set` beim eigenen Bereich,
+ohne den Stand vorher zu lesen; ein unlesbarer Stand wird ersetzt, statt den Batch und damit die
+Verlaufszeile zu reißen.
 
 **Was die Zeile nennt, muss sich bewegen.** Eine Fortschrittszahl, die in jedem Aufruf gleich
 lautet, ist keine. Die Sync-Zeile nennt deshalb in der Abrufphase den `offset`, in der
@@ -81,8 +105,8 @@ beide Tests leiten sie daraus ab. Der Anlass war ein Befund – als Stufe 20e da
 `*/5 6-8` erweiterte, rechneten `test/cron.spec.ts` und `test/lesekosten.spec.ts` als Literal
 weiter mit 24 und prüften zwölf Aufrufe zu wenig. Seit der Umstellung (09.10.2026) simuliert die
 Nacht 72 statt 60 Aufrufe und verdichtet sie auf 8 Zeilen; die Nachtsumme der gelesenen Zeilen
-stieg von 54 072 auf **80 784** und bleibt unter der Grenze von 100 000 – seit 18g, mit allen
-Abfragen eines Leerlaufs gezählt, **96 444** ([10-1-cron.md](10-1-cron.md)).
+stieg von 54 072 auf **80 784** und bleibt unter der Grenze von 100 000; den heutigen Stand, seit 18j
+als ganzer Aufruf gemessen, nennt [10-1-cron.md](10-1-cron.md).
 
 Drei Regeln halten die Zeile ehrlich: Verdichtet wird **nur bei gleicher Feldfolge** – wechselt der
 Sync von `offset` auf `offen`, beginnt eine neue Zeile, genau dort, wo auch ein Mensch trennen

@@ -1,6 +1,6 @@
 # Trophytracker – Technische Spezifikation
 
-*Version 82 – Stufe 20 entschieden, 20h geplant, drei Dateien geteilt. Die
+*Version 94 – Stufe 18j, 16.2 geteilt. Die
 Abschnittsnummern sind unverändert; die Versionsgeschichte steht in
 [`../changelog.md`](../changelog.md).*
 
@@ -59,6 +59,7 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 16 | [16-umsetzung.md](16-umsetzung.md) | Übersicht Umsetzungsreihenfolge |
 | 16 | [16-1-abgeschlossene-stufen.md](16-1-abgeschlossene-stufen.md) | eine Zeile je abgeschlossener Stufe |
 | 16 | [16-2-offene-stufen.md](16-2-offene-stufen.md) | die offenen Teile von Stufe 20: 20h, 20f, 20g |
+| 16 | [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) | CPU-Grenze (18i–20i), Betriebswarnungen, Nachtläufe bis 05:00 UTC |
 | 16 | [16-4-finale-stufen.md](16-4-finale-stufen.md) | die fünf finalen Stufen |
 | 17 | [17-risiken.md](17-risiken.md) | bekannte Risiken und wie damit umgegangen wird |
 

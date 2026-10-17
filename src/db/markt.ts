@@ -1,5 +1,6 @@
 import type { AngebotUrteil, AngebotWahl, MarktKanal } from "../domain/markt";
 import type { Plattform } from "../domain/titel";
+import { eins, einzeln, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 
 /**
@@ -116,17 +117,23 @@ export class MarktRepository {
 	 * gefragt wird, wessen Preis in der Oberflaeche ueberhaupt vorkommt.
 	 */
 	async zuPruefen(limit: number): Promise<ZuPruefen[]> {
-		const { results } = await this.db
-			.prepare(
-				"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
-					"r.physical_release_status AS discFassung " +
-					"FROM release r JOIN game g ON g.id = r.game_id " +
-					FAELLIG_IN_AUSWAHL +
-					"ORDER BY r.markt_geprueft_am, r.id LIMIT ?",
-			)
-			.bind(limit)
-			.all<ZuPruefen>();
-		return results ?? [];
+		return einzeln(this.db, this.zuPruefenBaustein(limit));
+	}
+
+	/** Dieselbe Auswahl als Baustein - fuer den Lage-Batch des Cron (Stufe 18j). */
+	zuPruefenBaustein(limit: number): Baustein<ZuPruefen[]> {
+		return eins(
+			this.db
+				.prepare(
+					"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
+						"r.physical_release_status AS discFassung " +
+						"FROM release r JOIN game g ON g.id = r.game_id " +
+						FAELLIG_IN_AUSWAHL +
+						"ORDER BY r.markt_geprueft_am, r.id LIMIT ?",
+				)
+				.bind(limit),
+			(e) => zeilen<ZuPruefen>(e),
+		);
 	}
 
 	/**
