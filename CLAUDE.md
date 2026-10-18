@@ -205,12 +205,13 @@ Gilt für `/catchup` vor dessen allgemeinen Schritten. **Es gibt kein `plan.md` 
 
 ## Session-Abschluss
 
-Gilt für `/wrapup` vor dessen allgemeinen Schritten. Die Rolle von Plan und Erkenntnissen übernehmen die Orte aus „Arbeitsweise", mit deren Regeln (ersetzen statt anhängen, verschwundene Zahlen im Bericht nennen, rund 15 KB je Datei):
+Gilt für `/wrapup` vor dessen allgemeinen Schritten. **Nur echte Abweichungen, Entscheidungen und neue Konventionen, keine Umformulierungen** – ist nichts zu ändern, wird das gesagt. Die Rolle von Plan und Erkenntnissen übernehmen die fünf Orte aus „Arbeitsweise", mit deren Regeln:
 
-- **Stand der Stufe, offene Punkte, verworfene Ansätze mit Grund** → ihr Abschnitt in `docs/spec/` (16.2 für Offenes); offene Entscheidungen bleiben als offen markiert.
-- **Wo die Session steht, nächster konkreter Schritt, anstehende Beobachtungen** → die Erinnerung „Projektstand" und ihre Zeile in `MEMORY.md`, mit Datum.
-- **Entscheidungen des Nutzers** → `docs/entscheidungen.md`; **Vorfälle mit Zahlen** → `docs/lehren.md`; hat sich die Spezifikation geändert, eine Zeile in `docs/changelog.md`.
-- **Committen, Pushen und Mergen sind freigegeben** – abweichend von `/wrapup` ohne Rückfrage, nach der Branch-Regel oben. Halbfertiger Code wird auf seinem Branch committet und gepusht, nie nach `main` gemergt; ein Push auf `main` deployt, also danach den Lauf prüfen. Keine Nutzerdaten in die Dokumentation – das Repository ist öffentlich.
+- **Stand der Stufe, offene Punkte, verworfene Ansätze mit Grund** → ihr Abschnitt in `docs/spec/`, ersetzt statt ergänzt (16.2 für Offenes, offene Entscheidungen bleiben offen markiert); hat sich die Spezifikation geändert, eine Zeile in `docs/changelog.md`.
+- **Entscheidungen des Nutzers** → `docs/entscheidungen.md`. **Wo der Nutzer korrigieren musste** → der Vorfall in `docs/lehren.md`.
+- **CLAUDE.md** nur, wenn eine Regel fehlte oder unklar war: die bestehende Regel schärfen, keinen Absatz und kein Beispiel anhängen, kein Datum, keine Zahlen aus dem Vorfall. README nur bei Einrichtung, Betrieb oder Funktionsumfang.
+- **Wo die Session steht, nächster Schritt, anstehende Beobachtungen** → die Erinnerung „Projektstand" und ihre Zeile in `MEMORY.md`, mit Datum.
+- **Erst den Diff zeigen, dann schreiben.** Nach der Freigabe wird ohne zweite Rückfrage committet, gemergt und gepusht (Branch-Regel oben); halbfertiger Code bleibt auf seinem Branch, ein Push auf `main` deployt. Keine Nutzerdaten in die Dokumentation – das Repository ist öffentlich.
 
 ## Kontext
 
