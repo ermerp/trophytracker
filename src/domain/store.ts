@@ -99,31 +99,93 @@ export type CacheRoh = Record<string, unknown>;
  * (gemessen am 02.10.2026). Der Aufrufer sucht sich den richtigen heraus -
  * `preisBlock` und `conceptBlock` wissen, welcher das ist.
  */
+const BLOCK_PRAEFIX = '<script id="env:';
 const BLOCK_ANFANG = '<script id="env:[^"]*" type="application/json">';
+const BLOCK_ENDE = "</script>";
 
 /**
- * Der naechste vollstaendige Block ab `ab`, oder `null`.
+ * Die Bloecke einer Seite, die als Strom ankommt (Stufe 18l).
  *
- * Gibt `ende` mit zurueck, damit ein Aufrufer, der die Seite als Strom liest,
- * weiss, wo er weitersuchen muss - und wann er abbrechen darf.
+ * `weiter` haengt ein Stueck an und liefert die Bloecke, die damit
+ * vollstaendig geworden sind - `daten` ist `null` fuer einen Block, der kein
+ * JSON ist (der ist nicht unser Block, aber auch kein Grund steckenzubleiben).
+ *
+ * **Gesucht wird nur im neuen Teil.** Bis 18l lag die ganze bisher gelesene
+ * Seite in einem wachsenden Text, und jedes Stueck suchte ihn von der letzten
+ * Blockgrenze an erneut ab - bei 60 KB bis zum Preisblock und kleinen
+ * Stuecken ein Vielfaches der Seite. Jetzt merkt sich der Leser, bis wohin er
+ * gesucht hat, und behaelt nur den unverarbeiteten Rest: hoechstens einen
+ * halben Block oder ein paar Zeichen, die der Anfang eines Markers sein
+ * koennten. Ein Marker oder ein `</script>` ueber eine Stueckgrenze hinweg
+ * wird so trotzdem gefunden.
  */
-export function naechsterBlock(text: string, ab = 0): { daten: unknown; anfang: number; ende: number } | null {
-	// Der Ausdruck entsteht je Aufruf: Ein geteiltes `lastIndex` am Modul
-	// waere Zustand zwischen zwei Abrufen, und davon haette niemand etwas.
-	const suche = new RegExp(BLOCK_ANFANG, "g");
-	suche.lastIndex = ab;
-	const treffer = suche.exec(text);
-	if (!treffer) return null;
-	const inhaltAb = treffer.index + treffer[0].length;
-	const ende = text.indexOf("</script>", inhaltAb);
-	// Noch nicht vollstaendig geladen: Der Aufrufer liest weiter.
-	if (ende < 0) return null;
-	try {
-		return { daten: JSON.parse(text.slice(inhaltAb, ende)), anfang: treffer.index, ende: ende + 9 };
-	} catch {
-		// Ein Block, der kein JSON ist, ist nicht unser Block.
-		return { daten: null, anfang: treffer.index, ende: ende + 9 };
+export class BlockStrom {
+	/** Was noch nicht verarbeitet ist - ab einer Blockgrenze. */
+	private rest = "";
+	/** Bis hierher ist `rest` nach einem Anfang abgesucht. */
+	private sucheAb = 0;
+	/** Ein Anfang ist gefunden, und `rest` beginnt mit seinem Inhalt. */
+	private imBlock = false;
+	/** Bis hierher ist der Inhalt nach `</script>` abgesucht. */
+	private endeAb = 0;
+	// Je Leser ein eigener Ausdruck: Ein geteiltes `lastIndex` am Modul waere
+	// Zustand zwischen zwei Abrufen.
+	private readonly anfangSuche = new RegExp(BLOCK_ANFANG, "y");
+
+	weiter(stueck: string): unknown[] {
+		this.rest += stueck;
+		const raus: unknown[] = [];
+		for (;;) {
+			if (!this.imBlock) {
+				const anfang = this.rest.indexOf(BLOCK_PRAEFIX, this.sucheAb);
+				if (anfang < 0) {
+					// Nichts gefunden: Behalten wird nur, was der Beginn eines
+					// Markers sein koennte, der im naechsten Stueck weitergeht.
+					this.rest = this.rest.slice(Math.max(0, this.rest.length - BLOCK_PRAEFIX.length + 1));
+					this.sucheAb = 0;
+					break;
+				}
+				this.anfangSuche.lastIndex = anfang;
+				const treffer = this.anfangSuche.exec(this.rest);
+				if (!treffer) {
+					// Der Tag ist noch nicht ganz da - oder es ist kein Block.
+					if (this.rest.indexOf(">", anfang) < 0) {
+						this.rest = this.rest.slice(anfang);
+						this.sucheAb = 0;
+						break;
+					}
+					this.sucheAb = anfang + 1;
+					continue;
+				}
+				this.rest = this.rest.slice(anfang + treffer[0].length);
+				this.imBlock = true;
+				this.endeAb = 0;
+			}
+			const ende = this.rest.indexOf(BLOCK_ENDE, this.endeAb);
+			if (ende < 0) {
+				// Noch nicht vollstaendig: Beim naechsten Stueck nur dort weiter,
+				// wo ein `</script>` ueber die Grenze reichen koennte.
+				this.endeAb = Math.max(0, this.rest.length - BLOCK_ENDE.length + 1);
+				break;
+			}
+			let daten: unknown = null;
+			try {
+				daten = JSON.parse(this.rest.slice(0, ende));
+			} catch {
+				// Ein Block, der kein JSON ist, ist nicht unser Block.
+			}
+			raus.push(daten);
+			this.rest = this.rest.slice(ende + BLOCK_ENDE.length);
+			this.imBlock = false;
+			this.sucheAb = 0;
+		}
+		return raus;
 	}
+}
+
+/** Alle vollstaendigen Bloecke eines ganzen Textes - fuer Tests und Seiten am Stueck. */
+export function bloeckeAus(text: string): unknown[] {
+	return new BlockStrom().weiter(text);
 }
 
 function cacheVon(daten: unknown): CacheRoh | null {

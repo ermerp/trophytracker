@@ -6,7 +6,8 @@ import {
 	istConceptBlock,
 	istPreisBlock,
 	kaufpreisAus,
-	naechsterBlock,
+	BlockStrom,
+	bloeckeAus,
 	produktReihe,
 	produkteAus,
 	standardProdukt,
@@ -23,23 +24,43 @@ import { conceptSeite, fakeStore, htmlAntwort, produktSeite } from "./store-fake
  */
 
 describe("Bloecke einer Store-Seite", () => {
-	it("findet den Block und sagt, wo er endet", () => {
+	it("findet den Block zwischen anderem Markup", () => {
 		const html = `<p>x</p><script id="env:abc" type="application/json">{"cache":{"a":1}}</script><p>y</p>`;
-		const block = naechsterBlock(html);
-		expect(block?.daten).toEqual({ cache: { a: 1 } });
-		expect(html.slice(block?.ende)).toBe("<p>y</p>");
+		expect(bloeckeAus(html)).toEqual([{ cache: { a: 1 } }]);
 	});
 
-	it("liefert null, solange der Block nicht vollstaendig ist", () => {
+	it("liefert nichts, solange der Block nicht vollstaendig ist - und ihn mit dem Rest", () => {
 		// Genau der Fall beim Lesen als Strom: Das Stueck endet mitten im Block.
-		expect(naechsterBlock(`<script id="env:a" type="application/json">{"cache":`)).toBeNull();
+		const strom = new BlockStrom();
+		expect(strom.weiter(`<script id="env:a" type="application/json">{"cache":`)).toEqual([]);
+		expect(strom.weiter(`{}}</script>`)).toEqual([{ cache: {} }]);
 	});
 
 	it("ueberspringt einen Block, der kein JSON ist, statt steckenzubleiben", () => {
 		const html = `<script id="env:a" type="application/json">kein json</script><script id="env:b" type="application/json">{"cache":{}}</script>`;
-		const erst = naechsterBlock(html);
-		expect(erst?.daten).toBeNull();
-		expect(naechsterBlock(html, erst?.ende)?.daten).toEqual({ cache: {} });
+		expect(bloeckeAus(html)).toEqual([null, { cache: {} }]);
+	});
+
+	it("nimmt ein anderes Skript mit demselben Anfang nicht fuer einen Block", () => {
+		const html = `<script id="env:x" type="text/javascript">{"cache":{"nein":1}}</script><script id="env:b" type="application/json">{"cache":{}}</script>`;
+		expect(bloeckeAus(html)).toEqual([{ cache: {} }]);
+	});
+
+	it("findet dieselben Bloecke, wie klein die Stuecke auch sind (Stufe 18l)", () => {
+		// Der Strom liefert Stuecke beliebiger Groesse; Marker, `</script>` und
+		// Umlaute koennen ueber jede Grenze reichen. Gesucht wird nur im neuen
+		// Teil - und genau dabei darf an einer Grenze nichts verloren gehen.
+		const seite =
+			produktSeite("EP1-A_00-X", [{ typ: "ADD_TO_CART", produktId: "EP1-A_00-X" }], { vorspann: 3_000, vorblock: true, name: "Ökö – Spiel" }) +
+			`<script id="env:z" type="application/json">kein json</script>`;
+		const amStueck = bloeckeAus(seite);
+		expect(amStueck).toHaveLength(3);
+		for (const groesse of [1, 2, 7, 15, 16, 17, 64, 1_000]) {
+			const strom = new BlockStrom();
+			const gefunden: unknown[] = [];
+			for (let i = 0; i < seite.length; i += groesse) gefunden.push(...strom.weiter(seite.slice(i, i + groesse)));
+			expect(gefunden, `Stuecke zu ${groesse}`).toEqual(amStueck);
+		}
 	});
 });
 
@@ -51,12 +72,8 @@ describe("Der Block mit dem Preis", () => {
 		// Preis, Block 62 420 denselben mit Preis.
 		const html = produktSeite(produktId, [{ typ: "ADD_TO_CART", produktId, grundCents: 5999 }], { vorblock: true });
 		let gefunden = 0;
-		let ab = 0;
-		for (;;) {
-			const block = naechsterBlock(html, ab);
-			if (!block) break;
-			ab = block.ende;
-			if (istPreisBlock(block.daten, produktId)) gefunden++;
+		for (const daten of bloeckeAus(html)) {
+			if (istPreisBlock(daten, produktId)) gefunden++;
 		}
 		expect(gefunden).toBe(1);
 	});
@@ -118,8 +135,8 @@ describe("Der Kaufpreis", () => {
 
 	it("nennt den Namen des Produkts, damit eine Edition auffaellt", () => {
 		const html = produktSeite(p, [{ typ: "ADD_TO_CART", produktId: p }], { name: "Baldur's Gate 3" });
-		const block = naechsterBlock(html);
-		expect((istPreisBlock(block?.daten, p) as Record<string, { name?: string }>)[`Product:${p}`].name).toBe("Baldur's Gate 3");
+		const [daten] = bloeckeAus(html);
+		expect((istPreisBlock(daten, p) as Record<string, { name?: string }>)[`Product:${p}`].name).toBe("Baldur's Gate 3");
 	});
 });
 
@@ -199,12 +216,8 @@ describe("Die Wahl des Produkts auf einer Concept-Seite", () => {
 			{ id: "EP4133-PPSA04929_00-SNOWRUNNERGAME01", name: "SnowRunner" },
 			{ id: "EP4133-PPSA04929_00-SNOWRUNNERPRMEDI", name: "SnowRunner - 1-Year Anniversary Edition" },
 		]);
-		let ab = 0;
-		for (;;) {
-			const block = naechsterBlock(html, ab);
-			if (!block) break;
-			ab = block.ende;
-			const treffer = istConceptBlock(block.daten);
+		for (const daten of bloeckeAus(html)) {
+			const treffer = istConceptBlock(daten);
 			if (!treffer) continue;
 			expect(produkteAus(treffer.cache, treffer.concept)).toHaveLength(2);
 			expect(standardProdukt(treffer.concept)).toContain("SNOWRUNNERGAME01");
@@ -271,6 +284,33 @@ describe("Der Abruf", () => {
 		});
 		const { client } = fakeStore([[/\/product\//, () => htmlAntwort(html)]]);
 		await expect(client.holePreis(p)).resolves.toMatchObject({ preisCents: 5999, produktName: "Horizon Forbidden West" });
+	});
+
+	it("liest den Preis aus einem Strom kleiner Stuecke und hoert danach auf (Stufe 18l)", async () => {
+		// Byteweise geschnitten, also auch mitten in Umlauten und Markern. Nach
+		// dem Preisblock folgt noch reichlich Seite, die nie gelesen werden soll.
+		const html =
+			produktSeite(p, [{ typ: "ADD_TO_CART", produktId: p, grundCents: 5999 }], {
+				vorspann: 60_000,
+				vorblock: true,
+				name: "Horizon – Ökö",
+			}) + "<div>x</div>".repeat(50_000);
+		const bytes = new TextEncoder().encode(html);
+		for (const groesse of [333, 4_096]) {
+			let geholt = 0;
+			const strom = new ReadableStream<Uint8Array>({
+				pull(c) {
+					if (geholt >= bytes.length) return c.close();
+					c.enqueue(bytes.slice(geholt, geholt + groesse));
+					geholt += groesse;
+				},
+			});
+			const { client } = fakeStore([
+				[/\/product\//, () => new Response(strom, { headers: { "content-type": "text/html; charset=utf-8" } })],
+			]);
+			await expect(client.holePreis(p)).resolves.toMatchObject({ preisCents: 5999, produktName: "Horizon – Ökö" });
+			expect(geholt, `Stuecke zu ${groesse}`).toBeLessThan(80_000);
+		}
 	});
 
 	it("bricht nach der Obergrenze ab, statt eine umgebaute Seite ganz zu parsen", async () => {

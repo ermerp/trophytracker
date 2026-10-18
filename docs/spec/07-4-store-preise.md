@@ -18,7 +18,7 @@ Welcher Endpunkt es ist, ist gemessen – und die naheliegende Antwort war die f
 
 #### Wie gelesen wird
 
-Die Seite wird als **Strom** gelesen: Jeder vollständige Block wird geprüft, und sobald der richtige da ist, bricht der Leser ab (`reader.cancel()`). Gemessen liest er damit **69 292, 81 920 und 69 167 Byte** statt 994 083, 923 747 und 1 407 018 – fünf bis neun Prozent. Die ganze Seite zu parsen wäre gegen die 10-ms-CPU-Grenze unvernünftig; eine Obergrenze von 256 KB fängt den Fall ab, dass Sony das Gerüst umbaut. Ein `Range`-Kopf hilft nicht: Sony beantwortet ihn mit der vollen Seite.
+Die Seite wird als **Strom** gelesen: Jeder vollständige Block wird geprüft, und sobald der richtige da ist, bricht der Leser ab (`reader.cancel()`). Gesucht wird dabei nur im neu angekommenen Teil, behalten nur der unverarbeitete Rest (`BlockStrom`, seit Stufe 18l; 16.2). Gemessen liest er damit **69 292, 81 920 und 69 167 Byte** statt 994 083, 923 747 und 1 407 018 – fünf bis neun Prozent. Die ganze Seite zu parsen wäre gegen die 10-ms-CPU-Grenze unvernünftig; eine Obergrenze von 256 KB fängt den Fall ab, dass Sony das Gerüst umbaut. Ein `Range`-Kopf hilft nicht: Sony beantwortet ihn mit der vollen Seite.
 
 **Keine Rohablage** (Regel in CLAUDE.md): kleiner Abruf, Normalisierung ist Feldkopieren, jede Seite jederzeit wiederholbar – alle drei Merkmale fehlen.
 

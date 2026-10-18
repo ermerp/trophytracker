@@ -56,7 +56,7 @@ Leerlauf der Wartung, 16 im PSN-Fenster. Seither:
 Ein Leerlauf sind damit **zwei** D1-Aufrufe; `test/cron-lage.spec.ts` zählt sie über eine D1, die
 ihre Aufrufe zählt (`test/d1-zaehler.ts`). Die Spielzeit fragt seit 18k gebündelt – zwei D1-Aufrufe
 je Seite statt 217 ([16.2](16-2-cpu-und-betrieb.md)); was die übrigen arbeitenden Schritte in sich
-abfragen, bleibt bis 18l und 20i, wie es ist.
+abfragen, bleibt bis 20i, wie es ist (18l änderte den Store-Leser, nicht seine D1-Aufrufe).
 
 **Scheitert eine Anweisung des Lage-Batchs, scheitert er ganz** – auch die Marke wird nicht gesetzt,
 gearbeitet wird nichts, und der Aufruf schreibt „cron: abgebrochen". Halb geschehen ist dann nichts.

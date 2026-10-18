@@ -2,9 +2,9 @@ import {
 	ctasAus,
 	imPlusKatalog,
 	istConceptBlock,
+	BlockStrom,
 	istPreisBlock,
 	kaufpreisAus,
-	naechsterBlock,
 	produkteAus,
 	standardProdukt,
 	type ProduktRoh,
@@ -29,7 +29,8 @@ import {
  * 64 668 und 57 718 Byte). Die ganze Seite zu lesen und zu parsen waere
  * gegen die 10-ms-CPU-Grenze unvernuenftig; der Block selbst ist 3,2 bis
  * 7,1 KB. Also lesen wir Stueck fuer Stueck, pruefen jeden vollstaendigen
- * Block und brechen ab, sobald der richtige da ist. Ein `Range`-Kopf hilft
+ * Block und brechen ab, sobald der richtige da ist. Gesucht wird dabei nur im
+ * neu angekommenen Teil (`BlockStrom`, Stufe 18l). Ein `Range`-Kopf hilft
  * nicht - Sony beantwortet ihn mit der vollen Seite (gemessen).
  */
 
@@ -112,21 +113,17 @@ export function erstelleStoreClient(hole: FetchFn = fetch) {
 
 		const leser = antwort.body.getReader();
 		const zerleger = new TextDecoder();
-		let puffer = "";
-		let ab = 0;
+		// Sucht nur im neu angekommenen Teil und behaelt nur den
+		// unverarbeiteten Rest (Stufe 18l, `BlockStrom`).
+		const bloecke = new BlockStrom();
 		let gelesen = 0;
 		try {
 			for (;;) {
 				const { done, value } = await leser.read();
-				if (value) {
-					gelesen += value.byteLength;
-					puffer += zerleger.decode(value, { stream: true });
-				}
-				for (;;) {
-					const block = naechsterBlock(puffer, ab);
-					if (!block) break;
-					ab = block.ende;
-					const treffer = pruefen(block.daten);
+				const stueck = value ? zerleger.decode(value, { stream: true }) : "";
+				if (value) gelesen += value.byteLength;
+				for (const daten of bloecke.weiter(done ? stueck + zerleger.decode() : stueck)) {
+					const treffer = pruefen(daten);
 					if (treffer !== null) return { art: "treffer", wert: treffer };
 				}
 				if (done) return { art: "unlesbar" };
