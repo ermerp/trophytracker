@@ -694,3 +694,18 @@ zur selben Zeit schon „läuft bald ab". Die Frage ging vor dem Bau zurück an 
 → Wer eine Regel vorschlägt, sucht vorher in der Spezifikation nach derselben Sache – eine Warnung,
 eine Frist, eine Schwelle hat oft schon eine Stelle und eine Entscheidung dahinter (Regel in
 CLAUDE.md, Arbeitsweise).
+
+**18.10.2026 (Stufe 18m) – eine Stichprobe als Messwert vorgelegt.** Für die Lesekosten des
+Lage-Batches nannte ich „~2 870 Zeilen je Wartungsaufruf, 30 % über dem Test", gerechnet aus
+`d1QueriesAdaptiveGroups`. Der Nutzer legte darauf die Vorgabe „Bestand auf Produktionsgröße
+bringen". Exakt gelesen (`meta.rows_read`, dieselben Anweisungen aus dem Code) waren es 2 590,
+also 17 %, und ein Drittel des Abstands lag nicht an der Menge, sondern an 59 nie geprüften
+Releases; die Kosten selbst kommen von drei Auswahlen ohne passenden Index. Dieselbe Quelle hatte
+am 17.10. die Nachtsumme mit 178 600 statt 229 836 angegeben.
+→ Summen und Zeilen je Aufruf nie aus der Stichprobe (Regel in CLAUDE.md, Zeilenlesegrenze).
+
+**18.10.2026 (Stufe 18m) – Gold für eine gute Nachricht.** Der Prototyp der Betriebswarnungen
+setzte den Platzhalter für den Preisalarm in Gold. Der Nutzer korrigierte: Gold liegt neben dem
+Warn-Gelb der Glocke, und ein Preisalarm ist eine gute Nachricht, keine wartende Arbeit. Gold ist
+in `tokens.css` als Akzent für Auszeichnung beschrieben, nicht für Meldungen.
+→ Ein Ton wird nach seiner Bedeutung gewählt (Regel in CLAUDE.md, Tokens).
