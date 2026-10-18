@@ -129,7 +129,7 @@ export function useOffenePosten(): OffeneDaten {
 			key: 'pruefen',
 			inhalt: (
 				<>
-					<strong>{review.offen}</strong> Spiele warten auf deine erste Durchsicht.{' '}
+					<strong>{review.offen}</strong> {review.offen === 1 ? 'Spiel wartet' : 'Spiele warten'} auf deine erste Durchsicht.{' '}
 					<Link to="/pruefliste">Prüfliste</Link>
 				</>
 			),
@@ -156,7 +156,7 @@ export function useOffenePosten(): OffeneDaten {
 			key: 'unentschieden',
 			inhalt: (
 				<>
-					<strong>{review.unentschieden}</strong> Spiele stehen auf „unentschieden".{' '}
+					<strong>{review.unentschieden}</strong> {review.unentschieden === 1 ? 'Spiel steht' : 'Spiele stehen'} auf „unentschieden".{' '}
 					<Link to="/sammlung?playStatus=unentschieden">Ansehen</Link>
 				</>
 			),
@@ -167,7 +167,7 @@ export function useOffenePosten(): OffeneDaten {
 			key: 'zuordnung',
 			inhalt: (
 				<>
-					<strong>{listenOffen}</strong> Trophäenlisten sind noch nicht zugeordnet.{' '}
+					<strong>{listenOffen}</strong> {listenOffen === 1 ? 'Trophäenliste ist' : 'Trophäenlisten sind'} noch nicht zugeordnet.{' '}
 					<Link to="/zuordnung">Zuordnung</Link>
 				</>
 			),
@@ -178,7 +178,7 @@ export function useOffenePosten(): OffeneDaten {
 			key: 'igdb-abgleich',
 			inhalt: (
 				<>
-					<strong>{igdb.ungeprueft}</strong> Spiele wurden noch nicht bei IGDB gesucht.{' '}
+					<strong>{igdb.ungeprueft}</strong> {igdb.ungeprueft === 1 ? 'Spiel wurde' : 'Spiele wurden'} noch nicht bei IGDB gesucht.{' '}
 					<Link to="/einstellungen">Abgleich starten</Link>
 				</>
 			),
@@ -189,7 +189,7 @@ export function useOffenePosten(): OffeneDaten {
 			key: 'igdb-pruefung',
 			inhalt: (
 				<>
-					<strong>{igdb.zurPruefung}</strong> Spiele warten auf die IGDB-Zuordnung.{' '}
+					<strong>{igdb.zurPruefung}</strong> {igdb.zurPruefung === 1 ? 'Spiel wartet' : 'Spiele warten'} auf die IGDB-Zuordnung.{' '}
 					<Link to="/igdb">IGDB-Zuordnung</Link>
 				</>
 			),
@@ -200,7 +200,7 @@ export function useOffenePosten(): OffeneDaten {
 			key: 'import',
 			inhalt: (
 				<>
-					Ein Wunschlisten-Import hat <strong>{importOffen.offen}</strong> offene Zeilen.{' '}
+					Ein Wunschlisten-Import hat <strong>{importOffen.offen}</strong> {importOffen.offen === 1 ? 'offene Zeile' : 'offene Zeilen'}.{' '}
 					<Link to={`/import/${importOffen.id}`}>Weiter</Link>
 				</>
 			),
@@ -211,7 +211,7 @@ export function useOffenePosten(): OffeneDaten {
 			key: 'freitext',
 			inhalt: (
 				<>
-					<strong>{freitext}</strong> Einträge haben keinen IGDB-Eintrag.{' '}
+					<strong>{freitext}</strong> {freitext === 1 ? 'Eintrag hat' : 'Einträge haben'} keinen IGDB-Eintrag.{' '}
 					<Link to="/ohne-zuordnung">Ohne Zuordnung</Link>
 				</>
 			),
@@ -222,7 +222,7 @@ export function useOffenePosten(): OffeneDaten {
 			key: 'kandidaten',
 			inhalt: (
 				<>
-					<strong>{kandidaten}</strong> Spiele im Besitz stehen auf keiner Liste.{' '}
+					<strong>{kandidaten}</strong> {kandidaten === 1 ? 'Spiel im Besitz steht' : 'Spiele im Besitz stehen'} auf keiner Liste.{' '}
 					<Link to="/backlog">Backlog-Kandidaten</Link>
 				</>
 			),
