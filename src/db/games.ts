@@ -332,6 +332,45 @@ export class GamesRepository {
 	}
 
 	/**
+	 * Dasselbe fuer viele Schluessel auf einmal (Stufe 18k): `IN`-Listen in
+	 * EINEM Batch statt einer Abfrage je Titel. Der Spielzeit-Schritt fragte
+	 * bis dahin 200-mal je Seite einzeln, und jeder D1-Aufruf kostet CPU
+	 * (10.1, rund 0,7 ms gegen ein Zwanzigstel je Anweisung im Batch).
+	 *
+	 * In Stuecken zu 100, weil D1 hoechstens 100 gebundene Werte je
+	 * Statement erlaubt. Jeder Schluessel bleibt ein Lookup ueber
+	 * `idx_game_sort_title`, die Releases kommen ueber `idx_release_game`.
+	 * Schluessel ohne Treffer fehlen in der Antwort.
+	 */
+	async releasesNachSchluesseln(
+		schluessel: readonly string[],
+	): Promise<Map<string, Array<{ id: number; platform: string }>>> {
+		const einmal = [...new Set(schluessel)];
+		const raus = new Map<string, Array<{ id: number; platform: string }>>();
+		if (einmal.length === 0) return raus;
+		const stuecke: string[][] = [];
+		for (let i = 0; i < einmal.length; i += 100) stuecke.push(einmal.slice(i, i + 100));
+		const ergebnisse = await this.db.batch<{ schluessel: string; id: number; platform: string }>(
+			stuecke.map((s) =>
+				this.db
+					.prepare(
+						"SELECT g.sort_title AS schluessel, r.id, r.platform FROM game g JOIN release r ON r.game_id = g.id " +
+							`WHERE g.sort_title IN (${s.map(() => "?").join(", ")})`,
+					)
+					.bind(...s),
+			),
+		);
+		for (const e of ergebnisse) {
+			for (const z of e.results ?? []) {
+				const liste = raus.get(z.schluessel) ?? [];
+				liste.push({ id: z.id, platform: z.platform });
+				raus.set(z.schluessel, liste);
+			}
+		}
+		return raus;
+	}
+
+	/**
 	 * Rechnet sort_title fuer alle Spiele neu aus dem Titel aus.
 	 *
 	 * sort_title ist abgeleitete Information. Aendert sich die Regel in
