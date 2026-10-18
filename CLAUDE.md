@@ -194,6 +194,24 @@ Kein `env.DB.prepare()` direkt in Route-Handlern – alle Zugriffe laufen über 
 - **Ein gemeldeter Darstellungsfehler wird erst belegt, dann behoben**, und **`env(safe-area-inset-*)` ist headless null, auf dem Handy nicht** – was daran hängt, ist auf dem Entwicklungsrechner nicht nachstellbar. Die echten Werte zeigt der Block „Anzeige" in den Einstellungen; nachstellen lässt sich die Geometrie, indem die `env()`-Regeln im Browser durch feste Pixelwerte ersetzt werden.
 - **Deutsche Bezeichner in Daten und Oberfläche** (Statuswerte, Anzeigetexte), englische im Code. **Bei Unklarheiten in der Spezifikation nachfragen**, statt eine Annahme zu treffen und weiterzubauen.
 
+## Session-Start
+
+Gilt für `/catchup` vor dessen allgemeinen Schritten. **Es gibt kein `plan.md` und kein `findings.md`** – nicht suchen, nicht anlegen.
+
+- **Stand und nächster Schritt** stehen in der Erinnerung „Projektstand" (über `MEMORY.md` verlinkt); der Plan ist der Abschnitt der nächsten Stufe in `docs/spec/16-2-cpu-und-betrieb.md` bzw. `16-2-offene-stufen.md` – nur diesen lesen, nicht ganz 16.
+- Changelog, Lehren und Entscheidungen bleiben ungelesen (siehe oben).
+- Zu `git log`/`git status` gehört der Branch: Wer nicht auf `main` steht oder einen ungemergten `stufe-*`-Branch findet, hat eine halbe Stufe vor sich und sagt das.
+- Unstimmigkeiten heißen hier: „gebaut" in der Spezifikation ohne Merge, ein Merge ohne Zeile im Changelog, oder ein Projektstand, der hinter `git log` zurückliegt. Steht eine Nachtauswertung an, wird sie genannt, nicht begonnen.
+
+## Session-Abschluss
+
+Gilt für `/wrapup` vor dessen allgemeinen Schritten. Die Rolle von Plan und Erkenntnissen übernehmen die Orte aus „Arbeitsweise", mit deren Regeln (ersetzen statt anhängen, verschwundene Zahlen im Bericht nennen, rund 15 KB je Datei):
+
+- **Stand der Stufe, offene Punkte, verworfene Ansätze mit Grund** → ihr Abschnitt in `docs/spec/` (16.2 für Offenes); offene Entscheidungen bleiben als offen markiert.
+- **Wo die Session steht, nächster konkreter Schritt, anstehende Beobachtungen** → die Erinnerung „Projektstand" und ihre Zeile in `MEMORY.md`, mit Datum.
+- **Entscheidungen des Nutzers** → `docs/entscheidungen.md`; **Vorfälle mit Zahlen** → `docs/lehren.md`; hat sich die Spezifikation geändert, eine Zeile in `docs/changelog.md`.
+- **Committen, Pushen und Mergen sind freigegeben** – abweichend von `/wrapup` ohne Rückfrage, nach der Branch-Regel oben. Halbfertiger Code wird auf seinem Branch committet und gepusht, nie nach `main` gemergt; ein Push auf `main` deployt, also danach den Lauf prüfen. Keine Nutzerdaten in die Dokumentation – das Repository ist öffentlich.
+
 ## Kontext
 
 Die PSN-Anbindung ist inoffiziell und kann jederzeit brechen. Fehler beim Sync dürfen die Anwendung nie unbenutzbar machen: vorhandene Daten bleiben stehen, der Zustand wird angezeigt, der Nutzer kann ein neues NPSSO eintragen.
