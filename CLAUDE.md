@@ -4,7 +4,7 @@ Single-User-Webanwendung zur Verwaltung einer PlayStation-Spielesammlung (PS3, P
 
 **Die Spezifikation steht in [`docs/spec/`](docs/spec/README.md) und ist die maßgebliche Quelle.** Lies den Abschnitt, der zu deinem Feature gehört – der Index sagt, welche Datei welche Nummer trägt. Diese Datei enthält nur, was in jeder Sitzung gilt; die Zahlen und Vorfälle hinter den Regeln stehen dort, nicht hier.
 
-Drei Dateien werden **nicht routinemäßig gelesen**, nur wenn eine Frage dorthin zeigt: [`docs/changelog.md`](docs/changelog.md) (eine Zeile je Fassung), [`docs/lehren.md`](docs/lehren.md) (Vorfälle mit Datum und Zahlen, aus denen die Regeln entstanden sind), [`docs/entscheidungen.md`](docs/entscheidungen.md) (Entscheidungen des Nutzers mit Datum).
+Drei Dateien werden **nicht routinemäßig gelesen**, nur wenn eine Frage dorthin zeigt – die eine Ausnahme ist der Kopf des Changelogs beim Session-Start: [`docs/changelog.md`](docs/changelog.md) (eine Zeile je Fassung), [`docs/lehren.md`](docs/lehren.md) (Vorfälle mit Datum und Zahlen, aus denen die Regeln entstanden sind), [`docs/entscheidungen.md`](docs/entscheidungen.md) (Entscheidungen des Nutzers mit Datum).
 
 ## Stack
 
@@ -198,8 +198,9 @@ Kein `env.DB.prepare()` direkt in Route-Handlern – alle Zugriffe laufen über 
 
 Gilt für `/catchup` vor dessen allgemeinen Schritten. **Es gibt kein `plan.md` und kein `findings.md`** – nicht suchen, nicht anlegen.
 
-- **Stand und nächster Schritt** stehen in der Erinnerung „Projektstand" (über `MEMORY.md` verlinkt); der Plan ist der Abschnitt der nächsten Stufe in `docs/spec/16-2-cpu-und-betrieb.md` bzw. `16-2-offene-stufen.md` – nur diesen lesen, nicht ganz 16.
-- Changelog, Lehren und Entscheidungen bleiben ungelesen (siehe oben).
+- **Stand und nächste Schritte** stehen in `docs/spec/16-2-offene-stufen.md` und `16-2-cpu-und-betrieb.md` – daraus nur der Abschnitt der nächsten Stufe und die offenen Punkte, nicht beide Dateien ganz. Sitzungsstand, der in wenigen Tagen erledigt ist (anstehende Beobachtungen), steht in der Erinnerung „Projektstand" (über `MEMORY.md` verlinkt).
+- Dazu die **ersten fünf Tabellenzeilen** von `docs/changelog.md` (neueste zuerst – nicht `tail`) und `git log --oneline -10`.
+- **Nicht** gelesen werden die übrige Spezifikation, `lehren.md` und `entscheidungen.md`.
 - Zu `git log`/`git status` gehört der Branch: Wer nicht auf `main` steht oder einen ungemergten `stufe-*`-Branch findet, hat eine halbe Stufe vor sich und sagt das.
 - Unstimmigkeiten heißen hier: „gebaut" in der Spezifikation ohne Merge, ein Merge ohne Zeile im Changelog, oder ein Projektstand, der hinter `git log` zurückliegt. Steht eine Nachtauswertung an, wird sie genannt, nicht begonnen.
 
@@ -210,7 +211,7 @@ Gilt für `/wrapup` vor dessen allgemeinen Schritten. **Nur echte Abweichungen, 
 - **Stand der Stufe, offene Punkte, verworfene Ansätze mit Grund** → ihr Abschnitt in `docs/spec/`, ersetzt statt ergänzt (16.2 für Offenes, offene Entscheidungen bleiben offen markiert); hat sich die Spezifikation geändert, eine Zeile in `docs/changelog.md`.
 - **Entscheidungen des Nutzers** → `docs/entscheidungen.md`. **Wo der Nutzer korrigieren musste** → der Vorfall in `docs/lehren.md`.
 - **CLAUDE.md** nur, wenn eine Regel fehlte oder unklar war: die bestehende Regel schärfen, keinen Absatz und kein Beispiel anhängen, kein Datum, keine Zahlen aus dem Vorfall. README nur bei Einrichtung, Betrieb oder Funktionsumfang.
-- **Wo die Session steht, nächster Schritt, anstehende Beobachtungen** → die Erinnerung „Projektstand" und ihre Zeile in `MEMORY.md`, mit Datum.
+- **Wo die Session steht und anstehende Beobachtungen** → die Erinnerung „Projektstand" und ihre Zeile in `MEMORY.md`, mit Datum – nur, was in wenigen Tagen erledigt ist, und Erledigtes wird aus der Erinnerung gestrichen; Dauerhaftes gehört nach 16.2.
 - **Erst den Diff zeigen, dann schreiben.** Nach der Freigabe wird ohne zweite Rückfrage committet, gemergt und gepusht (Branch-Regel oben); halbfertiger Code bleibt auf seinem Branch, ein Push auf `main` deployt. Keine Nutzerdaten in die Dokumentation – das Repository ist öffentlich.
 
 ## Kontext

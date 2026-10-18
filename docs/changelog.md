@@ -6,10 +6,11 @@ hier steht nur, **wann was dazukam**. Vorfälle, aus denen eine Regel entstanden
 ist, stehen in [`lehren.md`](lehren.md), Entscheidungen des Nutzers in
 [`entscheidungen.md`](entscheidungen.md).
 
-Diese Datei wird **nicht routinemäßig gelesen**.
+Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabellenzeilen beim Session-Start.
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 100 | 18.10.2026 | **Nachtrag: Session-Start mit Changelog-Kopf.** `/catchup` liest aus 16.2 die nächste Stufe und die offenen Punkte, dazu die ersten fünf Changelog-Zeilen und `git log --oneline -10`; die Projektstand-Erinnerung hält nur kurzlebigen Sitzungsstand, Dauerhaftes steht in 16.2 (CLAUDE.md) |
 | 99 | 18.10.2026 | **Nachtrag: Session-Befehle.** Die Abschnitte „Session-Start" und „Session-Abschluss" in CLAUDE.md stimmen die allgemeinen Befehle `/catchup` und `/wrapup` auf das Projekt ab: kein `plan.md`/`findings.md`, der Stand steht in der Projektstand-Erinnerung und in 16.2, vor dem Schreiben kommt der Diff. Dazu eine geschärfte Regel zum Ersetzen bestehender Abläufe (CLAUDE.md, lehren.md) |
 | 98 | 18.10.2026 | **Stufe 18l: Store-Leser.** Die Seite bleibt ein Strom, gesucht wird nur im neu angekommenen Teil (`BlockStrom` statt `naechsterBlock`), behalten nur der unverarbeitete Rest; Test mit byteweise geschnittenem Strom. Die Portion bleibt bei zehn und wird mit „Cron je Minute" entschieden; aus der Nacht zum 19.10. die CPU je Store-Release (7.4, 10.1, 16.2, entscheidungen.md) |
 | 97 | 18.10.2026 | **Stufe 18k: Spielzeit mit `IN`-Listen.** Kandidaten der Seite in einem Lese-Batch (`releasesNachSchluesseln`, je 100 Schlüssel), die Seite als mehrzeilige Upserts in einem Schreib-Batch: 2 D1-Aufrufe je Seite statt 217, gelesen 1 100 / 1 300 statt 900 / 1 100 Zeilen. CPU-Erwartung rund 9 ms, gemessen wird in der Nacht zum 19.10. (7.7, 10.1, 16.2) |
