@@ -23,10 +23,16 @@ Nutzers vom 17.10.2026).
 
 - **Leerlauf – gebaut in 18j:** zwei D1-Aufrufe statt zehn (Wartung) bzw. 16 (PSN, gemessen in 18h vor 18i), ein
   Lese- und ein Schreib-Batch ([10.1](10-1-cron.md), „Ein Lese- und ein Schreib-Batch"). Vorher 7–11 ms
-  mit echter D1 in der Messung von 18h. Die Wirkung in der Produktion wird je Standort gegen die Nacht
-  zum 17.10.2026 gemessen: PSN-Leerlauf in EWR 11,5 ms, IAD ~16, ATL ~17, ORD ~13,5; Wartung in SJC
-  ~12, LAX ~16. **Erwartet sind 3–6 ms – eine Vermutung**, gerechnet aus dem Verhältnis in 18h mal dem
-  Standortfaktor.
+  mit echter D1 in der Messung von 18h. **Gemessen in der Nacht zum 18.10.2026** (alle 72 Aufrufe
+  `success`, keiner ohne Ausgang): Wartungs-Leerlauf 4,1–7,5 ms, Median 4,8 (n = 12; SJC 4,5 gegen
+  10,9–12,9 am 17.10., EWR 4,1–5,5, DFW 4,4–7,5) – die Vermutung von 3–6 ms trifft im Median, drei
+  von zwölf lagen darüber, alle unter 10. **Den PSN-Leerlauf gab es nicht:** In einer Kaufliste-Nacht
+  belegt die Arbeit alle 36 Aufrufe (Sync 11, Spielzeit 2, Besitz 15, Level 1, Store 7, der Store
+  fertig im letzten); Vergleichswerte vom 17.10.: EWR 11,5 ms, IAD ~16, ATL ~17, ORD ~13,5. Sync,
+  Store und Markt blieben je Standort unverändert – 18j spart den Rahmen, nicht die Arbeit. **Die
+  zwei D1-Aufrufe sind in der Produktion nicht zählbar** (die D1-Analytics zählen Anweisungen, als
+  Stichprobe; D1 zählt nicht als `subrequests`): In den Leerlauf-Minuten kamen nur die zwölf
+  Anweisungsarten der beiden Batches vor. Die Zahl selbst hält `test/cron-lage.spec.ts`.
 - **Spielzeit** (217 Abfragen je Seite): der Abgleich je Titel als **ein Batch** statt 200
   einzelner Abfragen; dann rund 5 ms D1 plus 6 ms Rechnen für 200 Titel. Die Seitengröße ist im
   Code einstellbar (`GESPIELTE_JE_SEITE`); bei 100 Titeln läge eine Seite um 8 ms.
@@ -46,8 +52,9 @@ Nutzers vom 17.10.2026).
 **Cron je Minute** (`* * * * *` ist erlaubt): 180 statt 36 Aufrufe je Fenster, je Konto sind fünf
 Einträge erlaubt, zwei sind belegt. Selbst wenn jeder Aufruf als Anfrage zählt, sind es rund 540
 am Tag gegen 100 000. Eine Änderung am Cron braucht bis zu 15 Minuten, bis sie wirkt. Der
-Leerlauf der Wartung läse dann fünfmal so viele Zeilen je Nacht (gerechnet am 16.10.2026: rund
-480 000 statt 96 000; seit 18j liest ein Wartungsleerlauf 2 218 statt 2 659 Zeilen). **Es hilft nur
+Leerlauf der Wartung läse dann fünfmal so viele Zeilen je Nacht: Der Lage-Batch liest in der
+Produktion rund **2 590** Zeilen je Wartungsaufruf, **in jedem**, nicht nur im Leerlauf (gemessen am
+18.10.2026, unten) – bei 180 Aufrufen rund **466 000** je Nacht statt 93 000. **Es hilft nur
 Schritten, die je Aufruf unter 10 ms bleiben** – also erst nach den Änderungen oben.
 
 **Zu entscheiden:** je Schritt, welcher Weg – Abfragen bündeln, kleinere Portion mit Cron je Minute,
@@ -73,39 +80,74 @@ fällig; vorgeschlagen sind 20. Die Rechnung hängt an der Fensterlage und gehö
 **Danach, als eigener Nachtrag: der Marktschritt** – an der Regel „Abgleiche bereiten den Bestand
 einmal vor" ausgerichtet: Titel einmal zerlegen statt je Prüfung, ein Wortindex je Aufruf statt
 jedes Angebot gegen alle Spiele (Vorgabe des Nutzers vom 16.10.2026). Dazu gehört die **Auswahl,
-die im Leerlauf 430 Zeilen liest** (10.1, Schritt 14). Derselbe Fehler wie bei `offen` steckt in
+die im Leerlauf 596 Zeilen liest** (10.1, Schritt 14; Tabelle unten). Derselbe Fehler wie bei `offen` steckt in
 der Store-Zeile: `offen` zählt dort Releases ohne Stempel mit Produkt-Id im ganzen Bestand, nicht
 das Fällige – nicht angefasst, notiert. Dazu gehört auch, dass diese Zählung (`offeneAnzahl`) in der
 Produktion 412 Zeilen je Aufruf liest, obwohl ihr Kommentar `idx_release_store` nennt (D1-Analytics,
 17.10.2026).
 
-#### Nächste Stufe nach 18j: Betriebswarnungen in der App
+**Für 20i vorgemerkt, spätestens dort: der Bestand der Lesekosten-Messung** (Vorgabe des Nutzers vom
+18.10.2026). Der Test liest im Wartungsleerlauf 2 218 Zeilen, die Produktion rund 2 590 – die drei
+Auswahlen des Lage-Batches, exakt gemessen am 18.10.2026 über `meta.rows_read`, dieselben Anweisungen
+aus dem Code (die Marktauswahl mit verschobener Frist, damit nichts fällig ist wie im Leerlauf):
 
-Anforderung des Nutzers vom 17.10.2026: im Alltag mitbekommen, wenn die Automatik Probleme hat.
-**Der Plan entsteht erst, wenn 18j deployt ist**; vor 20g. Ausgangspunkt ist, was es schon gibt
-(13.2, Stufe 19a): der gelbe Block für Stillstand (abgelaufener Zugang, fehlgeschlagener Nachtlauf
-jünger als 24 h, überfällige Sicherung) und die Glocke für wartende Arbeit.
+| Auswahl | Test | Produktion | Plan | Woran der Abstand liegt |
+|---|---|---|---|---|
+| IGDB-Auffrischen | 431 | 480 | `SCAN game`, Sortierung über temporären Baum | **Menge** (430 gegen 479 Spiele) |
+| Disc-Prüfung | 1 289 | 1 445 | `SCAN g`, je Spiel `idx_release_game` | **Menge** (430 gegen 490 Releases) |
+| Gebrauchtpreise | 430 | 596 | ganzer `idx_release_markt` | **Verteilung**: 59 nie geprüfte Releases außerhalb der Auswahl (im Test 0) |
 
-Vorschlag des Nutzers: **Rot** für Handlungsbedarf (Automatik über ~26 h nicht gelaufen, NPSSO
-abgelaufen oder bald fällig, Sync mehrfach gescheitert, Sicherung zu alt), **eine zweite Stufe zur
-Kenntnis** (Aufrufe ohne Ausgang, Schritt bis Fensterende nicht fertig, Schritt ruht wegen Fehler);
-**ermittelt beim Lesen**, damit auch ein ganz ausgefallener Cron auffällt; eine Meldung je Nacht und
-Art, die von selbst verschwindet; gemeinsam mit dem Preisalarm aus 20g in der Glocke, optisch
-getrennt; Lesekosten **und CPU** der Prüfungen gemessen, weil sie bei jedem Öffnen laufen.
+Die Schätzung „~2 870" aus der Stichprobe der D1-Analytics lag rund 10 % zu hoch; die Lücke zum Test
+sind **17 %, nicht 30 %**. Der Test braucht also 479 Spiele, 490 Releases (manche Spiele mit zwei)
+und 59 ungeprüfte Releases, die nie in die Auswahl kommen. **Die Ursache der Kosten selbst ist eine
+andere:** Alle drei lesen im Leerlauf den ganzen Bestand, in Test und Produktion. Die IGDB-Auswahl
+kann keinen Index nutzen (keiner auf `igdb_synced_at`, und `ORDER BY igdb_synced_at IS NOT NULL`
+verhinderte ihn auch), die Disc-Auswahl geht von `game` statt vom kleinen Teil der Releases aus (171
+`unbekannt`, davon 170 in der 30-Tage-Frist) – das ist Arbeit für einen Index-Nachtrag, nicht für
+den Testbestand.
 
-**Die Fakten schreibt der Cron, das Urteil entsteht beim Lesen.** Was sich nur aus den Textzeilen von
-`cron_verlauf` ergäbe (Abbrüche, Rest bei Fensterschluss), legt seit 18j der Ausgangs-Batch als Zahlen
-unter `cron_stand` ab ([10-1-cron-verlauf.md](10-1-cron-verlauf.md)) – die Stufe selbst fasst den Cron
-nicht an. Die Prüfungen beim Lesen gehören in **einen** Batch; die Bausteine aus 18j
-(`src/db/baustein.ts`) lassen sich dafür mitbenutzen.
+#### Stufe 18m: Betriebswarnungen in der App
 
-**Offen, ausdrücklich:**
+Anforderung des Nutzers vom 17.10.2026: im Alltag mitbekommen, wenn die Automatik Probleme hat; vor
+20g. Plan vorgelegt am 18.10.2026, Entscheidungen vom selben Tag. **Keine Migration, kein Eingriff
+in den Cron** – die Stufe liest nur, was schon steht. **Die Fakten schreibt der Cron, das Urteil
+entsteht beim Lesen:** `cron_stand` ([10-1-cron-verlauf.md](10-1-cron-verlauf.md)), die Sync-Läufe
+des Crons, Status und Ablaufzeiten des Zugangs (nie das Geheimnis), der Sicherungsstand und die
+Stände mit `fehlerAm`, gelesen in **einem** Batch aus Bausteinen (`src/db/baustein.ts`). Ein reines
+Domain-Modul fällt das Urteil, **eine Route** liefert alle Warnungen; die drei Warnungen von heute
+(13.2) ziehen dorthin um. Ermittelt beim Lesen, damit auch ein ganz ausgefallener Cron auffällt; eine
+Meldung je Nacht und Art, die von selbst verschwindet, sobald ihre Fakten sie nicht mehr tragen;
+gemeinsam mit dem Preisalarm aus 20g in der Glocke, optisch getrennt; Lesekosten **und CPU**
+gemessen, weil die Prüfung bei jedem Öffnen läuft.
 
-- **Farben:** Das Gelb „zur Kenntnis" verwechselt sich mit dem Gelb der Glocke („Arbeit wartet"), und
-  der heutige gelbe Block ist inhaltlich das Rot des Vorschlags. Was die Zahl an der Glocke zählt,
-  wenn vier Arten zusammenkommen, wird im **Prototyp** entschieden.
-- **„Bis Fensterende nicht fertig"** wäre bis 20i jede Nacht gelb (Marktfrist, oben) und wird erst
-  danach scharf geschaltet.
+| Regel | Stufe |
+|---|---|
+| Ein Bereich seit über **26 h** ohne vermerkten Ausgang (auch: Stand fehlt ganz) | rot |
+| Zugang abgelaufen oder ungültig – **sofort**, unabhängig von der Zahl der Nächte | rot |
+| NPSSO läuft laut Sony in ≤ **3 Tagen** ab / in ≤ **14 Tagen** | rot / zur Kenntnis |
+| Nacht-Sync gescheitert: **zwei Nächte hintereinander** / eine | rot / zur Kenntnis |
+| Sicherung älter als acht Tage oder keine (14.2) | rot |
+| Kette ohne Ausgang, gemeldet in den letzten 24 h | zur Kenntnis |
+| Letzter Ausgang eines Bereichs mit Meldung; Kaufliste mit `fehlerAm` | zur Kenntnis |
+| Schritt bis Fensterende nicht fertig (`offen > 0`) | zur Kenntnis, **erst nach 20i scharf** – bis dahin jede Nacht (`offen=18` am 18.10.) |
+
+Das NPSSO-Datum ist, was Sony beim Eintragen angekündigt hat, nicht gemessen – der Text sagt deshalb
+„läuft laut Sony am … ab". Am 18.10.2026: 28.11.2026. **Kurze Fehler, die sich im nächsten Aufruf
+selbst beheben, zeigt 18m nicht:** `cron_stand` hält je Bereich nur den letzten Ausgang
+(Entscheidung des Nutzers vom 18.10.2026).
+
+**Offen bis zum Prototyp:** die Farben – das Gelb „zur Kenntnis" verwechselt sich mit dem Gelb der
+Glocke („Arbeit wartet"), und der heutige gelbe Block ist inhaltlich das Rot –, und was die Zahl an
+der Glocke zählt, wenn die Arten zusammenkommen.
+
+#### Nach 18m vorgemerkt: Nachtrag 18m-b, Fehler je Nacht
+
+Vorgabe des Nutzers vom 18.10.2026, als eigener Nachtrag statt in 18k, damit 18k allein die
+Spielzeit misst. Der Ausgangs-Batch zählt je Bereich unter `cron_stand` die **Fehler in dieser
+Nacht** mit; eine spätere Regel kann dann Häufungen zeigen. Zurückgesetzt wird beim ersten Aufruf
+eines neuen UTC-Tags, im selben `json_set` und ohne den Stand vorher zu lesen – kein zusätzlicher
+D1-Aufruf. Ein Abbruch durch die Laufzeit erreicht den Zähler nicht; den zeigt weiter die Kette
+ohne Ausgang.
 
 #### Offen nach 20i: Nachtläufe bis 05:00 UTC
 
@@ -121,3 +163,6 @@ zusammenfallen. Zwei Prüffragen:
 2. **Reicht die Kapazität – 60 statt 72 Aufrufe, Kaufliste-Nächte eingerechnet –, sobald 18j bis 20i
    gebaut sind?** Heute braucht eine Kaufliste-Nacht 64 bis 73. Kleinere Portionen (18l: ein Release
    je Aufruf) heißen mehr Aufrufe, nicht weniger; die Frage hängt mit „Cron je Minute" zusammen.
+   **Gemessen am 18.10.2026:** Eine Kaufliste-Nacht belegt das PSN-Fenster **voll** (36 von 36, der
+   Store fertig im letzten Aufruf), und der Lage-Batch liest je Wartungsaufruf rund 2 590 Zeilen –
+   mit Cron je Minute rund 466 000 je Nacht (oben).

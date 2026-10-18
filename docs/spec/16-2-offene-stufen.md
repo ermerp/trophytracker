@@ -148,7 +148,7 @@ aber keine Teilstufe.
 #### Offen: die CPU-Grenze, Betriebswarnungen, Nachtläufe bis 05:00 UTC
 
 Stehen in [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md): die Nachträge 18i bis 20i, die
-nächste Stufe nach 18j (Betriebswarnungen) und der offene Punkt nach 20i.
+Stufe 18m (Betriebswarnungen) mit dem Nachtrag 18m-b und der offene Punkt nach 20i.
 
 **Die fünf finalen Stufen** – die Sammlung finalisieren, Oberfläche, Refactoring
 (abgetragen), Wiederherstellungsprobe, Außendarstellung – stehen in
