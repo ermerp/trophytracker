@@ -41,7 +41,8 @@ Nutzers vom 17.10.2026).
   geschrieben unverändert 600 / 400. **Erwartung, nicht gemessen:** aus den Einzelkosten von 18h
   rund 3 ms D1 plus 6 ms Rechnen – also weiter grenzwertig; die Seitengröße bleibt bei 200
   (`GESPIELTE_JE_SEITE`). Gemessen wird in der Nacht zum 19.10.2026 an
-  `workersInvocationsScheduled`, je Standort gegen die Werte vom 17.10. (EWR 115–150 ms vor 18j).
+  `workersInvocationsScheduled`, je Standort gegen die Tabelle in [10.1](10-1-cron.md) (EWR
+  115–150 ms, USA am 17.10. 100–124 ms).
 - **Sync** (5–6 Abfragen, ein Batch mit 104 Anweisungen): rund 4 ms D1, 3 ms Rechnen, dazu die
   echte Seite aus dem Netz – grenzwertig.
 - **Store** (je Release ein Batch, die Seite als Strom): rund 1 ms D1 plus 3 ms Lesen je Release;
