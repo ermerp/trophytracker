@@ -213,7 +213,7 @@ export const CRON_SCHLUESSEL = { verlauf: SCHLUESSEL_CRON, stand: SCHLUESSEL_STA
 export const verlaufAus = (roh: string | undefined | null): string[] =>
 	roh ? roh.split("\n").filter((l) => l !== "") : [];
 
-function standAus(roh: string | undefined | null): CronStand {
+export function standAus(roh: string | undefined | null): CronStand {
 	if (!roh) return {};
 	try {
 		const s = JSON.parse(roh) as CronStand;
@@ -348,6 +348,19 @@ export class SyncRepository {
 		return this.db
 			.prepare("SELECT * FROM psn_sync_run ORDER BY id DESC LIMIT 1")
 			.first<SyncLauf>();
+	}
+
+	/**
+	 * Die juengsten Nacht-Syncs, neueste zuerst - fuer die Betriebswarnungen
+	 * (Stufe 18m): Zwei gescheiterte Naechte hintereinander sind rot. Liest
+	 * rueckwaerts ueber den Primaerschluessel, bis `n` Laeufe des Crons
+	 * gefunden sind - ein bis zwei Laeufe je Tag.
+	 */
+	cronLaeufeBaustein(n: number): Baustein<SyncLauf[]> {
+		return eins(
+			this.db.prepare("SELECT * FROM psn_sync_run WHERE started_by = 'cron' ORDER BY id DESC LIMIT ?").bind(n),
+			(e) => zeilen<SyncLauf>(e),
+		);
 	}
 
 	/**

@@ -10,7 +10,7 @@ unten ausdrücklich als offen.
 **20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
 20h und 20f sind am 11.10.2026 abgenommen; **als Nächstes 20g** – dort ist alles entschieden außer der relativen Regel, die ab dem 03.11.2026 messbar wird.
 
-**Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu seit 17.10.2026 die Betriebswarnungen. Wann 20g folgt, ist danach zu entscheiden.
+**Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026). Wann 20g folgt, ist danach zu entscheiden.
 
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 
@@ -58,6 +58,11 @@ Einträge sind frei.
 #### 20g – Preisalarm
 
 Die Glocke in der Kopfzeile meldet einen Preis, der zur Absicht passt.
+
+**Ein eigener Ton, nicht Gold** (Vorgabe des Nutzers vom 18.10.2026, am Prototyp von 18m): Gold liegt
+zu nah am Warn-Gelb, und ein Preisalarm ist eine gute Nachricht, keine wartende Arbeit. Im Prototyp
+von 20g wird ein Grün aus den Tokens (`--st-am_spielen`) neben Rot, Grau und Gelb der Glocke geprüft;
+die Gruppe in der Tafel steht zwischen Warnungen und Posten ([16.2](16-2-cpu-und-betrieb.md), 18m).
 
 **Der Kanal folgt der Absicht** (Entscheidung des Nutzers vom 09.10.2026) – für Alarm *und*
 Anzeige: Disc-Fassung `ja` → Gebrauchtpreis, `nein` oder „physisch nicht gewünscht"

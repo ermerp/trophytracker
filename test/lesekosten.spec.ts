@@ -7,7 +7,7 @@ import { createExecutionContext } from "cloudflare:test";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
 import { erstelleEbayClient } from "../src/ebay/client";
-import { createScheduled } from "../src/index";
+import { createApp, createScheduled } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
 import { zaehlendeDb } from "./d1-zaehler";
 import { fakeIgdb } from "./igdb-fake";
@@ -1328,7 +1328,27 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(nacht).toBeLessThan(100_000);
 		expect(geschriebenJeNacht).toBeLessThan(1_000);
 
+		// Die Betriebswarnungen (Stufe 18m) laufen bei JEDEM Oeffnen des
+		// Dashboards - gemessen als Route, im Stand nach einer Nacht: Stand des
+		// Crons geschrieben, Zugang da, fuenf Nacht-Syncs, zwei Zugaenge in der
+		// Zeitreihe wie in der Produktion am 18.10.2026.
 		await env.DB.batch([
+			env.DB.prepare("DELETE FROM psn_zugang"),
+			env.DB.prepare(
+				"INSERT INTO psn_zugang (eingetragen_am, gestorben_am) VALUES ('2026-09-04 18:02:33', '2026-09-29 03:00:38')",
+			),
+			env.DB.prepare("INSERT INTO psn_zugang (eingetragen_am) VALUES ('2026-09-29 17:59:37')"),
+		]);
+		const warnZaehler = zaehlendeDb(env.DB);
+		const warnAntwort = await createApp().request("/api/betrieb/warnungen", undefined, { ...env, DB: warnZaehler.db });
+		expect(warnAntwort.status).toBe(200);
+		const betrieb = { aufrufe: warnZaehler.aufrufe(), gelesen: warnZaehler.gelesen() };
+		console.info({ betrieb });
+		expect(betrieb.aufrufe).toBe(1);
+		expect(betrieb.gelesen).toBeLessThan(30);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM psn_zugang"),
 			env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_synced_at = NULL"),
 			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, markt_geprueft_am = NULL"),
 			env.DB.prepare("DELETE FROM psn_raw_response"),

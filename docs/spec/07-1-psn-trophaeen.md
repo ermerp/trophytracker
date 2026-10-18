@@ -52,10 +52,15 @@ gehalten hätte, erfährt niemand. Die Tabelle enthält ausschließlich Zeitpunk
 `EXPORT_TABELLEN`; die Zeitreihe ist ihr ganzer Zweck und nach einem Verlust nicht
 wiederherstellbar.
 
-**Gewarnt wird nach dem gemessenen Alter, nicht nach Sonys Zahl:** ab **18 Tagen**, also sieben Tage
-Vorlauf auf die bisher einzige gemessene Lebensdauer. Sonys Frist steht daneben als Tatsache. Das
-ist ausdrücklich eine Faustregel auf einem Messpunkt — sie wird nachgezogen, sobald die
-Aufzeichnung mehr hergibt.
+**Gewarnt wird nach dem früheren Ende** (Stufe 18m, Entscheidung des Nutzers vom 18.10.2026): das
+frühere von Sonys Ankündigung und „eingetragen + kürzeste gemessene Lebensdauer" aus `psn_zugang`
+(Kalendertage; heute 25). Zur Kenntnis ab **14 Tagen** davor, rot ab **3** – auf dem Dashboard und,
+mit derselben Rechnung (`zugangsende`, `src/domain/betrieb.ts`), als „Läuft bald ab" in den
+Einstellungen. Der Satz nennt, woher das Datum kommt: „hält vermutlich bis um den 24.10. – der bisher
+kürzeste hielt 25 Tage, Sony nennt den 28.11.". Nach Sonys Datum allein käme die Warnung für den
+Zugang vom 29.09.2026 drei Wochen nach dem wahrscheinlichen Ende. Mit jedem gemessenen Zugang zieht
+die Rechnung von selbst nach; bis 18m galt eine feste Schwelle von 18 Tagen Alter (sieben Tage
+Vorlauf auf den einen Messpunkt).
 
 **Was nicht gebaut wird, und warum** (Entscheidung des Nutzers vom 29.09.2026, nach Abwägung): Sonys
 Anmeldung nachzubauen — Passwort und 2FA-Geheimnis hinterlegen, Headless-Browser gegen Akamais

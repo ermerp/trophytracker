@@ -68,7 +68,8 @@ Schritt 7) → **18j** Ablauf: ein Lese- und ein Schreib-Batch je Cron-Aufruf, g
 Release je Aufruf, Bytes sammeln und einmal dekodieren statt je Stück zu suchen; ganz am Stück
 wäre bei 380 KB bis 1,4 MB je Seite teurer) – beide in derselben Nacht, aber eine Nacht nach 18j,
 damit ihre Wirkung nicht mit der Grundlast vermischt → nachmessen → **20i** Markt. Erst mit den
-Zahlen aus 20i entscheidet der Nutzer zwischen Wortindex-Zeile, Cron je Minute und GitHub Actions.
+Zahlen aus 20i entscheidet der Nutzer zwischen Wortindex-Zeile, Cron je Minute und GitHub Actions –
+und erst nach dem Index-Nachtrag für die Auswahlen des Lage-Batches (unten).
 
 **Für 20i vorgemerkt: die Marktfrist** (Vorgabe des Nutzers vom 17.10.2026). Die Frist von 24 Stunden
 setzt jedes Release auf die Uhrzeit seiner letzten Prüfung; was am Vortag spät im Fenster lag, wird
@@ -104,41 +105,48 @@ andere:** Alle drei lesen im Leerlauf den ganzen Bestand, in Test und Produktion
 kann keinen Index nutzen (keiner auf `igdb_synced_at`, und `ORDER BY igdb_synced_at IS NOT NULL`
 verhinderte ihn auch), die Disc-Auswahl geht von `game` statt vom kleinen Teil der Releases aus (171
 `unbekannt`, davon 170 in der 30-Tage-Frist) – das ist Arbeit für einen Index-Nachtrag, nicht für
-den Testbestand.
+den Testbestand. **Dieser Index-Nachtrag für die drei Auswahlen kommt vor die Entscheidung „Cron je
+Minute", spätestens mit 20i** (Vorgabe des Nutzers vom 18.10.2026): Bei 180 Aufrufen je Fenster
+multipliziert sich gerade der Lage-Batch, und die Entscheidung soll mit den Zahlen danach fallen.
 
-#### Stufe 18m: Betriebswarnungen in der App
+#### Stufe 18m: Betriebswarnungen in der App (gebaut am 18.10.2026)
 
 Anforderung des Nutzers vom 17.10.2026: im Alltag mitbekommen, wenn die Automatik Probleme hat; vor
-20g. Plan vorgelegt am 18.10.2026, Entscheidungen vom selben Tag. **Keine Migration, kein Eingriff
-in den Cron** – die Stufe liest nur, was schon steht. **Die Fakten schreibt der Cron, das Urteil
-entsteht beim Lesen:** `cron_stand` ([10-1-cron-verlauf.md](10-1-cron-verlauf.md)), die Sync-Läufe
-des Crons, Status und Ablaufzeiten des Zugangs (nie das Geheimnis), der Sicherungsstand und die
-Stände mit `fehlerAm`, gelesen in **einem** Batch aus Bausteinen (`src/db/baustein.ts`). Ein reines
-Domain-Modul fällt das Urteil, **eine Route** liefert alle Warnungen; die drei Warnungen von heute
-(13.2) ziehen dorthin um. Ermittelt beim Lesen, damit auch ein ganz ausgefallener Cron auffällt; eine
-Meldung je Nacht und Art, die von selbst verschwindet, sobald ihre Fakten sie nicht mehr tragen;
-gemeinsam mit dem Preisalarm aus 20g in der Glocke, optisch getrennt; Lesekosten **und CPU**
-gemessen, weil die Prüfung bei jedem Öffnen läuft.
+20g. Entscheidungen vom 18.10.2026. **Keine Migration, kein Eingriff in den Cron.** **Die Fakten
+schreibt der Cron, das Urteil entsteht beim Lesen:** `GET /api/betrieb/warnungen` liest `cron_stand`
+([10-1-cron-verlauf.md](10-1-cron-verlauf.md)), die zwei jüngsten Nacht-Syncs, Status und
+Ablaufzeiten des Zugangs (nie das Geheimnis), die kürzeste gemessene Lebensdauer aus `psn_zugang`,
+den Sicherungsstand und `fehlerAm` der Kaufliste in **einem** Batch aus Bausteinen
+(`src/db/betrieb.ts`); `urteile` in `src/domain/betrieb.ts` fällt das Urteil, rein und ohne Uhr.
+Gespeichert wird nichts: Eine Warnung verschwindet, sobald ihre Fakten sie nicht mehr tragen, und ein
+ganz ausgefallener Cron fällt gerade deshalb auf. Die drei Warnungen, die bis 18m das Frontend aus
+drei Antworten zusammensetzte, kommen von hier. **Kosten, gemessen als Route im Stand nach einer
+Nacht** (`test/lesekosten.spec.ts`): ein D1-Aufruf, **10** gelesene Zeilen je Öffnen des Dashboards.
+Die CPU der Route wird nach dem Deploy an `workersInvocationsAdaptive` gemessen.
 
 | Regel | Stufe |
 |---|---|
-| Ein Bereich seit über **26 h** ohne vermerkten Ausgang (auch: Stand fehlt ganz) | rot |
-| Zugang abgelaufen oder ungültig – **sofort**, unabhängig von der Zahl der Nächte | rot |
-| NPSSO läuft laut Sony in ≤ **3 Tagen** ab / in ≤ **14 Tagen** | rot / zur Kenntnis |
-| Nacht-Sync gescheitert: **zwei Nächte hintereinander** / eine | rot / zur Kenntnis |
+| Ein Bereich seit über **26 h** ohne vermerkten Ausgang; fehlt der Stand ganz, eine Warnung | rot |
+| Zugang abgelaufen – **sofort**, unabhängig von der Zahl der Nächte; ein Sync, der daran scheitert, wird nicht zusätzlich gemeldet | rot |
+| Zugang endet in ≤ **3** / ≤ **14** Tagen – das frühere von Sonys Ankündigung und „eingetragen + kürzeste gemessene Lebensdauer" (7.1) | rot / zur Kenntnis |
+| Nacht-Sync gescheitert, jünger als 24 h: **zwei aufeinanderfolgende UTC-Nächte** / eine | rot / zur Kenntnis |
 | Sicherung älter als acht Tage oder keine (14.2) | rot |
 | Kette ohne Ausgang, gemeldet in den letzten 24 h | zur Kenntnis |
-| Letzter Ausgang eines Bereichs mit Meldung; Kaufliste mit `fehlerAm` | zur Kenntnis |
-| Schritt bis Fensterende nicht fertig (`offen > 0`) | zur Kenntnis, **erst nach 20i scharf** – bis dahin jede Nacht (`offen=18` am 18.10.) |
+| Letzter Ausgang eines Bereichs mit Meldung, jünger als 24 h (außer dem schon gemeldeten Sync) | zur Kenntnis |
+| Kaufliste mit `fehlerAm` von heute oder gestern | zur Kenntnis |
+| Schritt nach Fensterschluss nicht fertig (`offen > 0`) | zur Kenntnis, **ruht bis 20i** (`FENSTERREGEL_SCHARF`) – sonst jede Nacht (`offen=18` am 18.10.) |
 
-Das NPSSO-Datum ist, was Sony beim Eintragen angekündigt hat, nicht gemessen – der Text sagt deshalb
-„läuft laut Sony am … ab". Am 18.10.2026: 28.11.2026. **Kurze Fehler, die sich im nächsten Aufruf
-selbst beheben, zeigt 18m nicht:** `cron_stand` hält je Bereich nur den letzten Ausgang
-(Entscheidung des Nutzers vom 18.10.2026).
+**Das Zugangsende ist nicht Sonys Datum** (Entscheidung des Nutzers vom 18.10.2026, nachdem der Plan
+7.1 übersehen hatte): Sony kündigte rund 60 Tage an, der erste Zugang hielt 25. Für den Zugang vom
+29.09.2026 heißt das „hält vermutlich bis um den 24.10.", Sony nennt den 28.11. Die Einstellungen
+lesen dieselbe Rechnung. Zeiten und Daten im Satz stehen in Ortszeit (Europe/Berlin). **Kurze Fehler,
+die sich im nächsten Aufruf selbst beheben, zeigt 18m nicht:** `cron_stand` hält je Bereich nur den
+letzten Ausgang (Nachtrag 18m-b, unten).
 
-**Offen bis zum Prototyp:** die Farben – das Gelb „zur Kenntnis" verwechselt sich mit dem Gelb der
-Glocke („Arbeit wartet"), und der heutige gelbe Block ist inhaltlich das Rot –, und was die Zahl an
-der Glocke zählt, wenn die Arten zusammenkommen.
+**Darstellung, am Prototyp entschieden:** Rot steht als Block auf der Seite – er ersetzt den gelben
+Block – und oben in der Tafel; „zur Kenntnis" still, ohne eigenen Farbton, nur hinter der Glocke; die
+Glocke zählt die höchste Stufe. Einzelheiten in 13.2; der Preisalarm aus 20g bekommt eine eigene
+Gruppe, **nicht in Gold** ([20g](16-2-offene-stufen.md)).
 
 #### Nach 18m vorgemerkt: Nachtrag 18m-b, Fehler je Nacht
 

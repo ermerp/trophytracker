@@ -31,6 +31,8 @@
 	/* Meldungen: eine Warnung, ein Fehler. Beide nur als Text und Rand. */
 	--warnung: #e8a33d;
 	--gefahr: #e0685a;
+	/* Der Grund des roten Blocks auf dem Dashboard (Stufe 18m) - wie --gold-flaeche. */
+	--gefahr-flaeche: rgba(224, 104, 90, 0.1);
 
 	/*
 	 * Ein Ton fuer alles, was FEHLT: keine Disc, kein Download, offenes Platin

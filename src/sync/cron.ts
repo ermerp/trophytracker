@@ -141,7 +141,7 @@ export const ROHANTWORTEN_LAEUFE = 3;
 
 /** Schluessel des Blaetterungs-Fortschritts in app_setting. */
 const SCHLUESSEL_SPIELZEIT = "psn_spielzeit_stand";
-const SCHLUESSEL_BESITZ = "psn_besitz_stand";
+export const SCHLUESSEL_BESITZ = "psn_besitz_stand";
 
 export type CronErgebnis = {
 	getan:

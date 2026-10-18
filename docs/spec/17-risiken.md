@@ -18,10 +18,10 @@
 | Backup landet im öffentlichen Repo | Sammlung öffentlich lesbar | Getrennte Repos, Fine-grained Token nur auf das private, `*.sql` in `.gitignore` (Ausnahme `!migrations/*.sql`), Dump nie als Workflow-Artifact |
 | Bearer-Token geleakt | Fremdzugriff auf die Daten | Access-Richtlinie am Worker davor; kein Bearer-Token im Worker – Maschinen-Endpunkte laufen über ein Access Service Token (15.3) |
 | Zugangsdaten im Backup-Repo | NPSSO im Git-Verlauf, dauerhaft | Verschlüsselt in D1; `scripts/dump-pruefen.sh` in Backup- und Deploy-Job, Test über alle Tabellen, menschliche Gegenprobe (14.5) |
-| Service Token oder PAT laufen ab | Sicherung bleibt unbemerkt aus | Altersanzeige in den Einstellungen und Warnung im Hinweisblock ab acht Tagen (14.2); Ablaufdaten in 15.1 |
+| Service Token oder PAT laufen ab | Sicherung bleibt unbemerkt aus | Altersanzeige in den Einstellungen und rote Warnung auf dem Dashboard ab acht Tagen (14.2); Ablaufdaten in 15.1 |
 | Fehlerhafte Migration | Datenverlust | Export als erster Schritt jedes Deploy-Jobs, Migrationen abwärtskompatibel halten |
 | D1-Tageslimit für gelesene Zeilen erreicht | Anwendung bis Mitternacht UTC tot | Indizes auf allen Fremdschlüsseln **und auf jeder Spalte, über die in einer Schleife gesucht wird** (Migration 0025 holte `game.sort_title` nach), `test/lesekosten.spec.ts` als Wächter – auch für die **Schreibschritte**, nicht nur die Leseansichten –, `rows_read_24h` in `wrangler d1 info` beobachten (Abschnitt 2) |
-| Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht in den Einstellungen, Warnung im Hinweisblock ab acht Tagen; GitHub schaltet den Zeitplan nach 60 Tagen ohne Repo-Aktivität ab (14.2) |
+| Backup läuft unbemerkt nicht mehr | Sicherheit nur scheinbar | Datum der letzten Sicherung steht in den Einstellungen, rote Warnung auf dem Dashboard ab acht Tagen; GitHub schaltet den Zeitplan nach 60 Tagen ohne Repo-Aktivität ab (14.2) |
 | Wiederherstellung nie geprobt | Backup unbrauchbar | Probe am 14.09.2026 durchgeführt – sie fand einen echten Fehler (14.3). Ablauf und Ergebnis in der README |
 | Dump nicht einspielbar nach Tabellen-Neuaufbau | Backup nur scheinbar brauchbar | `scripts/dump-ordnen.mjs` ordnet Schema vor Daten, `PRAGMA foreign_key_check` prüft danach (14.3); `test/dump-ordnen.spec.ts` hält die Zerlegung fest |
 | Kritikerwertung fehlt | Eintrag rutscht ans Listenende | Sortierung nach Wertung stellt Unbewertete hinten an, mit „unbekannt" statt 0; die Nachpflege (8.3) findet sie |
@@ -35,7 +35,7 @@
 | Twitch-Token läuft ab | IGDB-Abfragen scheitern | Client-Credentials-Token im Speicher, Erneuerung bei Ablauf oder 401 ohne Zutun (7.6) |
 | Service Worker speichert die Access-Anmeldeseite | Offline erscheint die Anmeldeseite als Sammlung, oder die App-Hülle kommt ohne Anmeldung aus dem Cache | `index.html` nicht im Precache, Navigationen Network-First; in den Cache nur Antworten ohne Weiterleitung von der eigenen Origin (13) |
 | Sync bleibt auf `laufend` hängen | Der Cron fände ihn jede Nacht wieder, kein neuer Lauf | Abbruch nach drei Stunden ohne abgeleiteten Fortschritt, mit Test (10.1) |
-| Nachtlauf schlägt still fehl | Trophäen veralten, niemand merkt es | Hinweisblock meldet abgelaufenen Zugang und fehlgeschlagenen Nachtlauf; `letzterAutomatischerLauf` in den Einstellungen (10.1) |
+| Nachtlauf schlägt still fehl | Trophäen veralten, niemand merkt es | Betriebswarnungen (16.2): Automatik über 26 h ohne Ausgang, abgelaufener Zugang, gescheiterter Nacht-Sync, Aufrufe ohne Ausgang; `letzterAutomatischerLauf` in den Einstellungen (10.1) |
 | Cron und Handabruf gleichzeitig | Doppelte Arbeit an einem Lauf | Schritte sind idempotent (UPSERT, `naechsteUnverarbeitete`); ein Nachtfenster, in dem selten jemand klickt |
 | IGDB-Ratenlimit | Abgleich bricht ab | 260 ms Abstand je Anfrage, acht Spiele je Aufruf, 429 beendet den Schritt sauber und die Oberfläche ruft erneut |
 | IGDB-Zugangsdaten fehlen | Kein Cover, keine Wertung | Nur die IGDB-Routen antworten 503, alles andere läuft; Hinweis in den Einstellungen |

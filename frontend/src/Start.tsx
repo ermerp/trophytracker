@@ -14,8 +14,9 @@ import { Glocke, Tafel, useOffenePosten, Warnblock } from './Offenes'
  *
  * Zwei Dinge sind dabei entschieden worden (Nutzer, 24.–27.09.2026):
  *
- * - **Warnung und Information sind getrennt.** Gelb erscheint nur, was
- *   stillsteht; alles Zählende liegt hinter der Glocke (`Offenes.tsx`).
+ * - **Warnung und Information sind getrennt.** Auf der Seite steht nur Rot,
+ *   was Handeln braucht (seit 18m; bis dahin gelb); alles andere liegt
+ *   hinter der Glocke (`Offenes.tsx`).
  * - **Kein PSN-Abruf.** Die Trophäenzähler je Stufe kommen als Summe über
  *   `trophy_progress`, nicht aus `trophySummary`; das Trophäen-Level wandert
  *   nach Stufe 19b (7.7).
@@ -25,7 +26,7 @@ import { Glocke, Tafel, useOffenePosten, Warnblock } from './Offenes'
  * Glocke, obwohl dort Platz für einen Dauerblock wäre.
  */
 export function Start() {
-	const { warnungen, posten } = useOffenePosten()
+	const { rot, kenntnis, posten } = useOffenePosten()
 	const [tafel, setTafel] = useState(false)
 
 	// Die Tafel schwebt über der Seite; Escape schliesst sie, wie jedes andere
@@ -46,7 +47,8 @@ export function Start() {
 				logo
 				zusatz={
 					<Glocke
-						warnungen={warnungen.length}
+						rot={rot.length}
+						kenntnis={kenntnis.length}
 						posten={posten.length}
 						offen={tafel}
 						umschalten={() => setTafel((o) => !o)}
@@ -54,8 +56,8 @@ export function Start() {
 				}
 			/>
 			<div className="seite dashboard">
-				{tafel && <Tafel warnungen={warnungen} posten={posten} />}
-				<Warnblock warnungen={warnungen} />
+				{tafel && <Tafel rot={rot} kenntnis={kenntnis} posten={posten} />}
+				<Warnblock rot={rot} />
 				<div className="dspalten">
 					<div className="dlinks">
 						<Kennzahlen />
