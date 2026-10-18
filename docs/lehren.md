@@ -709,3 +709,13 @@ setzte den Platzhalter für den Preisalarm in Gold. Der Nutzer korrigierte: Gold
 Warn-Gelb der Glocke, und ein Preisalarm ist eine gute Nachricht, keine wartende Arbeit. Gold ist
 in `tokens.css` als Akzent für Auszeichnung beschrieben, nicht für Meldungen.
 → Ein Ton wird nach seiner Bedeutung gewählt (Regel in CLAUDE.md, Tokens).
+
+**18.10.2026 (Session-Befehle) – das bisherige Verhalten aus der Erinnerung nachgebaut.** Für
+`/wrapup` schrieb ich einen Abschnitt „Session-Abschluss" in CLAUDE.md, der das Verhalten „wie
+bisher" halten sollte, aus den Erinnerungen und ohne nach dem bisherigen Abschlussprompt zu fragen.
+Der Abschnitt erlaubte Schreiben und Committen ohne Rückfrage. Der Prompt des Nutzers verlangte
+„Zeig mir den Diff, bevor du schreibst" und drei Regeln dazu: nur echte Abweichungen, Korrekturen
+nach `lehren.md`, CLAUDE.md nur schärfen. Gemergt und deployt war der Abschnitt schon, als der
+Nutzer den Prompt nachreichte.
+→ Ein Ablauf, der ersetzt wird, kommt aus seiner Vorlage, nicht aus der Erinnerung an ihn (Regel
+in CLAUDE.md, Arbeitsweise).
