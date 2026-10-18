@@ -719,3 +719,12 @@ nach `lehren.md`, CLAUDE.md nur schärfen. Gemergt und deployt war der Abschnitt
 Nutzer den Prompt nachreichte.
 → Ein Ablauf, der ersetzt wird, kommt aus seiner Vorlage, nicht aus der Erinnerung an ihn (Regel
 in CLAUDE.md, Arbeitsweise).
+
+**18.10.2026 (Session-Start) – eine Einschränkung beim Umformulieren verloren.** Beim Einarbeiten
+der neuen Vorgaben für `/catchup` ersetzte ich die Zeile „nur den Abschnitt der nächsten Stufe
+lesen, nicht ganz 16" durch „beide Dateien lesen". Die alte Fassung stand im eigenen Diff als
+Minuszeile daneben. Der Nutzer korrigierte: Sonst liest jeder Start rund 26 KB statt eines
+Abschnitts. Zwei Stunden vorher war am selben Ablauf schon der Diff vor dem Schreiben verloren
+gegangen (Eintrag oben).
+→ Was die Vorlage einschränkt, fällt nur weg, wenn das jemand ausdrücklich sagt (Regel in
+CLAUDE.md, Arbeitsweise).
