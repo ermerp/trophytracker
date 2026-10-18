@@ -76,34 +76,40 @@ export async function spielzeitSchritt(
 	try {
 		const { gesamt, titel } = await psn.holeGespielteSeite(accessToken, offset, GESPIELTE_JE_SEITE);
 
-		const gefiltert: GespielterTitel[] = [];
-		let zugeordnet = 0;
-		for (const t of titel) {
-			// Streaming-Apps und Unbestimmtes fallen hier heraus, bevor
-			// irgendetwas gespeichert wird.
+		// Streaming-Apps und Unbestimmtes fallen hier heraus, bevor
+		// irgendetwas gespeichert wird.
+		const gueltig = titel.flatMap((t) => {
 			const plattform = plattformAusKategorie(t.category);
-			if (!plattform || !t.titleId || !t.name) continue;
+			return plattform && t.titleId && t.name
+				? [{ t, titleId: t.titleId, name: t.name, plattform, schluessel: titelSchluessel(t.name) }]
+				: [];
+		});
 
-			const releaseId = await releaseZu(repos, t.name, plattform);
+		// Alle Kandidaten der Seite in EINEM D1-Aufruf (Stufe 18k) statt einer
+		// Abfrage je Titel - dieselbe Regel wie `releaseZu`, nur gebuendelt.
+		const kandidaten = await repos.games.releasesNachSchluesseln(
+			gueltig.map((g) => g.schluessel).filter((s) => s !== ""),
+		);
+
+		let zugeordnet = 0;
+		const gefiltert: GespielterTitel[] = gueltig.map(({ t, titleId, name, plattform, schluessel }) => {
+			const passend = (kandidaten.get(schluessel) ?? []).filter((k) => k.platform === plattform);
+			const releaseId = passend.length === 1 ? passend[0].id : null;
 			if (releaseId !== null) zugeordnet++;
-			gefiltert.push({
-				titleId: t.titleId,
-				name: t.name,
+			return {
+				titleId,
+				name,
 				platform: plattform,
 				spielzeitSekunden: dauerInSekunden(t.playDuration),
 				spielzahl: typeof t.playCount === "number" ? t.playCount : null,
 				erstesSpielAm: t.firstPlayedDateTime ?? null,
 				letztesSpielAm: t.lastPlayedDateTime ?? null,
 				releaseId,
-			});
-		}
+			};
+		});
 
-		// In Stuecken schreiben: D1 erlaubt 100 gebundene Werte je Statement,
-		// und hier sind es acht je Titel.
-		let geschrieben = 0;
-		for (let i = 0; i < gefiltert.length; i += 12) {
-			geschrieben += await repos.besitz.spielzeitSchreiben(gefiltert.slice(i, i + 12));
-		}
+		// Die ganze Seite in einem Batch (Stufe 18k).
+		const geschrieben = await repos.besitz.spielzeitSchreiben(gefiltert);
 
 		return {
 			status: "erfolg",

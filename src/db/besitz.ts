@@ -41,32 +41,46 @@ export class BesitzRepository {
 	 */
 	async spielzeitSchreiben(titel: readonly GespielterTitel[]): Promise<number> {
 		if (titel.length === 0) return 0;
-		// D1 erlaubt 100 gebundene Werte je Statement: 8 Werte je Titel,
-		// also hoechstens zwoelf je Anweisung.
-		const anweisung = this.db.prepare(
-			"INSERT INTO psn_played_title " +
-				"(title_id, name, platform, play_duration_s, play_count, first_played_at, last_played_at, release_id, synced_at) " +
-				"VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
-				"ON CONFLICT(title_id) DO UPDATE SET " +
-				"name = excluded.name, platform = excluded.platform, play_duration_s = excluded.play_duration_s, " +
-				"play_count = excluded.play_count, first_played_at = excluded.first_played_at, " +
-				"last_played_at = excluded.last_played_at, synced_at = excluded.synced_at, " +
-				"release_id = COALESCE(psn_played_title.release_id, excluded.release_id)",
-		);
+		// Die ganze Seite in EINEM Batch (Stufe 18k; bis dahin ein Batch je
+		// zwoelf Titel, 17 D1-Aufrufe je Seite). Je Anweisung zwoelf Zeilen
+		// als `VALUES (…), (…)`: D1 erlaubt 100 gebundene Werte je Statement,
+		// und hier sind es acht je Titel.
+		//
+		// Scheitert eine Anweisung, scheitert der Batch ganz - die Seite ist
+		// dann nicht geschrieben, der Schritt meldet "fehler", und der
+		// Spielzeit-Stand versucht dieselbe Seite im naechsten Aufruf erneut
+		// (`spielzeitLauf`). Halb geschrieben bleibt nichts.
+		const stuecke: GespielterTitel[][] = [];
+		for (let i = 0; i < titel.length; i += 12) stuecke.push(titel.slice(i, i + 12));
 		const ergebnisse = await this.db.batch(
-			titel.map((t) =>
-				anweisung.bind(
-					t.titleId,
-					t.name,
-					t.platform,
-					t.spielzeitSekunden,
-					t.spielzahl,
-					t.erstesSpielAm,
-					t.letztesSpielAm,
-					t.releaseId,
-				),
+			stuecke.map((s) =>
+				this.db
+					.prepare(
+						"INSERT INTO psn_played_title " +
+							"(title_id, name, platform, play_duration_s, play_count, first_played_at, last_played_at, release_id, synced_at) " +
+							`VALUES ${s.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))").join(", ")} ` +
+							"ON CONFLICT(title_id) DO UPDATE SET " +
+							"name = excluded.name, platform = excluded.platform, play_duration_s = excluded.play_duration_s, " +
+							"play_count = excluded.play_count, first_played_at = excluded.first_played_at, " +
+							"last_played_at = excluded.last_played_at, synced_at = excluded.synced_at, " +
+							"release_id = COALESCE(psn_played_title.release_id, excluded.release_id)",
+					)
+					.bind(
+						...s.flatMap((t) => [
+							t.titleId,
+							t.name,
+							t.platform,
+							t.spielzeitSekunden,
+							t.spielzahl,
+							t.erstesSpielAm,
+							t.letztesSpielAm,
+							t.releaseId,
+						]),
+					),
 			),
 		);
+		// Die Summe ist hier richtig: Im Batch steht keine Protokollzeile,
+		// nur die eigentliche Aenderung (8.5).
 		return ergebnisse.reduce((summe, r) => summe + (r.meta.changes ?? 0), 0);
 	}
 

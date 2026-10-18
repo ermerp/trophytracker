@@ -11,7 +11,8 @@ import { createApp, createScheduled } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
 import { zaehlendeDb } from "./d1-zaehler";
 import { fakeIgdb } from "./igdb-fake";
-import { fakeFetch } from "./psn-fake";
+import { fakeFetch, jsonAntwort } from "./psn-fake";
+import { GESPIELTE_JE_SEITE, spielzeitSchritt } from "../src/sync/besitz";
 import { storeOhne } from "./store-fake";
 
 /** Das UTC-Datum, mit dem die Staende als "heute" gelten. */
@@ -224,6 +225,10 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Produktion - also rund 145 000 Zeilen je Nacht und 350 000 je
 		// Kaufliste. Migration 0025 legt idx_game_sort_title an.
 		//
+		// Seit Stufe 18k fragt der Spielzeit-Schritt alle Titel einer Seite in
+		// `IN`-Listen (`releasesNachSchluesseln`, gemessen im naechsten Test);
+		// die Kaufliste und die Zuordnung fragen weiter einzeln.
+		//
 		// Die Lehre steckt in der Zeile darunter: Dieser Test hat bis zum
 		// 28.09.2026 nur Leseansichten gemessen. Ein Schreibschritt, der je
 		// Eintrag eine Abfrage macht, gehoert genauso hierher.
@@ -242,6 +247,55 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// genau das soll hier nie wieder unbemerkt passieren.
 		expect(treffer).toBeLessThan(10);
 		expect(danebenObwohlVorhanden).toBeLessThan(10);
+	});
+
+	it("misst eine ganze Spielzeit-Seite als Schritt (Stufe 18k)", async () => {
+		// Gemessen wird der Schritt, nicht die Abfrage: 200 Titel wie eine
+		// volle Seite von Sony, die Haelfte mit passender Plattform. Bis 18k
+		// fragte der Schritt je Titel einzeln und schrieb je zwoelf Titel einen
+		// Batch - 217 D1-Aufrufe je Seite (16.2).
+		await env.DB.prepare("DELETE FROM psn_played_title").run();
+		const titel = Array.from({ length: GESPIELTE_JE_SEITE }, (_, k) => {
+			const i = k + 1;
+			const passt = i % 4 === 1 || i % 4 === 2;
+			return {
+				titleId: `CUSA${String(i).padStart(5, "0")}_00`,
+				name: `Spiel ${String(i).padStart(4, "0")}`,
+				category: i % 4 === 2 ? "ps5_native_game" : "ps4_game",
+				playDuration: passt ? "PT3H" : "PT1H",
+				playCount: 1,
+			};
+		});
+		const psn = erstellePsnClient(
+			fakeFetch([[/gamelist\/v2/, () => jsonAntwort({ totalItemCount: titel.length, titles: titel })]]).fetch,
+		);
+		const schritt = async () => {
+			const zaehler = zaehlendeDb(env.DB);
+			const e = await spielzeitSchritt(
+				createRepositories(zaehler.db, env.NPSSO_KEY),
+				psn,
+				new Geheimnis("access-token-test"),
+				0,
+			);
+			return { e, aufrufe: zaehler.aufrufe(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
+		};
+
+		// Erste Nacht: alles neu. Zweite: dieselben Titel, nur Updates - der
+		// Normalfall jeder weiteren Nacht.
+		const neu = await schritt();
+		const wieder = await schritt();
+		console.info({ spielzeitSeite: { neu: { ...neu, e: undefined }, wieder: { ...wieder, e: undefined } } });
+
+		expect(neu.e).toMatchObject({ status: "erfolg", geholt: 200, geschrieben: 200, zugeordnet: 100 });
+		expect(wieder.e).toMatchObject({ status: "erfolg", geschrieben: 200, zugeordnet: 100 });
+		// Ein Lese- und ein Schreib-Batch, gleich wie viele Titel.
+		expect(neu.aufrufe).toBe(2);
+		expect(wieder.aufrufe).toBe(2);
+		// Je Titel ein Index-Lookup plus seine Releases - kein Scan ueber game.
+		expect(neu.gelesen).toBeLessThan(1_500);
+		expect(wieder.gelesen).toBeLessThan(1_500);
+
+		await env.DB.prepare("DELETE FROM psn_played_title").run();
 	});
 
 	it("misst die Abfragen der Sammlung einzeln", async () => {
