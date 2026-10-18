@@ -47,7 +47,16 @@ Nutzers vom 17.10.2026).
   echte Seite aus dem Netz – grenzwertig.
 - **Store** (je Release ein Batch, die Seite als Strom): rund 1 ms D1 plus 3 ms Lesen je Release;
   **ein Release je Aufruf** trägt, zehn nicht. Am Stück zu lesen wäre billiger, aber dann wird die
-  ganze Seite geholt (380 KB bis 1,4 MB, 7.4).
+  ganze Seite geholt (380 KB bis 1,4 MB, 7.4). **Leser gebaut in 18l (18.10.2026):** weiter ein
+  Strom, aber gesucht wird nur im neuen Teil, behalten nur der Rest (`BlockStrom`, 7.4). **Ob das die
+  3 ms trifft, ist offen:** In Node (nachgebaute Seite, 1 MB, Block bei 67 KB) liegen alter und neuer
+  Leser ab 4-KB-Stücken kalt wie warm unter 1,1 ms, nur bei 1-KB-Stücken warm 0,70 gegen 0,21 ms – die
+  3 ms sitzen vermutlich in den Stücken selbst, nicht in der Suche (Vermutung). **Die Portion bleibt
+  bei zehn** (Entscheidung des Nutzers vom 18.10.2026): Für 79 Ziele (18.10.: 53 PS4, 22 PS5, 4 PS3)
+  bräuchte ein Release je Aufruf rund 75 Aufrufe, frei sind ohne Kaufliste 22 – kein PSN-Leerlauf
+  mehr, nur ~22 frische Preise je Nacht. Aus der Nacht zum 19.10. wird die CPU je Store-Release
+  abgeleitet (Aufruf geteilt durch Releases, je Standort) und daraus, wie viele ins Budget von ~5 ms
+  passen; **die Portion fällt mit „Cron je Minute"** – offen.
 - **Gebrauchtpreise:** Die Grundlast eines Aufrufs (vier Abfragen, Sammlung laden und
   vorbereiten) liegt schon bei 5–8 ms, jedes Release kostet 3–4 ms mehr (94 ms für 20 mit echter D1). **Trägt auch mit einem
   Release je Aufruf nicht.** Die Sammlung auf Modulebene zu halten bringt nichts – **kein**
@@ -65,16 +74,16 @@ Produktion rund **2 590** Zeilen je Wartungsaufruf, **in jedem**, nicht nur im L
 Schritten, die je Aufruf unter 10 ms bleiben** – also erst nach den Änderungen oben.
 
 **Zu entscheiden:** je Schritt, welcher Weg – Abfragen bündeln, kleinere Portion mit Cron je Minute,
-Wortindex als Zeile, oder GitHub Actions. Für GitHub Actions ist vorab zu prüfen, ob PSN die
+Wortindex als Zeile, oder GitHub Actions – und damit die Portion des Store (18l oben). Für GitHub Actions ist vorab zu prüfen, ob PSN die
 Adressen von GitHub abweist, wie es für die Kaufliste und Cloudflares Adressen vermutet wird (7.7).
 
 **Die Reihenfolge der Nachträge** (Entscheidung des Nutzers vom 16.10.2026), jeder einzeln
 zurücknehmbar und einzeln gemessen: **18i** Token-Erneuerung im PSN-Leerlauf (gebaut, 10.1
 Schritt 7) → **18j** Ablauf: ein Lese- und ein Schreib-Batch je Cron-Aufruf, gemessen am Leerlauf
-(gebaut am 17.10.2026) → **18k** Spielzeit mit `IN`-Listen (gebaut am 18.10.2026) und **18l** Store-Leser (ein
-Release je Aufruf, Bytes sammeln und einmal dekodieren statt je Stück zu suchen; ganz am Stück
-wäre bei 380 KB bis 1,4 MB je Seite teurer) – beide in derselben Nacht, aber eine Nacht nach 18j,
-damit ihre Wirkung nicht mit der Grundlast vermischt → nachmessen → **20i** Markt. Erst mit den
+(gebaut am 17.10.2026) → **18k** Spielzeit mit `IN`-Listen (gebaut am 18.10.2026) und **18l** Store-Leser (gebaut am
+18.10.2026: Strom behalten, nur im neuen Teil suchen; ganz am Stück wäre bei 380 KB bis 1,4 MB je
+Seite teurer; die Portion bleibt bis „Cron je Minute" bei zehn) – beide in derselben Nacht, aber
+eine Nacht nach 18j, damit ihre Wirkung nicht mit der Grundlast vermischt → nachmessen → **20i** Markt. Erst mit den
 Zahlen aus 20i entscheidet der Nutzer zwischen Wortindex-Zeile, Cron je Minute und GitHub Actions –
 und erst nach dem Index-Nachtrag für die Auswahlen des Lage-Batches (unten).
 
