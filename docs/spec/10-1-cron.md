@@ -121,10 +121,13 @@ gerechnet 96 444, bis 18g 80 784) – aus den gemessenen Einzelkosten, nicht fri
 gemessen. Geschrieben werden je Aufruf fünf Zeilen (Marke setzen und wegräumen, Verlauf, Stand),
 **360** je Nacht. Gemessen über 24 Stunden ohne Import: **216 950** gelesene und **2 977**
 geschriebene Zeilen am 16.10.2026, in einer Woche mit abgebrochenen Wartungsaufrufen (unten);
-**325 631** und **3 537** am 17.10.2026 um 12:17 UTC, davon die Nacht – die erste vollständige
-Wartung seit dem 10.10. – rund **178 600** gelesene (PSN 32 900, Wartung 145 700, zugeordnet je
-Abfrage über die D1-Analytics `d1QueriesAdaptiveGroups`); die vorige Messung, 116 040 am 01.10.2026
-(15.4), liegt vor der Erweiterung des Wartungsfensters.
+**325 631** und **3 537** am 17.10.2026 um 12:17 UTC, davon die Nacht 03–09 UTC – die erste
+vollständige Wartung seit dem 10.10. – **229 836** gelesene (PSN 31 799, Wartung 198 037); am
+18.10.2026 um 09:38 UTC **406 778** und **3 325**, davon die Nacht **223 047** (PSN 27 660, Wartung
+196 387 samt der Sonntagssicherung um 08:07 mit rund 51 000). Summen stammen aus
+`d1AnalyticsAdaptiveGroups` je Stunde, das sich mit `rows_read_24h` deckt; `d1QueriesAdaptiveGroups`
+ist eine Stichprobe, lag rund 25 % darunter und taugt nur für Anteile je Abfrage. Die vorige
+Messung, 116 040 am 01.10.2026 (15.4), liegt vor der Erweiterung des Wartungsfensters.
 
 **Der Leerlauf ist aber nicht die Nacht.** Die *arbeitenden* Aufrufe kosten mehr: Der
 Spielzeit-Schritt allein las über einen Titelabgleich ohne Index rund **145 000** Zeilen je Nacht,
