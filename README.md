@@ -30,7 +30,7 @@ erfasste Discs, nächtliche Läufe seit dem 20.09.2026.
 | Sicherung vor Migration | Dump gegen die Zeilenzahlen der Datenbank, Abbruch bei Abweichung; Datenmigrationen protokollieren ihre Wirkung | [14.2](docs/spec/14-backup-export.md) |
 | Zugriffsschutz | Cloudflare Access vor dem ganzen Worker, ein Access Service Token für Maschinen-Endpunkte | [15.3](docs/spec/15-repository-deployment.md) |
 | Schema | 26 Tabellen, 32 Migrationen, sieben Views; Zugriff nur über `src/db/` | [3](docs/spec/03-sammlung.md), [11](docs/spec/11-sichten.md) |
-| PSN-Anbindung | NPSSO einfügen, Token-Kette mit Rückfall, Zustand dreistufig mit Frühwarnung ab 18 Tagen | [7.1](docs/spec/07-1-psn-trophaeen.md) |
+| PSN-Anbindung | NPSSO einfügen, Token-Kette mit Rückfall, Zustand dreistufig mit Frühwarnung vor dem erwarteten Ende | [7.1](docs/spec/07-1-psn-trophaeen.md) |
 | Trophäen-Sync | Zwei Phasen (Abruf, Normalisierung), begrenzte Arbeit je Aufruf, Rohantworten der jüngsten drei Läufe | [10](docs/spec/10-sync-protokoll.md) |
 | Zuordnung | Trophäenlisten als Gruppenvorschläge, einzeln korrigierbar, auftrennbar | [7.2](docs/spec/07-2-matching.md) |
 | Sammlung | Kacheln oder Zeilen (je Liste gemerkt), Chip-Filter, Suche hinter der Lupe, Seiten à 100 | [13](docs/spec/13-1-ansichten.md) |
@@ -56,7 +56,7 @@ erfasste Discs, nächtliche Läufe seit dem 20.09.2026.
 | Store-Preise | Neupreis der digitalen Fassung aus der gerenderten Produktseite, „im PS-Plus-Katalog", Angebote mit Grundpreis | [7.4](docs/spec/07-4-store-preise.md) |
 | Spielzeit und digitaler Besitz | Aus PSN ergänzt, nie importiert; `kauf` schlägt `plus`, PS+ ist eine Momentaufnahme | [7.7](docs/spec/07-7-psn-weitere-daten.md) |
 | Einzeltrophäen | 18 355 Trophäen mit Seltenheit, Stufe und Fortschrittszähler; Liste je Release, Level und Jahre im Dashboard | [7.7](docs/spec/07-7-einzeltrophaeen.md) |
-| Dashboard | Kennzahlen je Plattform, Trophäen je Stufe, Feed aus zwei Quellen; Warnung gelb, Zählendes an der Glocke | [13](docs/spec/13-1-ansichten.md) |
+| Dashboard | Kennzahlen je Plattform, Trophäen je Stufe, Feed aus zwei Quellen; Betriebswarnungen rot, „zur Kenntnis" und Zählendes an der Glocke | [13](docs/spec/13-1-ansichten.md) |
 | Spiel anlegen | Aus der Sammlung oder beim Scannen, mit IGDB-Suche oder ohne IGDB-Eintrag | [9.2](docs/spec/09-barcode.md) |
 | Scannen | Kamera (Handy, Webcam), EAN-13/UPC-A/EAN-8, zwei Lesungen zur Bestätigung (UPC-A drei); „Überspringen" speichert nichts | [9](docs/spec/09-barcode.md) |
 | EAN-Auflösung | `ean_mapping` → `market_offer` → **eBay live** → upcitemdb als Rückfall, alles im Moment des Scannens | [9.2](docs/spec/09-barcode.md) |
@@ -289,8 +289,9 @@ halten.
 
 **Wie lange ein Zugang hält, zeichnet die App auf** (`psn_zugang`, Migration 0026).
 Sony kündigt beim Ausstellen rund 60 Tage an; der Zugang vom 04.09.2026 hielt 25.
-Gewarnt wird deshalb nach Alter – ab 18 Tagen –, nicht nach Sonys Zahl, und gezählt
-werden nur abgelehnte Zugänge: Wer früher erneuert, erfährt nie, wie lange seiner
+Gewarnt wird deshalb nach dem früheren Ende – Sonys Datum oder Eintragung plus die
+kürzeste gemessene Lebensdauer –, 14 Tage vorher zur Kenntnis, 3 Tage vorher rot, und
+gezählt werden nur abgelehnte Zugänge: Wer früher erneuert, erfährt nie, wie lange seiner
 gehalten hätte.
 
 **Ablage.** NPSSO und Refresh-Token liegen AES-GCM-verschlüsselt in D1, der
@@ -328,7 +329,7 @@ nur letztere zeigt, *welcher* Aufruf teuer ist.
 
 Läuft das NPSSO ab, ist das kein Fehlerfall, sondern ein regulärer Zustand:
 `status` wird `abgelaufen`, vorhandene Daten bleiben stehen, und in den
-Einstellungen lässt sich ein neues eintragen. Das steht auch im Hinweisblock der Sammlung – „der nächtliche Abruf steht still".
+Einstellungen lässt sich ein neues eintragen. Das Dashboard meldet es rot – „der nächtliche Abruf steht still".
 
 ## Automatik
 
@@ -345,9 +346,11 @@ und mit welchen Fristen, steht in [Abschnitt 10.1](docs/spec/10-1-cron.md).
 stehen beide Fenster, der letzte automatische Abruf und der **Verlauf der letzten
 zwanzig Aufrufe**; gleichartige Arbeit ist zu einer Zeile verdichtet, der
 Fortschritt als Spanne (`sync ×5 offset=100→400`). Eine ganze Nacht sind
-normalerweise sieben Zeilen. Ein abgelaufener PSN-Zugang und ein
-fehlgeschlagener Nachtlauf jünger als 24 Stunden erscheinen im Hinweisblock der
-Startseite.
+normalerweise sieben Zeilen. **Was davon zählt, meldet das Dashboard selbst**
+(Betriebswarnungen, [16.2](docs/spec/16-2-cpu-und-betrieb.md)): rot, wenn ein Fenster
+über 26 Stunden still war, der Zugang abgelaufen ist oder bald endet, der Sync zwei
+Nächte hintereinander scheiterte oder die Sicherung zu alt ist; zur Kenntnis hinter
+der Glocke, was nachts schiefging, ohne dass etwas stillsteht.
 
 **Von Hand anstoßen** geht für jeden Schritt: „Jetzt synchronisieren",
 „Kaufliste jetzt abrufen", „Trophäen holen" (Portionsknopf), „Marktpreise
@@ -665,8 +668,8 @@ bleibt auswertbar, auch wenn es dieses Projekt eines Tages nicht mehr gibt.
 stattdessen zu tun ist, steht unter [Wiederherstellung](#wiederherstellung).
 
 **Ob es läuft.** Die Einstellungen zeigen „Letzte Sicherung: … (Commit …)".
-Bleibt sie länger als acht Tage aus oder gab es nie eine, steht eine Warnung im
-Hinweisblock der Sammlung. Acht statt sieben Tage, weil der Lauf wöchentlich
+Bleibt sie länger als acht Tage aus oder gab es nie eine, steht eine rote Warnung
+auf dem Dashboard. Acht statt sieben Tage, weil der Lauf wöchentlich
 ist – ein Tag Luft verhindert eine Warnung, die sonst jede Woche von allein
 erscheint. Der wahrscheinlichste Grund für ein stilles Ausbleiben sind die drei
 Secrets, die nach einem Jahr ablaufen (siehe [Secrets](#einrichtung-eines-eigenen-kontos)).

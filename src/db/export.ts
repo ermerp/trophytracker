@@ -166,7 +166,8 @@ export type Sicherungsstand = {
 	letzterCommit: string | null;
 };
 
-const SCHLUESSEL_ERFOLG = "backup_letzter_erfolg_am";
+/** Wann die Sicherung zuletzt lief - auch die Betriebswarnungen lesen das (18m). */
+export const SCHLUESSEL_ERFOLG = "backup_letzter_erfolg_am";
 const SCHLUESSEL_COMMIT = "backup_letzter_commit";
 
 export class ExportRepository {

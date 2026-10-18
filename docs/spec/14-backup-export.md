@@ -27,7 +27,7 @@ Zwei Formate mit Absicht: Der SQL-Dump ist die technisch exakte Sicherung zum Wi
 
 **Der Vermerk steht in `app_setting`**, unter `backup_letzter_erfolg_am` und `backup_letzter_commit`. Kein eigenes Feld und keine eigene Tabelle: Es sind zwei Werte, die beim Wiedereinspielen mitkommen sollen. Ein Lauf ohne Commit gilt als Erfolg – „geprüft, nichts Neues" heisst, dass die Sicherung lief, nicht dass sie ausfiel.
 
-Das Datum der letzten erfolgreichen Sicherung steht in den Einstellungen; bis es das Dashboard gibt, warnt der Hinweisblock der Sammlungsansicht (Abschnitt 13) bei **mehr als acht Tagen** oder wenn noch nie gesichert wurde. Acht statt sieben, weil der Lauf wöchentlich ist: Ein Tag Luft verhindert eine Warnung, die sonst jede Woche von allein erscheint. Ein Backup, von dem man nicht weiss, ob es läuft, ist kein Backup.
+Das Datum der letzten erfolgreichen Sicherung steht in den Einstellungen; das Dashboard warnt rot (Betriebswarnungen, [16.2](16-2-cpu-und-betrieb.md), Darstellung 13.2) bei **mehr als acht Tagen** oder wenn noch nie gesichert wurde. Acht statt sieben, weil der Lauf wöchentlich ist: Ein Tag Luft verhindert eine Warnung, die sonst jede Woche von allein erscheint. Ein Backup, von dem man nicht weiss, ob es läuft, ist kein Backup.
 
 **Eine Ausfallursache, die kein rotes Log hinterlässt:** GitHub deaktiviert geplante Workflows in Repositories, die 60 Tage lang keine Aktivität hatten, und schickt dem Besitzer eine E-Mail. Das trifft zu, sobald das Projekt fertig ist und niemand mehr committet – also genau dann, wenn die Sicherung am wichtigsten wird. Dagegen hilft kein Workflow, sondern nur die Altersanzeige. Sie ist der Grund, warum es sie gibt.
 

@@ -683,3 +683,14 @@ Lage-Batch einfügt. Im selben Plan standen Schreibzugriffe (Marke, Hänger, Fre
 in einem Batch, der „Lese-Batch" hieß, ohne zu sagen, was beim Scheitern einer Anweisung geschieht –
 auch das kam vom Nutzer: Reihenfolge festlegen, Scheitern benennen.
 → Regeln in CLAUDE.md (CPU-Grenze: Baustein; Batch als Transaktion, geschärft).
+
+**18.10.2026 (Stufe 18m) – der Plan schlug eine Regel vor, die es schon anders gab.** Der Plan für
+die Betriebswarnungen nannte als NPSSO-Regel „läuft in ≤ N Tagen ab" und rechnete mit Sonys Datum
+(28.11.). Der Nutzer entschied darauf Vorläufe von 14 und 3 Tagen. Erst beim Bauen stand in 7.1 die
+Entscheidung vom 29.09.2026: gewarnt wird nach dem gemessenen Alter, nicht nach Sonys Zahl – der erste
+Zugang hielt 25 statt 60 Tage. Nach Sonys Datum hätte die Warnung für den laufenden Zugang am 14.11.
+eingesetzt, drei Wochen nach seinem wahrscheinlichen Ende um den 24.10.; die Einstellungen meldeten
+zur selben Zeit schon „läuft bald ab". Die Frage ging vor dem Bau zurück an den Nutzer.
+→ Wer eine Regel vorschlägt, sucht vorher in der Spezifikation nach derselben Sache – eine Warnung,
+eine Frist, eine Schwelle hat oft schon eine Stelle und eine Entscheidung dahinter (Regel in
+CLAUDE.md, Arbeitsweise).

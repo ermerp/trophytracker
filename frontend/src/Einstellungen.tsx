@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { alsDatum, datumMitJahr } from './api'
+import { alsDatum, anfrage, datumMitJahr } from './api'
+import type { BetriebAntwort } from './Offenes'
 
 /**
  * Einstellungen: NPSSO hinterlegen und Sync auslösen.
@@ -134,14 +135,14 @@ function laufText(lauf: NonNullable<Lauf>): string {
 const SONY_URL = 'https://ca.account.sony.com/api/v1/ssocookie'
 
 /**
- * Ab wann gemeldet wird, dass der Zugang bald abläuft.
- *
- * 18 Tage, nicht Sonys Ankündigung: Die lautete rund 60 Tage, gehalten hat
- * der Zugang 25 (gemessen am 29.09.2026, 7.1). Sieben Tage Vorlauf auf die
- * gemessene Lebensdauer – eine Faustregel auf EINEM Messpunkt, die durch die
- * Aufzeichnung in `psn_zugang` mit jeder Runde besser wird.
+ * Ob der Zugang bald abläuft, rechnet seit Stufe 18m der Server – dieselbe
+ * Rechnung, die die Betriebswarnung auf dem Dashboard trägt
+ * (`zugangsende`, src/domain/betrieb.ts): das frühere von Sonys Ankündigung
+ * und „eingetragen + kürzeste gemessene Lebensdauer" aus `psn_zugang`, und
+ * „bald" ab 14 Tagen davor. Bis 18m stand hier eine feste Schwelle von 18
+ * Tagen Alter, sieben Tage Vorlauf auf die erste gemessene Lebensdauer (7.1).
  */
-const WARNEN_AB_TAGEN = 18
+type Zugangsende = BetriebAntwort['zugangsende']
 
 /** Grob genug: ganze Tage seit einem Zeitpunkt aus D1 oder ISO. */
 function tageSeit(wert: string | null): number | null {
@@ -165,10 +166,9 @@ const ZUSTANDSWORT: Record<Zustand, string> = {
   weg: 'Abgelaufen',
 }
 
-function zustandAus(zugang: Zugang): Zustand {
+function zustandAus(zugang: Zugang, ende: Zugangsende): Zustand {
   if (!zugang.eingerichtet || zugang.status === 'abgelaufen') return 'weg'
-  const tage = tageSeit(zugang.npssoHinterlegtAm)
-  return tage !== null && tage >= WARNEN_AB_TAGEN ? 'bald' : 'ok'
+  return ende?.stufe ? 'bald' : 'ok'
 }
 
 type Rueckmeldung = { art: 'laeuft' | 'gut' | 'schlecht'; text: string } | null
@@ -188,6 +188,14 @@ export function ZugangBlock({
   const [rueck, setRueck] = useState<Rueckmeldung>(null)
   const [handfeld, setHandfeld] = useState('')
   const [laeuft, setLaeuft] = useState(false)
+  const [ende, setEnde] = useState<Zugangsende>(null)
+
+  // Neu gelesen, sobald sich der Zugang ändert – etwa nach dem Eintragen.
+  useEffect(() => {
+    anfrage<BetriebAntwort>('/api/betrieb/warnungen')
+      .then((a) => setEnde(a.zugangsende))
+      .catch(() => setEnde(null))
+  }, [zugang])
 
   const eintragen = useCallback(
     async (text: string) => {
@@ -258,7 +266,7 @@ export function ZugangBlock({
   }, [wartet, eintragen])
 
   if (!zugang) return null
-  const zustand = zustandAus(zugang)
+  const zustand = zustandAus(zugang, ende)
   const tage = tageSeit(zugang.npssoHinterlegtAm)
   const gemessen = zugaenge.filter((z) => z.ausgang === 'gestorben' && z.endeAm)
 
@@ -271,10 +279,12 @@ export function ZugangBlock({
         <span className="zugangwort">{zugang.eingerichtet ? ZUSTANDSWORT[zustand] : 'Nicht eingerichtet'}</span>
       </div>
 
-      {zustand === 'bald' && (
+      {zustand === 'bald' && ende && (
         <p className="still zugangsatz">
-          Ein Zugang hielt bisher rund 25 Tage. Erneuere ihn, wenn es dir passt – sonst steht der nächtliche
-          Abruf still.
+          {ende.quelle === 'gemessen'
+            ? `Der Zugang hält vermutlich bis um den ${datumMitJahr(ende.am)} – der bisher kürzeste hielt ${ende.lebensdauerTage} Tage.`
+            : `Sony nennt als Frist den ${datumMitJahr(ende.am)}.`}{' '}
+          Erneuere ihn, wenn es dir passt – sonst steht der nächtliche Abruf still.
         </p>
       )}
       {zustand === 'weg' && zugang.eingerichtet && (
@@ -290,6 +300,12 @@ export function ZugangBlock({
           <b>{tageText(tage)}</b>
           <span>Letzter Abruf</span>
           <b>{zugang.letzterErfolgAm ? datumMitJahr(zugang.letzterErfolgAm) : 'noch keiner'}</b>
+          {ende?.quelle === 'gemessen' && (
+            <>
+              <span>Hält vermutlich bis</span>
+              <b>{datumMitJahr(ende.am)}</b>
+            </>
+          )}
           {zugang.npssoLaeuftAbUm && (
             <>
               <span>Sony nennt als Frist</span>

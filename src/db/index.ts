@@ -1,5 +1,6 @@
 import { CredentialsRepository } from "./credentials";
 import { CronLageRepository } from "./cron-lage";
+import { BetriebRepository } from "./betrieb";
 import { EventRepository } from "./events";
 import { ExportRepository } from "./export";
 import { GamesRepository } from "./games";
@@ -55,6 +56,8 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		// Die Lage eines Cron-Aufrufs in einem Batch (Stufe 18j) - aus den
 		// Bausteinen derselben Repositories, die die Knoepfe einzeln benutzen.
 		cronLage: new CronLageRepository(db, { sync, credentials, trophaeen, store, games, igdb, markt }),
+		// Die Fakten der Betriebswarnungen in einem Batch (Stufe 18m).
+		betrieb: new BetriebRepository(db, { sync, credentials }),
 		ownership: new OwnershipRepository(db, events),
 		besitz: new BesitzRepository(db, events),
 		plan,

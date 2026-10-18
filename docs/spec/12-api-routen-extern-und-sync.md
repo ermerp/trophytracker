@@ -31,6 +31,7 @@ POST   /api/imports/wishlist/:id/zeilen/:zeileId/aufteilen  Body: { titel: strin
 GET    /api/export/:liste.csv         sammlung|wunsch|todo|backlog|kauf|luecken|trophaeen; Semikolon und BOM (14.4)
 GET    /api/export/backup.json        Vollsicherung: die 19 Fachtabellen, ohne Rohantworten und Zugangsdaten (14.2)
 GET    /api/backup/status             { letzterErfolgAm, letzterCommit, tageSeit }
+GET    /api/betrieb/warnungen         { warnungen[]: art, stufe (rot|kenntnis), text, ziel?, zielText?; zugangsende } – ein D1-Aufruf (Stufe 18m, 16.2)
 POST   /api/backup/vermerk            Body: { zeitpunkt (ISO), commit? } – die Backup-Action meldet ihren Lauf
 
 GET    /api/upcoming                  { anzahl, eintraege[] } aus v_erscheint_bald: planId, art, spielId, releaseId, titel, bild, plattform, erscheinungsdatum, favorit (Stufe 15)

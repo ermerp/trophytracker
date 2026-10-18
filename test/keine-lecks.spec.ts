@@ -308,6 +308,8 @@ describe("Dichtheitsprüfung", () => {
 			}),
 			await ruf(app, "/api/sync", { method: "POST" }),
 			await ruf(app, "/api/sync/status"),
+			// Die Betriebswarnungen (Stufe 18m) tragen die Meldung des Nachtlaufs.
+			await ruf(app, "/api/betrieb/warnungen"),
 			await ruf(app, "/api/health"),
 			await ruf(app, "/api/games?owned=physisch&search=x"),
 			await ruf(app, "/api/games/1"),
@@ -527,6 +529,8 @@ describe("Dichtheitsprüfung", () => {
 			}),
 			await ruf(app, "/api/sync", { method: "POST" }),
 			await ruf(app, "/api/sync/status"),
+			// Die Betriebswarnungen (Stufe 18m) tragen die Meldung des Nachtlaufs.
+			await ruf(app, "/api/betrieb/warnungen"),
 			await ruf(app, "/api/settings/npsso", {
 				method: "POST",
 				headers: { "content-type": "application/json" },

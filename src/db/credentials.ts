@@ -201,6 +201,27 @@ export class CredentialsRepository {
 	}
 
 	/**
+	 * Die kuerzeste gemessene Lebensdauer eines Zugangs in Kalendertagen, oder
+	 * null, solange keiner gestorben ist (Stufe 18m). Nur `gestorben_am` ist
+	 * eine Messung - ein ersetzter Zugang haette vielleicht laenger gehalten
+	 * (7.1). Kalendertage wie in 7.1: eingetragen am 04.09., abgelehnt am
+	 * 29.09. sind 25 Tage. Die Tabelle hat eine Zeile je Zugang - wenige.
+	 */
+	async kuerzesteLebensdauer(): Promise<number | null> {
+		return einzeln(this.db, this.lebensdauerBaustein());
+	}
+
+	lebensdauerBaustein(): Baustein<number | null> {
+		return eins(
+			this.db.prepare(
+				"SELECT CAST(MIN(julianday(date(gestorben_am)) - julianday(date(eingetragen_am))) AS INTEGER) AS tage " +
+					"FROM psn_zugang WHERE gestorben_am IS NOT NULL",
+			),
+			(e) => ersteZeile<{ tage: number | null }>(e)?.tage ?? null,
+		);
+	}
+
+	/**
 	 * Die aufgezeichneten Zugaenge, neueste zuerst (Stufe 19e).
 	 *
 	 * Fuer die Anzeige in den Einstellungen und als Grundlage der Frage, wie

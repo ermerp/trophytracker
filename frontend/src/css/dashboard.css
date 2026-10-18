@@ -36,6 +36,12 @@
   color: var(--gefahr);
 }
 
+/* Zur Kenntnis (Stufe 18m): still, kein eigener Farbton – nichts steht still
+   (Entscheidung des Nutzers vom 18.10.2026). */
+.ikone.kenntnis {
+  color: var(--text-leise);
+}
+
 /* Die Marke sitzt auf dem Zeichen, nicht daneben: 44 px sind der Knopf, das
    Zeichen darin ist 22 px – rechts oben bleibt genug Platz. */
 .punktzahl {
@@ -59,6 +65,10 @@
   background: var(--gefahr);
 }
 
+.punktzahl.kenntnis {
+  background: var(--text-leise);
+}
+
 /* „Da ist noch mehr" – ohne eine zweite Zahl aufzumachen. Der Rand in der
    Grundfarbe trennt ihn von der roten Glocke darunter. */
 .nebenpunkt {
@@ -72,15 +82,21 @@
   border: 2px solid var(--grund);
 }
 
+.nebenpunkt.kenntnis {
+  background: var(--text-leise);
+}
+
 /* --- Warnungen und Tafel ------------------------------------------------ */
 
+/* Der Block auf der Seite trägt nur Rot – was Handeln braucht (Stufe 18m;
+   bis dahin gelb mit demselben Inhalt). */
 .warnungen {
   list-style: none;
   padding: 0.6rem 0.8rem;
   margin: 0 0 var(--a4);
-  border: 1px solid var(--warnung);
+  border: 1px solid var(--gefahr);
   border-radius: var(--r2);
-  background: rgba(232, 163, 61, 0.09);
+  background: var(--gefahr-flaeche);
 }
 
 .warnungen li + li {
@@ -88,7 +104,7 @@
 }
 
 .warnungen b {
-  color: var(--warnung);
+  color: var(--gefahr);
 }
 
 /*
@@ -145,6 +161,25 @@
 
 .tafelname.gefahr {
   color: var(--gefahr);
+}
+
+.tafelname.kenntnis {
+  color: var(--text-leise);
+}
+
+/* Die Tafel der Glocke endet über der Leiste und scrollt in sich: Mit Rot,
+   Hinweisen und Posten lief sie bei 360 px unten aus dem Bild (gesehen im
+   Bild vom 18.10.2026). Nur diese Tafel – `.tafel` tragen auch die Menüs. */
+.glockentafel {
+  max-height: calc(100dvh - var(--kopf-hoehe) - var(--leiste-hoehe) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--a4));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Die Hinweise zur Kenntnis: eine feine Linie statt einer Farbe. */
+.tafel .kenntnisliste li {
+  padding-left: var(--a2);
+  border-left: 2px solid var(--linie);
 }
 
 /* --- Blöcke und Kacheln -------------------------------------------------- */

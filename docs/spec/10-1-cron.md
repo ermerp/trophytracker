@@ -109,7 +109,8 @@ liest: Die drei teuren (erschienene Titel, IGDB-Auswahl, Disc-Auswahl) laufen ni
 PSN-Fenster mit. **Gemessen wird seit Stufe 18j der ganze Aufruf durch den echten Einstieg**, mit
 eingerichtetem PSN-Zugang und einer D1, die `meta.rows_read` aller Anweisungen summiert
 (`test/lesekosten.spec.ts`, 430 Listen, Stand 17.10.2026): ein Leerlauf im PSN-Fenster liest **42**
-Zeilen, einer in der Wartung **2 218** – weit unter dem Tagesbudget von fünf Millionen.
+Zeilen, einer in der Wartung **2 218** – weit unter dem Tagesbudget von fünf Millionen. In der
+Produktion sind es rund 2 590; woran der Abstand liegt: [16.2](16-2-cpu-und-betrieb.md).
 
 Bis dahin war die Summe aus nachgebauten Einzelabfragen zusammengesetzt und lag zweimal daneben;
 als Aufruf gemessen, stand die Wartung vor Migration 0034 bei **3 075** statt der geführten 2 659

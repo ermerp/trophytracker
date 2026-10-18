@@ -1,27 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { anfrage, type IgdbStatus, type ImportLauf, type ReviewFortschritt } from './api'
-import type { StatusAntwort } from './Einstellungen'
-import type { Sicherungsstand } from './Sicherung'
 import { Zeichen } from './Symbole'
 
 /**
- * Offene Posten des Dashboards (Stufe 19a, Abschnitt 13).
+ * Offene Posten des Dashboards (Stufe 19a, Abschnitt 13) und die
+ * Betriebswarnungen (Stufe 18m, Abschnitt 16.2).
  *
- * Bis Stufe 19 stand alles in einem gelben Block – der Zugang, der
- * fehlgeschlagene Nachtlauf und die Prüfliste gleich laut. Seit 19a sind es
- * zwei Dinge (Entscheidung des Nutzers vom 27.09.2026):
+ * Drei Stufen (Entscheidungen des Nutzers vom 27.09. und 18.10.2026):
  *
- * - **Warnung**: Etwas steht still. Abgelaufener Zugang, fehlgeschlagener
- *   Nachtlauf, überfällige Sicherung. Gelber Block, immer sichtbar.
- * - **Information**: Etwas wartet. Prüfliste, `unentschieden`, Zuordnung,
- *   IGDB, Import, Freitext, Backlog-Kandidaten. Liegt hinter der Glocke.
+ * - **Rot – handeln**: Etwas steht still oder steht kurz davor. Roter Block
+ *   auf der Seite, immer sichtbar, und oben in der Tafel.
+ * - **Zur Kenntnis**: In der Nacht ging etwas schief, es steht aber nichts
+ *   still. Still, grau, nur hinter der Glocke.
+ * - **Gelb – Posten**: Etwas wartet. Prüfliste, `unentschieden`, Zuordnung,
+ *   IGDB, Import, Freitext, Backlog-Kandidaten.
  *
- * An der Glocke schlägt Rot Gelb: Gibt es Warnungen, nennt die Zahl **sie**,
- * und ein gelber Punkt sagt, dass außerdem Posten warten. Die Kopfzeile klebt
- * oben, das Alarmzeichen bleibt deshalb über die ganze Seite sichtbar,
- * während der gelbe Block wegscrollt – genau das meint Abschnitt 13 mit „sein
- * Fehler muss am Morgen hier stehen".
+ * Rot und „zur Kenntnis" urteilt der Server (`GET /api/betrieb/warnungen`) –
+ * bis 18m setzte diese Datei drei Warnungen selbst aus drei Antworten
+ * zusammen. Die Glocke zählt die höchste Stufe, die da ist; ein Punkt in der
+ * Farbe der nächsten sagt, dass darunter noch etwas wartet. Die Kopfzeile
+ * klebt oben, das Alarmzeichen bleibt deshalb über die ganze Seite sichtbar,
+ * während der Block wegscrollt.
  *
  * Die Unentschieden-Zeile steht auch dann, wenn die Prüfliste leer ist: Sonst
  * verschwindet die zweite Runde aus dem Blick.
@@ -29,30 +29,71 @@ import { Zeichen } from './Symbole'
 
 export type Posten = { key: string; inhalt: React.ReactNode }
 
-export type OffeneDaten = { warnungen: Posten[]; posten: Posten[] }
+export type OffeneDaten = { rot: Posten[]; kenntnis: Posten[]; posten: Posten[] }
+
+/** Eine Betriebswarnung, wie der Server sie urteilt (src/domain/betrieb.ts). */
+export type Betriebswarnung = {
+	art: string
+	stufe: 'rot' | 'kenntnis'
+	text: string
+	ziel?: 'einstellungen'
+	zielText?: string
+}
+
+/** Was `/api/betrieb/warnungen` liefert – das Zugangsende lesen auch die Einstellungen. */
+export type BetriebAntwort = {
+	warnungen: Betriebswarnung[]
+	zugangsende: {
+		am: string
+		quelle: 'sony' | 'gemessen'
+		sonyAm: string | null
+		lebensdauerTage: number | null
+		tage: number
+		stufe: 'rot' | 'kenntnis' | null
+	} | null
+}
+
+const ZIELE: Record<NonNullable<Betriebswarnung['ziel']>, string> = { einstellungen: '/einstellungen' }
+
+function alsPosten(w: Betriebswarnung, i: number): Posten {
+	return {
+		key: `${w.art}-${i}`,
+		inhalt: (
+			<>
+				{w.text}
+				{w.ziel && (
+					<>
+						{' '}
+						<Link to={ZIELE[w.ziel]}>{w.zielText ?? 'Einstellungen'}</Link>
+					</>
+				)}
+			</>
+		),
+	}
+}
 
 export function useOffenePosten(): OffeneDaten {
 	const [params] = useSearchParams()
 	const [review, setReview] = useState<ReviewFortschritt | null>(null)
 	const [listenOffen, setListenOffen] = useState(0)
-	const [sicherung, setSicherung] = useState<Sicherungsstand | null>(null)
 	const [igdb, setIgdb] = useState<IgdbStatus | null>(null)
 	const [importOffen, setImportOffen] = useState<{ id: number; offen: number } | null>(null)
 	const [freitext, setFreitext] = useState(0)
 	const [kandidaten, setKandidaten] = useState(0)
 	const [storeOffen, setStoreOffen] = useState(0)
-	const [sync, setSync] = useState<StatusAntwort | null>(null)
+	const [betrieb, setBetrieb] = useState<Betriebswarnung[]>([])
 
 	useEffect(() => {
 		// Fehler bleiben hier still: Ein Posten, der sich nicht laden lässt,
 		// darf das Dashboard nicht leeren. Was fehlt, fehlt – die Zahlen
 		// daneben kommen aus einer eigenen Anfrage und stehen trotzdem.
 		anfrage<ReviewFortschritt>('/api/review/progress').then(setReview).catch(() => {})
-		anfrage<StatusAntwort>('/api/sync/status').then(setSync).catch(() => {})
+		anfrage<BetriebAntwort>('/api/betrieb/warnungen')
+			.then((a) => setBetrieb(a.warnungen))
+			.catch(() => {})
 		anfrage<{ listenOffen: number }>('/api/zuordnung/offen?limit=1')
 			.then((a) => setListenOffen(a.listenOffen))
 			.catch(() => {})
-		anfrage<Sicherungsstand>('/api/backup/status').then(setSicherung).catch(() => {})
 		anfrage<IgdbStatus>('/api/igdb/status').then(setIgdb).catch(() => {})
 		anfrage<{ eintraege: unknown[] }>('/api/sync/store/offen')
 			.then((a) => setStoreOffen(a.eintraege.length))
@@ -76,59 +117,10 @@ export function useOffenePosten(): OffeneDaten {
 			.catch(() => {})
 	}, [])
 
-	const warnungen: Posten[] = []
+	// --- Betriebswarnungen: geurteilt vom Server (Stufe 18m) ----------------
+	const rot = betrieb.filter((w) => w.stufe === 'rot').map(alsPosten)
+	const kenntnis = betrieb.filter((w) => w.stufe === 'kenntnis').map(alsPosten)
 	const posten: Posten[] = []
-
-	// --- Warnungen: etwas steht still ---------------------------------------
-
-	// Abschnitt 7.1: Der abgelaufene Zugang ist ein regulärer Zustand, aber
-	// der nächtliche Abruf steht dann – das ist keine Wartezeile.
-	if (sync?.zugang.status === 'abgelaufen') {
-		warnungen.push({
-			key: 'npsso',
-			inhalt: (
-				<>
-					Der PlayStation-Zugang ist <b>abgelaufen</b> – der nächtliche Abruf steht still.{' '}
-					<Link to="/einstellungen">Neues NPSSO eintragen</Link>
-				</>
-			),
-		})
-	}
-	if (sync?.letzterAutomatischerLauf && nachtlaufFehlgeschlagen(sync.letzterAutomatischerLauf)) {
-		warnungen.push({
-			key: 'nachtlauf',
-			inhalt: (
-				<>
-					Der <b>automatische Abruf</b> ist fehlgeschlagen
-					{sync.letzterAutomatischerLauf.meldung ? `: ${sync.letzterAutomatischerLauf.meldung}` : '.'}{' '}
-					<Link to="/einstellungen">Einstellungen</Link>
-				</>
-			),
-		})
-	}
-	// Abschnitt 14.2: „Ein Backup, von dem man nicht weiss, ob es laeuft, ist
-	// kein Backup." Acht Tage, nicht sieben – der Lauf ist wöchentlich.
-	if (sicherung && sicherung.letzterErfolgAm === null) {
-		warnungen.push({
-			key: 'sicherung',
-			inhalt: (
-				<>
-					Noch <b>keine Sicherung</b> – die Daten liegen nur bei Cloudflare.{' '}
-					<Link to="/einstellungen">Einstellungen</Link>
-				</>
-			),
-		})
-	} else if (sicherung?.tageSeit != null && sicherung.tageSeit > 8) {
-		warnungen.push({
-			key: 'sicherung',
-			inhalt: (
-				<>
-					Die letzte Sicherung ist <b>{sicherung.tageSeit} Tage</b> alt.{' '}
-					<Link to="/einstellungen">Einstellungen</Link>
-				</>
-			),
-		})
-	}
 
 	// --- Information: etwas wartet ------------------------------------------
 
@@ -237,37 +229,40 @@ export function useOffenePosten(): OffeneDaten {
 		})
 	}
 
-	return { warnungen, posten }
+	return { rot, kenntnis, posten }
 }
 
 /**
  * Die Glocke in der Kopfzeile.
  *
- * Drei Zustände: still ohne Marke, gelb mit der Anzahl offener Posten, rot
- * mit der Anzahl der **Warnungen** – dann sagt ein gelber Punkt, dass es
- * außerdem Posten gibt. Ohne beides ist die Glocke kein Knopf, sondern nur
- * ein Zeichen: Es gäbe nichts aufzuklappen.
+ * Sie zählt die **höchste Stufe**, die da ist (Entscheidung des Nutzers vom
+ * 18.10.2026): rot die Warnungen, sonst grau die Hinweise zur Kenntnis, sonst
+ * gelb die offenen Posten. Ein Punkt in der Farbe der nächsten Stufe sagt,
+ * dass darunter noch etwas wartet. Ist nichts da, ist die Glocke kein Knopf,
+ * sondern nur ein Zeichen: Es gäbe nichts aufzuklappen.
  */
 export function Glocke({
-	warnungen,
+	rot,
+	kenntnis,
 	posten,
 	offen,
 	umschalten,
 }: {
-	warnungen: number
+	rot: number
+	kenntnis: number
 	posten: number
 	offen: boolean
 	umschalten: () => void
 }) {
-	const alarm = warnungen > 0
-	const zahl = alarm ? warnungen : posten
-	const text = alarm
-		? `${warnungen} ${warnungen === 1 ? 'Warnung' : 'Warnungen'}${posten > 0 ? `, ${posten} offene Posten` : ''}`
-		: posten > 0
-			? `${posten} offene Posten`
-			: 'Nichts offen'
+	const stufe = rot > 0 ? 'rot' : kenntnis > 0 ? 'kenntnis' : posten > 0 ? 'posten' : null
+	const teile = [
+		rot > 0 && `${rot} ${rot === 1 ? 'Warnung' : 'Warnungen'}`,
+		kenntnis > 0 && `${kenntnis} zur Kenntnis`,
+		posten > 0 && `${posten} offene Posten`,
+	].filter(Boolean)
+	const text = teile.length > 0 ? teile.join(', ') : 'Nichts offen'
 
-	if (zahl === 0) {
+	if (stufe === null) {
 		return (
 			<span className="ikone" title={text}>
 				<Zeichen name="glocke" />
@@ -275,28 +270,31 @@ export function Glocke({
 			</span>
 		)
 	}
+	const zahl = stufe === 'rot' ? rot : stufe === 'kenntnis' ? kenntnis : posten
+	// Die nächste Stufe darunter, falls es eine gibt.
+	const darunter = stufe === 'rot' ? (kenntnis > 0 ? 'kenntnis' : posten > 0 ? 'posten' : null) : stufe === 'kenntnis' && posten > 0 ? 'posten' : null
 	return (
 		<button
 			type="button"
-			className={`ikone ${alarm ? 'alarm' : 'wach'}`}
+			className={`ikone ${stufe === 'rot' ? 'alarm' : stufe === 'kenntnis' ? 'kenntnis' : 'wach'}`}
 			aria-label={text}
 			aria-expanded={offen}
 			title={text}
 			onClick={umschalten}
 		>
 			<Zeichen name="glocke" />
-			<span className={alarm ? 'punktzahl rot' : 'punktzahl'}>{zahl}</span>
-			{alarm && posten > 0 && <span className="nebenpunkt" />}
+			<span className={stufe === 'rot' ? 'punktzahl rot' : stufe === 'kenntnis' ? 'punktzahl kenntnis' : 'punktzahl'}>{zahl}</span>
+			{darunter && <span className={darunter === 'kenntnis' ? 'nebenpunkt kenntnis' : 'nebenpunkt'} />}
 		</button>
 	)
 }
 
-/** Der gelbe Block: nur, was stillsteht. Immer sichtbar, nie hinter der Glocke. */
-export function Warnblock({ warnungen }: { warnungen: Posten[] }) {
-	if (warnungen.length === 0) return null
+/** Der rote Block: nur, was Handeln braucht. Immer sichtbar, nie nur hinter der Glocke. */
+export function Warnblock({ rot }: { rot: Posten[] }) {
+	if (rot.length === 0) return null
 	return (
 		<ul className="warnungen">
-			{warnungen.map((w) => (
+			{rot.map((w) => (
 				<li key={w.key}>{w.inhalt}</li>
 			))}
 		</ul>
@@ -304,18 +302,30 @@ export function Warnblock({ warnungen }: { warnungen: Posten[] }) {
 }
 
 /**
- * Die Tafel hinter der Glocke. Sie zeigt **beides** – oben die Warnungen,
- * darunter die Posten: Der rote Zähler an der Glocke braucht seine Auflösung
- * auch dann, wenn der gelbe Block weit oben aus dem Bild gescrollt ist.
+ * Die Tafel hinter der Glocke. Sie zeigt **alles** – oben Rot, dann zur
+ * Kenntnis, dann die Posten: Der rote Zähler an der Glocke braucht seine
+ * Auflösung auch dann, wenn der rote Block weit oben aus dem Bild gescrollt
+ * ist. Der Preisalarm aus 20g kommt als eigene Gruppe zwischen Warnungen und
+ * Posten, in einem eigenen Ton (16.2).
  */
-export function Tafel({ warnungen, posten }: OffeneDaten) {
+export function Tafel({ rot, kenntnis, posten }: OffeneDaten) {
 	return (
-		<div className="tafel" role="region" aria-label="Offene Posten">
-			{warnungen.length > 0 && (
+		<div className="tafel glockentafel" role="region" aria-label="Offene Posten">
+			{rot.length > 0 && (
 				<>
-					<div className="tafelname gefahr">Steht still</div>
+					<div className="tafelname gefahr">Handeln</div>
 					<ul>
-						{warnungen.map((w) => (
+						{rot.map((w) => (
+							<li key={w.key}>{w.inhalt}</li>
+						))}
+					</ul>
+				</>
+			)}
+			{kenntnis.length > 0 && (
+				<>
+					<div className="tafelname kenntnis">Zur Kenntnis</div>
+					<ul className="kenntnisliste">
+						{kenntnis.map((w) => (
 							<li key={w.key}>{w.inhalt}</li>
 						))}
 					</ul>
@@ -333,11 +343,4 @@ export function Tafel({ warnungen, posten }: OffeneDaten) {
 			)}
 		</div>
 	)
-}
-
-/** Fehlgeschlagen und jünger als 24 Stunden – ältere hat ein neuer Lauf abgelöst. */
-function nachtlaufFehlgeschlagen(lauf: NonNullable<StatusAntwort['letzterAutomatischerLauf']>): boolean {
-	if (lauf.status !== 'fehler') return false
-	const gestartet = new Date(lauf.gestartetAm.replace(' ', 'T') + (lauf.gestartetAm.includes('Z') ? '' : 'Z'))
-	return Date.now() - gestartet.getTime() < 24 * 60 * 60 * 1000
 }
