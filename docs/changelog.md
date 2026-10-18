@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 101 | 18.10.2026 | **Nachtrag: Reihenfolge in 16.2.** Die vorgesehene Reihenfolge 18m-b → Index-Nachtrag → 20i → 05:00 → 20g steht als Arbeitsplan in 16.2 statt in der Projektstand-Erinnerung, mit den drei festen Abhängigkeiten; wann 20g kommt, bleibt offen (16.2) |
 | 100 | 18.10.2026 | **Nachtrag: Session-Start mit Changelog-Kopf.** `/catchup` liest aus 16.2 die nächste Stufe und die offenen Punkte, dazu die ersten fünf Changelog-Zeilen und `git log --oneline -10`; die Projektstand-Erinnerung hält nur kurzlebigen Sitzungsstand, Dauerhaftes steht in 16.2 (CLAUDE.md) |
 | 99 | 18.10.2026 | **Nachtrag: Session-Befehle.** Die Abschnitte „Session-Start" und „Session-Abschluss" in CLAUDE.md stimmen die allgemeinen Befehle `/catchup` und `/wrapup` auf das Projekt ab: kein `plan.md`/`findings.md`, der Stand steht in der Projektstand-Erinnerung und in 16.2, vor dem Schreiben kommt der Diff. Dazu eine geschärfte Regel zum Ersetzen bestehender Abläufe (CLAUDE.md, lehren.md) |
 | 98 | 18.10.2026 | **Stufe 18l: Store-Leser.** Die Seite bleibt ein Strom, gesucht wird nur im neu angekommenen Teil (`BlockStrom` statt `naechsterBlock`), behalten nur der unverarbeitete Rest; Test mit byteweise geschnittenem Strom. Die Portion bleibt bei zehn und wird mit „Cron je Minute" entschieden; aus der Nacht zum 19.10. die CPU je Store-Release (7.4, 10.1, 16.2, entscheidungen.md) |

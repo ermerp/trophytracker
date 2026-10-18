@@ -8,9 +8,20 @@ unten ausdrücklich als offen.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 09.10.2026): **20h**, dann **20f**, dann
 **20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
-20h und 20f sind am 11.10.2026 abgenommen; **als Nächstes 20g** – dort ist alles entschieden außer der relativen Regel, die ab dem 03.11.2026 messbar wird.
+20h und 20f sind am 11.10.2026 abgenommen. Für 20g ist alles entschieden außer der relativen Regel, die ab dem 03.11.2026 messbar wird.
 
-**Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026). Wann 20g folgt, ist danach zu entscheiden.
+**Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026).
+
+**Vorgesehene Reihenfolge – ein Arbeitsplan, keine Entscheidung** (Stand 18.10.2026): Nachtmessung
+von 18k/18l → **18m-b** → **Index-Nachtrag** für die drei Auswahlen des Lage-Batches → **20i** →
+**Nachtläufe bis 05:00 UTC** → **20g**. Fest sind nur die Abhängigkeiten:
+
+- **20g kommt nach 20i**; der Allzeittief-Auslöser bliebe bis zum 03.11.2026 ohnehin still
+  (Mindesthistorie, unten). **Wann 20g kommt, ist offen.**
+- **Der Index-Nachtrag kommt vor die Entscheidung „Cron je Minute"** ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
+- **Der große Wunschlisten-Import erst nach 20i und nach der Entscheidung** zwischen Wortindex-Zeile,
+  Cron je Minute und GitHub Actions ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) – dazu die
+  Takt-Frage unten.
 
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 
