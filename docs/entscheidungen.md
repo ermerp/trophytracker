@@ -275,3 +275,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 18.10.2026 | **Das NPSSO wird bewusst erst ab dem 21.10. erneuert**, um die Zugangswarnung in beiden Stufen zu beobachten (zur Kenntnis bis 20.10., rot ab 21.10.) | [7.1](spec/07-1-psn-trophaeen.md) |
 | 18.10.2026 | **Die Erinnerung „Projektstand" hält nur Sitzungsstand, der in wenigen Tagen erledigt ist**; Dauerhaftes steht in 16.2, `/wrapup` streicht Erledigtes | CLAUDE.md, Session-Abschluss |
 | 18.10.2026 | **`/catchup` liest die ersten fünf Tabellenzeilen des Changelogs** und aus 16.2 nur die nächste Stufe und die offenen Punkte | CLAUDE.md, Session-Start |
+| 19.10.2026 | **Das Zugangsende zählt Kalendertage in Ortszeit (Europe/Berlin)**, nicht abgerundete 24-Stunden-Spannen: rot ab 21.10. wie geplant, am 19.10. „in 5 Tagen" | [7.1](spec/07-1-psn-trophaeen.md) |

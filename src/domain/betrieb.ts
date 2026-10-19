@@ -144,6 +144,19 @@ const BERLIN = "Europe/Berlin";
 const datumFormat = new Intl.DateTimeFormat("de-DE", { timeZone: BERLIN, day: "2-digit", month: "2-digit" });
 const zeitFormat = new Intl.DateTimeFormat("de-DE", { timeZone: BERLIN, hour: "2-digit", minute: "2-digit" });
 
+const tagFormat = new Intl.DateTimeFormat("en-CA", { timeZone: BERLIN, year: "numeric", month: "2-digit", day: "2-digit" });
+
+/**
+ * Der Kalendertag in Ortszeit als fortlaufende Zahl - die Differenz zweier
+ * Ortstage sind die Tage, die der Nutzer im Kalender zaehlt. Bis zum Nachtrag
+ * vom 19.10.2026 stand hier `Math.floor` ueber Stunden: Am 19.10. hiess der
+ * 24.10. "in 4 Tagen", und rot wurde es einen Tag zu frueh.
+ */
+function ortstag(d: Date): number {
+	const teile = Object.fromEntries(tagFormat.formatToParts(d).map((t) => [t.type, t.value]));
+	return Date.UTC(Number(teile.year), Number(teile.month) - 1, Number(teile.day)) / TAG_MS;
+}
+
 /** "24.10." - Ortszeit des Nutzers, nicht UTC. */
 export const datum = (d: Date) => `${datumFormat.format(d)}`;
 /** "06:30" - Ortszeit. */
@@ -157,7 +170,7 @@ export type Zugangsende = {
 	/** Sonys Ankuendigung, falls bekannt - auch wenn sie nicht das fruehere Ende ist. */
 	sonyAm: string | null;
 	lebensdauerTage: number | null;
-	/** Ganze Tage bis zum Ende, abgerundet; negativ, wenn es schon vorbei ist. */
+	/** Kalendertage bis zum Ende in Ortszeit (19.10. bis 24.10. sind 5); negativ, wenn es schon vorbei ist. */
 	tage: number;
 	stufe: BetriebStufe | null;
 };
@@ -186,7 +199,7 @@ export function zugangsende(
 	}
 	const ende = sony && gemessen ? (gemessen < sony ? gemessen : sony) : (gemessen ?? sony);
 	if (!ende) return null;
-	const tage = Math.floor((ende.getTime() - jetzt.getTime()) / TAG_MS);
+	const tage = ortstag(ende) - ortstag(jetzt);
 	const stufe = tage <= ZUGANG_ROT_TAGE ? "rot" : tage <= ZUGANG_KENNTNIS_TAGE ? "kenntnis" : null;
 	return {
 		am: ende.toISOString(),

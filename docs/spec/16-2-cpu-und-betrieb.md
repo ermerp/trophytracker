@@ -144,7 +144,7 @@ Die CPU der Route wird nach dem Deploy an `workersInvocationsAdaptive` gemessen.
 |---|---|
 | Ein Bereich seit über **26 h** ohne vermerkten Ausgang; fehlt der Stand ganz, eine Warnung | rot |
 | Zugang abgelaufen – **sofort**, unabhängig von der Zahl der Nächte; ein Sync, der daran scheitert, wird nicht zusätzlich gemeldet | rot |
-| Zugang endet in ≤ **3** / ≤ **14** Tagen – das frühere von Sonys Ankündigung und „eingetragen + kürzeste gemessene Lebensdauer" (7.1) | rot / zur Kenntnis |
+| Zugang endet in ≤ **3** / ≤ **14** Kalendertagen (Ortszeit) – das frühere von Sonys Ankündigung und „eingetragen + kürzeste gemessene Lebensdauer" (7.1) | rot / zur Kenntnis |
 | Nacht-Sync gescheitert, jünger als 24 h: **zwei aufeinanderfolgende UTC-Nächte** / eine | rot / zur Kenntnis |
 | Sicherung älter als acht Tage oder keine (14.2) | rot |
 | Kette ohne Ausgang, gemeldet in den letzten 24 h | zur Kenntnis |

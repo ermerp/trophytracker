@@ -54,7 +54,9 @@ wiederherstellbar.
 
 **Gewarnt wird nach dem früheren Ende** (Stufe 18m, Entscheidung des Nutzers vom 18.10.2026): das
 frühere von Sonys Ankündigung und „eingetragen + kürzeste gemessene Lebensdauer" aus `psn_zugang`
-(Kalendertage; heute 25). Zur Kenntnis ab **14 Tagen** davor, rot ab **3** – auf dem Dashboard und,
+(Kalendertage; heute 25). Zur Kenntnis ab **14 Tagen** davor, rot ab **3** – gezählt in Kalendertagen
+nach Ortszeit (Europe/Berlin): Am 19.10. ist der 24.10. „in 5 Tagen", rot wird es am 21.10. um 00:00
+(Entscheidung des Nutzers vom 19.10.2026; bis dahin abgerundete 24-Stunden-Spannen, einen Tag zu früh) – auf dem Dashboard und,
 mit derselben Rechnung (`zugangsende`, `src/domain/betrieb.ts`), als „Läuft bald ab" in den
 Einstellungen. Der Satz nennt, woher das Datum kommt: „hält vermutlich bis um den 24.10. – der bisher
 kürzeste hielt 25 Tage, Sony nennt den 28.11.". Nach Sonys Datum allein käme die Warnung für den
