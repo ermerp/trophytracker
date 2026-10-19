@@ -12,15 +12,22 @@ unten ausdrücklich als offen.
 
 **Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026).
 
-**Vorgesehene Reihenfolge – ein Arbeitsplan, keine Entscheidung** (Stand 18.10.2026): Nachtmessung
-von 18k/18l → **18m-b** → **Index-Nachtrag** für die drei Auswahlen des Lage-Batches → **20i** →
-**Nachtläufe bis 05:00 UTC** → **20g**. Fest sind nur die Abhängigkeiten:
+**Vorgesehene Reihenfolge – ein Arbeitsplan, keine Entscheidung** (Stand 19.10.2026): **Kaufliste
+bündeln** (Nachtrag, vor 18m-b entschieden am 19.10.2026) → **18m-b** → **Index-Nachtrag** für die
+Auswahlen des Lage-Batches → **20i: Markt in einer GitHub Action** ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md))
+→ **neu bewerten: Nachtläufe bis 05:00 UTC und Cron je Minute** – ohne Markt wird das
+Wartungsfenster fast leer (am 19.10. 21 von 36 Aufrufen Markt, 1 Jahre, 14 Leerlauf), damit
+ändern sich beide Fragen → **20g**. Der Store wird nach dem Probelauf vom 19.10. entschieden. Am
+02.11.2026 wird das Budget arbeitender Aufrufe neu bewertet. Fest sind nur die Abhängigkeiten:
 
 - **20g kommt nach 20i**; der Allzeittief-Auslöser bliebe bis zum 03.11.2026 ohnehin still
   (Mindesthistorie, unten). **Wann 20g kommt, ist offen.**
 - **Der Index-Nachtrag kommt vor die Entscheidung „Cron je Minute"** ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
-- **Der große Wunschlisten-Import erst nach 20i und nach der Kapazitätsfrage:** welcher Weg für den
-  Markt (Wortindex-Zeile oder GitHub Actions), entschieden zusammen mit „Cron je Minute"
+  Geht der Markt in die Action, entfällt seine Auswahl im Lage-Batch (596 Zeilen je Wartungsaufruf);
+  der Nachtrag betrifft dann noch IGDB-Auffrischen und Disc-Prüfung.
+- **Der große Wunschlisten-Import erst nach 20i und nach der Kapazitätsfrage:** Der Weg für den
+  Markt ist entschieden (GitHub Action, 19.10.2026); offen bleibt, ob die Action den größeren
+  Bestand im täglichen Takt trägt, und „Cron je Minute"
   ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)); was sie für den täglichen Takt heißt, steht
   unten.
 

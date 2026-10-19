@@ -277,3 +277,7 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 18.10.2026 | **`/catchup` liest die ersten fünf Tabellenzeilen des Changelogs** und aus 16.2 nur die nächste Stufe und die offenen Punkte | CLAUDE.md, Session-Start |
 | 19.10.2026 | **Das Zugangsende zählt Kalendertage in Ortszeit (Europe/Berlin)**, nicht abgerundete 24-Stunden-Spannen: rot ab 21.10. wie geplant, am 19.10. „in 5 Tagen" | [7.1](spec/07-1-psn-trophaeen.md) |
 | 19.10.2026 | **Die kürzere Frist aus 20i gilt für Markt und Store** – beide wandern sonst täglich hinter das Fenster | [16.2](spec/16-2-cpu-und-betrieb.md) |
+| 19.10.2026 | **Budget arbeitender Aufrufe: Median ≤ 8 ms, P90 ≤ 10 ms, keiner über 15 ms** – als Arbeitshypothese, neu bewertet am 02.11.2026 mit den Abbruchdaten | [16.2](spec/16-2-cpu-und-betrieb.md) |
+| 19.10.2026 | **Die Kaufliste wird gebündelt wie in 18k, als nächster Nachtrag vor 18m-b** – auch wegen bis zu 150 Abfragen je Aufruf gegen die dokumentierte Grenze von 50 | [16.2](spec/16-2-cpu-und-betrieb.md) |
+| 19.10.2026 | **Der Markt wandert in eine GitHub Action; 20i wird zu dieser Stufe.** Wie geschrieben wird (Worker-Route oder D1-Schnittstelle), entscheidet ein Plan | [16.2](spec/16-2-cpu-und-betrieb.md) |
+| 19.10.2026 | **Über den Store wird erst nach einem Probelauf aus GitHub Actions entschieden** | [16.2](spec/16-2-cpu-und-betrieb.md) |
