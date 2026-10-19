@@ -1,5 +1,9 @@
 import type { SpielzeitPlattform } from "../domain/psn-besitz";
+import { zeilen } from "./baustein";
 import type { EventRepository } from "./events";
+
+/** Berechtigungen je INSERT: zwei Binds je Zeile, D1 erlaubt 100 je Statement. */
+const BERECHTIGUNGEN_JE_STUECK = 45;
 
 /**
  * Spielzeit und digitaler Besitz aus PSN (Abschnitt 7.7, Stufe 18c).
@@ -97,58 +101,88 @@ export class BesitzRepository {
 	}
 
 	/**
-	 * Eine von PSN erkannte Berechtigung anlegen.
+	 * Die von PSN erkannten Berechtigungen einer Seite anlegen - in EINEM
+	 * Batch (Stufe 18k-b). Bis dahin ein Batch je Eintrag; zusammen mit den
+	 * Lookups waren das bis zu 150 Abfragen je Aufruf gegen die
+	 * dokumentierten 50 (10.1).
 	 *
 	 * `ON CONFLICT DO NOTHING` ueber UNIQUE(release_id, source): Eine Zeile,
 	 * die der Nutzer selbst angelegt hat, bleibt unveraendert - auch ihre
-	 * Herkunft. Rueckgabe: true, wenn eine Zeile entstanden ist.
+	 * Herkunft. Rueckgabe: die Releases, an denen eine Zeile ENTSTANDEN ist,
+	 * aus `RETURNING` des INSERT allein - nie aus dem Protokoll.
+	 *
+	 * Je Quelle und Stueck zwei Anweisungen, in dieser Reihenfolge: das
+	 * Protokoll mit derselben Bedingung wie der INSERT (NOT EXISTS), davor,
+	 * damit es nur Neues sieht (8.5) - dann der INSERT. Scheitert eine
+	 * Anweisung, scheitert der Batch ganz: Keine Berechtigung und kein
+	 * Ereignis der Seite stehen da, der Schritt meldet "fehler", und der
+	 * naechste Lauf holt dieselbe Seite neu (`besitzLauf` rueckt den Start
+	 * dann nicht vor). Stillstehen kann dabei nur die Kaufliste.
 	 */
-	async berechtigungErkennen(releaseId: number, quelle: "kauf" | "plus"): Promise<boolean> {
-		const [, eingefuegt] = await this.db.batch([
-			// Protokoll mit Quelle 'sync' und Anlass 'psn' - dieselbe Bedingung
-			// wie der INSERT, davor im Batch (8.5).
-			this.events.insertSelect(
-				"SELECT 'sync', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'berechtigung_angelegt', 'source', NULL, ?, 'psn' " +
-					"FROM release r JOIN game g ON g.id = r.game_id WHERE r.id = ? " +
-					"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = ?)",
-				quelle,
-				releaseId,
-				quelle,
-			),
-			this.db
-				.prepare(
-					"INSERT INTO digital_entitlement (release_id, source, herkunft) VALUES (?, ?, 'psn') " +
-						"ON CONFLICT(release_id, source) DO NOTHING RETURNING id",
-				)
-				.bind(releaseId, quelle),
-		]);
-		return (eingefuegt.results?.length ?? 0) > 0;
+	async berechtigungenErkennen(neu: {
+		kauf: readonly number[];
+		plus: readonly number[];
+	}): Promise<{ kauf: number[]; plus: number[] }> {
+		const anweisungen: D1PreparedStatement[] = [];
+		const inserts: Array<{ quelle: "kauf" | "plus"; index: number }> = [];
+		for (const quelle of ["kauf", "plus"] as const) {
+			const ids = [...new Set(neu[quelle])];
+			// Zwei Binds je Zeile im INSERT, also hoechstens 45 Zeilen - D1
+			// erlaubt 100 gebundene Werte je Statement. Eine Seite hat 50.
+			for (let i = 0; i < ids.length; i += BERECHTIGUNGEN_JE_STUECK) {
+				const stueck = ids.slice(i, i + BERECHTIGUNGEN_JE_STUECK);
+				const platzhalter = stueck.map(() => "?").join(", ");
+				anweisungen.push(
+					// Protokoll mit Quelle 'sync' und Anlass 'psn'.
+					this.events.insertSelect(
+						"SELECT 'sync', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'berechtigung_angelegt', 'source', NULL, ?, 'psn' " +
+							`FROM release r JOIN game g ON g.id = r.game_id WHERE r.id IN (${platzhalter}) ` +
+							"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = ?)",
+						quelle,
+						...stueck,
+						quelle,
+					),
+				);
+				inserts.push({ quelle, index: anweisungen.length });
+				anweisungen.push(
+					this.db
+						.prepare(
+							"INSERT INTO digital_entitlement (release_id, source, herkunft) VALUES " +
+								stueck.map(() => "(?, ?, 'psn')").join(", ") +
+								" ON CONFLICT(release_id, source) DO NOTHING RETURNING release_id",
+						)
+						.bind(...stueck.flatMap((id) => [id, quelle])),
+				);
+			}
+		}
+		const raus = { kauf: [] as number[], plus: [] as number[] };
+		if (anweisungen.length === 0) return raus;
+		const ergebnisse = await this.db.batch(anweisungen);
+		for (const { quelle, index } of inserts) {
+			for (const z of zeilen<{ release_id: number }>(ergebnisse[index])) raus[quelle].push(z.release_id);
+		}
+		return raus;
 	}
 
 	/**
-	 * Gibt es das Spiel ausschliesslich digital?
+	 * Welche dieser Releases gibt es ausschliesslich digital?
 	 *
 	 * Nur dann erledigt ein von PSN erkannter Kauf einen offenen Wunsch
 	 * (Entscheidung des Nutzers vom 22.09.2026): Steht dort `ja` oder
 	 * `unbekannt`, koennte der Wunsch der Disc gelten, und der Eintrag bleibt
 	 * offen. Anders als beim Erfassen von Hand weiss hier niemand, was
-	 * gemeint war - deshalb die Zurueckhaltung.
+	 * gemeint war - deshalb die Zurueckhaltung. Eine Anweisung fuer alle neu
+	 * erkannten Kaeufe einer Seite (Stufe 18k-b); hoechstens 50 Binds.
 	 */
-	async nurDigital(releaseId: number): Promise<boolean> {
-		const z = await this.db
-			.prepare("SELECT 1 AS x FROM release WHERE id = ? AND physical_release_status = 'nein'")
-			.bind(releaseId)
-			.first();
-		return z !== null;
-	}
-
-	/** Liegt am Release schon ein Kauf? Dann schlaegt er PS+ (7.7). */
-	async hatKauf(releaseId: number): Promise<boolean> {
-		const z = await this.db
-			.prepare("SELECT 1 AS x FROM digital_entitlement WHERE release_id = ? AND source = 'kauf'")
-			.bind(releaseId)
-			.first();
-		return z !== null;
+	async nurDigitalUnter(releaseIds: readonly number[]): Promise<Set<number>> {
+		if (releaseIds.length === 0) return new Set();
+		const { results } = await this.db
+			.prepare(
+				`SELECT id FROM release WHERE id IN (${releaseIds.map(() => "?").join(", ")}) AND physical_release_status = 'nein'`,
+			)
+			.bind(...releaseIds)
+			.all<{ id: number }>();
+		return new Set(results.map((z) => z.id));
 	}
 
 	/**

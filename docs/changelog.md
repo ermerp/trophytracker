@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 105 | 19.10.2026 | **Stufe 18k-b: Kaufliste gebündelt.** Ein Lese- und ein Schreib-Batch je Seite statt zwei bis drei D1-Aufrufen je Eintrag: 4 / 3 D1-Aufrufe statt 103 / 85, 8 / 7 Anweisungen statt 130 / 112 (gegen 50 je Aufruf); Kauf schlägt PS+ auch auf derselben Seite. Der Testzähler zählt Anweisungen (7.7, 16.2) |
 | 104 | 19.10.2026 | **Nachtrag: Entscheidungen nach der Gesamtrechnung.** Budget arbeitender Aufrufe Median ≤ 8 / P90 ≤ 10 / max. 15 ms als Arbeitshypothese bis 02.11.; Markt wird in 20i eine GitHub Action, die Kaufliste wird vorher gebündelt; Store-Probelauf aus Actions angenommen; Arbeitsplan neu (16.2, CLAUDE.md) |
 | 103 | 19.10.2026 | **Nachtrag: Nacht zum 19.10.** Messwerte nach 18k/18l: Spielzeit EWR 18,6 / IAD 29,3 ms (rund 85 % weniger), Store 2,2–6,1 ms je Release (keine Wirkung von 18l sichtbar), PSN-Leerlauf erstmals gemessen (Median 5,7); Abbrüche in 8 von 22 Nächten, nicht nur in Singapur (10.1); die kürzere Frist aus 20i gilt für Markt **und** Store (16.2) |
 | 102 | 19.10.2026 | **Nachtrag zu 18m: Zugangsende in Kalendertagen.** `zugangsende` zählt die Tage bis zum Ende in Ortszeit (Europe/Berlin) statt `Math.floor` über Stunden: am 19.10. „in 5 Tagen" statt 4, rot ab 21.10. 00:00 statt einen Tag früher; Tests mit Tageswechsel in Sommer- und Winterzeit (7.1, 16.2) |

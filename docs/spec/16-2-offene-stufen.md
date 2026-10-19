@@ -13,7 +13,7 @@ unten ausdrücklich als offen.
 **Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026).
 
 **Vorgesehene Reihenfolge – ein Arbeitsplan, keine Entscheidung** (Stand 19.10.2026): **Kaufliste
-bündeln** (Nachtrag, vor 18m-b entschieden am 19.10.2026) → **18m-b** → **Index-Nachtrag** für die
+bündeln** (18k-b, gebaut am 19.10.2026, CPU um den 25.10. messen) → **18m-b** → **Index-Nachtrag** für die
 Auswahlen des Lage-Batches → **20i: Markt in einer GitHub Action** ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md))
 → **neu bewerten: Nachtläufe bis 05:00 UTC und Cron je Minute** – ohne Markt wird das
 Wartungsfenster fast leer (am 19.10. 21 von 36 Aufrufen Markt, 1 Jahre, 14 Leerlauf), damit
