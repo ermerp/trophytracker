@@ -652,20 +652,32 @@ export class SyncRepository {
 		if (marke?.verwaist) {
 			stand.push(["$.ohneAusgang", JSON.stringify({ ...marke.verwaist, gemeldetAm: zeitstempel })]);
 		}
-		if (stand.length > 0) {
-			const pfade = stand.map(() => "?, json(?)").join(", ");
-			const werte = stand.flat();
-			anweisungen.push(
-				this.db
-					.prepare(
-						`INSERT INTO app_setting (key, value) VALUES (?, json_set('{}', ${pfade})) ` +
-							"ON CONFLICT(key) DO UPDATE SET value = CASE WHEN json_valid(value) " +
-							`THEN json_set(value, ${pfade}) ELSE json_set('{}', ${pfade}) END`,
-					)
-					.bind(SCHLUESSEL_STAND, ...werte, ...werte, ...werte),
-			);
-		}
+		if (stand.length > 0) anweisungen.push(this.standAnweisung(stand));
 		await this.db.batch(anweisungen);
+	}
+
+	/**
+	 * Nur den Stand EINES Bereichs setzen, ohne Verlaufszeile - fuer die Marke
+	 * "begonnen" der Markt-Action (Stufe 20i). Sie steht unter einem eigenen
+	 * Bereich (`markt_begonnen`), damit Beginn und Ausgang nie dieselbe Marke
+	 * hinterlassen (CLAUDE.md): Ein Lauf, der nach dem Beginn stirbt, laesst
+	 * `markt` auf dem letzten Ausgang stehen.
+	 */
+	async standVermerken(bereich: string, wert: CronFakt): Promise<void> {
+		await this.standAnweisung([[`$.${bereich}`, JSON.stringify(wert)]]).run();
+	}
+
+	/** Pfade in `cron_stand` setzen; ein unlesbarer Stand wird ersetzt. */
+	private standAnweisung(stand: Array<[string, string]>): D1PreparedStatement {
+		const pfade = stand.map(() => "?, json(?)").join(", ");
+		const werte = stand.flat();
+		return this.db
+			.prepare(
+				`INSERT INTO app_setting (key, value) VALUES (?, json_set('{}', ${pfade})) ` +
+					"ON CONFLICT(key) DO UPDATE SET value = CASE WHEN json_valid(value) " +
+					`THEN json_set(value, ${pfade}) ELSE json_set('{}', ${pfade}) END`,
+			)
+			.bind(SCHLUESSEL_STAND, ...werte, ...werte, ...werte);
 	}
 
 	/**

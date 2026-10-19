@@ -17,7 +17,7 @@ import type { EventRepository } from "./events";
  */
 
 /**
- * Nach so vielen Tagen wird ein Release erneut gefragt. Als Text im
+ * Nach so vielen Stunden wird ein Release erneut gefragt. Als Text im
  * Statement, nie als Bind.
  *
  * Taeglich seit Stufe 20e (Entscheidung des Nutzers vom 02.10.2026). Nicht
@@ -25,8 +25,22 @@ import type { EventRepository } from "./events";
  * Verlaufs: Ein gleitender Median braucht Punkte, um gegen den einzelnen
  * Verkaeufer robust zu sein, der eine Disc fuer drei Euro einstellt. Und ein
  * Preisalarm (Stufe 20g) kann nur melden, was er gesehen hat.
+ *
+ * Zwanzig Stunden statt eines Tages seit Stufe 20i (Vorgabe des Nutzers vom
+ * 17.10.2026): Mit 24 Stunden wurde jedes Release erst zur Uhrzeit seiner
+ * letzten Pruefung wieder faellig - was am Vortag spaet lag, rutschte hinter
+ * das Fenster (`offen=16` am 17.10., `offen=19` am 19.10.). Die Action startet
+ * zu einer festen Zeit, GitHub verschiebt sie um Minuten bis Stunden; unter
+ * 24 minus Verspaetung ist am naechsten Tag alles faellig.
  */
-export const MARKT_FRIST_TAGE = 1;
+export const MARKT_FRIST_STUNDEN = 20;
+
+/**
+ * Releases je Lage fuer die Action (Stufe 20i): alle faelligen, nicht eine
+ * Portion - die Action fragt eBay ohne CPU-Grenze. Die Zahl ist das Netz
+ * gegen einen ausufernden Bestand, nicht die Erwartung (431 am 19.10.2026).
+ */
+export const LAGE_HOECHSTENS = 2000;
 
 /**
  * Welche Releases JETZT gefragt werden - die eine Bedingung fuer Auswahl und
@@ -35,7 +49,7 @@ export const MARKT_FRIST_TAGE = 1;
  * ausgeschrieben statt ueber `v_luecken`: siehe `zuPruefen`.
  */
 export const FAELLIG_IN_AUSWAHL =
-	`WHERE (r.markt_geprueft_am IS NULL OR r.markt_geprueft_am < datetime('now', '-${MARKT_FRIST_TAGE} days')) ` +
+	`WHERE (r.markt_geprueft_am IS NULL OR r.markt_geprueft_am < datetime('now', '-${MARKT_FRIST_STUNDEN} hours')) ` +
 	"AND ((r.physical_release_status IN ('ja', 'unbekannt') " +
 	"AND EXISTS (SELECT 1 FROM trophy_progress t WHERE t.release_id = r.id AND t.progress_pct > 0) " +
 	"AND NOT EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id)) " +
@@ -137,6 +151,75 @@ export class MarktRepository {
 	}
 
 	/**
+	 * Was die Action fuer einen Lauf braucht, in EINEM D1-Aufruf (Stufe 20i):
+	 * alle faelligen Releases (dieselbe Auswahl wie bisher der Cron), die
+	 * Sammlung fuer den Titelabgleich und die ganze Sperrliste. Die Sperrliste
+	 * ganz statt je Release: Sie ist klein, und eine `IN`-Liste ueber alle
+	 * Faelligen sprengte die 100 Binds.
+	 */
+	async lageFuerAction(sammlung: Baustein<Array<{ spielId: number; titel: string }>>): Promise<{
+		ziele: ZuPruefen[];
+		sammlung: Array<{ spielId: number; titel: string }>;
+		verworfen: Array<{ releaseId: number; itemIds: string[] }>;
+	}> {
+		const ziele = this.zuPruefenBaustein(LAGE_HOECHSTENS);
+		const sperre = this.db.prepare("SELECT release_id, ebay_item_id FROM market_offer_verworfen ORDER BY release_id");
+		const [z, s, v] = await this.db.batch([...ziele.anweisungen, ...sammlung.anweisungen, sperre]);
+		const je = new Map<number, string[]>();
+		for (const zeile of zeilen<{ release_id: number; ebay_item_id: string }>(v)) {
+			je.set(zeile.release_id, [...(je.get(zeile.release_id) ?? []), zeile.ebay_item_id]);
+		}
+		return {
+			ziele: ziele.lesen([z]),
+			sammlung: sammlung.lesen([s]),
+			verworfen: [...je].map(([releaseId, itemIds]) => ({ releaseId, itemIds })),
+		};
+	}
+
+	/**
+	 * Mehrere Releases per Id - fuer die Route, die Ergebnisse der Action
+	 * schreibt. Titel, Plattform und Disc-Fassung kommen aus der Datenbank,
+	 * nie vom Aufrufer: Von `discFassung` haengt ab, ob ein Statuswechsel
+	 * protokolliert wird. Hoechstens MARKT_JE_POST Ids, weit unter 100 Binds.
+	 */
+	async einige(releaseIds: readonly number[]): Promise<ZuPruefen[]> {
+		if (releaseIds.length === 0) return [];
+		const { results } = await this.db
+			.prepare(
+				"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
+					"r.physical_release_status AS discFassung " +
+					`FROM release r JOIN game g ON g.id = r.game_id WHERE r.id IN (${releaseIds.map(() => "?").join(", ")})`,
+			)
+			.bind(...releaseIds)
+			.all<ZuPruefen>();
+		return results;
+	}
+
+	/**
+	 * Die Ergebnisse MEHRERER Releases in EINEM Batch (Stufe 20i) - fuer die
+	 * Portionen der Action. Je Release dieselben Anweisungen wie
+	 * `ergebnisSchreiben`, hintereinander; hoechstens sieben je Release
+	 * (zwei Angebote, zwei Verlaufspunkte, Protokoll und Statuswechsel, Stempel).
+	 *
+	 * Scheitert eine Anweisung, scheitert der Batch ganz: Kein Release der
+	 * Portion bekommt Angebot oder Stempel, alle bleiben faellig, und der
+	 * naechste Lauf fragt sie neu. Stillstehen kann nur diese Portion.
+	 */
+	async ergebnisseSchreiben(
+		liste: ReadonlyArray<{ ziel: ZuPruefen; angebote: AngebotJeKanal; rohangebote: number }>,
+	): Promise<Array<{ discBelegt: boolean; preis: AngezeigtesAngebot | null }>> {
+		const teile = liste.map((e) => this.ergebnisAnweisungen(e.ziel, e.angebote, e.rohangebote));
+		if (teile.length === 0) return [];
+		const ergebnisse = await this.db.batch(teile.flatMap((t) => t.anweisungen));
+		let pos = 0;
+		return teile.map((t) => {
+			const eigene = ergebnisse.slice(pos, pos + t.anweisungen.length);
+			pos += t.anweisungen.length;
+			return t.lesen(eigene);
+		});
+	}
+
+	/**
 	 * Das Ergebnis EINES Releases festschreiben.
 	 *
 	 * `rohangebote` ist die Zahl der Angebote, die eBay in der
@@ -153,6 +236,19 @@ export class MarktRepository {
 		angebote: AngebotJeKanal,
 		rohangebote: number,
 	): Promise<{ discBelegt: boolean; preis: AngezeigtesAngebot | null }> {
+		const [ergebnis] = await this.ergebnisseSchreiben([{ ziel, angebote, rohangebote }]);
+		return ergebnis;
+	}
+
+	/** Die Anweisungen zu EINEM Release und wie ihr Ergebnis gelesen wird. */
+	private ergebnisAnweisungen(
+		ziel: ZuPruefen,
+		angebote: AngebotJeKanal,
+		rohangebote: number,
+	): {
+		anweisungen: D1PreparedStatement[];
+		lesen: (ergebnisse: D1Result[]) => { discBelegt: boolean; preis: AngezeigtesAngebot | null };
+	} {
 		const anweisungen: D1PreparedStatement[] = [];
 
 		// In `market_offer` kommt der PREIS, nicht der Beleg: Ein loser
@@ -213,9 +309,13 @@ export class MarktRepository {
 				.bind(rohangebote, ziel.releaseId),
 		);
 
-		const ergebnisse = await this.db.batch(anweisungen);
-		const discBelegt = belegt && (ergebnisse[stempelIndex - 1]?.meta.changes ?? 0) > 0;
-		return { discBelegt, preis: gezeigt === null ? null : angezeigt(gezeigt) };
+		return {
+			anweisungen,
+			lesen: (ergebnisse) => ({
+				discBelegt: belegt && (ergebnisse[stempelIndex - 1]?.meta.changes ?? 0) > 0,
+				preis: gezeigt === null ? null : angezeigt(gezeigt),
+			}),
+		};
 	}
 
 	/** Ein gefundenes Angebot - UPSERT, damit der naechste Lauf dieselbe Zeile trifft. */

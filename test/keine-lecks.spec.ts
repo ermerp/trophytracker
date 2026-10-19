@@ -2,6 +2,7 @@ import { createExecutionContext, env } from "cloudflare:test";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { erstelleStoreClient } from "../src/psn/store";
 import { conceptSeite, htmlAntwort, produktSeite } from "./store-fake";
+import { marktLauf } from "../src/sync/markt-lauf";
 import { createApp, createScheduled } from "../src/index";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
@@ -414,6 +415,23 @@ describe("Dichtheitsprüfung", () => {
 				body: JSON.stringify({ releaseId: 1, itemId: "110000000001" }),
 			}),
 			await ruf(app, "/api/sync/markt/verwerfen/1"),
+			// Die Routen der Markt-Action (Stufe 20i), mit Fehlerpfaden.
+			await ruf(app, "/api/sync/markt/lage"),
+			await ruf(app, "/api/sync/markt/ergebnisse", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ ergebnisse: [{ releaseId: 1, rohangebote: 0, angebote: { markt: { preis: null, beleg: null } } }] }),
+			}),
+			await ruf(app, "/api/sync/markt/ergebnisse", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ ergebnisse: "kaputt" }),
+			}),
+			await ruf(app, "/api/sync/markt/ausgang", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ art: "ende", geprueft: 0, mitPreis: 0, discBelegt: 0, ohneAngebot: 0, fehler: "zugang" }),
+			}),
 			// Der Preisverlauf (Stufe 20f): die eine lesende Route auf price_snapshot.
 			await ruf(app, "/api/releases/1/preise"),
 			await ruf(app, "/api/releases/0/preise"),
@@ -454,7 +472,7 @@ describe("Dichtheitsprüfung", () => {
 		// Der Store laeuft im PSN-Fenster und wirft hier einen Fehlertext
 		// voller Markierungen zurueck (Stufe 21). Sein Statuscode darf in die
 		// Meldung, der Koerper nicht.
-		await createScheduled(psnKaputt, () => igdbMarkiert(), undefined, () => storeKaputt())(ereignis, env, ctx);
+		await createScheduled(psnKaputt, () => igdbMarkiert(), () => storeKaputt())(ereignis, env, ctx);
 
 		// Und der Fall, um den es in 18e geht: Fehlerantworten mit markiertem
 		// Koerper, deren Statuscode jetzt woertlich in Meldung und Verlauf
@@ -475,6 +493,23 @@ describe("Dichtheitsprüfung", () => {
 		expect(istDicht(alles), alles).toMatchObject({ dicht: true });
 	});
 
+	/** Ein Lauf der Action mit einem faelligen Release, damit eBay wirklich gefragt wird. */
+	async function marktLaufKaputt(app: ReturnType<typeof createApp>, status: number) {
+		await env.DB.batch([
+			env.DB.prepare("INSERT OR IGNORE INTO game (id, title, sort_title) VALUES (9001, 'Erfunden', 'erfunden')"),
+			env.DB.prepare("INSERT OR IGNORE INTO release (id, game_id, platform) VALUES (9001, 9001, 'PS4')"),
+			env.DB.prepare("UPDATE release SET markt_geprueft_am = NULL WHERE id = 9001"),
+			env.DB.prepare(
+				"INSERT INTO plan_entry (kind, release_id, origin, status) SELECT 'wunsch', 9001, 'manuell', 'offen' " +
+					"WHERE NOT EXISTS (SELECT 1 FROM plan_entry WHERE release_id = 9001 AND status = 'offen')",
+			),
+		]);
+		const e = await marktLauf((pfad, init) => Promise.resolve(app.request(pfad, init, env)), ebayKaputt(status));
+		// Sonst bewiese der Lauf nichts: eBay muss gefragt und gescheitert sein.
+		expect(e.status === "fehler" || e.uebersprungen > 0, JSON.stringify(e)).toBe(true);
+		return e;
+	}
+
 	it("gibt auf keiner eBay-Route ein Geheimnis heraus - Fehlerpfade (Stufe 17c)", async () => {
 		for (const status of [401, 429, 500]) {
 			const app = createApp(psnKaputt, () => igdbMarkiert(), () => ebayKaputt(status));
@@ -484,7 +519,6 @@ describe("Dichtheitsprüfung", () => {
 				// Die Angebotskorrektur (Stufe 20h) laeuft ueber denselben
 				// Client: Sie holt nach jeder Entscheidung neu ab, und ihre
 				// Meldung landet in der Antwort.
-				await ruf(app, "/api/sync/markt", { method: "POST" }),
 				await ruf(app, "/api/sync/markt/verwerfen", {
 					method: "POST",
 					headers: { "content-type": "application/json" },
@@ -496,6 +530,11 @@ describe("Dichtheitsprüfung", () => {
 					body: JSON.stringify({ releaseId: 1, itemId: "110000000001" }),
 				}),
 				await ruf(app, "/api/sync/markt/verwerfen/1"),
+				// Seit 20i fragt die Action eBay und schreibt ihren Ausgang ueber
+				// die Routen: Was dabei zurueckkommt und im Verlauf landet, muss
+				// genauso dicht sein.
+				JSON.stringify(await marktLaufKaputt(app, status)),
+				(await createRepositories(env.DB, env.NPSSO_KEY).sync.cronVerlauf()).join("\n"),
 			];
 			for (const text of texte) {
 				expect(istDicht(text), `Leck in: ${text.slice(0, 200)}`).toMatchObject({ dicht: true });

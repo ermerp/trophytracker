@@ -17,15 +17,18 @@ import type { EventRepository } from "./events";
  */
 
 /**
- * Nach so vielen Tagen wird ein Release erneut gefragt. Als Text im
+ * Nach so vielen Stunden wird ein Release erneut gefragt. Als Text im
  * Statement, nie als Bind.
  *
  * Taeglich, wie der Gebrauchtpreis seit 20e - und hier mit mehr Grund:
  * Store-Angebote laufen ab. Gemessen am 02.10.2026 standen 18 von 57 Titeln
  * gerade im Angebot, und ein Rabatt, den man zwei Tage spaeter erfaehrt, ist
- * keiner.
+ * keiner. Zwanzig Stunden statt eines Tages seit Stufe 20i, aus demselben
+ * Grund wie beim Markt (`MARKT_FRIST_STUNDEN`): In der Nacht zum 19.10.2026
+ * pruefte der Store um 04:10 neun Releases und lief erst ab 05:30 weiter -
+ * zur Uhrzeit, zu der er am Vortag geprueft hatte.
  */
-export const STORE_FRIST_TAGE = 1;
+export const STORE_FRIST_STUNDEN = 20;
 
 /**
  * Nach so vielen Tagen wird IGDB erneut nach einer Concept-Id gefragt.
@@ -111,7 +114,7 @@ export class StoreRepository {
 					"SELECT r.id AS releaseId, r.game_id AS gameId, g.igdb_id AS igdbId, g.title AS titel, r.platform AS plattform, " +
 					"g.store_concept_id AS conceptId, g.store_concept_am AS conceptAm, r.psn_product_id AS produktId " +
 					"FROM ziele z JOIN release r ON r.id = z.id JOIN game g ON g.id = r.game_id " +
-					`WHERE (r.store_geprueft_am IS NULL OR r.store_geprueft_am < datetime('now', '-${STORE_FRIST_TAGE} days')) ` +
+					`WHERE (r.store_geprueft_am IS NULL OR r.store_geprueft_am < datetime('now', '-${STORE_FRIST_STUNDEN} hours')) ` +
 					"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') " +
 					"ORDER BY r.store_geprueft_am, r.id LIMIT ?",
 			)

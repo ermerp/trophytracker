@@ -14,7 +14,7 @@ unten ausdrücklich als offen.
 
 **Vorgesehene Reihenfolge – ein Arbeitsplan, keine Entscheidung** (Stand 19.10.2026): **Kaufliste
 bündeln** (18k-b, gebaut am 19.10.2026, CPU um den 25.10. messen) → **18m-b** → **Index-Nachtrag** für die
-Auswahlen des Lage-Batches → **20i: Markt in einer GitHub Action** ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md))
+Auswahlen des Lage-Batches → **20i: Markt in einer GitHub Action** (gebaut am 19.10.2026, erster Lauf per `workflow_dispatch`, [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md))
 → **neu bewerten: Nachtläufe bis 05:00 UTC und Cron je Minute** – ohne Markt wird das
 Wartungsfenster fast leer (am 19.10. 21 von 36 Aufrufen Markt, 1 Jahre, 14 Leerlauf), damit
 ändern sich beide Fragen → **20g**. Der Store wird nach dem Probelauf vom 19.10. entschieden. Am

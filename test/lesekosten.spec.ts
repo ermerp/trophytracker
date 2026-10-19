@@ -6,7 +6,6 @@ import { CRON_PSN, CRON_WARTUNG, cronFenster } from "../src/sync/cron";
 import { createExecutionContext } from "cloudflare:test";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
-import { erstelleEbayClient } from "../src/ebay/client";
 import { createApp, createScheduled } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
 import { zaehlendeDb } from "./d1-zaehler";
@@ -14,6 +13,7 @@ import { fakeIgdb } from "./igdb-fake";
 import { fakeFetch, jsonAntwort } from "./psn-fake";
 import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt } from "../src/sync/besitz";
 import { storeOhne } from "./store-fake";
+import { MARKT_JE_POST } from "../src/sync/markt";
 
 /** Das UTC-Datum, mit dem die Staende als "heute" gelten. */
 const HEUTE_UTC = new Date().toISOString().slice(0, 10);
@@ -356,6 +356,56 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(wieder.gelesen).toBeLessThan(1_500);
 
 		await env.DB.prepare("DELETE FROM digital_entitlement").run();
+	});
+
+	it("misst die Routen der Markt-Action als Route (Stufe 20i)", async () => {
+		// Die Lage holt die Action einmal je Lauf: alle faelligen Releases, die
+		// Sammlung, die Sperrliste. Die Schreibroute laeuft einmal je Portion -
+		// bei 431 Faelligen rund 72-mal je Nacht.
+		const app = createApp(
+			() => erstellePsnClient(fakeFetch([]).fetch),
+			() => fakeIgdb([[]], { zugang: null }).client,
+		);
+		const route = async (pfad: string, koerper?: unknown) => {
+			const zaehler = zaehlendeDb(env.DB);
+			const antwort = await app.request(
+				pfad,
+				koerper === undefined
+					? undefined
+					: { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(koerper) },
+				{ ...env, DB: zaehler.db },
+			);
+			return { antwort: (await antwort.json()) as Record<string, unknown>, aufrufe: zaehler.aufrufe(), anweisungen: zaehler.anweisungen(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
+		};
+		const lage = await route("/api/sync/markt/lage");
+		const ziele = lage.antwort.ziele as Array<{ releaseId: number }>;
+		const preis = (cents: number) => ({
+			anbieter: "x",
+			angebot: { titel: "Spiel PS4", preisCents: cents, zustand: "Gut", verkaeufer: null, url: "https://www.ebay.de/itm/1", itemId: "110000000001" },
+		});
+		const portion = await route("/api/sync/markt/ergebnisse", {
+			ergebnisse: ziele.slice(0, MARKT_JE_POST).map((z) => ({
+				releaseId: z.releaseId,
+				rohangebote: 3,
+				angebote: { markt: { preis: preis(1099), beleg: preis(1099) } },
+			})),
+		});
+		console.info({ marktLage: { ...lage, antwort: undefined, ziele: ziele.length }, marktPortion: { ...portion, antwort: undefined } });
+
+		expect(ziele.length).toBeGreaterThan(300);
+		expect(lage.aufrufe).toBe(1);
+		expect(portion.antwort).toMatchObject({ geprueft: MARKT_JE_POST });
+		expect(portion.aufrufe).toBe(2);
+		expect(portion.anweisungen).toBeLessThanOrEqual(50);
+		expect(lage.gelesen).toBeLessThan(5_000);
+		expect(portion.gelesen).toBeLessThan(500);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM price_snapshot"),
+			env.DB.prepare("DELETE FROM market_offer"),
+			env.DB.prepare("DELETE FROM game_event"),
+			env.DB.prepare("UPDATE release SET markt_geprueft_am = NULL, markt_rohangebote = NULL, physical_release_status = 'unbekannt', physical_source = NULL"),
+		]);
 	});
 
 	it("misst die Abfragen der Sammlung einzeln", async () => {
@@ -1402,7 +1452,6 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			await createScheduled(
 				() => erstellePsnClient(fakeFetch([]).fetch),
 				() => fakeIgdb([[]], { zugang: null }).client,
-				() => erstelleEbayClient(null),
 				() => storeOhne(),
 			)({ scheduledTime: Date.now(), cron, noRetry() {} }, { ...env, DB: zaehler.db }, createExecutionContext());
 			return { aufrufe: zaehler.aufrufe(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };

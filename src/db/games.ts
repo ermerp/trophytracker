@@ -2,7 +2,7 @@ import { quelleAusMatch, type EreignisQuelle } from "../domain/ereignis";
 import type { TrophyEintrag } from "../domain/gruppen";
 import type { PlayStatus } from "../domain/play-status";
 import { SUCHE_SQL, suchbar, titelSchluessel, type Plattform } from "../domain/titel";
-import { einzeln, geaendert, type Baustein } from "./baustein";
+import { eins, einzeln, geaendert, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 
 export type ZuOrdnenderRelease = {
@@ -827,10 +827,14 @@ aeenliste haengt
 	 * Treffer nach, statt hier 430 Unterabfragen mitzuschleppen.
 	 */
 	async alleTitel(): Promise<Array<{ spielId: number; titel: string }>> {
-		const { results } = await this.db
-			.prepare("SELECT id AS spielId, title AS titel FROM game")
-			.all<{ spielId: number; titel: string }>();
-		return results;
+		return einzeln(this.db, this.alleTitelBaustein());
+	}
+
+	/** Dieselbe Abfrage als Baustein - fuer die Lage der Markt-Action (Stufe 20i). */
+	alleTitelBaustein(): Baustein<Array<{ spielId: number; titel: string }>> {
+		return eins(this.db.prepare("SELECT id AS spielId, title AS titel FROM game"), (e) =>
+			zeilen<{ spielId: number; titel: string }>(e),
+		);
 	}
 
 	async spielNachIgdbId(igdbId: number): Promise<number | null> {

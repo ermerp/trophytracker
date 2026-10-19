@@ -1,0 +1,56 @@
+name: Gebrauchtpreise
+
+# Der Marktschritt als GitHub Action (Stufe 20i, Abschnitt 7.3 und 16.2).
+#
+# Im Worker blieb kein einzelnes Release unter 10 ms CPU, und 431 Aufrufe
+# passten in keinen Cron-Takt. Hier fragt der Lauf eBay und gleicht ab, ohne
+# CPU-Grenze; geschrieben wird ausschliesslich ueber die Routen des Workers
+# (/api/sync/markt/*), mit dem Service Token 'github-markt' - kein zweiter
+# Zugriffsweg auf die Datenbank.
+#
+# NUR schedule und workflow_dispatch, NIE pull_request oder
+# pull_request_target (Bedingung des Nutzers vom 19.10.2026): Die Secrets
+# duerfen keinem fremden Code begegnen. test/markt-action.spec.ts haelt das.
+#
+# Das Log ist oeffentlich - das Skript gibt nur Zahlen aus.
+
+on:
+  schedule:
+    # 02:17 UTC: genug Puffer fuer Verspaetungen von GitHub bis 05:00 UTC,
+    # und bewusst nicht zur vollen Stunde (dort stauen sich die Cron-Jobs).
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Zwei Laeufe zugleich fragten dieselben Releases doppelt. Anstellen.
+concurrency:
+  group: markt
+  cancel-in-progress: false
+
+jobs:
+  markt:
+    name: Gebrauchtpreise holen
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx esbuild scripts/markt-action.ts --bundle --platform=node --format=esm --outfile=markt-action.mjs --log-level=warning
+
+      - name: Lauf
+        env:
+          APP_URL: https://trophytracker.philipp-ermer-bvb.workers.dev
+          CF_ACCESS_CLIENT_ID: ${{ secrets.MARKT_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.MARKT_ACCESS_CLIENT_SECRET }}
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+        run: node markt-action.mjs

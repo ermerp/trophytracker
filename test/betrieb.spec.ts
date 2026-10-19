@@ -29,7 +29,10 @@ function ruhig(ueber: Partial<BetriebFakten> = {}): BetriebFakten {
 		jetzt: JETZT,
 		stand: {
 			psn: { am: "2026-10-18 05:55", getan: "store", meldung: false, offen: 0 },
-			wartung: { am: "2026-10-18 08:56", getan: "markt", meldung: false, offen: 18 },
+			wartung: { am: "2026-10-18 08:56", getan: "nichts", meldung: false },
+			// Seit 20i laeuft der Markt als Action, mit eigenem Bereich.
+			markt_begonnen: { am: "2026-10-18 02:20", getan: "markt", meldung: false },
+			markt: { am: "2026-10-18 02:26", getan: "markt", meldung: false, offen: 0 },
 		},
 		zugang: { ...ZUGANG, npssoHinterlegtAm: "2026-10-17 10:00:00" },
 		lebensdauerTage: 25,
@@ -50,16 +53,16 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 	describe("Automatik still", () => {
 		it("ist rot nach mehr als 26 Stunden ohne Ausgang, nicht schon bei 26", () => {
 			const stand = ruhig().stand;
-			const genau = ruhig({ jetzt: new Date("2026-10-19T10:56:00Z"), stand: { ...stand, psn: { ...stand.psn!, am: "2026-10-19 05:55" } } });
+			const genau = ruhig({ jetzt: new Date("2026-10-19T10:56:00Z"), stand: { ...stand, psn: { ...stand.psn!, am: "2026-10-19 05:55" }, markt: { ...stand.markt!, am: "2026-10-19 02:26" } } });
 			expect(arten(genau)).not.toContain("automatik_still:rot");
-			const drueber = ruhig({ jetzt: new Date("2026-10-19T10:57:00Z"), stand: { ...stand, psn: { ...stand.psn!, am: "2026-10-19 05:55" } } });
+			const drueber = ruhig({ jetzt: new Date("2026-10-19T10:57:00Z"), stand: { ...stand, psn: { ...stand.psn!, am: "2026-10-19 05:55" }, markt: { ...stand.markt!, am: "2026-10-19 02:26" } } });
 			const w = urteile(drueber);
 			expect(w.map((x) => x.art)).toEqual(["automatik_still"]);
 			expect(w[0].text).toMatch(/^Die Wartung ist seit 26 Stunden nicht gelaufen, zuletzt am 18\.10\. um 10:56\.$/);
 		});
 
 		it("meldet einen fehlenden Bereich, und einen ganz fehlenden Stand nur einmal", () => {
-			expect(arten(ruhig({ stand: { psn: ruhig().stand.psn } }))).toEqual(["automatik_still:rot"]);
+			expect(arten(ruhig({ stand: { psn: ruhig().stand.psn, markt: ruhig().stand.markt } }))).toEqual(["automatik_still:rot"]);
 			const leer = urteile(ruhig({ stand: {} }));
 			expect(leer).toHaveLength(1);
 			expect(leer[0].text).toBe("Die Automatik hat noch keinen Lauf vermerkt.");
@@ -88,7 +91,8 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 			expect(ende.stufe).toBeNull();
 			const spaet = urteile(ruhig({ zugang: ZUGANG, lebensdauerTage: null, jetzt: new Date("2026-11-20T12:00:00Z"), stand: {
 				psn: { am: "2026-11-20 05:55", getan: "store", meldung: false },
-				wartung: { am: "2026-11-20 08:56", getan: "markt", meldung: false },
+				wartung: { am: "2026-11-20 08:56", getan: "nichts", meldung: false },
+				markt: { am: "2026-11-20 02:26", getan: "markt", meldung: false },
 			}, sicherungAm: "2026-11-20T08:00:00Z", syncLaeufe: [] }));
 			expect(spaet.map((w) => `${w.art}:${w.stufe}`)).toEqual(["zugang_endet:kenntnis"]);
 			expect(spaet[0].text).toBe("Der PlayStation-Zugang läuft laut Sony am 28.11. ab (in 8 Tagen).");
@@ -155,7 +159,8 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 		it("vergisst einen Fehlschlag nach 24 Stunden", () => {
 			expect(arten(ruhig({ jetzt: new Date("2026-10-19T03:01:00Z"), stand: {
 				psn: { am: "2026-10-19 02:55", getan: "nichts", meldung: false },
-				wartung: { am: "2026-10-18 08:56", getan: "markt", meldung: false },
+				wartung: { am: "2026-10-18 08:56", getan: "nichts", meldung: false },
+				markt: { am: "2026-10-19 02:26", getan: "markt", meldung: false },
 			}, syncLaeufe: [fehler("2026-10-18")] }))).toEqual([]);
 		});
 	});
@@ -209,17 +214,58 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 		});
 	});
 
-	describe("Fenster nicht fertig (ruht bis 20i)", () => {
-		it("ist nicht scharf - der Rest von heute Nacht erscheint nicht", () => {
-			expect(FENSTERREGEL_SCHARF).toBe(false);
+	describe("Nicht fertig geworden (scharf seit 20i)", () => {
+		it("ist scharf - und schweigt ohne Rest", () => {
+			expect(FENSTERREGEL_SCHARF).toBe(true);
 			expect(urteile(ruhig())).toEqual([]);
 		});
 
-		it("meldet einen Rest erst nach Fensterschluss", () => {
-			const stand = ruhig().stand;
-			expect(fensterOffen(stand, new Date("2026-10-18T08:58:00Z"))).toEqual([]);
+		it("meldet einen Rest im Fenster erst nach Fensterschluss", () => {
+			const stand = { ...ruhig().stand, psn: { am: "2026-10-18 05:55", getan: "store", meldung: false, offen: 7 } };
+			expect(fensterOffen(stand, new Date("2026-10-18T05:58:00Z"))).toEqual([]);
 			const w = fensterOffen(stand, JETZT);
-			expect(w.map((x) => x.text)).toEqual(["Gebrauchtpreise: 18 Einträge blieben bei Fensterschluss offen."]);
+			expect(w.map((x) => x.text)).toEqual(["Store-Preise: 7 Einträge blieben bei Fensterschluss offen."]);
+		});
+
+		it("meldet einen Rest der Markt-Action gleich nach ihrem Ausgang", () => {
+			const stand = { ...ruhig().stand, markt: { am: "2026-10-18 02:26", getan: "markt", meldung: true, offen: 120 } };
+			expect(fensterOffen(stand, JETZT).map((x) => x.text)).toEqual(["Gebrauchtpreise: 120 Einträge blieben nach dem Lauf offen."]);
+		});
+	});
+
+	describe("Markt-Action (Stufe 20i)", () => {
+		const mit = (markt: object) => ruhig({ stand: { ...ruhig().stand, ...markt } });
+
+		it("ist rot, wenn sie seit ueber 26 Stunden keinen Ausgang hat - auch wenn sie jede Nacht beginnt", () => {
+			const w = urteile(
+				mit({
+					markt_begonnen: { am: "2026-10-18 02:20", getan: "markt", meldung: false },
+					markt: { am: "2026-10-17 02:26", getan: "markt", meldung: false, offen: 0 },
+				}),
+			);
+			expect(w.map((x) => `${x.art}:${x.stufe}`)).toContain("automatik_still:rot");
+			expect(w.find((x) => x.art === "automatik_still")?.text).toMatch(/^Die Gebrauchtpreis-Action ist seit 31 Stunden nicht gelaufen/);
+		});
+
+		it("meldet einen Beginn ohne Ausgang nach einer Stunde, nicht vorher", () => {
+			const stand = {
+				markt_begonnen: { am: "2026-10-18 08:50", getan: "markt", meldung: false },
+				markt: { am: "2026-10-17 10:00", getan: "markt", meldung: false, offen: 0 },
+			};
+			expect(arten(mit(stand))).toEqual([]);
+			const spaeter = urteile(ruhig({ jetzt: new Date("2026-10-18T09:51:00Z"), stand: { ...ruhig().stand, ...stand } }));
+			expect(spaeter.map((x) => x.text)).toContain("Der Lauf der Gebrauchtpreis-Action von 10:50 ist ohne Ausgang geblieben.");
+		});
+
+		it("meldet einen Ausgang mit Meldung zur Kenntnis", () => {
+			const w = urteile(mit({ markt: { am: "2026-10-18 02:26", getan: "markt", meldung: true, offen: 0 } }));
+			expect(w.map((x) => `${x.art}:${x.stufe}`)).toEqual(["meldung:kenntnis"]);
+		});
+
+		it("ist rot, solange sie noch nie gelaufen ist", () => {
+			const { markt: _m, markt_begonnen: _b, ...ohne } = ruhig().stand;
+			const w = urteile(ruhig({ stand: ohne }));
+			expect(w.map((x) => x.text)).toEqual(["Die Gebrauchtpreis-Action hat noch keinen Lauf vermerkt."]);
 		});
 	});
 

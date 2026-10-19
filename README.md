@@ -227,6 +227,16 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
    | `BACKUP_REPO_TOKEN` | Fine-grained PAT, nur auf das private Backup-Repo | 8 | **nach einem Jahr** |
    | `CF_ACCESS_CLIENT_ID` | Service Token `github-backup` für die Backup-Action | 8 | **nach einem Jahr** |
    | `CF_ACCESS_CLIENT_SECRET` | dasselbe Token, Secret-Teil | 8 | **nach einem Jahr** |
+   | `MARKT_ACCESS_CLIENT_ID` | Service Token `github-markt` für die Gebrauchtpreis-Action | 20i | **nach einem Jahr** |
+   | `MARKT_ACCESS_CLIENT_SECRET` | dasselbe Token, Secret-Teil | 20i | **nach einem Jahr** |
+   | `EBAY_CLIENT_ID` | eBay App ID für die Gebrauchtpreis-Action | 20i | nein |
+   | `EBAY_CLIENT_SECRET` | eBay Cert ID, dasselbe Keyset | 20i | nein |
+
+   Die eBay-Werte und `github-markt` liegen nur in der Action
+   `.github/workflows/markt.yml`, und die läuft **nur über `schedule` und
+   `workflow_dispatch`, nie über `pull_request` oder `pull_request_target`** –
+   die Secrets dürfen keinem fremden Code begegnen
+   (`test/markt-action.spec.ts` hält das fest).
 
    Die drei ablaufenden Werte sind der wahrscheinlichste Grund, aus dem die
    Sicherung eines Tages unbemerkt ausbleibt. `BACKUP_REPO_TOKEN` ist ein
@@ -490,6 +500,7 @@ eines zurückziehen lässt, ohne das andere zu treffen.
 |---|---|---|
 | `claude-code` | Prüfungen gegen die Produktion nach einem Deploy | `.dev.vars` (lokal, gitignored) |
 | `github-backup` | Backup-Action ab Stufe 8 | GitHub Secrets `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` |
+| `github-markt` | Gebrauchtpreis-Action ab Stufe 20i | GitHub Secrets `MARKT_ACCESS_CLIENT_ID` / `MARKT_ACCESS_CLIENT_SECRET` |
 
 Dazu ein **GitHub**-Token, der mit Cloudflare nichts zu tun hat:
 
@@ -715,17 +726,22 @@ Beide laufen **live im Worker, im Moment des Scannens** – upcitemdb drosselt h
 wird aber nur selten gefragt, und ein Fehler dort heißt schlicht „kein Titel".
 
 Die eBay-Zugangsdaten (App ID und Cert ID aus einem **Production**-Keyset unter
-https://developer.ebay.com/my/keys) liegen an zwei getrennten Orten – dieselben
-zwei Werte, zwei eigene Ablagen:
+https://developer.ebay.com/my/keys) liegen an drei getrennten Orten – dieselben
+zwei Werte, drei eigene Ablagen. Die dritte trägt seit Stufe 20i die
+Gebrauchtpreise, die als GitHub Action laufen (siehe [Einrichtung](#einrichtung-eines-eigenen-kontos)):
 
 ```bash
 # 1. lokal, für `wrangler dev` – in .dev.vars, niemals ins Repository
 EBAY_CLIENT_ID=…
 EBAY_CLIENT_SECRET=…
 
-# 2. für den laufenden Worker (Produktion)
+# 2. für den laufenden Worker (Produktion): Scanner und Neuabruf eines Angebots
 npx wrangler secret put EBAY_CLIENT_ID
 npx wrangler secret put EBAY_CLIENT_SECRET
+
+# 3. für die Gebrauchtpreis-Action: GitHub Secrets
+gh secret set EBAY_CLIENT_ID
+gh secret set EBAY_CLIENT_SECRET
 ```
 
 Fehlen sie, antwortet nur `GET /api/scan/:ean/online` mit `503`; Scanner und

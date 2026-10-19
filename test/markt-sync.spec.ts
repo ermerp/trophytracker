@@ -6,7 +6,10 @@ import { erstelleEbayClient } from "../src/ebay/client";
 import { erstellePsnClient } from "../src/psn/client";
 import { fakeFetch } from "./psn-fake";
 import { titelSchluessel } from "../src/domain/titel";
-import { marktSchritt } from "../src/sync/markt";
+import { marktLauf } from "../src/sync/markt-lauf";
+import type { EbayClient } from "../src/ebay/client";
+import { MARKT_JE_POST } from "../src/sync/markt";
+import { zaehlendeDb } from "./d1-zaehler";
 
 /**
  * Gebrauchtpreise und Disc-Nachweis aus eBay (7.3, Stufe 20).
@@ -109,7 +112,21 @@ const verlauf = async (releaseId: number, kanal?: string) =>
 			.all()
 	).results;
 
-describe("marktSchritt", () => {
+/**
+ * Ein Lauf der Markt-Action gegen die ECHTEN Routen (Stufe 20i): Seit der
+ * Schritt eine Action ist, schreibt er nur noch ueber den Worker - gemessen
+ * wird deshalb der ganze Weg, nicht das Repository allein.
+ */
+const lauf = (ebay: EbayClient, jePost?: number) => {
+	const app = createApp(
+		() => erstellePsnClient(fakeFetch([]).fetch),
+		() => ({ konfiguriert: () => false }) as never,
+		() => ebay,
+	);
+	return marktLauf((pfad, init) => Promise.resolve(app.request(pfad, init, env)), ebay, { jePost });
+};
+
+describe("Markt-Lauf der Action (Stufe 20i)", () => {
 	beforeEach(async () => {
 		for (const t of ["price_snapshot", "market_offer_verworfen", "market_offer", "game_event", "trophy_progress", "release", "game"]) {
 			await env.DB.prepare(`DELETE FROM ${t}`).run();
@@ -117,7 +134,7 @@ describe("marktSchritt", () => {
 		gerufen = [];
 	});
 
-	it("offen zaehlt, was in der Auswahl faellig ist - nicht, was nie gefragt wird (Stufe 18g)", async () => {
+	it("prueft alle Faelligen in einem Lauf, in Portionen - und offen zaehlt nur die Auswahl", async () => {
 		await luecke(1, "Bloodborne");
 		await luecke(2, "Killzone 3");
 		await luecke(3, "Uncharted 2");
@@ -125,22 +142,22 @@ describe("marktSchritt", () => {
 		// genau so etwas als "offen" - 59 Releases, jede Nacht dieselbe Zahl.
 		await luecke(4, "Gravity Rush", "nein");
 
-		const erster = await marktSchritt(repos(), ebayMit({}), 2);
-		expect(erster.geprueft).toBe(2);
-		expect(erster.nochOffen).toBe(1);
+		const e = await lauf(ebayMit({}), 2);
+		expect(e).toMatchObject({ status: "erfolg", geprueft: 3, nochOffen: 0, portionen: 2 });
+	});
 
-		const zweiter = await marktSchritt(repos(), ebayMit({}), 2);
-		expect(zweiter.geprueft).toBe(1);
-		expect(zweiter.nochOffen).toBe(0);
-
-		// Ein Tag spaeter ist ein gepruefter Release wieder faellig.
-		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-2 days') WHERE id = 1").run();
+	it("macht nach 20 Stunden wieder faellig, nicht erst nach 24 (Stufe 20i)", async () => {
+		await luecke(1, "Bloodborne");
+		await lauf(ebayMit({}));
+		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-19 hours') WHERE id = 1").run();
+		expect(await repos().markt.faelligeAnzahl()).toBe(0);
+		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-21 hours') WHERE id = 1").run();
 		expect(await repos().markt.faelligeAnzahl()).toBe(1);
 	});
 
 	it("kodiert Filter und Aspekt - unkodiert wuerde eBay sie stillschweigend ignorieren", async () => {
 		await luecke(1, "Bloodborne");
-		await marktSchritt(repos(), ebayMit({}));
+		await lauf(ebayMit({}));
 		expect(gerufen).toHaveLength(2);
 		// %7B = {, %7C = |, %3A = :
 		expect(gerufen[0]).toContain("conditionIds%3A%7B5000%7C4000");
@@ -150,9 +167,7 @@ describe("marktSchritt", () => {
 
 	it("nimmt den Haendlerpreis, auch wenn der Markt guenstiger ist", async () => {
 		await luecke(1, "Bloodborne");
-		const e = await marktSchritt(
-			repos(),
-			ebayMit({ haendler: [angebot("Bloodborne", "12.77", "rebuy-shop")], markt: [angebot("Bloodborne PS4", "10.99")] }),
+		const e = await lauf(ebayMit({ haendler: [angebot("Bloodborne", "12.77", "rebuy-shop")], markt: [angebot("Bloodborne PS4", "10.99")] }),
 		);
 		expect(e).toMatchObject({ status: "erfolg", geprueft: 1, mitPreis: 1, discBelegt: 1 });
 		// Beide Kanaele stehen in der Tabelle; die Anzeige entscheidet.
@@ -176,9 +191,9 @@ describe("marktSchritt", () => {
 
 	it("haeuft keine Zeilen an - ein zweiter Lauf trifft dieselbe Zeile", async () => {
 		await luecke(1, "Bloodborne");
-		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
+		await lauf(ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
 		await fristAbgelaufen();
-		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "9.50")] }), 10);
+		await lauf(ebayMit({ markt: [angebot("Bloodborne PS4", "9.50")] }));
 		const zeilen = await angebote();
 		expect(zeilen).toHaveLength(1);
 		expect(zeilen[0]).toMatchObject({ kanal: "markt", price_cents: 950, source_product_id: "markt:1" });
@@ -186,20 +201,18 @@ describe("marktSchritt", () => {
 
 	it("schreibt den Verlauf nur bei geaendertem Preis, je Kanal getrennt", async () => {
 		await luecke(1, "Bloodborne");
-		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
+		await lauf(ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
 		await fristAbgelaufen();
-		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
+		await lauf(ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
 		expect(await verlauf(1, "markt")).toHaveLength(1);
 		await fristAbgelaufen();
-		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "8.00")] }));
+		await lauf(ebayMit({ markt: [angebot("Bloodborne PS4", "8.00")] }));
 		expect(await verlauf(1, "markt")).toMatchObject([{ price_cents: 1099 }, { price_cents: 800 }]);
 
 		// Ein unveraenderter Haendlerpreis darf die Marktreihe nicht am
 		// Schreiben hindern und umgekehrt: Die Pruefung laeuft je Kanal.
 		await fristAbgelaufen();
-		await marktSchritt(
-			repos(),
-			ebayMit({ haendler: [angebot("Bloodborne", "12.77", "rebuy-shop")], markt: [angebot("Bloodborne PS4", "8.00")] }),
+		await lauf(ebayMit({ haendler: [angebot("Bloodborne", "12.77", "rebuy-shop")], markt: [angebot("Bloodborne PS4", "8.00")] }),
 		);
 		expect(await verlauf(1, "markt")).toHaveLength(2);
 		expect(await verlauf(1, "haendler")).toMatchObject([{ price_cents: 1277 }]);
@@ -207,7 +220,7 @@ describe("marktSchritt", () => {
 
 	it("setzt unbekannt auf ja und protokolliert es mit Quelle feed und Detail ebay", async () => {
 		await luecke(1, "Bloodborne");
-		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
+		await lauf(ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
 		expect(await release(1)).toMatchObject({ s: "ja", q: "ebay" });
 		const ereignis = await env.DB.prepare(
 			"SELECT source, kind, old_value, new_value, detail FROM game_event WHERE kind = 'disc_fassung_belegt'",
@@ -223,7 +236,7 @@ describe("marktSchritt", () => {
 
 	it("fasst ein bestehendes nein NIE an - auch nicht mit einem Treffer", async () => {
 		await luecke(1, "Bloodborne", "nein");
-		const e = await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
+		const e = await lauf(ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
 		// 'nein' ist nicht in v_luecken, also wird es gar nicht erst gefragt.
 		expect(e.geprueft).toBe(0);
 		expect(await release(1)).toMatchObject({ s: "nein" });
@@ -233,7 +246,7 @@ describe("marktSchritt", () => {
 	it("laesst ein bestehendes ja stehen, holt aber seinen Preis", async () => {
 		await luecke(1, "Bloodborne", "ja");
 		await env.DB.prepare("UPDATE release SET physical_source = 'igdb' WHERE id = 1").run();
-		const e = await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
+		const e = await lauf(ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
 		expect(e).toMatchObject({ geprueft: 1, mitPreis: 1, discBelegt: 0 });
 		// Die Quelle bleibt igdb - nicht ueberschreiben, was schon belegt ist.
 		expect(await release(1)).toMatchObject({ s: "ja", q: "igdb" });
@@ -246,7 +259,7 @@ describe("marktSchritt", () => {
 	 */
 	it("belegt die Disc-Fassung mit einer losen Disc, nimmt sie aber nicht als Preis", async () => {
 		await luecke(1, "Bloodborne");
-		const e = await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4 Nur Disc", "3.98")] }));
+		const e = await lauf(ebayMit({ markt: [angebot("Bloodborne PS4 Nur Disc", "3.98")] }));
 
 		// Belegt ist sie - eine lose Disc ist der staerkste Hinweis darauf,
 		// dass es die Disc-Fassung gibt.
@@ -260,9 +273,7 @@ describe("marktSchritt", () => {
 
 	it("nimmt bei einer losen und einer ganzen Disc die ganze als Preis", async () => {
 		await luecke(1, "Bloodborne");
-		await marktSchritt(
-			repos(),
-			ebayMit({ markt: [angebot("Bloodborne PS4 Nur Disc", "3.98"), angebot("Bloodborne PS4", "12.99")] }),
+		await lauf(ebayMit({ markt: [angebot("Bloodborne PS4 Nur Disc", "3.98"), angebot("Bloodborne PS4", "12.99")] }),
 		);
 		expect(await angebote()).toMatchObject([{ kanal: "markt", price_cents: 1299 }]);
 		expect(await verlauf(1, "markt")).toMatchObject([{ price_cents: 1299 }]);
@@ -270,7 +281,7 @@ describe("marktSchritt", () => {
 
 	it("haelt fest, dass eBay gar nichts kennt - der Hinweis fuer Block B", async () => {
 		await luecke(1, "Bloodborne");
-		const e = await marktSchritt(repos(), ebayMit({}));
+		const e = await lauf(ebayMit({}));
 		expect(e).toMatchObject({ geprueft: 1, mitPreis: 0, discBelegt: 0, ohneAngebot: 1 });
 		expect(await release(1)).toMatchObject({ s: "unbekannt", roh: 0 });
 	});
@@ -278,16 +289,16 @@ describe("marktSchritt", () => {
 	it("unterscheidet 'nichts gefunden' von 'nichts Geprueftes gefunden'", async () => {
 		await luecke(1, "Brothers", "unbekannt", "PS3");
 		// Ein Angebot, das den Abgleich nicht uebersteht: roh ist 1, nicht 0.
-		const e = await marktSchritt(repos(), ebayMit({ markt: [angebot("Brothers in Arms: Hell's Highway PS3", "6.99")] }));
+		const e = await lauf(ebayMit({ markt: [angebot("Brothers in Arms: Hell's Highway PS3", "6.99")] }));
 		expect(e).toMatchObject({ geprueft: 1, mitPreis: 0, ohneAngebot: 0 });
 		expect(await release(1)).toMatchObject({ s: "unbekannt", roh: 1 });
 	});
 
 	it("fragt ein geprueftes Release nicht noch einmal", async () => {
 		await luecke(1, "Bloodborne");
-		await marktSchritt(repos(), ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
+		await lauf(ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] }));
 		const zweiter = ebayMit({ markt: [angebot("Bloodborne PS4", "10.99")] });
-		expect((await marktSchritt(repos(), zweiter)).geprueft).toBe(0);
+		expect((await lauf(zweiter)).geprueft).toBe(0);
 		expect(gerufen).toHaveLength(0);
 	});
 
@@ -296,9 +307,7 @@ describe("marktSchritt", () => {
 		// Beide Kanaele treffen - das sind zwei Zeilen zu EINEM Release. Die
 		// erste Fassung zaehlte die Zeilen und meldete nach dem ersten
 		// Durchlauf in der Produktion 323, wo 239 Releases einen Preis hatten.
-		await marktSchritt(
-			repos(),
-			ebayMit({ haendler: [angebot("Bloodborne", "12.77", "rebuy-shop")], markt: [angebot("Bloodborne PS4", "10.99")] }),
+		await lauf(ebayMit({ haendler: [angebot("Bloodborne", "12.77", "rebuy-shop")], markt: [angebot("Bloodborne PS4", "10.99")] }),
 		);
 		expect(await angebote()).toHaveLength(2);
 		expect(await repos().markt.stand()).toMatchObject({ mitPreis: 1, geprueft: 1 });
@@ -306,9 +315,110 @@ describe("marktSchritt", () => {
 
 	it("bleibt ohne Zugangsdaten stumm, statt zu werfen", async () => {
 		await luecke(1, "Bloodborne");
-		const e = await marktSchritt(repos(), erstelleEbayClient(null));
+		const e = await lauf(erstelleEbayClient(null));
 		expect(e.status).toBe("fehler");
 		expect(e.geprueft).toBe(0);
+	});
+});
+
+describe("Routen der Markt-Action (Stufe 20i)", () => {
+	const app = createApp(
+		() => erstellePsnClient(fakeFetch([]).fetch),
+		() => ({ konfiguriert: () => false }) as never,
+		() => erstelleEbayClient(null),
+	);
+	const sende = (pfad: string, koerper: unknown, e: typeof env = env) =>
+		app.request(pfad, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(koerper) }, e);
+	const urteil = (titel: string, cents: number, verkaeufer: string | null = null) => ({
+		anbieter: "egal",
+		angebot: { titel, preisCents: cents, zustand: "Gut", verkaeufer, url: "https://www.ebay.de/itm/1", itemId: "110000000001" },
+	});
+	const ergebnis = (releaseId: number, cents = 1099) => ({
+		releaseId,
+		rohangebote: 3,
+		angebote: {
+			haendler: { preis: urteil("Spiel PS4", cents + 100, "rebuy-shop"), beleg: urteil("Spiel PS4", cents + 100, "rebuy-shop") },
+			markt: { preis: urteil("Spiel PS4", cents), beleg: urteil("Spiel PS4", cents) },
+		},
+	});
+	const stand = async () => (await repos().sync.cronStand()) as Record<string, { getan: string; meldung: boolean; offen?: number }>;
+
+	beforeEach(async () => {
+		for (const t of ["price_snapshot", "market_offer_verworfen", "market_offer", "game_event", "trophy_progress", "release", "game", "app_setting"]) {
+			await env.DB.prepare(`DELETE FROM ${t}`).run();
+		}
+	});
+
+	it("nimmt die Disc-Fassung aus der Datenbank und den Anbieter aus dem Verkaeufer, nicht aus dem Koerper", async () => {
+		await luecke(1, "Bloodborne", "nein");
+		await luecke(2, "Killzone 3", "unbekannt");
+		const a = await sende("/api/sync/markt/ergebnisse", { ergebnisse: [ergebnis(1), ergebnis(2), ergebnis(99)] });
+		expect(a.status).toBe(200);
+		expect(await a.json()).toMatchObject({ geprueft: 2, discBelegt: 1, unbekannt: 1 });
+		// Ein 'nein' setzt nur der Nutzer - auch ein Koerper mit Beleg aendert es nicht.
+		expect(await release(1)).toMatchObject({ s: "nein" });
+		expect(await release(2)).toMatchObject({ s: "ja", q: "ebay" });
+		const anbieter = (await env.DB.prepare("SELECT DISTINCT anbieter FROM market_offer ORDER BY anbieter").all()).results;
+		expect(anbieter).toEqual([{ anbieter: "eBay" }, { anbieter: "rebuy" }]);
+	});
+
+	it("weist ab, was kein Ergebnis ist - und mehr als eine Portion", async () => {
+		const kaputt = [
+			{ ergebnisse: [] },
+			{ ergebnisse: Array.from({ length: MARKT_JE_POST + 1 }, (_, i) => ergebnis(i + 1)) },
+			{ ergebnisse: [{ ...ergebnis(1), angebote: { andere: { preis: null, beleg: null } } }] },
+			{ ergebnisse: [{ ...ergebnis(1), angebote: { markt: { preis: { ...urteil("x", 100), angebot: { ...urteil("x", 100).angebot, url: "http://x" } }, beleg: null } } }] },
+			{ ergebnisse: [{ ...ergebnis(1), angebote: { markt: { preis: { ...urteil("x", 100), angebot: { ...urteil("x", 100).angebot, itemId: "abc" } }, beleg: null } } }] },
+			{ ergebnisse: [{ ...ergebnis(1), angebote: { markt: { preis: urteil("x", -5), beleg: null } } }] },
+			{ ergebnisse: [{ ...ergebnis(1), rohangebote: 1.5 }] },
+		];
+		for (const k of kaputt) expect((await sende("/api/sync/markt/ergebnisse", k)).status, JSON.stringify(k).slice(0, 80)).toBe(400);
+	});
+
+	it("bleibt auch im schlimmsten Fall unter 50 Anweisungen je POST, in zwei D1-Aufrufen", async () => {
+		// Jedes Release mit beiden Kanaelen, zwei Verlaufspunkten und einem
+		// Statuswechsel: sieben Anweisungen je Release.
+		for (let i = 1; i <= MARKT_JE_POST; i++) await luecke(i, `Spiel ${i}`);
+		const zaehler = zaehlendeDb(env.DB);
+		const a = await sende(
+			"/api/sync/markt/ergebnisse",
+			{ ergebnisse: Array.from({ length: MARKT_JE_POST }, (_, i) => ergebnis(i + 1)) },
+			{ ...env, DB: zaehler.db },
+		);
+		expect(await a.json()).toMatchObject({ geprueft: MARKT_JE_POST, discBelegt: MARKT_JE_POST });
+		expect(zaehler.anweisungen()).toBeLessThanOrEqual(50);
+		expect(zaehler.aufrufe()).toBe(2);
+	});
+
+	it("vermerkt den Beginn unter eigenem Bereich und den Ausgang mit Zeile - die Meldung als Code", async () => {
+		await sende("/api/sync/markt/ausgang", { art: "begonnen" });
+		expect((await stand()).markt_begonnen).toMatchObject({ getan: "markt", meldung: false });
+		expect((await stand()).markt).toBeUndefined();
+		expect(await repos().sync.cronVerlauf()).toEqual([]);
+
+		const a = await sende("/api/sync/markt/ausgang", { art: "ende", geprueft: 4, mitPreis: 3, discBelegt: 1, ohneAngebot: 1, fehler: "ratenlimit" });
+		expect(await a.json()).toMatchObject({ status: "fehler", meldung: "Das eBay-Tageskontingent ist erschöpft." });
+		expect((await stand()).markt).toMatchObject({ getan: "markt", meldung: true, offen: 0 });
+		expect((await repos().sync.cronVerlauf())[0]).toMatch(
+			/ cron: markt bereich=action markt=fehler geprueft=4 preis=3 disc=1 ohneAngebot=1 offen=0 meldung="Das eBay-Tageskontingent ist erschöpft\."$/,
+		);
+
+		// Fremdtext kommt nicht in den Verlauf - er koennte ein Geheimnis zitieren.
+		const frei = await sende("/api/sync/markt/ausgang", { art: "ende", geprueft: 0, mitPreis: 0, discBelegt: 0, ohneAngebot: 0, fehler: "Token abc123 abgelehnt" });
+		expect(frei.status).toBe(400);
+	});
+
+	it("schreibt bei einem Ratenlimit mitten im Lauf, was schon gefragt ist, und laesst den Rest faellig", async () => {
+		for (let i = 1; i <= 3; i++) await luecke(i, `Spiel ${i}`);
+		let anfragen = 0;
+		const hole = async (eingabe: RequestInfo | URL): Promise<Response> => {
+			if (String(eingabe).includes("oauth2/token")) return Response.json({ access_token: "t", expires_in: 7200 });
+			// Zwei Anfragen je Release: das dritte Release trifft das Limit.
+			return ++anfragen > 4 ? new Response("", { status: 429 }) : Response.json({ itemSummaries: [] });
+		};
+		const ebay = erstelleEbayClient({ clientId: "id", clientSecret: { offenlegen: () => "g" } as never }, hole as typeof fetch);
+		const e = await lauf(ebay, 1);
+		expect(e).toMatchObject({ status: "fehler", geprueft: 2, nochOffen: 1, meldung: "Das eBay-Tageskontingent ist erschöpft." });
 	});
 });
 
@@ -349,7 +459,7 @@ describe("POST /api/sync/markt/verwerfen", () => {
 	/** Der erste Lauf, damit ein Angebot ueberhaupt dasteht. */
 	async function ersterLauf(jeKanal: { haendler?: Angebot[]; markt?: Angebot[] }) {
 		await luecke(1, "Bloodborne");
-		await marktSchritt(repos(), ebayMit(jeKanal));
+		await lauf(ebayMit(jeKanal));
 	}
 
 	it("nimmt das naechstguenstigste und laesst die alten Punkte stehen", async () => {
@@ -421,7 +531,7 @@ describe("POST /api/sync/markt/verwerfen", () => {
 	it("fasst ein bestehendes ja NIE an - ein Verwerfen setzt es nicht zurueck", async () => {
 		const einziges = angebot("Bloodborne PS4", "6.98");
 		await luecke(1, "Bloodborne");
-		await marktSchritt(repos(), ebayMit({ markt: [einziges] }));
+		await lauf(ebayMit({ markt: [einziges] }));
 		// Der erste Lauf hat 'ja' gesetzt (Quelle ebay).
 		expect(await release(1)).toMatchObject({ s: "ja", q: "ebay" });
 

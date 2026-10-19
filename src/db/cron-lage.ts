@@ -2,7 +2,6 @@ import type { Baustein } from "./baustein";
 import type { CredentialAnzeige, CredentialsRepository } from "./credentials";
 import type { GamesRepository } from "./games";
 import type { IgdbRepository } from "./igdb";
-import type { MarktRepository, ZuPruefen as MarktZiel } from "./markt";
 import type { StoreRepository, ZuPruefen as StoreZiel } from "./store";
 import { CRON_SCHLUESSEL, verlaufAus, type CronMarke, type SyncLauf, type SyncRepository } from "./sync";
 import type { TrophaeenRepository, ZuFuellen } from "./trophaeen";
@@ -46,7 +45,6 @@ export type LageOptionen = {
 	haengtNachStunden: number;
 	rohantwortenLaeufe: number;
 	storeJeAufruf: number;
-	marktJeAufruf: number;
 	igdbJeAufruf: number;
 	auffrischFristTage: number;
 };
@@ -68,7 +66,6 @@ export type CronLage = {
 		geloescht: number;
 		zumAuffrischen: Array<{ id: number; igdb_id: number }>;
 		zurDisc: Array<{ id: number; igdb_id: number }>;
-		marktZiele: MarktZiel[];
 	};
 };
 
@@ -79,7 +76,6 @@ type Quellen = {
 	store: StoreRepository;
 	games: GamesRepository;
 	igdb: IgdbRepository;
-	markt: MarktRepository;
 };
 
 export class CronLageRepository {
@@ -131,7 +127,6 @@ export class CronLageRepository {
 					geloescht: merke(this.q.sync.rohantwortenAufraeumenBaustein(o.rohantwortenLaeufe)),
 					auffrischen: merke(this.q.igdb.zumAuffrischenBaustein(o.igdbJeAufruf, o.auffrischFristTage)),
 					disc: merke(this.q.igdb.zurDiscPruefungBaustein(o.igdbJeAufruf)),
-					markt: merke(this.q.markt.zuPruefenBaustein(o.marktJeAufruf)),
 				}
 			: null;
 
@@ -170,7 +165,6 @@ export class CronLageRepository {
 							geloescht: wert<number>(w.geloescht),
 							zumAuffrischen: wert<Array<{ id: number; igdb_id: number }>>(w.auffrischen),
 							zurDisc: wert<Array<{ id: number; igdb_id: number }>>(w.disc),
-							marktZiele: wert<MarktZiel[]>(w.markt),
 						},
 					}
 				: {}),

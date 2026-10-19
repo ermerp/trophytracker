@@ -55,7 +55,9 @@ Kosten seit 18j: fünf geschriebene Zeilen je Aufruf samt Verlauf und Stand, **3
 
 **Die Fakten unter `cron_stand` (Stufe 18j).** Der Ausgangs-Batch legt neben der Textzeile Zahlen ab:
 je Bereich den letzten Ausgang (`am`, `getan`, `meldung` als Wahrheitswert, `offen` beim Markt und
-Store) und die zuletzt gemeldete Kette ohne Ausgang (`ohneAusgang`: Anzahl, von, bis, Bereich,
+Store; seit 20i schreibt die Markt-Action ihren Ausgang als Bereich `markt` und ihren Beginn getrennt
+als `markt_begonnen`, über `POST /api/sync/markt/ausgang`, mit einer Zeile `cron: markt bereich=action …`
+im selben Verlauf) und die zuletzt gemeldete Kette ohne Ausgang (`ohneAusgang`: Anzahl, von, bis, Bereich,
 `gemeldetAm`). Das ist die Grundlage der Betriebswarnungen ([16.2](16-2-cpu-und-betrieb.md)): **Die
 Fakten schreibt der Cron, das Urteil entsteht beim Lesen** – die Textzeile ist Anzeige, kein Datum,
 und sie zu zerlegen bräche beim nächsten Umbau. Geschrieben wird mit `json_set` beim eigenen Bereich,
