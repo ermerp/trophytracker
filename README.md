@@ -357,7 +357,7 @@ stehen beide Fenster, der letzte automatische Abruf und der **Verlauf der letzte
 zwanzig Aufrufe**; gleichartige Arbeit ist zu einer Zeile verdichtet, der
 Fortschritt als Spanne (`sync ×5 offset=100→400`). Eine ganze Nacht sind
 normalerweise sieben Zeilen. **Was davon zählt, meldet das Dashboard selbst**
-(Betriebswarnungen, [16.2](docs/spec/16-2-cpu-und-betrieb.md)): rot, wenn ein Fenster
+(Betriebswarnungen, [16.2](docs/spec/16-2-betriebswarnungen.md)): rot, wenn ein Fenster
 über 26 Stunden still war, der Zugang abgelaufen ist oder bald endet, der Sync zwei
 Nächte hintereinander scheiterte oder die Sicherung zu alt ist; zur Kenntnis hinter
 der Glocke, was nachts schiefging, ohne dass etwas stillsteht.
