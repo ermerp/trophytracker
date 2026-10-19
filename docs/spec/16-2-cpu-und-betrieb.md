@@ -80,9 +80,29 @@ Produktion rund **2 590** Zeilen je Wartungsaufruf, **in jedem**, nicht nur im L
 18.10.2026, unten) – bei 180 Aufrufen rund **466 000** je Nacht statt 93 000. **Es hilft nur
 Schritten, die je Aufruf unter 10 ms bleiben** – also erst nach den Änderungen oben.
 
-**Zu entscheiden:** je Schritt, welcher Weg – Abfragen bündeln, kleinere Portion mit Cron je Minute,
-Wortindex als Zeile, oder GitHub Actions – und damit die Portion des Store (18l oben). Für GitHub Actions ist vorab zu prüfen, ob PSN die
-Adressen von GitHub abweist, wie es für die Kaufliste und Cloudflares Adressen vermutet wird (7.7).
+**Budget arbeitender Aufrufe** (Entscheidung des Nutzers vom 19.10.2026, **Arbeitshypothese**):
+Median ≤ 8 ms, P90 ≤ 10 ms über die Standorte einer Nacht, kein Aufruf über 15 ms; für den Leerlauf
+gilt weiter Median um 5, P99 unter 10. Grundlage, gemessen in den Nächten 18. und 19.10.2026: Der
+Leerlauf allein liegt im Median bei 5,8 ms (n = 41), dieselbe Arbeit kostet je Standort das Doppelte
+bis 2,5-Fache – P99 unter 10 ließe praktisch keine Arbeit zu. Bewusst eine Wette auf die Duldung
+„gelegentlicher" Überschreitungen; **neu bewertet am 02.11.2026** mit den Abbruchdaten der zwei
+Wochen dazwischen ([10.1](10-1-cron.md)).
+
+**Die Wege je Schritt** (Entscheidungen des Nutzers vom 19.10.2026), gerechnet mit der kleinsten
+sinnvollen Portion gegen dieses Budget:
+
+- **Markt → GitHub Action**, als Stufe 20i: kein einzelnes Release bleibt unter 10 ms, und 431
+  Aufrufe passen in keinen Takt. Wie die Action schreibt – Worker-Route in Portionen oder direkt
+  über die D1-Schnittstelle –, ist **offen** (Plan vom 19.10.2026).
+- **Kaufliste → bündeln wie 18k**, als nächster Nachtrag vor 18m-b: je Eintrag zwei bis drei
+  D1-Aufrufe nacheinander, bis zu 150 Abfragen je Aufruf gegen die dokumentierten 50.
+- **Store → offen bis nach dem Probelauf, jetzt zu entscheiden:** Ein Release je Aufruf ist die
+  Untergrenze, rund die Hälfte läge über 10 ms. Ein Probelauf aus GitHub Actions am 19.10.2026
+  (echter Store-Client, ein öffentliches Concept, zwei Anfragen) wurde **angenommen**: 200 in 0,4
+  und 0,6 s, Preis gelesen. Wie Sony auf 80 bis 240 Anfragen am Stück antwortet, sagt er nicht.
+- Sync, Spielzeit, Level, Jahre und IGDB bleiben im Worker. Mit 25 Titeln je Seite blieben Sync und
+  Spielzeit im Budget; der Sync-Abschluss (11–14 ms) und das Level (9–21 ms) sind ungeteilt
+  darüber – Ursache nicht untersucht.
 
 **Die Reihenfolge der Nachträge** (Entscheidung des Nutzers vom 16.10.2026), jeder einzeln
 zurücknehmbar und einzeln gemessen: **18i** Token-Erneuerung im PSN-Leerlauf (gebaut, 10.1
@@ -104,7 +124,7 @@ Bestand nicht nachgesehen). **Die kürzere Frist gilt für beide.** Jede Frist *
 fällig; vorgeschlagen sind 20. Die Rechnung hängt an der Fensterlage und gehört mit dem Punkt
 „Nachtläufe bis 05:00 UTC" unten neu geprüft.
 
-**Danach, als eigener Nachtrag: der Marktschritt** – an der Regel „Abgleiche bereiten den Bestand
+**Für die Action übernommen, nicht mehr als eigener Nachtrag: der Marktschritt** – an der Regel „Abgleiche bereiten den Bestand
 einmal vor" ausgerichtet: Titel einmal zerlegen statt je Prüfung, ein Wortindex je Aufruf statt
 jedes Angebot gegen alle Spiele (Vorgabe des Nutzers vom 16.10.2026). Dazu gehört die **Auswahl,
 die im Leerlauf 596 Zeilen liest** (10.1, Schritt 14; Tabelle unten). Derselbe Fehler wie bei `offen` steckt in
