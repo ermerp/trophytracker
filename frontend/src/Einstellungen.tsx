@@ -435,19 +435,6 @@ type MarktStand = {
   offen: number
 }
 
-/** Was eine Portion zurueckgibt (`POST /api/sync/markt`). */
-type MarktAntwort = {
-  status: 'erfolg' | 'fehler'
-  geprueft: number
-  mitPreis: number
-  discBelegt: number
-  ohneAngebot: number
-  nochOffen: number
-  weiter: boolean
-  meldung?: string
-  fehler?: string
-}
-
 /** Was `GET /api/sync/store` sagt (Stufe 21). */
 type StoreStand = {
   mitPreis: number
@@ -494,7 +481,6 @@ export function Einstellungen() {
   const [trophaeen, setTrophaeen] = useState<TrophaeenStand | null>(null)
   const [trophText, setTrophText] = useState<string | null>(null)
   const [markt, setMarkt] = useState<MarktStand | null>(null)
-  const [marktText, setMarktText] = useState<string | null>(null)
   const [store, setStore] = useState<StoreStand | null>(null)
   const [storeText, setStoreText] = useState<string | null>(null)
   const [storeOffen, setStoreOffen] = useState<StoreOffen[] | null>(null)
@@ -772,43 +758,6 @@ export function Einstellungen() {
   }
 
   /**
-   * Gebrauchtpreise holen (Stufe 20). Zehn Releases je Aufruf, also zwanzig
-   * Fremdanfragen – ein Aufruf darf fünfzig machen (15.4). Die Schleife ruft
-   * nach, solange `weiter` gesetzt ist; bei rund 370 betroffenen Releases
-   * sind das 37 Durchläufe.
-   *
-   * Die Zeitgrenze steht am `fetch`, nicht nur ein Wiederholen bei Fehler –
-   * dieselbe Lehre wie bei den Trophäen am 01.10.2026: Eine Anfrage, die nie
-   * antwortet, lässt die Oberfläche sonst still warten.
-   */
-  async function marktHolen() {
-    setMeldung(null)
-    setMarktText('Preise werden geholt …')
-    setLaeuft(true)
-    let geprueft = 0
-    let preise = 0
-    let discs = 0
-    try {
-      for (;;) {
-        const antwort = await fetch('/api/sync/markt', { method: 'POST', signal: AbortSignal.timeout(60_000) })
-        const daten = (await antwort.json()) as MarktAntwort
-        if (!antwort.ok) throw new Error(daten.meldung ?? daten.fehler ?? 'Der Abruf der Preise ist fehlgeschlagen.')
-        geprueft += daten.geprueft
-        preise += daten.mitPreis
-        discs += daten.discBelegt
-        setMarktText(`${geprueft} Releases geprüft, ${preise} mit Preis, ${discs} Disc-Fassungen belegt – noch ${daten.nochOffen} offen …`)
-        if (!daten.weiter || daten.geprueft === 0) break
-      }
-      setMarktText(`Fertig: ${geprueft} Releases geprüft, ${preise} mit Preis, ${discs} Disc-Fassungen belegt.`)
-    } catch (fehler) {
-      setMarktText(`Angehalten nach ${geprueft} Releases: ${fehler instanceof Error ? fehler.message : 'unbekannter Fehler'}`)
-    } finally {
-      setLaeuft(false)
-      await marktStandLaden()
-    }
-  }
-
-  /**
    * Store-Preise holen (Stufe 21). Zehn Releases je Aufruf, höchstens vierzig
    * Fremdanfragen – beim ersten Mal kostet ein Release bis zu vier (Concept
    * und bis zu drei Produktseiten), danach genau eine.
@@ -910,19 +859,19 @@ export function Einstellungen() {
             ? 'Keine eBay-Zugangsdaten hinterlegt – Preise bleiben „unbekannt".'
             : `${markt.geprueft} Releases gefragt, ${markt.mitPreis} mit Preis, ${markt.ohneAngebot} ohne jedes Angebot.`}
       </p>
-      <button type="button" onClick={marktHolen} disabled={laeuft || !markt?.zugangsdaten}>
-        Preise jetzt holen
-      </button>
-      {marktText && (
-        <p className="zeile" role="status">
-          {marktText}
-        </p>
-      )}
       <p className="zeile">
         Gesucht wird bei eBay – zuerst bei rebuy und medimops, dann im breiten Gebrauchtmarkt. Die Zahl ist
         eine Forderung bei einem Anbieter, kein Wert. Findet die Suche in der Plattform-Kategorie gar nichts,
         steht das in der Lückenansicht als Hinweis auf eine reine Download-Fassung; ob es die Disc gibt,
-        entscheidest weiter nur du. Der Schritt läuft sonst nachts in der Wartung mit, zehn Releases je Aufruf.
+        entscheidest weiter nur du.
+      </p>
+      <p className="zeile">
+        Die Preise holt jede Nacht um 02:17 UTC eine GitHub Action, alle fälligen Releases in einem Lauf.
+        Von Hand starten:{' '}
+        <a href="https://github.com/ermerp/trophytracker/actions/workflows/markt.yml" target="_blank" rel="noreferrer noopener">
+          Gebrauchtpreise in GitHub Actions
+        </a>{' '}
+        → „Run workflow“. Ihr letzter Lauf steht im Verlauf unten.
       </p>
       <h3>Store-Preise</h3>
       <p className="zeile">

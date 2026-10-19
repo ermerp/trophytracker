@@ -5,12 +5,10 @@ import type { CronLage } from "../src/db/cron-lage";
 import { MARKEN_HOECHSTENS } from "../src/db/sync";
 import { ZU_FUELLEN_SQL } from "../src/db/trophaeen";
 import { Geheimnis } from "../src/domain/secret";
-import { erstelleEbayClient } from "../src/ebay/client";
 import { createScheduled } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
 import { CRON_PSN, CRON_WARTUNG, cronSchritt, entscheide, lageLesen } from "../src/sync/cron";
 import { zaehlendeDb } from "./d1-zaehler";
-import { fakeEbay } from "./ebay-fake";
 import { fakeIgdb } from "./igdb-fake";
 import { fakeFetch } from "./psn-fake";
 import { storeOhne } from "./store-fake";
@@ -27,7 +25,6 @@ const repos = () => createRepositories(env.DB, env.NPSSO_KEY);
 const HEUTE = new Date().toISOString().slice(0, 10);
 const psnStumm = () => erstellePsnClient(fakeFetch([]).fetch);
 const igdbOhne = () => fakeIgdb([[]], { zugang: null }).client;
-const ebayOhne = () => erstelleEbayClient(null);
 
 const marken = async () =>
 	(
@@ -40,7 +37,7 @@ const marken = async () =>
 async function aufrufZaehlen(cron: string): Promise<number> {
 	const zaehler = zaehlendeDb(env.DB);
 	const ereignis = { scheduledTime: Date.now(), cron, noRetry() {} };
-	await createScheduled(psnStumm, () => igdbOhne(), () => ebayOhne(), () => storeOhne())(
+	await createScheduled(psnStumm, () => igdbOhne(), () => storeOhne())(
 		ereignis,
 		{ ...env, DB: zaehler.db },
 		createExecutionContext(),
@@ -216,7 +213,7 @@ describe("cron_stand: die Fakten fuer die Betriebswarnungen (Stufe 18j)", () => 
 		expect((await repos().sync.cronStand()).wartung?.getan).toBe("nichts");
 	});
 
-	it("der Rest des Marktschritts steht als offen=", async () => {
+	it("der Markt ist kein Cron-Schritt mehr: ein faelliges Release bleibt der Action (20i)", async () => {
 		await env.DB.batch([
 			env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (1, 'Erfunden', 'erfunden')"),
 			env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (1, 1, 'PS4')"),
@@ -225,16 +222,16 @@ describe("cron_stand: die Fakten fuer die Betriebswarnungen (Stufe 18j)", () => 
 				JSON.stringify({ standAm: HEUTE, jahre: [] }),
 			),
 		]);
-		const ebay = fakeEbay([[]]).client;
-		await createScheduled(psnStumm, () => igdbOhne(), () => ebay, () => storeOhne())(
+		await createScheduled(psnStumm, () => igdbOhne(), () => storeOhne())(
 			{ scheduledTime: Date.now(), cron: CRON_WARTUNG, noRetry() {} },
 			env,
 			createExecutionContext(),
 		);
 
 		const { wartung } = await repos().sync.cronStand();
-		expect(wartung?.getan).toBe("markt");
-		expect(wartung?.offen).toBe(0);
+		expect(wartung?.getan).toBe("nichts");
+		// Faellig ist es trotzdem - fuer die Action, nicht fuer den Cron.
+		expect(await repos().markt.zuPruefen(20)).toHaveLength(1);
 	});
 });
 
@@ -246,7 +243,7 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 		einstellungen: new Map(Object.entries(einstellungen)),
 		psn: { abgebrochen: 0, laufend: null, heutige: [lauf], zugang, naechsteListe: null, storeZiele: [], ...psn },
 	});
-	const k = { heute: HEUTE, igdbKonfiguriert: true, ebayKonfiguriert: true };
+	const k = { heute: HEUTE, igdbKonfiguriert: true };
 	const fertig = {
 		psn_spielzeit_stand: `${HEUTE}:-1`,
 		psn_besitz_stand: JSON.stringify({ fertigAm: HEUTE }),
@@ -265,19 +262,19 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 		expect(entscheide(l, k)).toEqual(erwartet);
 	});
 
-	it("die Wartung: Jahre zuerst, Markt zuletzt, ohne Zugangsdaten nichts von IGDB und eBay", () => {
+	it("die Wartung: Jahre zuerst, ohne Zugangsdaten nichts von IGDB - der Markt laeuft als Action (20i)", () => {
 		const w: CronLage = {
 			verlauf: [],
 			einstellungen: new Map(),
-			wartung: { erschienen: 0, geloescht: 0, zumAuffrischen: [{ id: 1, igdb_id: 1 }], zurDisc: [{ id: 1, igdb_id: 1 }], marktZiele: [{} as never] },
+			wartung: { erschienen: 0, geloescht: 0, zumAuffrischen: [{ id: 1, igdb_id: 1 }], zurDisc: [{ id: 1, igdb_id: 1 }] },
 		};
-		expect(entscheide(w, k)).toEqual(["jahre", "igdb_auffrischen", "igdb_physisch", "markt"]);
-		expect(entscheide(w, { ...k, igdbKonfiguriert: false, ebayKonfiguriert: false })).toEqual(["jahre"]);
+		expect(entscheide(w, k)).toEqual(["jahre", "igdb_auffrischen", "igdb_physisch"]);
+		expect(entscheide(w, { ...k, igdbKonfiguriert: false })).toEqual(["jahre"]);
 	});
 });
 
 describe("Knopf und Cron sehen dieselbe Auswahl (Stufe 18j, Vorgabe des Nutzers)", () => {
-	it("Markt, Store, IGDB und Einzeltrophaeen: der Lage-Batch liefert, was die Repository-Methode liefert", async () => {
+	it("Store, IGDB und Einzeltrophaeen: der Lage-Batch liefert, was die Repository-Methode liefert", async () => {
 		await env.DB.batch([
 			env.DB.prepare(
 				"INSERT INTO game (id, title, sort_title, igdb_id) VALUES (1, 'Erfunden A', 'erfunden a', 101), (2, 'Erfunden B', 'erfunden b', 102)",
@@ -294,13 +291,11 @@ describe("Knopf und Cron sehen dieselbe Auswahl (Stufe 18j, Vorgabe des Nutzers)
 		const r = repos();
 		const lage = await lageLesen(r, "alles", HEUTE);
 
-		expect(lage.wartung?.marktZiele).toEqual(await r.markt.zuPruefen(20));
 		expect(lage.psn?.storeZiele).toEqual(await r.store.zuPruefen(10));
 		expect(lage.wartung?.zumAuffrischen).toEqual(await r.igdb.zumAuffrischen(50, 7));
 		expect(lage.wartung?.zurDisc).toEqual(await r.igdb.zurDiscPruefung(50));
 		expect(lage.psn?.naechsteListe).toEqual((await r.trophaeen.naechsteZumFuellen(1))[0]);
 		// Und die Auswahlen sind nicht leer - sonst bewiese der Vergleich nichts.
-		expect(lage.wartung?.marktZiele).toHaveLength(1);
 		expect(lage.psn?.storeZiele.map((z) => z.releaseId).sort()).toEqual([1, 2]);
 		expect(lage.psn?.naechsteListe?.npCommunicationId).toBe("NPWR00001_00");
 	});
@@ -342,7 +337,7 @@ describe("die Daueraufgaben im Lage-Batch", () => {
 
 	it("ein Aufruf ohne Lage liest sie selbst - so rufen ihn Tests und nichts sonst", async () => {
 		// Ohne Trophaeen gibt es keine Jahre - der Schritt faellt durch.
-		const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), ebayOhne(), storeOhne(), { bereich: "wartung", heute: HEUTE });
+		const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), storeOhne(), { bereich: "wartung", heute: HEUTE });
 		expect(e.getan).toBe("nichts");
 	});
 });

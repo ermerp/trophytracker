@@ -34,6 +34,9 @@ export type AusgangFakt = { am: string; getan: string; meldung: boolean; offen?:
 export type StandFakt = {
 	psn?: AusgangFakt;
 	wartung?: AusgangFakt;
+	/** Die Markt-Action (Stufe 20i): ihr letzter Ausgang und, getrennt, ihr letzter Beginn. */
+	markt?: AusgangFakt;
+	markt_begonnen?: AusgangFakt;
 	ohneAusgang?: { anzahl: number; von: string; bis: string; bereich: string; gekappt?: boolean; gemeldetAm: string };
 };
 
@@ -99,19 +102,30 @@ export const SICHERUNG_ROT_NACH_TAGEN = 8;
 const HINWEIS_STUNDEN = 24;
 
 /**
- * "Bis Fensterende nicht fertig" ruht bis 20i: Mit der Marktfrist von 24
- * Stunden schliesst das Wartungsfenster jede Nacht mit Rest (`offen=18` am
- * 18.10.2026). Gebaut und getestet, aber erst nach 20i scharf (16.2).
+ * "Nicht fertig geworden" ist seit 20i scharf. Bis dahin schloss das
+ * Wartungsfenster mit der Marktfrist von 24 Stunden jede Nacht mit Rest
+ * (`offen=18` am 18.10.2026); seit der Markt eine Action ist und beide
+ * Fristen 20 Stunden haben, ist ein Rest wieder ein Befund (16.2).
  */
-export const FENSTERREGEL_SCHARF = false;
+export const FENSTERREGEL_SCHARF = true;
 
-/** Ende der beiden Cron-Fenster in UTC-Stunden (wrangler.jsonc: 3-5 und 6-8). */
+/**
+ * Ende der beiden Cron-Fenster in UTC-Stunden (wrangler.jsonc: 3-5 und 6-8).
+ * Die Markt-Action hat kein Fenster: Ihr Rest zaehlt ab ihrem Ausgang.
+ */
 const FENSTERENDE_STUNDE: Record<string, number> = { psn: 6, wartung: 9 };
 
-/** Die beiden Bereiche, im Satz als Subjekt und als Ort. */
+/**
+ * Ein begonnener Lauf der Markt-Action ohne Ausgang, nach so vielen Stunden.
+ * Ein Lauf dauert Minuten (431 Releases, 2 Anfragen je Release zu ~0,3 s).
+ */
+export const MARKT_OHNE_AUSGANG_STUNDEN = 1;
+
+/** Die Bereiche, im Satz als Subjekt und als Ort. */
 const BEREICH: Record<string, { wer: string; wo: string }> = {
 	psn: { wer: "Das PSN-Fenster", wo: "im PSN-Fenster" },
 	wartung: { wer: "Die Wartung", wo: "in der Wartung" },
+	markt: { wer: "Die Gebrauchtpreis-Action", wo: "der Gebrauchtpreis-Action" },
 };
 
 /** Was ein Aufruf getan hat, so wie es in der Oberflaeche heisst. */
@@ -240,8 +254,8 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 	// --- Die Automatik selbst ------------------------------------------------
 	// Ein Bereich ohne Ausgang seit ueber 26 Stunden. Fehlt der Stand ganz,
 	// hat der Cron seit 18j nie etwas vermerkt - das ist dasselbe Schweigen.
-	const bereiche = ["psn", "wartung"] as const;
-	if (bereiche.every((b) => !f.stand[b])) {
+	const bereiche = ["psn", "wartung", "markt"] as const;
+	if ((["psn", "wartung"] as const).every((b) => !f.stand[b])) {
 		raus.push({
 			art: "automatik_still",
 			stufe: "rot",
@@ -250,6 +264,9 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 			zielText: "Verlauf",
 		});
 	} else {
+		// Die Markt-Action zaehlt mit (Stufe 20i): Ein Lauf, der jede Nacht
+		// nach dem Beginn stirbt, laesst ihren Ausgang altern - der Beginn
+		// steht unter eigenem Bereich und zaehlt hier nicht.
 		for (const b of bereiche) {
 			const fakt = f.stand[b];
 			const stunden = fakt ? alterStunden(fakt.am) : Number.POSITIVE_INFINITY;
@@ -356,6 +373,24 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 		});
 	}
 
+	// Ein Lauf der Markt-Action, der begonnen und keinen Ausgang hat.
+	const begonnen = f.stand.markt_begonnen;
+	if (
+		begonnen &&
+		(!f.stand.markt || f.stand.markt.am < begonnen.am) &&
+		alterStunden(begonnen.am) > MARKT_OHNE_AUSGANG_STUNDEN &&
+		alterStunden(begonnen.am) <= HINWEIS_STUNDEN
+	) {
+		const am = zeitAus(begonnen.am);
+		raus.push({
+			art: "ohne_ausgang",
+			stufe: "kenntnis",
+			text: `Der Lauf ${BEREICH.markt.wo}${am ? ` von ${uhrzeit(am)}` : ""} ist ohne Ausgang geblieben.`,
+			ziel: "einstellungen",
+			zielText: "Verlauf",
+		});
+	}
+
 	for (const b of bereiche) {
 		const fakt = f.stand[b];
 		if (!fakt?.meldung || alterStunden(fakt.am) > HINWEIS_STUNDEN) continue;
@@ -395,17 +430,20 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
  */
 export function fensterOffen(stand: StandFakt, jetzt: Date): Betriebswarnung[] {
 	const raus: Betriebswarnung[] = [];
-	for (const b of ["psn", "wartung"] as const) {
+	for (const b of ["psn", "wartung", "markt"] as const) {
 		const fakt = stand[b];
 		if (!fakt || !fakt.offen) continue;
 		const am = zeitAus(fakt.am);
 		if (!am) continue;
-		const ende = Date.UTC(am.getUTCFullYear(), am.getUTCMonth(), am.getUTCDate(), FENSTERENDE_STUNDE[b]);
+		const ende =
+			b === "markt"
+				? am.getTime()
+				: Date.UTC(am.getUTCFullYear(), am.getUTCMonth(), am.getUTCDate(), FENSTERENDE_STUNDE[b]);
 		if (jetzt.getTime() < ende || jetzt.getTime() - ende > HINWEIS_STUNDEN * STUNDE_MS) continue;
 		raus.push({
 			art: "fenster_offen",
 			stufe: "kenntnis",
-			text: `${SCHRITT[fakt.getan] ?? fakt.getan}: ${fakt.offen} ${fakt.offen === 1 ? "Eintrag blieb" : "Einträge blieben"} bei Fensterschluss offen.`,
+			text: `${SCHRITT[fakt.getan] ?? fakt.getan}: ${fakt.offen} ${fakt.offen === 1 ? "Eintrag blieb" : "Einträge blieben"} ${b === "markt" ? "nach dem Lauf" : "bei Fensterschluss"} offen.`,
 			ziel: "einstellungen",
 			zielText: "Verlauf",
 		});

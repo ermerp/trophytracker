@@ -91,9 +91,14 @@ Wochen dazwischen ([10.1](10-1-cron.md)).
 **Die Wege je Schritt** (Entscheidungen des Nutzers vom 19.10.2026), gerechnet mit der kleinsten
 sinnvollen Portion gegen dieses Budget:
 
-- **Markt → GitHub Action**, als Stufe 20i: kein einzelnes Release bleibt unter 10 ms, und 431
-  Aufrufe passen in keinen Takt. Wie die Action schreibt – Worker-Route in Portionen oder direkt
-  über die D1-Schnittstelle –, ist **offen** (Plan vom 19.10.2026).
+- **Markt → GitHub Action – gebaut in 20i (19.10.2026):** kein einzelnes Release blieb unter 10 ms,
+  und 431 Aufrufe passten in keinen Takt. **Weg A** (Entscheidung des Nutzers vom 19.10.2026): Die
+  Action schreibt über Routen des Workers in Portionen, nicht direkt über die D1-Schnittstelle – die
+  Regeln zu `src/db/` und zum Protokoll bleiben, kein kontoweites Token mit Schreibrecht in GitHub.
+  Lauf um 02:17 UTC, Portion `MARKT_JE_POST = 6` (43 Anweisungen), Einzelheiten in
+  [7.3](07-3-ebay.md). **Erwartung, nicht gemessen:** rund 6–10 ms für die Lage, 5–8 ms je Portion;
+  gemessen wird am ersten Lauf, den der Nutzer tagsüber per `workflow_dispatch` startet, danach wird
+  die Portion angepasst. Der Neuabruf eines einzelnen Releases (20h) bleibt im Worker.
 - **Kaufliste → gebündelt wie 18k – gebaut in 18k-b (19.10.2026):** bis dahin je Eintrag zwei bis
   drei D1-Aufrufe nacheinander, bis zu 150 Abfragen je Aufruf gegen die dokumentierten 50. Jetzt ein
   Lese-Batch (`releasesNachSchluesseln` mit `mitKauf`) und ein Schreib-Batch (`berechtigungenErkennen`,
@@ -106,7 +111,10 @@ sinnvollen Portion gegen dieses Budget:
 - **Store → offen bis nach dem Probelauf, jetzt zu entscheiden:** Ein Release je Aufruf ist die
   Untergrenze, rund die Hälfte läge über 10 ms. Ein Probelauf aus GitHub Actions am 19.10.2026
   (echter Store-Client, ein öffentliches Concept, zwei Anfragen) wurde **angenommen**: 200 in 0,4
-  und 0,6 s, Preis gelesen. Wie Sony auf 80 bis 240 Anfragen am Stück antwortet, sagt er nicht.
+  und 0,6 s, Preis gelesen. **Die Probe in voller Größe** am selben Tag, nur lesend, die Ziele mit
+  der Auswahl aus dem Code: **79 Ziele, 75 Anfragen am Stück in 48 s, 200 × 74 und 302 × 1, kein
+  403, kein 429**, P50 603 ms je Anfrage; vier Ziele ohne Id (bräuchten IGDB) nicht gefragt. Die
+  Entscheidung über den Store fällt nach 20i (Entscheidung des Nutzers vom 19.10.2026).
 - Sync, Spielzeit, Level, Jahre und IGDB bleiben im Worker. Mit 25 Titeln je Seite blieben Sync und
   Spielzeit im Budget; der Sync-Abschluss (11–14 ms) und das Level (9–21 ms) sind ungeteilt
   darüber – Ursache nicht untersucht.
@@ -121,7 +129,8 @@ eine Nacht nach 18j, damit ihre Wirkung nicht mit der Grundlast vermischt → na
 Zahlen aus 20i entscheidet der Nutzer zwischen Wortindex-Zeile, Cron je Minute und GitHub Actions –
 und erst nach dem Index-Nachtrag für die Auswahlen des Lage-Batches (unten).
 
-**Für 20i vorgemerkt: die Fristen von Markt und Store** (Vorgabe des Nutzers vom 17.10.2026, für den
+**In 20i umgesetzt: die Fristen von Markt und Store, je 20 Stunden** (`MARKT_FRIST_STUNDEN`,
+`STORE_FRIST_STUNDEN`). (Vorgabe des Nutzers vom 17.10.2026, für den
 Store vom 19.10.2026). Die Frist von 24 Stunden setzt jedes Release auf die Uhrzeit seiner letzten
 Prüfung; was am Vortag spät im Fenster lag, wird erst nach Fensterschluss wieder fällig – in der
 Nacht zum 17.10.2026 schloss das Fenster mit `offen=16`, am 19.10. mit `offen=19`. **Der Store
@@ -140,8 +149,12 @@ das Fällige – nicht angefasst, notiert. Dazu gehört auch, dass diese Zählun
 Produktion 412 Zeilen je Aufruf liest, obwohl ihr Kommentar `idx_release_store` nennt (D1-Analytics,
 17.10.2026).
 
-**Für 20i vorgemerkt, spätestens dort: der Bestand der Lesekosten-Messung** (Vorgabe des Nutzers vom
-18.10.2026). Der Test liest im Wartungsleerlauf 2 218 Zeilen, die Produktion rund 2 590 – die drei
+**Offen, aus 20i herausgenommen – Vorschlag: in den Index-Nachtrag: der Bestand der
+Lesekosten-Messung** (Vorgabe des Nutzers vom 18.10.2026, „spätestens mit 20i"; nicht umgesetzt, weil
+der Testbestand an rund 15 Stellen Release-Id = Spiel-Id und genau 430 Releases voraussetzt, und weil
+die Marktauswahl mit ihren 59 nie geprüften Releases seit 20i nicht mehr im Lage-Batch steht – der
+Wartungsleerlauf liest im Test jetzt 1 788 statt 2 218 Zeilen; **die Verschiebung entscheidet der
+Nutzer**). Der Test liest im Wartungsleerlauf 2 218 Zeilen, die Produktion rund 2 590 – die drei
 Auswahlen des Lage-Batches, exakt gemessen am 18.10.2026 über `meta.rows_read`, dieselben Anweisungen
 aus dem Code (die Marktauswahl mit verschobener Frist, damit nichts fällig ist wie im Leerlauf):
 
@@ -179,15 +192,15 @@ Die CPU der Route wird nach dem Deploy an `workersInvocationsAdaptive` gemessen.
 
 | Regel | Stufe |
 |---|---|
-| Ein Bereich seit über **26 h** ohne vermerkten Ausgang; fehlt der Stand ganz, eine Warnung | rot |
+| Ein Bereich – PSN, Wartung, seit 20i die Markt-Action – seit über **26 h** ohne vermerkten Ausgang; fehlt der Stand ganz, eine Warnung | rot |
 | Zugang abgelaufen – **sofort**, unabhängig von der Zahl der Nächte; ein Sync, der daran scheitert, wird nicht zusätzlich gemeldet | rot |
 | Zugang endet in ≤ **3** / ≤ **14** Kalendertagen (Ortszeit) – das frühere von Sonys Ankündigung und „eingetragen + kürzeste gemessene Lebensdauer" (7.1) | rot / zur Kenntnis |
 | Nacht-Sync gescheitert, jünger als 24 h: **zwei aufeinanderfolgende UTC-Nächte** / eine | rot / zur Kenntnis |
 | Sicherung älter als acht Tage oder keine (14.2) | rot |
-| Kette ohne Ausgang, gemeldet in den letzten 24 h | zur Kenntnis |
+| Kette ohne Ausgang, gemeldet in den letzten 24 h – und ein Lauf der Markt-Action, der seit über einer Stunde begonnen ist und keinen Ausgang hat (20i) | zur Kenntnis |
 | Letzter Ausgang eines Bereichs mit Meldung, jünger als 24 h (außer dem schon gemeldeten Sync) | zur Kenntnis |
 | Kaufliste mit `fehlerAm` von heute oder gestern | zur Kenntnis |
-| Schritt nach Fensterschluss nicht fertig (`offen > 0`) | zur Kenntnis, **ruht bis 20i** (`FENSTERREGEL_SCHARF`) – sonst jede Nacht (`offen=18` am 18.10.) |
+| Schritt nach Fensterschluss nicht fertig (`offen > 0`), bei der Markt-Action nach ihrem Ausgang | zur Kenntnis, **scharf seit 20i** – bis dahin ruhte die Regel, weil die Wartung jede Nacht mit Rest schloss (`offen=18` am 18.10.) |
 
 **Das Zugangsende ist nicht Sonys Datum** (Entscheidung des Nutzers vom 18.10.2026, nachdem der Plan
 7.1 übersehen hatte): Sony kündigte rund 60 Tage an, der erste Zugang hielt 25. Für den Zugang vom

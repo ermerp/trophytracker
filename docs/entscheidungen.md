@@ -281,3 +281,8 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 19.10.2026 | **Die Kaufliste wird gebündelt wie in 18k, als nächster Nachtrag vor 18m-b** – auch wegen bis zu 150 Abfragen je Aufruf gegen die dokumentierte Grenze von 50 | [16.2](spec/16-2-cpu-und-betrieb.md) |
 | 19.10.2026 | **Der Markt wandert in eine GitHub Action; 20i wird zu dieser Stufe.** Wie geschrieben wird (Worker-Route oder D1-Schnittstelle), entscheidet ein Plan | [16.2](spec/16-2-cpu-und-betrieb.md) |
 | 19.10.2026 | **Über den Store wird erst nach einem Probelauf aus GitHub Actions entschieden** | [16.2](spec/16-2-cpu-und-betrieb.md) |
+| 19.10.2026 | **20i: Weg A** – die Markt-Action schreibt über Routen des Workers in Portionen, nicht direkt über D1; keine Vorab-Messung im Messworker, gemessen wird der erste Lauf per `workflow_dispatch`, die Portion ist eine Konstante | [7.3](spec/07-3-ebay.md) |
+| 19.10.2026 | **Die Markt-Action läuft um 02:17 UTC**, mit Puffer für Verspätungen von GitHub bis 05:00 UTC; eigenes Service Token `github-markt` | [7.3](spec/07-3-ebay.md), [15](spec/15-repository-deployment.md) |
+| 19.10.2026 | **eBay-Zugangsdaten dürfen als GitHub Secrets liegen** – unter der Bedingung, dass die Action nur über `schedule` und `workflow_dispatch` läuft, nie über `pull_request` oder `pull_request_target` | [15](spec/15-repository-deployment.md), CLAUDE.md |
+| 19.10.2026 | **Der Knopf „Gebrauchtpreise jetzt prüfen" entfällt** mit Hinweis auf die Action; kein GitHub-Token im Worker. Der Neuabruf eines einzelnen Releases bleibt im Worker | [7.3](spec/07-3-ebay.md) |
+| 19.10.2026 | **Store: eine Probe in voller Größe**, nur lesend; entschieden wird nach 20i | [16.2](spec/16-2-cpu-und-betrieb.md) |

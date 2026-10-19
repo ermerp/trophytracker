@@ -9,7 +9,7 @@ bis dahin einen). Der Free Tier erlaubt fünf je Konto – gegen Cloudflares Dok
 | Eintrag | Ausdruck | Aufrufe | Arbeit |
 |---|---|---|---|
 | PSN | `*/5 3-5 * * *` | 36 (05–08 Uhr MESZ) | Hänger abbrechen, Sync-Schritt, Spielzeit, Kaufliste, Einzeltrophäen, Store-Preise |
-| Wartung | `*/5 6-8 * * *` | 36 (08–11 Uhr MESZ) | erschienene Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, **Gebrauchtpreise**, Trophäen je Jahr, alte Rohantworten |
+| Wartung | `*/5 6-8 * * *` | 36 (08–11 Uhr MESZ) | erschienene Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, Trophäen je Jahr, alte Rohantworten – die **Gebrauchtpreise** laufen seit Stufe 20i als GitHub Action um 02:17 UTC (7.3) |
 
 **Warum aufgeteilt.** Ein Fenster trug die Arbeit nicht mehr: elf Aufrufe Sync, zwei Spielzeit,
 fünfzehn Kaufliste und – nach einem IGDB-Rückstand – acht Auffrischen sind **37 von 36**

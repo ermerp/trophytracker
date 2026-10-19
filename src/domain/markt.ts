@@ -311,3 +311,47 @@ export function anbieterName(verkaeufer: string | null): string {
 	if (verkaeufer === null) return "eBay";
 	return HAENDLER_VERKAEUFER[verkaeufer] ?? "eBay";
 }
+
+/**
+ * Eine `AngebotWahl` aus einem fremden JSON-Koerper lesen - oder null
+ * (Stufe 20i: die Action schickt ihre Ergebnisse an den Worker).
+ *
+ * Streng, weil daraus Zeilen in `market_offer` und `price_snapshot` werden:
+ * jede Laenge begrenzt, der Preis eine ganze Zahl von Cent, die Kennung eine
+ * Zahlenfolge wie bei der Sperrliste, die Adresse https. Den Anbieter nimmt
+ * die Funktion NICHT aus dem Koerper, sondern bildet ihn wie die Auswertung
+ * selbst aus dem Verkaeufer (`anbieterName`) - eine Quelle fuer die Anzeige.
+ */
+export function angebotWahlAus(roh: unknown): AngebotWahl | null {
+	if (roh === null || typeof roh !== "object") return null;
+	const w = roh as Record<string, unknown>;
+	const preis = urteilAus(w.preis);
+	const beleg = urteilAus(w.beleg);
+	if (preis === undefined || beleg === undefined) return null;
+	return { preis, beleg };
+}
+
+/** null bleibt null (kein Angebot); undefined heisst "ungueltig". */
+function urteilAus(roh: unknown): AngebotUrteil | null | undefined {
+	if (roh === null) return null;
+	if (typeof roh !== "object") return undefined;
+	const a = (roh as Record<string, unknown>).angebot;
+	if (a === null || typeof a !== "object") return undefined;
+	const { titel, preisCents, zustand, verkaeufer, url, itemId } = a as Record<string, unknown>;
+	const text = (w: unknown, max: number) => typeof w === "string" && w.length > 0 && w.length <= max;
+	const oderNull = (w: unknown, max: number) => w === null || text(w, max);
+	if (!text(titel, 500)) return undefined;
+	if (typeof preisCents !== "number" || !Number.isInteger(preisCents) || preisCents <= 0 || preisCents > 10_000_000) return undefined;
+	if (!oderNull(zustand, 100) || !oderNull(verkaeufer, 100)) return undefined;
+	if (!(url === null || (text(url, 1000) && (url as string).startsWith("https://")))) return undefined;
+	if (!(itemId === null || (typeof itemId === "string" && /^\d{1,20}$/.test(itemId)))) return undefined;
+	const angebot: MarktAngebot = {
+		titel: titel as string,
+		preisCents,
+		zustand: zustand as string | null,
+		verkaeufer: verkaeufer as string | null,
+		url: url as string | null,
+		itemId: itemId as string | null,
+	};
+	return { angebot, anbieter: anbieterName(angebot.verkaeufer) };
+}

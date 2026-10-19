@@ -1,9 +1,41 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { AppEnv } from "../types";
-import { einesPruefen, marktSchritt } from "../sync/markt";
+import { einesPruefen, MARKT_JE_POST, marktZeile, type MarktErgebnis } from "../sync/markt";
 import { liesJson } from "./validierung";
 import { meldungFuer } from "../ebay/client";
+import { angebotWahlAus } from "../domain/markt";
+import type { AngebotJeKanal } from "../db/markt";
+
+/**
+ * Die Meldungen eines Laufs der Action, als Code uebergeben (Stufe 20i). Die
+ * Texte sind dieselben wie die des eBay-Clients, damit Verlauf und Warnung
+ * dasselbe sagen wie bis 20i der Cron.
+ */
+const MARKT_MELDUNG = {
+	ratenlimit: "Das eBay-Tageskontingent ist erschöpft.",
+	zugang: "eBay hat die Zugangsdaten abgelehnt.",
+	konfig: "eBay-Zugangsdaten sind nicht hinterlegt.",
+	app: "Die Anwendung hat eine Portion nicht angenommen.",
+} as const;
+
+/** Ein Eintrag aus `ergebnisse` - oder null, wenn er nicht danach aussieht. */
+function ergebnisAus(roh: unknown): { releaseId: number; angebote: AngebotJeKanal; rohangebote: number } | null {
+	if (roh === null || typeof roh !== "object") return null;
+	const e = roh as Record<string, unknown>;
+	const { releaseId, rohangebote, angebote } = e;
+	if (typeof releaseId !== "number" || !Number.isInteger(releaseId) || releaseId <= 0) return null;
+	if (typeof rohangebote !== "number" || !Number.isInteger(rohangebote) || rohangebote < 0 || rohangebote > 10_000) return null;
+	if (angebote === null || typeof angebote !== "object") return null;
+	const raus: AngebotJeKanal = {};
+	for (const [kanal, wahl] of Object.entries(angebote as Record<string, unknown>)) {
+		if (kanal !== "haendler" && kanal !== "markt") return null;
+		const gelesen = angebotWahlAus(wahl);
+		if (gelesen === null) return null;
+		raus[kanal] = gelesen;
+	}
+	return { releaseId, angebote: raus, rohangebote };
+}
 
 /**
  * Gebrauchtpreise und Disc-Nachweis aus eBay (Abschnitt 7.3, Stufe 20).
@@ -18,24 +50,96 @@ import { meldungFuer } from "../ebay/client";
  */
 export const marktRoutes = new Hono<AppEnv>()
 	/**
-	 * Eine Portion holen: zehn Releases, zwanzig Fremdanfragen. Die
-	 * Oberflaeche ruft nach, solange `weiter` gesetzt ist - bei rund 370
-	 * betroffenen Releases sind das 37 Aufrufe.
+	 * Die Lage fuer einen Lauf der Markt-Action (Stufe 20i): alle faelligen
+	 * Releases, die Sammlung und die Sperrliste in EINEM D1-Aufruf.
 	 *
-	 * 503 nur auf dieser Route, wenn die Zugangsdaten fehlen: Die uebrige
-	 * Anwendung laeuft ohne eBay weiter (15.3).
+	 * Maschinen-Endpunkt wie `/api/backup/*`: Access steht vor dem Worker, die
+	 * Action kommt mit dem Service Token `github-markt` (15.3) - keine eigene
+	 * Token-Pruefung im Code. Kein eBay im Worker: Gefragt wird in der Action.
 	 */
-	.post("/markt", async (c) => {
-		if (!c.var.ebay.konfiguriert()) {
-			return c.json({ fehler: "eBay-Zugangsdaten sind nicht hinterlegt." }, 503);
+	.get("/markt/lage", async (c) => {
+		return c.json(await c.var.repos.markt.lageFuerAction(c.var.repos.games.alleTitelBaustein()));
+	})
+
+	/**
+	 * Die Ergebnisse einer Portion schreiben (Stufe 20i) - EIN Lese- und EIN
+	 * Schreib-Batch, gleich wie viele Releases. Hoechstens MARKT_JE_POST, damit
+	 * die Anweisungen unter den 50 je Aufruf bleiben.
+	 *
+	 * Vom Aufrufer kommen nur die Angebote. Titel, Plattform und Disc-Fassung
+	 * liest die Route selbst: Von der Disc-Fassung haengt der Statuswechsel
+	 * `unbekannt -> ja` samt Protokoll ab, und den entscheidet die Datenbank,
+	 * nicht ein Koerper. Eine unbekannte Release-Id wird uebergangen und
+	 * gezaehlt, nicht angelegt.
+	 */
+	.post("/markt/ergebnisse", async (c) => {
+		const koerper = await liesJson(c);
+		const liste = koerper?.ergebnisse;
+		if (!Array.isArray(liste) || liste.length === 0 || liste.length > MARKT_JE_POST) {
+			return c.json({ fehler: `Feld 'ergebnisse' muss 1 bis ${MARKT_JE_POST} Einträge haben.` }, 400);
 		}
-		try {
-			const ergebnis = await marktSchritt(c.var.repos, c.var.ebay);
-			return c.json(ergebnis, ergebnis.status === "fehler" ? 502 : 200);
-		} catch (fehler) {
-			// Nur eigene Texte, kein Fremdtext - er koennte ein Geheimnis zitieren.
-			return c.json({ fehler: meldungFuer(fehler) }, 502);
+		const gelesen = liste.map(ergebnisAus);
+		const kaputt = gelesen.findIndex((e) => e === null);
+		if (kaputt >= 0) return c.json({ fehler: `Eintrag ${kaputt + 1} ist kein gültiges Ergebnis.` }, 400);
+		const ergebnisse = gelesen as NonNullable<(typeof gelesen)[number]>[];
+
+		const ziele = new Map(
+			(await c.var.repos.markt.einige([...new Set(ergebnisse.map((e) => e.releaseId))])).map((z) => [z.releaseId, z]),
+		);
+		const schreiben = ergebnisse.flatMap((e) => {
+			const ziel = ziele.get(e.releaseId);
+			return ziel ? [{ ziel, angebote: e.angebote, rohangebote: e.rohangebote }] : [];
+		});
+		const geschrieben = await c.var.repos.markt.ergebnisseSchreiben(schreiben);
+		return c.json({
+			geprueft: geschrieben.length,
+			mitPreis: geschrieben.filter((g) => g.preis !== null).length,
+			discBelegt: geschrieben.filter((g) => g.discBelegt).length,
+			ohneAngebot: schreiben.filter((s) => s.rohangebote === 0).length,
+			unbekannt: ergebnisse.length - schreiben.length,
+		});
+	})
+
+	/**
+	 * Beginn und Ausgang eines Laufs der Markt-Action (Stufe 20i).
+	 *
+	 * Der Beginn wird VOR der Arbeit geschrieben, unter einem eigenen Bereich
+	 * (`markt_begonnen`): Ein Lauf, der danach stirbt, erreicht kein `catch`
+	 * und hinterliesse sonst nichts (CLAUDE.md, 10.1). Der Ausgang steht als
+	 * Bereich `markt` in `cron_stand` und als Zeile im Verlauf - daran haengen
+	 * die Betriebswarnungen (18m). Den Rest zaehlt die Route selbst, und die
+	 * Meldung ist ein Code, kein Text: Fremdtext koennte ein Geheimnis zitieren.
+	 */
+	.post("/markt/ausgang", async (c) => {
+		const koerper = await liesJson(c);
+		const am = new Date().toISOString().slice(0, 16).replace("T", " ");
+		if (koerper?.art === "begonnen") {
+			await c.var.repos.sync.standVermerken("markt_begonnen", { am, getan: "markt", meldung: false });
+			return c.json({ am });
 		}
+		const zahl = (k: string) => {
+			const w = koerper?.[k];
+			return typeof w === "number" && Number.isInteger(w) && w >= 0 ? w : null;
+		};
+		const zahlen = { geprueft: zahl("geprueft"), mitPreis: zahl("mitPreis"), discBelegt: zahl("discBelegt"), ohneAngebot: zahl("ohneAngebot") };
+		const fehler = koerper?.fehler;
+		if (koerper?.art !== "ende" || Object.values(zahlen).some((z) => z === null) || (fehler !== undefined && !(typeof fehler === "string" && fehler in MARKT_MELDUNG))) {
+			return c.json({ fehler: "Erwartet: art 'begonnen' oder 'ende' mit vier Zahlen und optional einem Fehlercode." }, 400);
+		}
+		const meldung = typeof fehler === "string" ? MARKT_MELDUNG[fehler as keyof typeof MARKT_MELDUNG] : undefined;
+		const ergebnis: MarktErgebnis = {
+			status: meldung ? "fehler" : "erfolg",
+			geprueft: zahlen.geprueft!,
+			mitPreis: zahlen.mitPreis!,
+			discBelegt: zahlen.discBelegt!,
+			ohneAngebot: zahlen.ohneAngebot!,
+			nochOffen: await c.var.repos.markt.faelligeAnzahl(),
+			...(meldung ? { meldung } : {}),
+		};
+		await c.var.repos.sync.cronAusgangVermerken(am, marktZeile(ergebnis), undefined, {
+			fakt: { bereich: "markt", wert: { am, getan: "markt", meldung: meldung !== undefined, offen: ergebnis.nochOffen } },
+		});
+		return c.json(ergebnis);
 	})
 
 	/**

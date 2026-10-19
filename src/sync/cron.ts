@@ -13,9 +13,7 @@ import {
 	type PhysischErgebnis,
 } from "./igdb";
 import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis } from "./besitz";
-import { meldungFuer as ebayMeldung, type EbayClient } from "../ebay/client";
 import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
-import { marktSchritt, RELEASES_JE_AUFRUF as MARKT_JE_AUFRUF, type MarktErgebnis } from "./markt";
 import { RELEASES_JE_AUFRUF as STORE_JE_AUFRUF, storeSchritt, type StoreSchrittErgebnis } from "./store";
 import { meldungFuer as storeMeldung, type StoreClient } from "../psn/store";
 import {
@@ -153,7 +151,6 @@ export type CronErgebnis = {
 		| "jahre"
 		| "igdb_auffrischen"
 		| "igdb_physisch"
-		| "markt"
 		| "store"
 		| "nichts";
 	/** angekuendigt -> erschienen (8.4), in jedem Aufruf. */
@@ -172,7 +169,6 @@ export type CronErgebnis = {
 	trophaeen?: ListenErgebnis;
 	level?: number;
 	jahre?: number;
-	markt?: MarktErgebnis;
 	store?: StoreSchrittErgebnis;
 	auffrischen?: AuffrischErgebnis;
 	physisch?: PhysischErgebnis;
@@ -189,8 +185,7 @@ export type CronKandidat =
 	| "store"
 	| "jahre"
 	| "igdb_auffrischen"
-	| "igdb_physisch"
-	| "markt";
+	| "igdb_physisch";
 
 /** Die Schluessel aus app_setting, die die Entscheidung braucht. */
 export const CRON_STAENDE = [SCHLUESSEL_SPIELZEIT, SCHLUESSEL_BESITZ, SCHLUESSEL_LEVEL, SCHLUESSEL_JAHRE] as const;
@@ -207,7 +202,7 @@ export const CRON_STAENDE = [SCHLUESSEL_SPIELZEIT, SCHLUESSEL_BESITZ, SCHLUESSEL
  */
 export function entscheide(
 	lage: CronLage,
-	k: { heute: string; igdbKonfiguriert: boolean; ebayKonfiguriert: boolean },
+	k: { heute: string; igdbKonfiguriert: boolean },
 ): CronKandidat[] {
 	const raus: CronKandidat[] = [];
 	const stand = (s: string) => lage.einstellungen.get(s) ?? null;
@@ -227,11 +222,10 @@ export function entscheide(
 		if (storeZiele.length > 0) raus.push("store");
 	}
 	if (lage.wartung) {
-		const { zumAuffrischen, zurDisc, marktZiele } = lage.wartung;
+		const { zumAuffrischen, zurDisc } = lage.wartung;
 		if (jahreStandAus(stand(SCHLUESSEL_JAHRE))?.standAm !== k.heute) raus.push("jahre");
 		if (k.igdbKonfiguriert && zumAuffrischen.length > 0) raus.push("igdb_auffrischen");
 		if (k.igdbKonfiguriert && zurDisc.length > 0) raus.push("igdb_physisch");
-		if (k.ebayKonfiguriert && marktZiele.length > 0) raus.push("markt");
 	}
 	return raus;
 }
@@ -251,7 +245,6 @@ export function lageLesen(
 		haengtNachStunden: HAENGT_NACH_STUNDEN,
 		rohantwortenLaeufe: ROHANTWORTEN_LAEUFE,
 		storeJeAufruf: STORE_JE_AUFRUF,
-		marktJeAufruf: MARKT_JE_AUFRUF,
 		igdbJeAufruf: AUFFRISCHEN_JE_AUFRUF,
 		auffrischFristTage: AUFFRISCH_FRIST_TAGE,
 	});
@@ -268,7 +261,6 @@ export async function cronSchritt(
 	repos: Repositories,
 	psn: PsnClient,
 	igdb: IgdbClient,
-	ebay: EbayClient,
 	store: StoreClient,
 	optionen: { heute?: string; bereich?: CronBereich; lage?: CronLage } = {},
 ): Promise<CronErgebnis> {
@@ -291,7 +283,6 @@ export async function cronSchritt(
 	for (const kandidat of entscheide(lage, {
 		heute,
 		igdbKonfiguriert: igdb.konfiguriert(),
-		ebayKonfiguriert: ebay.konfiguriert(),
 	})) {
 		switch (kandidat) {
 			case "sync":
@@ -384,18 +375,6 @@ export async function cronSchritt(
 					}
 				} catch (fehler) {
 					return { ...basis, getan: "nichts", meldung: meldungFuer(fehler) };
-				}
-				break;
-			}
-
-			// 12. Gebrauchtpreise (7.3, Stufe 20) - als letzter, weil er als
-			//     einziger das Fenster fuellen kann.
-			case "markt": {
-				try {
-					const markt = await marktSchritt(repos, ebay, MARKT_JE_AUFRUF, lage.wartung?.marktZiele);
-					if (markt.geprueft > 0 || markt.status === "fehler") return { ...basis, getan: "markt", markt };
-				} catch (fehler) {
-					return { ...basis, getan: "nichts", meldung: ebayMeldung(fehler) };
 				}
 				break;
 			}
@@ -597,12 +576,11 @@ export function cronFakt(am: string, e: CronErgebnis): CronFakt {
 			e.sync?.meldung ||
 			e.spielzeit?.meldung ||
 			e.besitz?.meldung ||
-			e.markt?.meldung ||
 			e.store?.meldung ||
 			e.auffrischen?.meldung ||
 			e.physisch?.meldung,
 	);
-	const offen = e.markt?.nochOffen ?? e.store?.nochOffen;
+	const offen = e.store?.nochOffen;
 	return { am, getan: e.getan, meldung, ...(offen === undefined ? {} : { offen }) };
 }
 
@@ -649,22 +627,6 @@ export function cronLogzeile(e: CronErgebnis): string {
 	}
 	if (e.level) teile.push(`level=${e.level}`);
 	if (e.jahre) teile.push(`jahre=${e.jahre}`);
-	if (e.markt) {
-		// Vier Zahlen, weil sie vier verschiedene Dinge sagen: `geprueft` ist
-		// die Portion, `preis` was einen Titelabgleich uebderstanden hat,
-		// `disc` die Statuswechsel unbekannt -> ja, und `ohneAngebot` die
-		// Releases, zu denen eBay in der Plattform-Kategorie NICHTS kennt -
-		// der Hinweis auf eine reine Download-Fassung (7.3).
-		teile.push(
-			`markt=${e.markt.status}`,
-			`geprueft=${e.markt.geprueft}`,
-			`preis=${e.markt.mitPreis}`,
-			`disc=${e.markt.discBelegt}`,
-			`ohneAngebot=${e.markt.ohneAngebot}`,
-			`offen=${e.markt.nochOffen}`,
-		);
-		if (e.markt.meldung) teile.push(`meldung="${e.markt.meldung}"`);
-	}
 	if (e.store) {
 		// Fuenf Zahlen, weil sie fuenf Dinge sagen: `geprueft` ist die Portion,
 		// `preis` was einen Kaufknopf hatte, `angebot` die Rabatte, `plus` die
