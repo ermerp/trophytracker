@@ -27,6 +27,7 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 7.1 | [07-1-psn-trophaeen.md](07-1-psn-trophaeen.md) | NPSSO, Token, Zugang erneuern |
 | 7.2 | [07-2-matching.md](07-2-matching.md) | das Matching-Problem |
 | 7.3 | [07-3-ebay.md](07-3-ebay.md) | Gebrauchtpreise und Disc-Nachweis aus eBay |
+| 7.3 | [07-3-ebay-betrieb.md](07-3-ebay-betrieb.md) | Umfang, Takt und Betrieb: die GitHub Action seit 20i, Lesekosten, verworfene Wege |
 | 7.3 | [07-3-ebay-reihen.md](07-3-ebay-reihen.md) | wie sich Händler-, Markt- und Store-Reihe bewegen (Messung für 20g) |
 | 7.3 | [07-3-ebay-verworfen.md](07-3-ebay-verworfen.md) | geprüft und verworfen: AWIN, eBays Aspekt `Spielname`, Quellen für „nur digital" |
 | 7.4 | [07-4-store-preise.md](07-4-store-preise.md) | PSN Store-Preise: Endpunkt, Produkt-Id, Zuschnitt |
@@ -46,6 +47,7 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 10 | [10-sync-protokoll.md](10-sync-protokoll.md) | `psn_sync_run`, Rohablage, zwei Phasen |
 | 10.1 | [10-1-cron.md](10-1-cron.md) | die Automatik: zwei Cron-Fenster, Auslastung, Lesekosten |
 | 10.1 | [10-1-cron-schritte.md](10-1-cron-schritte.md) | die 15 Schritte in ihrer Reihenfolge |
+| 10.1 | [10-1-cron-cpu.md](10-1-cron-cpu.md) | was ein Aufruf an CPU kostet, Standort, Messweg |
 | 10.1 | [10-1-cron-verlauf.md](10-1-cron-verlauf.md) | `cron_verlauf`, Verdichtung, örtlicher Aufruf |
 | 11 | [11-sichten.md](11-sichten.md) | die sieben Views |
 | 12 | [12-api-routen.md](12-api-routen.md) | Routen für Sammlung, Besitz, Bewertung, Absichten, Prüfliste; Filter |
@@ -59,7 +61,9 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 16 | [16-umsetzung.md](16-umsetzung.md) | Übersicht Umsetzungsreihenfolge |
 | 16 | [16-1-abgeschlossene-stufen.md](16-1-abgeschlossene-stufen.md) | eine Zeile je abgeschlossener Stufe |
 | 16 | [16-2-offene-stufen.md](16-2-offene-stufen.md) | die offenen Teile von Stufe 20: 20h, 20f, 20g |
-| 16 | [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) | CPU-Grenze (18i–20i), Betriebswarnungen, Nachtläufe bis 05:00 UTC |
+| 16 | [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) | CPU-Grenze: Budget, Wege je Schritt, Cron je Minute, Fristen, Index-Nachtrag |
+| 16 | [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md) | CPU-Grenze: was je Schritt folgt, mit den Nachtmessungen |
+| 16 | [16-2-betriebswarnungen.md](16-2-betriebswarnungen.md) | Betriebswarnungen (18m, 18m-b), Nachtläufe bis 05:00 UTC |
 | 16 | [16-4-finale-stufen.md](16-4-finale-stufen.md) | die fünf finalen Stufen |
 | 17 | [17-risiken.md](17-risiken.md) | bekannte Risiken und wie damit umgegangen wird |
 

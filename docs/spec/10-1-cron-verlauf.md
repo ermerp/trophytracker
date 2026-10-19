@@ -58,7 +58,7 @@ je Bereich den letzten Ausgang (`am`, `getan`, `meldung` als Wahrheitswert, `off
 Store; seit 20i schreibt die Markt-Action ihren Ausgang als Bereich `markt` und ihren Beginn getrennt
 als `markt_begonnen`, über `POST /api/sync/markt/ausgang`, mit einer Zeile `cron: markt bereich=action …`
 im selben Verlauf) und die zuletzt gemeldete Kette ohne Ausgang (`ohneAusgang`: Anzahl, von, bis, Bereich,
-`gemeldetAm`). Das ist die Grundlage der Betriebswarnungen ([16.2](16-2-cpu-und-betrieb.md)): **Die
+`gemeldetAm`). Das ist die Grundlage der Betriebswarnungen ([16.2](16-2-betriebswarnungen.md)): **Die
 Fakten schreibt der Cron, das Urteil entsteht beim Lesen** – die Textzeile ist Anzeige, kein Datum,
 und sie zu zerlegen bräche beim nächsten Umbau. Geschrieben wird mit `json_set` beim eigenen Bereich,
 ohne den Stand vorher zu lesen; ein unlesbarer Stand wird ersetzt, statt den Batch und damit die
@@ -122,7 +122,7 @@ Zeile die Zeit des jüngsten Aufrufs trägt. `erschienen=0` steht nicht mehr in 
 Zahl gibt es im PSN-Fenster gar nicht, und der Zeitstempel ist das Lebenszeichen. `GET /api/sync/status` nennt `letzterAutomatischerLauf`; die
 Einstellungen zeigen unter „Automatik" Fenster und letzten Nachtlauf, die Sync-Zeile nennt „von
 Hand" oder „automatisch". Ob daraus eine Warnung wird – rot oder zur Kenntnis –, urteilen seit
-Stufe 18m die Betriebswarnungen beim Lesen ([16.2](16-2-cpu-und-betrieb.md), Darstellung 13.2).
+Stufe 18m die Betriebswarnungen beim Lesen ([16.2](16-2-betriebswarnungen.md), Darstellung 13.2).
 
 Lokal: `npx wrangler dev --test-scheduled`, dann `curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"`
 für das PSN-Fenster, `?cron=*/5+6-8+*+*+*` für die Wartung, ohne Parameter für beides

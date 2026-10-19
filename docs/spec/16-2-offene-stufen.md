@@ -81,7 +81,7 @@ Die Glocke in der Kopfzeile meldet einen Preis, der zur Absicht passt.
 **Ein eigener Ton, nicht Gold** (Vorgabe des Nutzers vom 18.10.2026, am Prototyp von 18m): Gold liegt
 zu nah am Warn-Gelb, und ein Preisalarm ist eine gute Nachricht, keine wartende Arbeit. Im Prototyp
 von 20g wird ein Grün aus den Tokens (`--st-am_spielen`) neben Rot, Grau und Gelb der Glocke geprüft;
-die Gruppe in der Tafel steht zwischen Warnungen und Posten ([16.2](16-2-cpu-und-betrieb.md), 18m).
+die Gruppe in der Tafel steht zwischen Warnungen und Posten ([16.2](16-2-betriebswarnungen.md), 18m).
 
 **Der Kanal folgt der Absicht** (Entscheidung des Nutzers vom 09.10.2026) – für Alarm *und*
 Anzeige: Disc-Fassung `ja` → Gebrauchtpreis, `nein` oder „physisch nicht gewünscht"
@@ -171,8 +171,10 @@ aber keine Teilstufe.
 
 #### Offen: die CPU-Grenze, Betriebswarnungen, Nachtläufe bis 05:00 UTC
 
-Stehen in [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md): die Nachträge 18i bis 20i, die
-Stufe 18m (Betriebswarnungen) mit dem Nachtrag 18m-b und der offene Punkt nach 20i.
+Stehen in [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) (die Nachträge 18i bis 20i, Budget und
+Wege je Schritt), [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md) (die Messungen je Schritt) und
+[16-2-betriebswarnungen.md](16-2-betriebswarnungen.md) (Stufe 18m mit dem Nachtrag 18m-b und der
+offene Punkt nach 20i).
 
 **Die fünf finalen Stufen** – die Sammlung finalisieren, Oberfläche, Refactoring
 (abgetragen), Wiederherstellungsprobe, Außendarstellung – stehen in
