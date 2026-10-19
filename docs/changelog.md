@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 103 | 19.10.2026 | **Nachtrag: Nacht zum 19.10.** Messwerte nach 18k/18l: Spielzeit EWR 18,6 / IAD 29,3 ms (rund 85 % weniger), Store 2,2–6,1 ms je Release (keine Wirkung von 18l sichtbar), PSN-Leerlauf erstmals gemessen (Median 5,7); Abbrüche in 8 von 22 Nächten, nicht nur in Singapur (10.1); die kürzere Frist aus 20i gilt für Markt **und** Store (16.2) |
 | 102 | 19.10.2026 | **Nachtrag zu 18m: Zugangsende in Kalendertagen.** `zugangsende` zählt die Tage bis zum Ende in Ortszeit (Europe/Berlin) statt `Math.floor` über Stunden: am 19.10. „in 5 Tagen" statt 4, rot ab 21.10. 00:00 statt einen Tag früher; Tests mit Tageswechsel in Sommer- und Winterzeit (7.1, 16.2) |
 | 101 | 18.10.2026 | **Nachtrag: Reihenfolge in 16.2.** Die vorgesehene Reihenfolge 18m-b → Index-Nachtrag → 20i → 05:00 → 20g steht als Arbeitsplan in 16.2 statt in der Projektstand-Erinnerung, mit den drei festen Abhängigkeiten; wann 20g kommt, bleibt offen (16.2) |
 | 100 | 18.10.2026 | **Nachtrag: Session-Start mit Changelog-Kopf.** `/catchup` liest aus 16.2 die nächste Stufe und die offenen Punkte, dazu die ersten fünf Changelog-Zeilen und `git log --oneline -10`; die Projektstand-Erinnerung hält nur kurzlebigen Sitzungsstand, Dauerhaftes steht in 16.2 (CLAUDE.md) |

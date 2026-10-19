@@ -158,7 +158,11 @@ schon 22 Wartungsaufrufe ab (nachgemessen am 17.10.2026). Ab dem 10.10. bricht d
 schwerer Aufrufe für ein bis vier Stunden **jeden** Aufruf bei genau 10,0 ms ab (`exceededResources`),
 auch den Leerlauf – 12 von 36 Wartungsaufrufen am 10.10., 35 am 11.10. (dort schon ab 05:25 im
 PSN-Fenster), 15 bis 33 an jedem Tag danach. Am 16.10. lief es von 08:05 an wieder. Ausgelöst
-wurde jeder Aufruf; es fehlte keiner.
+wurde jeder Aufruf; es fehlte keiner. **Woran die Duldung hängt, ist offen** (nachgezählt am 19.10.2026,
+`workersInvocationsAdaptive`, Nächte 28.09.–19.10.): Abbrüche gab es in **8 von 22 Nächten** – am
+04.10. in Newark (21), vom 10. bis 16.10. in Singapur (12–42 je Nacht). In den Nächten 17. bis 19.10.
+lagen je 43 bis 69 Aufrufe über 10 ms, abgebrochen wurde keiner; Ende September liefen Nächte in
+Mumbai und Taipeh ohne Abbruch. Der Standort allein erklärt es also nicht.
 
 **Wohin die CPU geht** – gemessen am 16.10.2026 in einem eigenen Messworker ohne Produktionsdaten
 (Stufe 18h): der echte Code der Anwendung, einmal mit abgespielten D1-Antworten, einmal gegen
