@@ -7,6 +7,9 @@
  * Zwanzigstel davon. Die Anweisungen eines Batches werden vor der Uebergabe
  * an die echte D1 wieder ausgepackt.
  *
+ * Dazu die Anweisungen (Stufe 18k-b): D1 dokumentiert 50 Abfragen je Aufruf
+ * des Workers, und jede Anweisung eines Batches zaehlt einzeln mit.
+ *
  * Dazu die gelesenen und geschriebenen Zeilen aus `meta` - fuer die
  * Lesekosten-Messung, die den GANZEN Aufruf zaehlt statt nachgebauter
  * Einzelabfragen ("gemessen wird die Route, nicht die Abfrage").
@@ -14,10 +17,12 @@
 export function zaehlendeDb(db: D1Database): {
 	db: D1Database;
 	aufrufe: () => number;
+	anweisungen: () => number;
 	gelesen: () => number;
 	geschrieben: () => number;
 } {
 	let aufrufe = 0;
+	let einzelne = 0;
 	let gelesen = 0;
 	let geschrieben = 0;
 	const buchen = (e: D1Result) => {
@@ -33,6 +38,7 @@ export function zaehlendeDb(db: D1Database): {
 				if (name === "run" || name === "all") {
 					return async () => {
 						aufrufe++;
+						einzelne++;
 						return buchen(await ziel.all());
 					};
 				}
@@ -40,6 +46,7 @@ export function zaehlendeDb(db: D1Database): {
 				if (name === "first") {
 					return async (spalte?: string) => {
 						aufrufe++;
+						einzelne++;
 						const zeile = (buchen(await ziel.all()).results ?? [])[0] as Record<string, unknown> | undefined;
 						if (zeile === undefined) return null;
 						return spalte === undefined ? zeile : (zeile[spalte] ?? null);
@@ -48,6 +55,7 @@ export function zaehlendeDb(db: D1Database): {
 				if (name === "raw") {
 					return (...a: unknown[]) => {
 						aufrufe++;
+						einzelne++;
 						return (ziel.raw as (...x: unknown[]) => unknown).apply(ziel, a);
 					};
 				}
@@ -64,6 +72,7 @@ export function zaehlendeDb(db: D1Database): {
 			if (name === "batch") {
 				return async (anweisungen: D1PreparedStatement[]) => {
 					aufrufe++;
+					einzelne += anweisungen.length;
 					const ergebnisse = await ziel.batch(anweisungen.map((a) => echt.get(a) ?? a));
 					ergebnisse.forEach(buchen);
 					return ergebnisse;
@@ -79,5 +88,5 @@ export function zaehlendeDb(db: D1Database): {
 			return typeof wert === "function" ? wert.bind(ziel) : wert;
 		},
 	});
-	return { db: zaehlend, aufrufe: () => aufrufe, gelesen: () => gelesen, geschrieben: () => geschrieben };
+	return { db: zaehlend, aufrufe: () => aufrufe, anweisungen: () => einzelne, gelesen: () => gelesen, geschrieben: () => geschrieben };
 }

@@ -341,20 +341,28 @@ export class GamesRepository {
 	 * Statement erlaubt. Jeder Schluessel bleibt ein Lookup ueber
 	 * `idx_game_sort_title`, die Releases kommen ueber `idx_release_game`.
 	 * Schluessel ohne Treffer fehlen in der Antwort.
+	 *
+	 * `mitKauf` (Stufe 18k-b): ob am Release schon ein Kauf liegt - fuer die
+	 * Kaufliste, in derselben Anweisung statt einer Abfrage je Eintrag. Ein
+	 * Lookup ueber UNIQUE(release_id, source) je Release.
 	 */
 	async releasesNachSchluesseln(
 		schluessel: readonly string[],
-	): Promise<Map<string, Array<{ id: number; platform: string }>>> {
+		optionen: { mitKauf?: boolean } = {},
+	): Promise<Map<string, Array<{ id: number; platform: string; hatKauf?: boolean }>>> {
 		const einmal = [...new Set(schluessel)];
-		const raus = new Map<string, Array<{ id: number; platform: string }>>();
+		const raus = new Map<string, Array<{ id: number; platform: string; hatKauf?: boolean }>>();
 		if (einmal.length === 0) return raus;
 		const stuecke: string[][] = [];
 		for (let i = 0; i < einmal.length; i += 100) stuecke.push(einmal.slice(i, i + 100));
-		const ergebnisse = await this.db.batch<{ schluessel: string; id: number; platform: string }>(
+		const kauf = optionen.mitKauf
+			? ", EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') AS hat_kauf"
+			: "";
+		const ergebnisse = await this.db.batch<{ schluessel: string; id: number; platform: string; hat_kauf?: number }>(
 			stuecke.map((s) =>
 				this.db
 					.prepare(
-						"SELECT g.sort_title AS schluessel, r.id, r.platform FROM game g JOIN release r ON r.game_id = g.id " +
+						`SELECT g.sort_title AS schluessel, r.id, r.platform${kauf} FROM game g JOIN release r ON r.game_id = g.id ` +
 							`WHERE g.sort_title IN (${s.map(() => "?").join(", ")})`,
 					)
 					.bind(...s),
@@ -363,7 +371,7 @@ export class GamesRepository {
 		for (const e of ergebnisse) {
 			for (const z of e.results ?? []) {
 				const liste = raus.get(z.schluessel) ?? [];
-				liste.push({ id: z.id, platform: z.platform });
+				liste.push(optionen.mitKauf ? { id: z.id, platform: z.platform, hatKauf: z.hat_kauf === 1 } : { id: z.id, platform: z.platform });
 				raus.set(z.schluessel, liste);
 			}
 		}

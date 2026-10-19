@@ -52,20 +52,6 @@ export type BesitzErgebnis = {
 	meldung?: string;
 };
 
-/**
- * Das eine Release zu einem PSN-Titel - oder null.
- *
- * Genau ein Kandidat mit passender Plattform, sonst nichts: Zwei Treffer
- * bedeuten, dass die Entscheidung dem Nutzer gehoert (Abschnitt 7).
- */
-async function releaseZu(repos: Repositories, name: string, plattform: string): Promise<number | null> {
-	const schluessel = titelSchluessel(name);
-	if (!schluessel) return null;
-	const kandidaten = await repos.games.releasesNachSchluessel(schluessel);
-	const passend = kandidaten.filter((k) => k.platform === plattform);
-	return passend.length === 1 ? passend[0].id : null;
-}
-
 /** Eine Seite gespielter Titel holen, zuordnen und schreiben. */
 export async function spielzeitSchritt(
 	repos: Repositories,
@@ -140,37 +126,58 @@ export async function besitzSchritt(
 	try {
 		const { gesamt, eintraege } = await psn.holeKaeufeSeite(accessToken, start, KAEUFE_JE_SEITE);
 
-		let kauf = 0;
-		let plus = 0;
-		let erledigt = 0;
-		for (const e of eintraege) {
-			if (!e.name || !e.platform) continue;
-			const plattform = e.platform.trim().toUpperCase();
-			const releaseId = await releaseZu(repos, e.name, plattform);
-			if (releaseId === null) continue;
-
+		// Die ganze Seite in einem Lese- und einem Schreib-Batch (Stufe 18k-b)
+		// statt zwei bis drei D1-Aufrufen je Eintrag. Zugeordnet wird wie
+		// bisher: genau ein Release mit passender Plattform, sonst nichts -
+		// zwei Treffer bedeuten, dass die Entscheidung dem Nutzer gehoert (7).
+		const gueltig = eintraege.flatMap((e) =>
+			e.name && e.platform
+				? [{ e, plattform: e.platform.trim().toUpperCase(), schluessel: titelSchluessel(e.name) }]
+				: [],
+		);
+		const kandidaten = await repos.games.releasesNachSchluesseln(
+			gueltig.map((g) => g.schluessel).filter((s) => s !== ""),
+			{ mitKauf: true },
+		);
+		const kaufNeu: number[] = [];
+		const plusNeu: Array<{ id: number; hatKauf: boolean }> = [];
+		for (const { e, plattform, schluessel } of gueltig) {
+			const passend = (kandidaten.get(schluessel) ?? []).filter((k) => k.platform === plattform);
+			if (passend.length !== 1) continue;
+			const { id, hatKauf } = passend[0];
 			if (e.subscriptionService === "PS_PLUS") {
-				gesehen.push(releaseId);
-				// Kauf schlaegt PS+: Wer gekauft hat, behaelt - da ist das Abo
-				// gleichgueltig (Entscheidung des Nutzers vom 22.09.2026).
-				if (await repos.besitz.hatKauf(releaseId)) continue;
-				if (await repos.besitz.berechtigungErkennen(releaseId, "plus")) plus++;
-			} else if (await repos.besitz.berechtigungErkennen(releaseId, "kauf")) {
-				kauf++;
-				// Ein erkannter Kauf erledigt offene Kauf- und Wunscheintraege
-				// NUR, wenn es das Spiel ausschliesslich digital gibt. Sonst
-				// koennte der Wunsch der Disc gelten (Entscheidung des Nutzers
-				// vom 22.09.2026) - die Ausnahme zur Regel aus Abschnitt 5,
-				// die beim Erfassen von Hand ohne Rueckfrage greift.
-				if (await repos.besitz.nurDigital(releaseId)) {
-					const offen = await repos.plan.offeneAmZiel(["kauf", "wunsch"], { releaseId });
-					erledigt += await repos.plan.erledigen(
-						offen.map((e) => e.id),
-						"besitz",
-					);
-				}
+				gesehen.push(id);
+				plusNeu.push({ id, hatKauf: hatKauf === true });
+			} else {
+				kaufNeu.push(id);
 			}
 		}
+		// Kauf schlaegt PS+: Wer gekauft hat, behaelt - da ist das Abo
+		// gleichgueltig (Entscheidung des Nutzers vom 22.09.2026). Auch ein
+		// Kauf auf DERSELBEN Seite zaehlt; bis 18k-b hing das an der
+		// Reihenfolge der Eintraege.
+		const gekauft = new Set(kaufNeu);
+		const angelegt = await repos.besitz.berechtigungenErkennen({
+			kauf: kaufNeu,
+			plus: plusNeu.filter((p) => !p.hatKauf && !gekauft.has(p.id)).map((p) => p.id),
+		});
+
+		// Ein erkannter Kauf erledigt offene Kauf- und Wunscheintraege NUR,
+		// wenn es das Spiel ausschliesslich digital gibt. Sonst koennte der
+		// Wunsch der Disc gelten (Entscheidung des Nutzers vom 22.09.2026) -
+		// die Ausnahme zur Regel aus Abschnitt 5, die beim Erfassen von Hand
+		// ohne Rueckfrage greift. Selten (neu erkannte Kaeufe), deshalb je
+		// Release einzeln ueber die Kopplung.
+		let erledigt = 0;
+		for (const releaseId of await repos.besitz.nurDigitalUnter(angelegt.kauf)) {
+			const offen = await repos.plan.offeneAmZiel(["kauf", "wunsch"], { releaseId });
+			erledigt += await repos.plan.erledigen(
+				offen.map((o) => o.id),
+				"besitz",
+			);
+		}
+		const kauf = angelegt.kauf.length;
+		const plus = angelegt.plus.length;
 
 		const weiter = start + eintraege.length < gesamt && eintraege.length > 0;
 		// Nur am Ende eines vollstaendigen Durchlaufs aufraeumen.

@@ -12,7 +12,7 @@ import { erstellePsnClient } from "../src/psn/client";
 import { zaehlendeDb } from "./d1-zaehler";
 import { fakeIgdb } from "./igdb-fake";
 import { fakeFetch, jsonAntwort } from "./psn-fake";
-import { GESPIELTE_JE_SEITE, spielzeitSchritt } from "../src/sync/besitz";
+import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt } from "../src/sync/besitz";
 import { storeOhne } from "./store-fake";
 
 /** Das UTC-Datum, mit dem die Staende als "heute" gelten. */
@@ -227,7 +227,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		//
 		// Seit Stufe 18k fragt der Spielzeit-Schritt alle Titel einer Seite in
 		// `IN`-Listen (`releasesNachSchluesseln`, gemessen im naechsten Test);
-		// die Kaufliste und die Zuordnung fragen weiter einzeln.
+		// die Kaufliste seit 18k-b ebenso; die Zuordnung fragt weiter einzeln.
 		//
 		// Die Lehre steckt in der Zeile darunter: Dieser Test hat bis zum
 		// 28.09.2026 nur Leseansichten gemessen. Ein Schreibschritt, der je
@@ -296,6 +296,66 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(wieder.gelesen).toBeLessThan(1_500);
 
 		await env.DB.prepare("DELETE FROM psn_played_title").run();
+	});
+
+	it("misst eine ganze Kaufliste-Seite als Schritt (Stufe 18k-b)", async () => {
+		// Wie die Spielzeit-Seite: 50 Kaeufe wie eine volle Seite von Sony, die
+		// Haelfte mit passender Plattform, jeder dritte im Abo. Bis 18k-b fragte
+		// der Schritt je Eintrag einzeln - zwei bis drei D1-Aufrufe, bis zu 150
+		// Abfragen je Aufruf gegen die dokumentierten 50 (16.2).
+		await env.DB.prepare("DELETE FROM digital_entitlement").run();
+		const kaeufe = Array.from({ length: KAEUFE_JE_SEITE }, (_, k) => {
+			const i = k + 1;
+			const plattform = i % 4 === 1 ? "PS4" : i % 4 === 2 ? "PS5" : "PS4";
+			return {
+				titleId: `CUSA${String(i).padStart(5, "0")}_00`,
+				name: `Spiel ${String(i).padStart(4, "0")}`,
+				platform: plattform,
+				subscriptionService: i % 3 === 0 ? "PS_PLUS" : "NONE",
+			};
+		});
+		const psn = erstellePsnClient(
+			fakeFetch([
+				[
+					/graphql/,
+					() =>
+						jsonAntwort({
+							data: { purchasedTitlesRetrieve: { games: kaeufe, pageInfo: { totalCount: kaeufe.length } } },
+						}),
+				],
+			]).fetch,
+		);
+		const schritt = async () => {
+			const zaehler = zaehlendeDb(env.DB);
+			const e = await besitzSchritt(createRepositories(zaehler.db, env.NPSSO_KEY), psn, new Geheimnis("access-token-test"), 0, []);
+			return {
+				e,
+				aufrufe: zaehler.aufrufe(),
+				anweisungen: zaehler.anweisungen(),
+				gelesen: zaehler.gelesen(),
+				geschrieben: zaehler.geschrieben(),
+			};
+		};
+
+		// Erste Woche: alles neu. Zweite: dieselben Kaeufe, nichts mehr anzulegen.
+		const neu = await schritt();
+		const wieder = await schritt();
+		console.info({ kauflisteSeite: { neu: { ...neu, e: undefined }, wieder: { ...wieder, e: undefined } } });
+
+		expect(neu.e).toMatchObject({ status: "erfolg", geholt: 50, kauf: 18, plus: 8, weiter: false });
+		expect(wieder.e).toMatchObject({ status: "erfolg", kauf: 0, plus: 0 });
+		// Ein Lese- und ein Schreib-Batch; in der ersten Woche dazu die Frage
+		// "nur digital?" fuer die neu erkannten Kaeufe. Das Aufraeumen am Ende
+		// des Durchlaufs ist ein dritter (weiter=false, eine Seite).
+		expect(neu.aufrufe).toBeLessThanOrEqual(4);
+		expect(wieder.aufrufe).toBeLessThanOrEqual(3);
+		// Weit unter den 50 Abfragen je Aufruf, gleich wie viele Eintraege.
+		expect(neu.anweisungen).toBeLessThanOrEqual(12);
+		expect(wieder.anweisungen).toBeLessThanOrEqual(12);
+		expect(neu.gelesen).toBeLessThan(1_500);
+		expect(wieder.gelesen).toBeLessThan(1_500);
+
+		await env.DB.prepare("DELETE FROM digital_entitlement").run();
 	});
 
 	it("misst die Abfragen der Sammlung einzeln", async () => {

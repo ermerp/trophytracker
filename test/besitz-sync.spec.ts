@@ -178,6 +178,57 @@ describe("besitzSchritt", () => {
 		expect(await berechtigungen()).toEqual([{ release_id: 10, source: "kauf", herkunft: "psn" }]);
 	});
 
+	it("laesst Kauf vor PS+ gehen, auch auf derselben Seite und in beiden Reihenfolgen (Stufe 18k-b)", async () => {
+		await spiel(1, "Erst Abo", ["PS4"]);
+		await spiel(2, "Erst Kauf", ["PS4"]);
+		const psn = psnMit([], 0, [
+			{ titleId: "A", name: "Erst Abo", platform: "PS4", subscriptionService: "PS_PLUS" },
+			{ titleId: "A", name: "Erst Abo", platform: "PS4", subscriptionService: "NONE" },
+			{ titleId: "B", name: "Erst Kauf", platform: "PS4", subscriptionService: "NONE" },
+			{ titleId: "B", name: "Erst Kauf", platform: "PS4", subscriptionService: "PS_PLUS" },
+		], 4);
+
+		const e = await besitzSchritt(repos(), psn, TOKEN, 0, []);
+
+		expect(e).toMatchObject({ kauf: 2, plus: 0 });
+		expect(await berechtigungen()).toEqual([
+			{ release_id: 10, source: "kauf", herkunft: "psn" },
+			{ release_id: 20, source: "kauf", herkunft: "psn" },
+		]);
+	});
+
+	it("schreibt je neuer Berechtigung genau ein Ereignis, auch bei doppelten Eintraegen", async () => {
+		await spiel(1, "Doppelt", ["PS4"]);
+		await spiel(2, "Schon da", ["PS5"]);
+		await env.DB.prepare("INSERT INTO digital_entitlement (release_id, source, herkunft) VALUES (20, 'plus', 'psn')").run();
+		const psn = psnMit([], 0, [
+			{ titleId: "A", name: "Doppelt", platform: "PS4", subscriptionService: "NONE" },
+			{ titleId: "A", name: "Doppelt", platform: "PS4", subscriptionService: "NONE" },
+			{ titleId: "B", name: "Schon da", platform: "PS5", subscriptionService: "PS_PLUS" },
+		], 3);
+
+		const e = await besitzSchritt(repos(), psn, TOKEN, 0, []);
+
+		expect(e).toMatchObject({ kauf: 1, plus: 0 });
+		const { results } = await env.DB.prepare("SELECT release_id, kind, new_value FROM game_event ORDER BY id").all();
+		expect(results).toEqual([{ release_id: 10, kind: "berechtigung_angelegt", new_value: "kauf" }]);
+	});
+
+	it("ordnet nur bei genau einem Release mit passender Plattform zu", async () => {
+		await spiel(1, "Zweimal", ["PS4"]);
+		await spiel(2, "Zweimal", ["PS4"]);
+		await spiel(3, "Andere Plattform", ["PS5"]);
+		const psn = psnMit([], 0, [
+			{ titleId: "A", name: "Zweimal", platform: "PS4", subscriptionService: "NONE" },
+			{ titleId: "C", name: "Andere Plattform", platform: "PS4", subscriptionService: "NONE" },
+		], 2);
+
+		const e = await besitzSchritt(repos(), psn, TOKEN, 0, []);
+
+		expect(e).toMatchObject({ status: "erfolg", geholt: 2, kauf: 0, plus: 0 });
+		expect(await berechtigungen()).toEqual([]);
+	});
+
 	it("fasst eine von Hand erfasste Zeile nicht an", async () => {
 		await spiel(1, "Meins", ["PS4"]);
 		await env.DB.prepare("INSERT INTO digital_entitlement (release_id, source, herkunft) VALUES (10, 'plus', 'nutzer')").run();

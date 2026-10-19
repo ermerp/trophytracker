@@ -94,8 +94,15 @@ sinnvollen Portion gegen dieses Budget:
 - **Markt → GitHub Action**, als Stufe 20i: kein einzelnes Release bleibt unter 10 ms, und 431
   Aufrufe passen in keinen Takt. Wie die Action schreibt – Worker-Route in Portionen oder direkt
   über die D1-Schnittstelle –, ist **offen** (Plan vom 19.10.2026).
-- **Kaufliste → bündeln wie 18k**, als nächster Nachtrag vor 18m-b: je Eintrag zwei bis drei
-  D1-Aufrufe nacheinander, bis zu 150 Abfragen je Aufruf gegen die dokumentierten 50.
+- **Kaufliste → gebündelt wie 18k – gebaut in 18k-b (19.10.2026):** bis dahin je Eintrag zwei bis
+  drei D1-Aufrufe nacheinander, bis zu 150 Abfragen je Aufruf gegen die dokumentierten 50. Jetzt ein
+  Lese-Batch (`releasesNachSchluesseln` mit `mitKauf`) und ein Schreib-Batch (`berechtigungenErkennen`,
+  je Quelle Protokoll und mehrzeiliger INSERT). Gemessen in `test/lesekosten.spec.ts` an einer Seite
+  mit 50 Käufen, die Ausgangszahl im unberührten Stand: **4 / 3 D1-Aufrufe** (erste / jede weitere
+  Woche, mit „nur digital?" und dem Aufräumen) statt 103 / 85, **8 / 7 Anweisungen** statt 130 / 112,
+  gelesen 614 / 468 statt 494 / 372 Zeilen, geschrieben unverändert 182 / 0. Die CPU zeigt die
+  nächste Kaufliste-Nacht (um den 25.10.2026) – vorher 35–108 ms je Aufruf; ob die Portion von 50
+  dann ins Budget passt, ist offen.
 - **Store → offen bis nach dem Probelauf, jetzt zu entscheiden:** Ein Release je Aufruf ist die
   Untergrenze, rund die Hälfte läge über 10 ms. Ein Probelauf aus GitHub Actions am 19.10.2026
   (echter Store-Client, ein öffentliches Concept, zwei Anfragen) wurde **angenommen**: 200 in 0,4
