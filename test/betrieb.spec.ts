@@ -71,8 +71,15 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 			const ende = zugangsende(ZUGANG, 25, JETZT)!;
 			expect(ende.am).toBe("2026-10-24T00:00:00.000Z");
 			expect(ende.quelle).toBe("gemessen");
-			expect(ende.tage).toBe(5);
+			expect(ende.tage).toBe(6);
 			expect(ende.stufe).toBe("kenntnis");
+		});
+
+		it("zaehlt Kalendertage in Ortszeit, nicht angebrochene Tage", () => {
+			const tage = (jetzt: string) => zugangsende(ZUGANG, 25, new Date(jetzt))!.tage;
+			expect(tage("2026-10-19T09:58:00Z")).toBe(5); // vorher Math.floor: 4
+			expect(tage("2026-10-19T21:59:59Z")).toBe(5); // 23:59 in Berlin, noch der 19.
+			expect(tage("2026-10-19T22:00:00Z")).toBe(4); // 00:00 in Berlin, schon der 20.
 		});
 
 		it("nimmt Sonys Datum, solange keine Lebensdauer gemessen ist", () => {
@@ -87,20 +94,27 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 			expect(spaet[0].text).toBe("Der PlayStation-Zugang läuft laut Sony am 28.11. ab (in 8 Tagen).");
 		});
 
-		it("ist zur Kenntnis ab 14 Tagen vor dem Ende, rot ab 3", () => {
+		it("ist zur Kenntnis ab 14 Tagen vor dem Ende, rot ab 3 - Tageswechsel in Ortszeit", () => {
 			const stufe = (jetzt: string) => zugangsende(ZUGANG, 25, new Date(jetzt))?.stufe ?? null;
-			expect(stufe("2026-10-09T00:00:00Z")).toBeNull(); // 15 Tage
-			expect(stufe("2026-10-09T00:00:01Z")).toBe("kenntnis"); // 14,99 -> 14
-			expect(stufe("2026-10-20T00:00:00Z")).toBe("kenntnis"); // 4
-			expect(stufe("2026-10-20T00:00:01Z")).toBe("rot"); // 3,99 -> 3
+			expect(stufe("2026-10-09T21:59:59Z")).toBeNull(); // 09.10. 23:59 in Berlin, 15 Tage
+			expect(stufe("2026-10-09T22:00:00Z")).toBe("kenntnis"); // 10.10. 00:00, 14
+			expect(stufe("2026-10-20T21:59:59Z")).toBe("kenntnis"); // 20.10. 23:59, 4
+			expect(stufe("2026-10-20T22:00:00Z")).toBe("rot"); // 21.10. 00:00, 3
 			expect(stufe("2026-10-25T00:00:00Z")).toBe("rot"); // vorbei, Zugang noch ok
+		});
+
+		it("wechselt den Tag nach der Zeitumstellung um 23:00 UTC", () => {
+			// Sonys 28.11. liegt in der Winterzeit: der 25.11. beginnt um 23:00 UTC.
+			const stufe = (jetzt: string) => zugangsende(ZUGANG, null, new Date(jetzt))?.stufe ?? null;
+			expect(stufe("2026-11-24T22:59:59Z")).toBe("kenntnis");
+			expect(stufe("2026-11-24T23:00:00Z")).toBe("rot");
 		});
 
 		it("sagt im Satz, woher das Datum kommt", () => {
 			const w = urteile(ruhig({ zugang: ZUGANG }));
 			expect(w.map((x) => x.art)).toEqual(["zugang_endet"]);
 			expect(w[0].text).toBe(
-				"Der PlayStation-Zugang hält vermutlich bis um den 24.10. (in 5 Tagen) – der bisher kürzeste hielt 25 Tage, Sony nennt den 28.11.",
+				"Der PlayStation-Zugang hält vermutlich bis um den 24.10. (in 6 Tagen) – der bisher kürzeste hielt 25 Tage, Sony nennt den 28.11.",
 			);
 		});
 
