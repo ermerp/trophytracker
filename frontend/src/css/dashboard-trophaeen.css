@@ -81,20 +81,24 @@
   .stufenkurz {
     padding-left: var(--a5);
     justify-content: space-around;
+    flex-wrap: wrap;
   }
 
   /* Die Zahlen skalieren mit ihrem Block (Entscheidung des Nutzers vom
      20.10.2026): In einer halben Spalte bei 1280 px sind es rund 336 px, die
      Zeile brauchte bei 2,4 rem 495 – die Seite lief 42 px über. Pokal und
      Abstände wachsen in `em` mit, sonst schrumpfte nur die Schrift und die
-     festen Teile blieben zu breit. Volle Größe ab rund 530 px Blockbreite,
-     nie kleiner als am Handy (1,15 rem). */
+     festen Teile blieben zu breit. Nie kleiner als am Handy (1,15 rem).
+     Faktor 6, nicht 7: Die Breite hängt an der Stellenzahl, und mit den echten
+     Zahlen brauchte die Zeile in der Produktion bei 7 cqi 366 px in einem
+     336 px breiten Block (20.10.2026). Wächst eine Zahl um eine Stelle,
+     bricht die Zeile um, statt über den Rand zu ragen (`flex-wrap`). */
   .b-trophaeen {
     container-type: inline-size;
   }
 
   .sk {
-    font-size: clamp(1.15rem, 7cqi, 2.4rem);
+    font-size: clamp(1.15rem, 6cqi, 2.4rem);
     gap: 0.26em;
   }
 

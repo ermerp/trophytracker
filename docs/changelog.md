@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 112 | 20.10.2026 | **Nachtrag 19-c: Trophäenzahlen mit den echten Zahlen.** In der Produktion brauchte die Stufenzeile bei 7 cqi 366 px in 336; Faktor 6 und Umbruch statt Überstand, wenn eine Zahl eine Stelle länger wird (13.2) |
 | 111 | 20.10.2026 | **Nachtrag 19-b: Dashboard am Desktop ohne Überlauf.** Bei 1280 px war die Seite 1 322 breit, die Glocke lag fast ganz außerhalb; Spalten `minmax(0, 1fr)`, Trophäenzahlen skalieren mit ihrem Block, drei Stufen (Feed unten bis 64 rem, links einspaltig bis 72 rem) (13.1, 13.2) |
 | 110 | 20.10.2026 | **Nachtrag 18m-c: Rangfolge der Glocke.** Rot vor Gelb (Posten) vor Grau (Kenntnis) statt Grau vor Gelb; Zahl der höchsten Stufe, Punkt der nächsten; die Tafel in derselben Folge (13.2, 16.2) |
 | 109 | 20.10.2026 | **Nachtrag: Entscheidungen zur Store-Action (20j).** Frist 12 Stunden, 01:47 UTC mit Rückfall 07:47, eigene Workflow-Datei, Service Token `github-store`; gebaut nach der Auswertung am 21.10. Defektproben im eigenen Worktree (CLAUDE.md, lehren.md) (16.2) |
