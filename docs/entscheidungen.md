@@ -8,7 +8,7 @@ Diese Datei wird **nicht routinemäßig gelesen**. Wer wissen will, was gilt,
 liest den Abschnitt; wer wissen will, **seit wann und warum so entschieden
 wurde**, sieht hier nach.
 
-Vier Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
+Fünf Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
 
 | Datum | Entscheidung | Abschnitt |
 |---|---|---|
@@ -122,7 +122,7 @@ Vier Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
 
 ## Umkehrungen
 
-Vier Entscheidungen haben eine frühere aufgehoben. Beide Daten gehören
+Fünf Entscheidungen haben eine frühere aufgehoben. Beide Daten gehören
 zusammen, weil die zweite ohne die erste nicht zu verstehen ist.
 
 | zuerst | dann | worum es geht |
@@ -131,6 +131,7 @@ zusammen, weil die zweite ohne die erste nicht zu verstehen ist.
 | 15.09.2026: „ohne Plattform" bleibt wählbar | **27./28.09.2026**: ein Wunsch hängt immer an einem Release | erst die Plattform entscheidet über Lücke, Kauf und Preis ([5](spec/05-absichten.md)) |
 | 16.09.2026: dritter Knopf auch in Block B | **02.10.2026**: Block B hat zwei Knöpfe | in Block B steht eine einzige Frage; die Absicht entscheidet sich danach ([5.3](spec/05-3-luecke-verwerfen.md)) |
 | bis Version 30: fehlende Plattformangabe ist kein Gegenbeweis | **16.09.2026**: ohne nachgewiesene Plattform kein Treffer | ein PC-Eintrag war als PS4-Wunsch durchgekommen ([7.6](spec/07-6-igdb.md)) |
+| 18.10.2026: die Glocke zählt Rot, sonst Grau (Kenntnis), sonst Gelb (Posten) | **20.10.2026**: Rot vor Gelb vor Grau, Tafel in derselben Folge | „zur Kenntnis" heißt „nichts zu tun", ein Posten „Arbeit wartet" ([13.2](spec/13-2-darstellungsregeln.md)) |
 
 ## Offen
 
@@ -292,3 +293,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 20.10.2026 | **Reihenfolge:** Store-Action → Index-Nachtrag (mit dem Bestand der Lesekosten-Messung, soll auch den Wartungs-Leerlauf senken) → 18m-b → Neubewertung 05:00 / Cron je Minute → 20g | [16.2](spec/16-2-offene-stufen.md) |
 | 20.10.2026 | **20j – Store-Action:** Frist 12 Stunden, Lauf `47 1 * * *` mit Rückfall `47 7 * * *` (versetzt zum Markt, nicht zur vollen Stunde), eigene Workflow-Datei, eigenes Service Token `github-store`; gebaut nach der Auswertung der Nacht zum 21.10. | [16.2](spec/16-2-cpu-und-betrieb.md) |
 | 20.10.2026 | **Defektproben in einem eigenen `git worktree`**, nie mit `git checkout` im Arbeitsbaum | CLAUDE.md, [lehren.md](lehren.md) |
+| 20.10.2026 | **Rangfolge der Glocke: Rot vor Gelb (Posten) vor Grau (Kenntnis)**; die Zahl zählt die höchste Stufe, ein Punkt in der Farbe der nächsten zeigt, dass darunter etwas liegt; die Tafel zeigt ihre Gruppen in derselben Folge. Ersetzt den Punkt aus dem Prototyp vom 18.10. | [13.2](spec/13-2-darstellungsregeln.md) |

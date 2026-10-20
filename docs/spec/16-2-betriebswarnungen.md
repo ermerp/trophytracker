@@ -41,7 +41,7 @@ letzten Ausgang (Nachtrag 18m-b, unten) – mit der einen Ausnahme `markt_geprue
 
 **Darstellung, am Prototyp entschieden:** Rot steht als Block auf der Seite – er ersetzt den gelben
 Block – und oben in der Tafel; „zur Kenntnis" still, ohne eigenen Farbton, nur hinter der Glocke; die
-Glocke zählt die höchste Stufe. Einzelheiten in 13.2; der Preisalarm aus 20g bekommt eine eigene
+Glocke zählt die höchste Stufe, seit dem 20.10.2026 in der Rangfolge Rot vor Gelb (Posten) vor Grau (Kenntnis). Einzelheiten in 13.2; der Preisalarm aus 20g bekommt eine eigene
 Gruppe, **nicht in Gold** ([20g](16-2-offene-stufen.md)).
 
 #### Nach 18m vorgemerkt: Nachtrag 18m-b, Fehler je Nacht
