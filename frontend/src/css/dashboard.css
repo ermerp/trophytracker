@@ -565,24 +565,20 @@ table.plattformtabelle {
 
 /* --- Desktop ------------------------------------------------------------- */
 
+/* Drei Stufen ab 48 rem (Entscheidung des Nutzers vom 20.10.2026). Eine
+   1fr-Spalte ist nie schmaler als ihr Inhalt, deshalb `minmax(0, 1fr)` – und
+   deshalb kommen die Spalten erst, wenn der Inhalt hineinpasst. Mindestbreiten,
+   gemessen am 20.10.2026: Trophäenzahlen 495 px bei voller Größe (sie skalieren
+   seitdem mit, dashboard-trophaeen.css), „Wie ich dastehe" 262, Plattformen
+   220, die beiden Tabellen 438. Vorher lief die Seite bei 1280 px auf 1322 –
+   die Glocke lag fast ganz außerhalb des Fensters –, bei 800 px auf 978.
+   - 48–64 rem: der Feed unter dem Inhalt, links eine Spalte;
+   - 64–72 rem: der Feed rechts, links eine Spalte (rund 440 px);
+   - ab 72 rem: links zwei Spalten, je ab rund 270 px. */
 @media (min-width: 48rem) {
-  /* Links die Zahlen, rechts der Feed über die volle Höhe. */
-  .dspalten {
-    display: grid;
-    grid-template-columns: 1fr 19rem;
-    gap: var(--a5);
-    align-items: stretch;
-  }
-
-  .drechts .block {
-    height: 100%;
-  }
-
-  /* Kreis und „Zuletzt gespielt" teilen sich eine Zeile, ebenso die beiden
-     Tabellen darunter. Das Handy stapelt beides. */
   .dlinks {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0 var(--a5);
     align-items: start;
   }
@@ -644,6 +640,28 @@ table.plattformtabelle {
   .tafel {
     left: auto;
     width: 26rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  /* Links die Zahlen, rechts der Feed über die volle Höhe. */
+  .dspalten {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 19rem;
+    gap: var(--a5);
+    align-items: stretch;
+  }
+
+  .drechts .block {
+    height: 100%;
+  }
+}
+
+@media (min-width: 72rem) {
+  /* Kreis und „Zuletzt gespielt" teilen sich eine Zeile, ebenso die beiden
+     Tabellen darunter. Darunter steht links alles untereinander. */
+  .dlinks {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
