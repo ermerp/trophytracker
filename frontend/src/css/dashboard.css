@@ -574,7 +574,8 @@ table.plattformtabelle {
    die Glocke lag fast ganz außerhalb des Fensters –, bei 800 px auf 978.
    - 48–64 rem: der Feed unter dem Inhalt, links eine Spalte;
    - 64–72 rem: der Feed rechts, links eine Spalte (rund 440 px);
-   - ab 72 rem: links zwei Spalten, je ab rund 270 px. */
+   - ab 72 rem: links zwei Spalten, je ab rund 270 px, die Tabellen
+     nebeneinander. */
 @media (min-width: 48rem) {
   .dlinks {
     display: grid;
@@ -624,13 +625,6 @@ table.plattformtabelle {
     grid-column: 1 / -1;
   }
 
-  .dtabellen {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 var(--a5);
-    align-items: start;
-  }
-
   /* Die Legende gehört neben den Kreis, nicht über die halbe Seite. */
   .dlinks .legende {
     max-width: 21rem;
@@ -662,6 +656,16 @@ table.plattformtabelle {
      Tabellen darunter. Darunter steht links alles untereinander. */
   .dlinks {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  /* Die beiden Tabellen nebeneinander erst hier: Mit den echten Zahlen
+     brauchen sie 269 und 179 px, mit Abstand 472 – bei 1024 px sind links 440
+     (gemessen in der Produktion am 20.10.2026; mit den erfundenen 438). */
+  .dtabellen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 var(--a5);
+    align-items: start;
   }
 }
 
