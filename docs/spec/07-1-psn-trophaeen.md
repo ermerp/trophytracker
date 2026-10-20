@@ -48,7 +48,9 @@ fallen also auseinander, und ein Messpunkt sagt nicht, ob das die Regel war. `ps
 deshalb je Zugang fest, wann er eingetragen wurde, was angekündigt war, bis wann er nachweislich
 lief und wie er endete. **Zwei Ausgänge, und nur einer ist eine Messung:** `gestorben_am` (von PSN
 abgelehnt) zählt, `ersetzt_am` (der Nutzer hat früher erneuert) nicht — wie lange dieser Zugang
-gehalten hätte, erfährt niemand. Die Tabelle enthält ausschließlich Zeitpunkte und steht deshalb in
+gehalten hätte, erfährt niemand. Deshalb lässt der Nutzer den Zugang vom 29.09.2026 bewusst auslaufen
+(Entscheidung vom 20.10.2026): Gemessen wird die echte Lebensdauer, und die Warnung „Zugang
+abgelaufen" erscheint einmal echt; erneuert wird, sobald sie steht. Die Tabelle enthält ausschließlich Zeitpunkte und steht deshalb in
 `EXPORT_TABELLEN`; die Zeitreihe ist ihr ganzer Zweck und nach einem Verlust nicht
 wiederherstellbar.
 
