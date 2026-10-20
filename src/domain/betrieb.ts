@@ -28,7 +28,7 @@ export type ZugangFakt = {
 };
 
 /** Der letzte Ausgang eines Bereichs - wie `CronFakt` in src/db/sync.ts. */
-export type AusgangFakt = { am: string; getan: string; meldung: boolean; offen?: number };
+export type AusgangFakt = { am: string; getan: string; meldung: boolean; offen?: number; geprueft?: number };
 
 /** Der Stand unter `cron_stand` - wie `CronStand` in src/db/sync.ts. */
 export type StandFakt = {
@@ -37,6 +37,12 @@ export type StandFakt = {
 	/** Die Markt-Action (Stufe 20i): ihr letzter Ausgang und, getrennt, ihr letzter Beginn. */
 	markt?: AusgangFakt;
 	markt_begonnen?: AusgangFakt;
+	/**
+	 * Der letzte Lauf der Markt-Action, der etwas geprueft hat (Nachtrag
+	 * 20i-b). Eigener Bereich, weil der letzte Ausgang an einem normalen Tag
+	 * der Rueckfall um 08:17 ist - und der prueft dann nichts.
+	 */
+	markt_geprueft?: AusgangFakt;
 	ohneAusgang?: { anzahl: number; von: string; bis: string; bereich: string; gekappt?: boolean; gemeldetAm: string };
 };
 
@@ -52,6 +58,7 @@ export const BETRIEB_ARTEN = [
 	"ohne_ausgang",
 	"meldung",
 	"kaufliste",
+	"markt_leer",
 	"fenster_offen",
 ] as const;
 export type BetriebArt = (typeof BETRIEB_ARTEN)[number];
@@ -104,8 +111,9 @@ const HINWEIS_STUNDEN = 24;
 /**
  * "Nicht fertig geworden" ist seit 20i scharf. Bis dahin schloss das
  * Wartungsfenster mit der Marktfrist von 24 Stunden jede Nacht mit Rest
- * (`offen=18` am 18.10.2026); seit der Markt eine Action ist und beide
- * Fristen 20 Stunden haben, ist ein Rest wieder ein Befund (16.2).
+ * (`offen=18` am 18.10.2026); seit der Markt eine Action ist und die
+ * Fristen unter 21 Stunden liegen (Store 20, Markt seit 20i-b 12), ist ein
+ * Rest wieder ein Befund (16.2).
  */
 export const FENSTERREGEL_SCHARF = true;
 
@@ -389,6 +397,30 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 			ziel: "einstellungen",
 			zielText: "Verlauf",
 		});
+	}
+
+	// Die Markt-Action laeuft, prueft aber nichts (Nachtrag 20i-b). Ein
+	// einzelner leerer Lauf ist normal - der Rueckfall um 08:17 findet nach
+	// einem puenktlichen Lauf nichts. Erst wenn seit ueber 26 Stunden kein
+	// Lauf etwas geprueft hat, muesste die Auswahl etwas enthalten haben:
+	// Bei zwoelf Stunden Frist ist nach einem Tag jedes Release faellig.
+	// Ein Ausgang ohne `geprueft` (vor 20i-b) sagt nichts und schweigt.
+	const markt = f.stand.markt;
+	if (markt?.geprueft === 0 && !markt.meldung) {
+		const zuletzt = f.stand.markt_geprueft;
+		const stunden = zuletzt ? alterStunden(zuletzt.am) : Number.POSITIVE_INFINITY;
+		if (stunden > STILL_NACH_STUNDEN) {
+			const am = zuletzt ? zeitAus(zuletzt.am) : null;
+			raus.push({
+				art: "markt_leer",
+				stufe: "kenntnis",
+				text: am
+					? `${BEREICH.markt.wer} läuft, hat aber seit ${Math.floor(stunden)} Stunden kein Release geprüft, zuletzt am ${datum(am)} um ${uhrzeit(am)}.`
+					: `${BEREICH.markt.wer} läuft, hat aber noch kein Release geprüft.`,
+				ziel: "einstellungen",
+				zielText: "Verlauf",
+			});
+		}
 	}
 
 	for (const b of bereiche) {

@@ -24,7 +24,8 @@ import type { EventRepository } from "./events";
  * Store-Angebote laufen ab. Gemessen am 02.10.2026 standen 18 von 57 Titeln
  * gerade im Angebot, und ein Rabatt, den man zwei Tage spaeter erfaehrt, ist
  * keiner. Zwanzig Stunden statt eines Tages seit Stufe 20i, aus demselben
- * Grund wie beim Markt (`MARKT_FRIST_STUNDEN`): In der Nacht zum 19.10.2026
+ * Grund wie damals beim Markt (der seit 20i-b zwoelf hat, weil GitHub seinen
+ * Start verschiebt - der Cron hier ist puenktlich): In der Nacht zum 19.10.2026
  * pruefte der Store um 04:10 neun Releases und lief erst ab 05:30 weiter -
  * zur Uhrzeit, zu der er am Vortag geprueft hatte.
  */

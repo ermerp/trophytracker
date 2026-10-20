@@ -3,8 +3,12 @@
 ### 7.3 Umfang, Takt und Betrieb der Gebrauchtpreise
 
 **Der Schritt läuft als GitHub Action** (`.github/workflows/markt.yml`, Stufe 20i), täglich um
-**02:17 UTC** – Puffer für die Verspätungen von GitHub bis 05:00 UTC (Entscheidung des Nutzers vom
-19.10.2026) – und von Hand über `workflow_dispatch`; der Knopf in den Einstellungen ist entfallen.
+**02:17 UTC** (Entscheidung des Nutzers vom 19.10.2026) und als **Rückfall um 08:17 UTC** (Nachtrag
+20i-b, Entscheidung vom 20.10.2026), dazu von Hand über `workflow_dispatch`; der Knopf in den
+Einstellungen ist entfallen. **GitHub verschiebt den Start um Stunden:** Der erste geplante Lauf,
+02:17 am 20.10.2026, wurde erst um 07:31:42 UTC angelegt, 5 h 14 min später. Der Rückfall prüft
+dank der Frist nur, was der erste nicht geschafft hat; zwei Läufe zugleich stellt die
+`concurrency`-Gruppe hintereinander.
 Bis 20i lief er im Wartungsfenster des Cron, zwanzig Releases je Aufruf; dort blieb **kein einzelnes
 Release unter 10 ms CPU**, und 431 Aufrufe passten in keinen Takt (Gesamtrechnung in
 [16.2](16-2-cpu-und-betrieb.md)).
@@ -23,9 +27,15 @@ Meldung ist ein Code, kein Fremdtext. Das Log der Action ist öffentlich und ent
 
 Gefragt werden **nicht alle** Releases, sondern dieselbe Menge, die 7.4 für die Store-Preise
 festlegt: was in der Lückenansicht auftaucht oder auf einer offenen Absicht steht. Ein Release wird
-nach **20 Stunden** erneut fällig (`MARKT_FRIST_STUNDEN`, seit 20i; vorher ein Tag) – mit 24 Stunden
-rutschte, was am Vortag spät geprüft war, hinter das Fenster (`offen=16` am 17.10., `offen=19` am
-19.10.2026).
+nach **12 Stunden** erneut fällig (`MARKT_FRIST_STUNDEN`, seit 20i-b; in 20i 20 Stunden, davor ein
+Tag). Zwölf, weil der Start wandert: Nach dem Lauf um 07:31 am 20.10. wäre mit 20 Stunden am
+nächsten Morgen um 02:17 nichts fällig gewesen – ein Tag ohne Punkte, still. Mit zwölf ist nach
+jedem Lauf des Vortags alles fällig, und der Rückfall sechs Stunden nach einem pünktlichen Lauf
+findet nichts. Mit 24 Stunden (bis 20i) rutschte, was am Vortag spät geprüft war, hinter das Fenster
+(`offen=16` am 17.10., `offen=19` am 19.10.2026). **Erster Lauf unter voller Last** (20.10.2026,
+alle Aufrufe IAD): 411 Releases in 69 Portionen, 494 s, 231 mit Preis, 115 ohne Angebot, nichts
+übersprungen; CPU je Portion Median 2, P90 4, höchstens 15 ms (64 von 69 erfasst), Lage 7 ms. **Die
+Portion bleibt bei 6** – das Budget (16.2) ist eingehalten.
 
 **Takt: täglich** (Entscheidung des Nutzers vom 02.10.2026). Nicht, weil Gebrauchtpreise sich täglich bewegen — sie tun es nicht —, sondern weil der Verlauf (20f) und der Preisalarm (20g) Punkte brauchen: Ein gleitender Median ist nur über genügend Werte robust gegen den einzelnen Verkäufer, der eine Disc für drei Euro einstellt, und melden kann ein Alarm nur, was er gesehen hat.
 
