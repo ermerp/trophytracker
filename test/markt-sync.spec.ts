@@ -146,12 +146,16 @@ describe("Markt-Lauf der Action (Stufe 20i)", () => {
 		expect(e).toMatchObject({ status: "erfolg", geprueft: 3, nochOffen: 0, portionen: 2 });
 	});
 
-	it("macht nach 20 Stunden wieder faellig, nicht erst nach 24 (Stufe 20i)", async () => {
+	it("macht nach 12 Stunden wieder faellig - der Rueckfall um 08:17 findet nach 02:17 nichts (Nachtrag 20i-b)", async () => {
 		await luecke(1, "Bloodborne");
 		await lauf(ebayMit({}));
-		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-19 hours') WHERE id = 1").run();
+		// Puenktlicher Lauf um 02:17, Rueckfall um 08:17: sechs Stunden.
+		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-6 hours') WHERE id = 1").run();
 		expect(await repos().markt.faelligeAnzahl()).toBe(0);
-		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-21 hours') WHERE id = 1").run();
+		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-11 hours') WHERE id = 1").run();
+		expect(await repos().markt.faelligeAnzahl()).toBe(0);
+		// Ueber zwoelf: faellig. Am 21.10.2026 sind es knapp 19 (Vortag 07:31, heute 02:17).
+		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now', '-13 hours') WHERE id = 1").run();
 		expect(await repos().markt.faelligeAnzahl()).toBe(1);
 	});
 
@@ -406,6 +410,18 @@ describe("Routen der Markt-Action (Stufe 20i)", () => {
 		// Fremdtext kommt nicht in den Verlauf - er koennte ein Geheimnis zitieren.
 		const frei = await sende("/api/sync/markt/ausgang", { art: "ende", geprueft: 0, mitPreis: 0, discBelegt: 0, ohneAngebot: 0, fehler: "Token abc123 abgelehnt" });
 		expect(frei.status).toBe(400);
+	});
+
+	it("haelt den letzten pruefenden Lauf eigens fest - der leere Rueckfall ueberschreibt ihn nicht (Nachtrag 20i-b)", async () => {
+		await sende("/api/sync/markt/ausgang", { art: "ende", geprueft: 4, mitPreis: 3, discBelegt: 1, ohneAngebot: 1 });
+		const voll = await stand();
+		expect(voll.markt).toMatchObject({ geprueft: 4 });
+		expect(voll.markt_geprueft).toEqual(voll.markt);
+
+		await sende("/api/sync/markt/ausgang", { art: "ende", geprueft: 0, mitPreis: 0, discBelegt: 0, ohneAngebot: 0 });
+		const leer = await stand();
+		expect(leer.markt).toMatchObject({ geprueft: 0, meldung: false });
+		expect(leer.markt_geprueft).toEqual(voll.markt_geprueft);
 	});
 
 	it("schreibt bei einem Ratenlimit mitten im Lauf, was schon gefragt ist, und laesst den Rest faellig", async () => {

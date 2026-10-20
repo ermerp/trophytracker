@@ -197,7 +197,12 @@ export type CronFakt = {
 	meldung: boolean;
 	/** Der Rest des Schritts nach diesem Aufruf, wo es einen gibt (Markt, Store). */
 	offen?: number;
+	/** Wie viele Releases der Lauf geprueft hat - nur die Markt-Action (Nachtrag 20i-b). */
+	geprueft?: number;
 };
+
+/** Ein Fakt fuer einen Bereich unter `cron_stand`. */
+type StandFakt = { bereich: string; wert: CronFakt };
 
 /** Der ganze Stand unter `cron_stand`: der letzte Ausgang je Bereich und die letzte gemeldete Kette. */
 export type CronStand = Partial<Record<string, CronFakt>> & {
@@ -612,13 +617,15 @@ export class SyncRepository {
 	 * im `catch`, wenn schon die Lage scheiterte -, wird er hier gelesen. `fakt`
 	 * landet unter `cron_stand` beim eigenen Bereich, ohne den Stand vorher zu
 	 * lesen: `json_set` fuegt ihn ein, und ein unlesbarer Stand wird ersetzt,
-	 * statt den ganzen Batch und damit die Verlaufszeile zu reissen.
+	 * statt den ganzen Batch und damit die Verlaufszeile zu reissen. Mehrere
+	 * Fakten gehen in DASSELBE Statement (Nachtrag 20i-b: Ausgang und letzter
+	 * pruefender Lauf der Markt-Action) - einer ohne den anderen geht nicht.
 	 */
 	async cronAusgangVermerken(
 		zeitstempel: string,
 		zeile: string,
 		marke?: CronMarke,
-		optionen: { verlauf?: string[]; fakt?: { bereich: string; wert: CronFakt } } = {},
+		optionen: { verlauf?: string[]; fakt?: StandFakt | StandFakt[] } = {},
 	): Promise<void> {
 		const gelesen = optionen.verlauf ?? (await this.cronVerlauf());
 		const bisher = marke?.verwaist ? [verwaistZeile(marke.verwaist), ...gelesen] : gelesen;
@@ -648,7 +655,9 @@ export class SyncRepository {
 			}
 		}
 		const stand: Array<[string, string]> = [];
-		if (optionen.fakt) stand.push([`$.${optionen.fakt.bereich}`, JSON.stringify(optionen.fakt.wert)]);
+		for (const f of optionen.fakt === undefined ? [] : [optionen.fakt].flat()) {
+			stand.push([`$.${f.bereich}`, JSON.stringify(f.wert)]);
+		}
 		if (marke?.verwaist) {
 			stand.push(["$.ohneAusgang", JSON.stringify({ ...marke.verwaist, gemeldetAm: zeitstempel })]);
 		}

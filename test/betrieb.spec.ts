@@ -262,6 +262,52 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 			expect(w.map((x) => `${x.art}:${x.stufe}`)).toEqual(["meldung:kenntnis"]);
 		});
 
+		describe("laeuft, prueft aber nichts (Nachtrag 20i-b)", () => {
+			// 18.10.2026, 09:38 UTC: der Rueckfall um 08:17 war der juengste Ausgang.
+			const leer = { am: "2026-10-18 08:23", getan: "markt", meldung: false, offen: 0, geprueft: 0 };
+
+			it("schweigt an einem normalen Tag: 02:17 prueft alles, 08:17 nichts", () => {
+				const w = urteile(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-18 02:25", geprueft: 411 } }));
+				expect(w).toEqual([]);
+			});
+
+			it("meldet zur Kenntnis, wenn seit ueber 26 Stunden kein Lauf etwas geprueft hat", () => {
+				const w = urteile(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 07:37", geprueft: 411 } }));
+				expect(w).toEqual([
+					{
+						art: "markt_leer",
+						stufe: "kenntnis",
+						text: "Die Gebrauchtpreis-Action läuft, hat aber seit 26 Stunden kein Release geprüft, zuletzt am 17.10. um 09:37.",
+						ziel: "einstellungen",
+						zielText: "Verlauf",
+					},
+				]);
+			});
+
+			it("schweigt bei genau 26 Stunden", () => {
+				expect(arten(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 07:38", geprueft: 3 } }))).toEqual([]);
+			});
+
+			it("meldet, wenn noch nie ein Lauf etwas geprueft hat", () => {
+				expect(urteile(mit({ markt: leer })).map((x) => x.text)).toEqual([
+					"Die Gebrauchtpreis-Action läuft, hat aber noch kein Release geprüft.",
+				]);
+			});
+
+			it("schweigt, wenn der juengste Lauf etwas geprueft hat", () => {
+				expect(arten(mit({ markt: { ...leer, geprueft: 5 } }))).toEqual([]);
+			});
+
+			it("schweigt bei einem Ausgang ohne Zahl - fehlender Schluessel ist nicht 0", () => {
+				const { geprueft: _g, ...ohneZahl } = leer;
+				expect(arten(mit({ markt: ohneZahl }))).toEqual([]);
+			});
+
+			it("ueberlaesst einen gescheiterten Lauf der Meldung", () => {
+				expect(arten(mit({ markt: { ...leer, meldung: true } }))).toEqual(["meldung:kenntnis"]);
+			});
+		});
+
 		it("ist rot, solange sie noch nie gelaufen ist", () => {
 			const { markt: _m, markt_begonnen: _b, ...ohne } = ruhig().stand;
 			const w = urteile(ruhig({ stand: ohne }));

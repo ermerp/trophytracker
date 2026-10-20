@@ -24,7 +24,9 @@ PSN-Fenster), 15 bis 33 an jedem Tag danach. Am 16.10. lief es von 08:05 an wied
 wurde jeder Aufruf; es fehlte keiner. **Woran die Duldung hängt, ist offen** (nachgezählt am 19.10.2026,
 `workersInvocationsAdaptive`, Nächte 28.09.–19.10.): Abbrüche gab es in **8 von 22 Nächten** – am
 04.10. in Newark (21), vom 10. bis 16.10. in Singapur (12–42 je Nacht). In den Nächten 17. bis 19.10.
-lagen je 43 bis 69 Aufrufe über 10 ms, abgebrochen wurde keiner; Ende September liefen Nächte in
+lagen je 43 bis 69 Aufrufe über 10 ms, abgebrochen wurde keiner, und am 20.10. (USA verstreut, die
+Markt-Action erstmals außerhalb des Crons) 35 von 69 erfassten über 10 und 21 über 15 – ebenfalls
+alle `success`; Ende September liefen Nächte in
 Mumbai und Taipeh ohne Abbruch. Der Standort allein erklärt es also nicht.
 
 **Wohin die CPU geht** – gemessen am 16.10.2026 in einem eigenen Messworker ohne Produktionsdaten

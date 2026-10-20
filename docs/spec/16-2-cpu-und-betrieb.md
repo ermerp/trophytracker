@@ -46,15 +46,16 @@ sinnvollen Portion gegen dieses Budget:
   und 431 Aufrufe passten in keinen Takt. **Weg A** (Entscheidung des Nutzers vom 19.10.2026): Die
   Action schreibt über Routen des Workers in Portionen, nicht direkt über die D1-Schnittstelle – die
   Regeln zu `src/db/` und zum Protokoll bleiben, kein kontoweites Token mit Schreibrecht in GitHub.
-  Lauf um 02:17 UTC, Portion `MARKT_JE_POST = 6` (43 Anweisungen), Einzelheiten in
-  [7.3](07-3-ebay-betrieb.md). **Erster Lauf am 19.10.2026, 11:41 UTC** per `workflow_dispatch`, alle
+  Lauf um 02:17 UTC mit Rückfall um 08:17 (20i-b), Portion `MARKT_JE_POST = 6` (43 Anweisungen),
+  Einzelheiten in [7.3](07-3-ebay-betrieb.md). **Erster Lauf am 19.10.2026, 11:41 UTC** per `workflow_dispatch`, alle
   Aufrufe in IAD: 20 Releases in 4 Portionen, 15 mit Preis, nichts übersprungen; CPU je Aufruf Beginn
   5 ms, Lage 6 ms, Portionen **16 / 4 / ~4 / ~4 ms** (zwei aus der Minutensumme der Analytics
   zurückgerechnet, die Logs fehlten), Ausgang 4 ms. Erwartet waren 6–10 und 5–8 ms. Woran die eine
   Portion mit 16 ms lag, ist offen (Vermutung: frische Instanz oder die meisten neuen Angebotszeilen).
-  **Die Portion bleibt bei 6** – mehr verbieten die 50 Anweisungen – und wird nach der ersten Nacht
-  mit voller Last (20.10.2026, rund 430 Releases, rund 72 Portionen) nur gesenkt, falls P90 über
-  10 ms liegt. Der Neuabruf eines einzelnen Releases (20h) bleibt im Worker.
+  **Erste Nacht mit voller Last (20.10.2026):** 411 Releases in 69 Portionen, CPU je Portion Median 2,
+  P90 4, höchstens 15 ms – im Budget; **die Portion bleibt bei 6**, mehr verbieten die 50 Anweisungen.
+  GitHub startete den Lauf 5 h 14 min zu spät (07:31 statt 02:17); daraus Nachtrag **20i-b**: Frist
+  12 statt 20 Stunden, Rückfall um 08:17, Warnung bei leeren Läufen (7.3, [Betriebswarnungen](16-2-betriebswarnungen.md)). Der Neuabruf eines einzelnen Releases (20h) bleibt im Worker.
 - **Kaufliste → gebündelt wie 18k – gebaut in 18k-b (19.10.2026):** bis dahin je Eintrag zwei bis
   drei D1-Aufrufe nacheinander, bis zu 150 Abfragen je Aufruf gegen die dokumentierten 50. Jetzt ein
   Lese-Batch (`releasesNachSchluesseln` mit `mitKauf`) und ein Schreib-Batch (`berechtigungenErkennen`,
@@ -64,13 +65,14 @@ sinnvollen Portion gegen dieses Budget:
   gelesen 614 / 468 statt 494 / 372 Zeilen, geschrieben unverändert 182 / 0. Die CPU zeigt die
   nächste Kaufliste-Nacht (um den 25.10.2026) – vorher 35–108 ms je Aufruf; ob die Portion von 50
   dann ins Budget passt, ist offen.
-- **Store → offen bis nach dem Probelauf, jetzt zu entscheiden:** Ein Release je Aufruf ist die
-  Untergrenze, rund die Hälfte läge über 10 ms. Ein Probelauf aus GitHub Actions am 19.10.2026
+- **Store → GitHub Action nach dem Muster von 20i** (Entscheidung des Nutzers vom 20.10.2026; der
+  Plan wird vorgelegt, gebaut wird erst nach der Nacht zum 21.10., damit die Frist-Änderung aus 20i-b
+  für sich gemessen wird). Ein Release je Aufruf ist im Cron die
+  Untergrenze, rund die Hälfte läge über 10 ms; am 20.10. 29–41 ms je Aufruf zu zehn Releases. Ein Probelauf aus GitHub Actions am 19.10.2026
   (echter Store-Client, ein öffentliches Concept, zwei Anfragen) wurde **angenommen**: 200 in 0,4
   und 0,6 s, Preis gelesen. **Die Probe in voller Größe** am selben Tag, nur lesend, die Ziele mit
   der Auswahl aus dem Code: **79 Ziele, 75 Anfragen am Stück in 48 s, 200 × 74 und 302 × 1, kein
-  403, kein 429**, P50 603 ms je Anfrage; vier Ziele ohne Id (bräuchten IGDB) nicht gefragt. Die
-  Entscheidung über den Store fällt nach 20i (Entscheidung des Nutzers vom 19.10.2026).
+  403, kein 429**, P50 603 ms je Anfrage; vier Ziele ohne Id (bräuchten IGDB) nicht gefragt.
 - Sync, Spielzeit, Level, Jahre und IGDB bleiben im Worker. Mit 25 Titeln je Seite blieben Sync und
   Spielzeit im Budget; der Sync-Abschluss (11–14 ms) und das Level (9–21 ms) sind ungeteilt
   darüber – Ursache nicht untersucht.
@@ -85,9 +87,11 @@ eine Nacht nach 18j, damit ihre Wirkung nicht mit der Grundlast vermischt → na
 Zahlen aus 20i entscheidet der Nutzer zwischen Wortindex-Zeile, Cron je Minute und GitHub Actions –
 und erst nach dem Index-Nachtrag für die Auswahlen des Lage-Batches (unten).
 
-**In 20i umgesetzt: die Fristen von Markt und Store, je 20 Stunden** (`MARKT_FRIST_STUNDEN`,
-`STORE_FRIST_STUNDEN`). (Vorgabe des Nutzers vom 17.10.2026, für den
-Store vom 19.10.2026). Die Frist von 24 Stunden setzt jedes Release auf die Uhrzeit seiner letzten
+**Die Fristen von Markt und Store** (`MARKT_FRIST_STUNDEN`, `STORE_FRIST_STUNDEN`): in 20i je 20
+Stunden (Vorgabe des Nutzers vom 17.10.2026, für den Store vom 19.10.2026); **der Markt seit 20i-b
+zwölf**, weil GitHub den Start der Action verschiebt (7.3) – der Store bleibt bei 20, sein Cron ist
+pünktlich (Entscheidung vom 20.10.2026). **In der Nacht zum 20.10. lief der Store am Stück**, 04:10
+bis 04:45, ohne Lücke. Die Frist von 24 Stunden setzt jedes Release auf die Uhrzeit seiner letzten
 Prüfung; was am Vortag spät im Fenster lag, wird erst nach Fensterschluss wieder fällig – in der
 Nacht zum 17.10.2026 schloss das Fenster mit `offen=16`, am 19.10. mit `offen=19`. **Der Store
 wandert genauso:** In der Nacht zum 19.10. prüfte er um 04:10 neun Releases, ruhte 15 Aufrufe lang
@@ -105,12 +109,13 @@ das Fällige – nicht angefasst, notiert. Dazu gehört auch, dass diese Zählun
 Produktion 412 Zeilen je Aufruf liest, obwohl ihr Kommentar `idx_release_store` nennt (D1-Analytics,
 17.10.2026).
 
-**Offen, aus 20i herausgenommen – Vorschlag: in den Index-Nachtrag: der Bestand der
-Lesekosten-Messung** (Vorgabe des Nutzers vom 18.10.2026, „spätestens mit 20i"; nicht umgesetzt, weil
+**Der Bestand der Lesekosten-Messung kommt in den Index-Nachtrag** (Entscheidung des Nutzers vom
+20.10.2026; Vorgabe vom 18.10.2026, „spätestens mit 20i"; dort nicht umgesetzt, weil
 der Testbestand an rund 15 Stellen Release-Id = Spiel-Id und genau 430 Releases voraussetzt, und weil
 die Marktauswahl mit ihren 59 nie geprüften Releases seit 20i nicht mehr im Lage-Batch steht – der
-Wartungsleerlauf liest im Test jetzt 1 788 statt 2 218 Zeilen; **die Verschiebung entscheidet der
-Nutzer**). Der Test liest im Wartungsleerlauf 2 218 Zeilen, die Produktion rund 2 590 – die drei
+Wartungsleerlauf liest im Test jetzt 1 788 statt 2 218 Zeilen). **Der Nachtrag soll auch den
+Wartungs-Leerlauf senken** (rund 1 800 Zeilen je Aufruf); seine CPU blieb am 20.10. ohne die
+Marktauswahl bei Median 7 ms ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)). Der Test liest im Wartungsleerlauf 2 218 Zeilen, die Produktion rund 2 590 – die drei
 Auswahlen des Lage-Batches, exakt gemessen am 18.10.2026 über `meta.rows_read`, dieselben Anweisungen
 aus dem Code (die Marktauswahl mit verschobener Frist, damit nichts fällig ist wie im Leerlauf):
 

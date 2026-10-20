@@ -26,14 +26,17 @@ import type { EventRepository } from "./events";
  * Verkaeufer robust zu sein, der eine Disc fuer drei Euro einstellt. Und ein
  * Preisalarm (Stufe 20g) kann nur melden, was er gesehen hat.
  *
- * Zwanzig Stunden statt eines Tages seit Stufe 20i (Vorgabe des Nutzers vom
- * 17.10.2026): Mit 24 Stunden wurde jedes Release erst zur Uhrzeit seiner
- * letzten Pruefung wieder faellig - was am Vortag spaet lag, rutschte hinter
- * das Fenster (`offen=16` am 17.10., `offen=19` am 19.10.). Die Action startet
- * zu einer festen Zeit, GitHub verschiebt sie um Minuten bis Stunden; unter
- * 24 minus Verspaetung ist am naechsten Tag alles faellig.
+ * Zwoelf Stunden seit Nachtrag 20i-b (Entscheidung des Nutzers vom
+ * 20.10.2026). GitHub hat den Lauf von 02:17 am 20.10.2026 erst um 07:31
+ * gestartet; mit den 20 Stunden aus 20i waere am naechsten Morgen um 02:17
+ * nichts faellig gewesen, und ein Tag Preispunkte waere still ausgefallen.
+ * Zwoelf Stunden machen nach jedem Lauf des Vortags alles faellig, und der
+ * Rueckfall um 08:17 (.github/workflows/markt.yml) findet nach einem
+ * puenktlichen Lauf nichts - er prueft nur, was der erste nicht geschafft hat.
+ * Vorher (20i, 17.10.2026): 24 statt 20 Stunden liessen jedes Release zur
+ * Uhrzeit seiner letzten Pruefung wandern (`offen=16` am 17.10.).
  */
-export const MARKT_FRIST_STUNDEN = 20;
+export const MARKT_FRIST_STUNDEN = 12;
 
 /**
  * Releases je Lage fuer die Action (Stufe 20i): alle faelligen, nicht eine
