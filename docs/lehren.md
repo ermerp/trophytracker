@@ -589,6 +589,18 @@ Zwei Lehren:
    den unberührten Stand in einem eigenen `git worktree` 102. Berichtet wurde
    zuerst die falsche Zahl.
 
+**20.10.2026 (Nachtrag 20i-b) – eine Defektprobe hat die eigene Änderung
+gelöscht.** Für die neuen Tests baute ich drei Defekte nacheinander in den
+Arbeitsbaum ein und nahm sie jeweils mit `git checkout -- <datei>` zurück. Die
+erste Probe lag in `src/db/markt.ts`, und dieselbe Datei trug schon die
+Änderung, um die es ging (`MARKT_FRIST_STUNDEN` 20 → 12): Der Checkout setzte
+beide zurück. Aufgefallen ist es nur, weil in der zweiten Probe auch der
+Fristtest rot wurde und `git status` die Datei nicht mehr führte – sonst wäre
+ein Nachtrag ohne seine Hauptänderung gemergt worden, mit grünen Tests.
+→ Defektproben laufen in einem eigenen `git worktree` mit den Änderungen, nie
+mit `git checkout` im Arbeitsbaum (Vorgabe des Nutzers vom 20.10.2026; Regel in
+CLAUDE.md, Arbeitsweise).
+
 ## Die CPU-Grenze war geduldet, nicht eingehalten
 
 **10. bis 16.10.2026 – eine Woche Wartung mit Lücken, und der Verlauf sah aus wie
