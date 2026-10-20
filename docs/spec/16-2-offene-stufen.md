@@ -12,8 +12,8 @@ unten ausdrücklich als offen.
 
 **Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026).
 
-**Reihenfolge** (Entscheidung des Nutzers vom 20.10.2026): **Store in die GitHub Action** nach dem
-Muster von 20i (Plan vorgelegt, gebaut erst nach der Nacht zum 21.10.) → **Index-Nachtrag** für die
+**Reihenfolge** (Entscheidung des Nutzers vom 20.10.2026): **20j – Store in eine GitHub Action**
+nach dem Muster von 20i (Plan freigegeben, gebaut nach der Auswertung am 21.10.; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) → **Index-Nachtrag** für die
 Auswahlen des Lage-Batches, mit dem Bestand der Lesekosten-Messung und dem Ziel, den
 Wartungs-Leerlauf (rund 1 800 Zeilen je Aufruf) zu senken → **18m-b** → **neu bewerten: Nachtläufe
 bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster fast leer → **20g**.

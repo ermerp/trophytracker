@@ -65,9 +65,13 @@ sinnvollen Portion gegen dieses Budget:
   gelesen 614 / 468 statt 494 / 372 Zeilen, geschrieben unverändert 182 / 0. Die CPU zeigt die
   nächste Kaufliste-Nacht (um den 25.10.2026) – vorher 35–108 ms je Aufruf; ob die Portion von 50
   dann ins Budget passt, ist offen.
-- **Store → GitHub Action nach dem Muster von 20i** (Entscheidung des Nutzers vom 20.10.2026; der
-  Plan wird vorgelegt, gebaut wird erst nach der Nacht zum 21.10., damit die Frist-Änderung aus 20i-b
-  für sich gemessen wird). Ein Release je Aufruf ist im Cron die
+- **Store → GitHub Action nach dem Muster von 20i: Stufe 20j** (Entscheidungen des Nutzers vom
+  20.10.2026; Plan freigegeben, gebaut erst nach der Auswertung der Nacht zum 21.10., damit die
+  Frist-Änderung aus 20i-b für sich gemessen wird). Wie beim Markt: **Frist 12 Stunden**, Lauf um
+  **01:47 UTC** mit **Rückfall um 07:47** (versetzt zum Markt, nicht zur vollen Stunde), **eigene
+  Workflow-Datei** und **eigenes Service Token `github-store`** (15.3). Die Concept-Ids holt der
+  Worker über eine eigene Route – die IGDB-Zugangsdaten bleiben im Worker (7.6); der Einzelabruf
+  einer Adresse bleibt im Worker wie der Neuabruf in 20h. Ein Release je Aufruf ist im Cron die
   Untergrenze, rund die Hälfte läge über 10 ms; am 20.10. 29–41 ms je Aufruf zu zehn Releases. Ein Probelauf aus GitHub Actions am 19.10.2026
   (echter Store-Client, ein öffentliches Concept, zwei Anfragen) wurde **angenommen**: 200 in 0,4
   und 0,6 s, Preis gelesen. **Die Probe in voller Größe** am selben Tag, nur lesend, die Ziele mit
