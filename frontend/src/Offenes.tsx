@@ -7,14 +7,15 @@ import { Zeichen } from './Symbole'
  * Offene Posten des Dashboards (Stufe 19a, Abschnitt 13) und die
  * Betriebswarnungen (Stufe 18m, Abschnitt 16.2).
  *
- * Drei Stufen (Entscheidungen des Nutzers vom 27.09. und 18.10.2026):
+ * Drei Stufen, in dieser Rangfolge (Entscheidungen des Nutzers vom 27.09.,
+ * 18.10. und 20.10.2026):
  *
  * - **Rot – handeln**: Etwas steht still oder steht kurz davor. Roter Block
  *   auf der Seite, immer sichtbar, und oben in der Tafel.
- * - **Zur Kenntnis**: In der Nacht ging etwas schief, es steht aber nichts
- *   still. Still, grau, nur hinter der Glocke.
- * - **Gelb – Posten**: Etwas wartet. Prüfliste, `unentschieden`, Zuordnung,
+ * - **Gelb – Posten**: Arbeit wartet. Prüfliste, `unentschieden`, Zuordnung,
  *   IGDB, Import, Freitext, Backlog-Kandidaten.
+ * - **Grau – zur Kenntnis**: In der Nacht ging etwas schief, es steht aber
+ *   nichts still, und es ist nichts zu tun. Still, nur hinter der Glocke.
  *
  * Rot und „zur Kenntnis" urteilt der Server (`GET /api/betrieb/warnungen`) –
  * bis 18m setzte diese Datei drei Warnungen selbst aus drei Antworten
@@ -235,10 +236,11 @@ export function useOffenePosten(): OffeneDaten {
 /**
  * Die Glocke in der Kopfzeile.
  *
- * Sie zählt die **höchste Stufe**, die da ist (Entscheidung des Nutzers vom
- * 18.10.2026): rot die Warnungen, sonst grau die Hinweise zur Kenntnis, sonst
- * gelb die offenen Posten. Ein Punkt in der Farbe der nächsten Stufe sagt,
- * dass darunter noch etwas wartet. Ist nichts da, ist die Glocke kein Knopf,
+ * Sie zählt die **höchste Stufe**, die da ist: rot die Warnungen, sonst gelb
+ * die offenen Posten, sonst grau die Hinweise zur Kenntnis. Ein Punkt in der
+ * Farbe der nächsten Stufe sagt, dass darunter noch etwas liegt. Bis zum
+ * 20.10.2026 stand Grau vor Gelb – verkehrt, denn „zur Kenntnis" heißt
+ * „nichts zu tun", ein Posten „Arbeit wartet" (Entscheidung des Nutzers). Ist nichts da, ist die Glocke kein Knopf,
  * sondern nur ein Zeichen: Es gäbe nichts aufzuklappen.
  */
 export function Glocke({
@@ -254,11 +256,11 @@ export function Glocke({
 	offen: boolean
 	umschalten: () => void
 }) {
-	const stufe = rot > 0 ? 'rot' : kenntnis > 0 ? 'kenntnis' : posten > 0 ? 'posten' : null
+	const stufe = rot > 0 ? 'rot' : posten > 0 ? 'posten' : kenntnis > 0 ? 'kenntnis' : null
 	const teile = [
 		rot > 0 && `${rot} ${rot === 1 ? 'Warnung' : 'Warnungen'}`,
-		kenntnis > 0 && `${kenntnis} zur Kenntnis`,
 		posten > 0 && `${posten} offene Posten`,
+		kenntnis > 0 && `${kenntnis} zur Kenntnis`,
 	].filter(Boolean)
 	const text = teile.length > 0 ? teile.join(', ') : 'Nichts offen'
 
@@ -270,9 +272,9 @@ export function Glocke({
 			</span>
 		)
 	}
-	const zahl = stufe === 'rot' ? rot : stufe === 'kenntnis' ? kenntnis : posten
+	const zahl = stufe === 'rot' ? rot : stufe === 'posten' ? posten : kenntnis
 	// Die nächste Stufe darunter, falls es eine gibt.
-	const darunter = stufe === 'rot' ? (kenntnis > 0 ? 'kenntnis' : posten > 0 ? 'posten' : null) : stufe === 'kenntnis' && posten > 0 ? 'posten' : null
+	const darunter = stufe === 'rot' ? (posten > 0 ? 'posten' : kenntnis > 0 ? 'kenntnis' : null) : stufe === 'posten' && kenntnis > 0 ? 'kenntnis' : null
 	return (
 		<button
 			type="button"
@@ -302,8 +304,8 @@ export function Warnblock({ rot }: { rot: Posten[] }) {
 }
 
 /**
- * Die Tafel hinter der Glocke. Sie zeigt **alles** – oben Rot, dann zur
- * Kenntnis, dann die Posten: Der rote Zähler an der Glocke braucht seine
+ * Die Tafel hinter der Glocke. Sie zeigt **alles**, in der Rangfolge der
+ * Glocke – oben Rot, dann die Posten, dann zur Kenntnis (seit 20.10.2026): Der rote Zähler an der Glocke braucht seine
  * Auflösung auch dann, wenn der rote Block weit oben aus dem Bild gescrollt
  * ist. Der Preisalarm aus 20g kommt als eigene Gruppe zwischen Warnungen und
  * Posten, in einem eigenen Ton (16.2).
@@ -321,22 +323,22 @@ export function Tafel({ rot, kenntnis, posten }: OffeneDaten) {
 					</ul>
 				</>
 			)}
-			{kenntnis.length > 0 && (
-				<>
-					<div className="tafelname kenntnis">Zur Kenntnis</div>
-					<ul className="kenntnisliste">
-						{kenntnis.map((w) => (
-							<li key={w.key}>{w.inhalt}</li>
-						))}
-					</ul>
-				</>
-			)}
 			{posten.length > 0 && (
 				<>
 					<div className="tafelname">Offene Posten</div>
 					<ul>
 						{posten.map((p) => (
 							<li key={p.key}>{p.inhalt}</li>
+						))}
+					</ul>
+				</>
+			)}
+			{kenntnis.length > 0 && (
+				<>
+					<div className="tafelname kenntnis">Zur Kenntnis</div>
+					<ul className="kenntnisliste">
+						{kenntnis.map((w) => (
+							<li key={w.key}>{w.inhalt}</li>
 						))}
 					</ul>
 				</>
