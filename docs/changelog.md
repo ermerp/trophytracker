@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 114 | 20.10.2026 | **Nachtrag: Abschluss der Sitzung.** Zugang läuft bewusst aus (7.1); Lehre zu geschätzten Optionen und Testdaten, Prüfregel für Gestaltung geschärft (CLAUDE.md, lehren.md) |
 | 113 | 20.10.2026 | **Nachtrag 19-d: Tabellen nebeneinander erst ab 72 rem.** Mit den echten Zahlen brauchen „Bestand je Plattform" und „Anteil je Stufe" 472 px, bei 1024 px waren links 440 (13.2) |
 | 112 | 20.10.2026 | **Nachtrag 19-c: Trophäenzahlen mit den echten Zahlen.** In der Produktion brauchte die Stufenzeile bei 7 cqi 366 px in 336; Faktor 6 und Umbruch statt Überstand, wenn eine Zahl eine Stelle länger wird (13.2) |
 | 111 | 20.10.2026 | **Nachtrag 19-b: Dashboard am Desktop ohne Überlauf.** Bei 1280 px war die Seite 1 322 breit, die Glocke lag fast ganz außerhalb; Spalten `minmax(0, 1fr)`, Trophäenzahlen skalieren mit ihrem Block, drei Stufen (Feed unten bis 64 rem, links einspaltig bis 72 rem) (13.1, 13.2) |

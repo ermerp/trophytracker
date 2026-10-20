@@ -553,6 +553,25 @@ Lesen des Plans wird jede Behauptung über den Bestand nachgesehen.
 
 ---
 
+## Eine Option, die schätzt, entscheidet falsch
+
+**20.10.2026 (Nachträge 19-b bis 19-d) – drei Folgen versprochen, keine gemessen.**
+Für den Überlauf des Dashboards bei 1280 px schlug ich `minmax(0, 1fr)` vor
+(„vermutlich hilft"): Die Seite passte danach, aber die Kacheln lagen 42 px über
+dem Feed. In der nächsten Frage stand „die Zahlen rund zwei Drittel so groß, auf
+breiten Schirmen unverändert" – es wurde die Hälfte (20 statt 38 px), und durch
+den Deckel von `main` nie wieder 2,4 rem. Die gewählte Option versprach „der Feed
+bleibt rechts"; bei 800 px blieben dann links 216 px für Blöcke ab 220. Der
+Nutzer entschied dreimal auf einer Beschreibung, die nicht gemessen war.
+Dazu zweimal: Lokal mit erfundenen Daten passte alles, in der Produktion nicht –
+die Stufenzahlen brauchten 366 px in 336, die Tabellen 472 in 440. Erfundene
+Zahlen haben andere Stellen als echte.
+→ Was eine Option verspricht, wird vor der Frage gemessen (Regel in CLAUDE.md,
+Arbeitsweise); eine Gestaltungsänderung wird in der Produktion auf Überstände
+gemessen, als Zahlen (Regel in CLAUDE.md, Arbeitsweise).
+
+---
+
 ## Ein Test, der nichts prüfte, ist grün
 
 `test/keine-lecks.spec.ts` hält die Regel aus Abschnitt 15.3: Geheimnisse
