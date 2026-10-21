@@ -80,6 +80,23 @@ async function zeilenGelesen(sql: string, ...werte: unknown[]): Promise<number> 
 	return r.meta.rows_read ?? -1;
 }
 
+/**
+ * Zeilen, die eine ganze Route liest - gemessen wird die Route, nicht die
+ * Abfrage, und nie eine Abschrift von ihr (Stufe 20e-b: die Luecken-Messung
+ * las bis dahin eine Kopie der SQL, die mit dem Join auf `game` still
+ * auseinandergelaufen waere).
+ */
+async function routeGelesen(pfad: string): Promise<number> {
+	const app = createApp(
+		() => erstellePsnClient(fakeFetch([]).fetch),
+		() => fakeIgdb([[]], { zugang: null }).client,
+	);
+	const zaehler = zaehlendeDb(env.DB);
+	const antwort = await app.request(pfad, undefined, { ...env, DB: zaehler.db });
+	expect(antwort.status, pfad).toBe(200);
+	return zaehler.gelesen();
+}
+
 describe("Grenzen der Sammlungsabfrage", () => {
 	/**
 	 * Die Release-Abfrage bindet eine Id je Spiel der Seite; D1 erlaubt 100
@@ -149,6 +166,30 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	it("Sammlung, eine Seite nach Titel", async () => {
 		const antwort = await SELF.fetch(`${B}/api/games?limit=50`);
 		expect(antwort.status).toBe(200);
+	});
+
+	/**
+	 * Kritikerwertung und Erscheinungsdatum (Stufe 20e-b) stehen in `game`
+	 * selbst und brauchen keinen Unterselect wie "zuletzt gespielt" - sie
+	 * duerfen deshalb nicht teurer sein. Gefuellt wie in der Produktion, wo
+	 * die meisten Spiele beides tragen; ohne Werte waere die Sortierung trivial.
+	 */
+	it("misst die Sortierungen der Sammlung als Route (Stufe 20e-b)", async () => {
+		await env.DB.prepare(
+			"UPDATE game SET critic_score = CASE WHEN id % 10 = 0 THEN NULL ELSE 60 + id % 35 END, " +
+				"release_date = CASE WHEN id % 12 = 0 THEN NULL ELSE printf('%04d-%02d-15', 2006 + id % 19, 1 + id % 12) END",
+		).run();
+		const gelesen: Record<string, number> = {};
+		for (const sort of ["titel", "zuletzt", "spielzeit", "wertung", "release"]) {
+			gelesen[sort] = await routeGelesen(`/api/games?limit=50&sort=${sort}`);
+		}
+		gelesen["release auf"] = await routeGelesen("/api/games?limit=50&sort=release&richtung=auf");
+		await env.DB.prepare("UPDATE game SET critic_score = NULL, release_date = NULL").run();
+		console.info({ sammlungSortierung: gelesen });
+
+		expect(gelesen.wertung).toBeLessThanOrEqual(gelesen.zuletzt!);
+		expect(gelesen.release).toBeLessThanOrEqual(gelesen.zuletzt!);
+		expect(gelesen.wertung).toBeLessThan(5_000);
 	});
 
 	/**
@@ -727,13 +768,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		);
 		await env.DB.batch(Array.from({ length: 30 }, (_, i) => verworfen.bind((i + 1) * 2)));
 
-		const luecken = await zeilenGelesen(
-			`SELECT l.game_id, l.title, l.cover_url, l.release_id, l.platform, l.disc_fassung, l.disc_quelle,
-			        l.progress_pct, l.hat_platin, l.eigener_status, l.verworfen, l.bester_gebrauchtpreis_cents,
-			        (SELECT pe.id FROM plan_entry pe WHERE pe.release_id = l.release_id
-			           AND pe.kind = 'kauf' AND pe.status = 'verworfen' ORDER BY pe.id LIMIT 1) AS plan_id
-			 FROM v_luecken l ORDER BY l.title, l.platform`,
-		);
+		// Die ganze Route, nicht eine Abschrift ihrer Abfrage (seit 20e-b).
+		const luecken = await routeGelesen("/api/gaps?verworfene=1&unbekannte=1");
 		const auswahl = await zeilenGelesen(
 			`SELECT g.id, g.igdb_id FROM game g WHERE g.igdb_id IS NOT NULL AND EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id
 			 AND r.physical_release_status = 'unbekannt'
@@ -799,15 +835,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		);
 		await env.DB.batch(Array.from({ length: 40 }, (_, i) => verworfen.bind(i + 1, `12${1_000_000 + i + 1}`, `Spiel ${i + 1}`, 500)));
 
-		const luecken = await zeilenGelesen(
-			`SELECT l.game_id, l.title, l.cover_url, l.release_id, l.platform, l.disc_fassung, l.disc_quelle,
-			        l.progress_pct, l.hat_platin, l.eigener_status, l.verworfen, l.bester_gebrauchtpreis_cents,
-			        l.gebrauchtpreis_anbieter, l.gebrauchtpreis_item_id, l.gebrauchtpreis_verworfen,
-			        l.markt_geprueft_am, l.markt_rohangebote,
-			        (SELECT pe.id FROM plan_entry pe WHERE pe.release_id = l.release_id
-			           AND pe.kind = 'kauf' AND pe.status = 'verworfen' ORDER BY pe.id LIMIT 1) AS plan_id
-			 FROM v_luecken l ORDER BY l.title, l.platform`,
-		);
+		// Die ganze Route, nicht eine Abschrift ihrer Abfrage (seit 20e-b).
+		const luecken = await routeGelesen("/api/gaps?verworfene=1&unbekannte=1");
 		// Die Auswahl des Schritts. Erste Fassung las ueber v_luecken 3 424
 		// Zeilen fuer zehn Releases - die View rechnete die Preis-Unterabfragen
 		// fuer alle 430 Zeilen aus, nur um Ids zu liefern. Jetzt ueber

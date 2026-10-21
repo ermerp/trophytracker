@@ -234,6 +234,8 @@ describe("GET /api/gaps und verwerfen", () => {
 				gebrauchtpreisVerworfen: 0,
 				marktGeprueftAm: null,
 				marktRohangebote: null,
+				kritik: null,
+				erscheinungsdatum: null,
 				verworfen: false,
 				planId: null,
 			},
@@ -251,6 +253,22 @@ describe("GET /api/gaps und verwerfen", () => {
 		expect((await SELF.fetch(`${B}/api/plans/${v.body.id}`, { method: "DELETE" })).status).toBe(200);
 		expect((await json(await SELF.fetch(`${B}/api/gaps`))).body).toMatchObject({ anzahl: 2, verworfen: 0 });
 		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM release").first()).toEqual({ n: 4 });
+	});
+
+	it("liefert Kritikerwertung und Erscheinungsdatum des Spiels zum Sortieren (Stufe 20e-b)", async () => {
+		await spiel(1, null, [["PS4", "ja", "igdb"], ["PS5", "ja", "igdb"]]);
+		await spiel(2, null, [["PS4", "ja", "igdb"]]);
+		await env.DB.prepare("UPDATE game SET critic_score = 88, release_date = '2015-03-24' WHERE id = 1").run();
+		for (const r of (await env.DB.prepare("SELECT id FROM release").all<{ id: number }>()).results) await trophaeen(r.id, 50);
+
+		const body = (await json(await SELF.fetch(`${B}/api/gaps`))).body;
+		expect(body.luecken.map((l: any) => [l.titel, l.plattform, l.kritik, l.erscheinungsdatum])).toEqual([
+			// Beide Releases desselben Spiels tragen dessen Werte; der Join vervielfacht keine Zeile.
+			["Spiel 1", "PS4", 88, "2015-03-24"],
+			["Spiel 1", "PS5", 88, "2015-03-24"],
+			// Ohne Wert heisst unbekannt - null, nie 0.
+			["Spiel 2", "PS4", null, null],
+		]);
 	});
 
 	it("verwirft auch ein Release mit unbekannter Disc-Fassung - die Frage bleibt offen, der Block blendet es aus", async () => {

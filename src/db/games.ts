@@ -63,17 +63,20 @@ export const JA_NEIN = ["ja", "nein"] as const;
 export const PLATIN_FILTER = ["ja", "nein", "nichtverfuegbar"] as const;
 export const DISC_FILTER = ["ja", "nein", "unbekannt"] as const;
 export type DiscFassung = (typeof DISC_FILTER)[number];
-export const SORTIERUNGEN = ["titel", "zuletzt", "spielzeit"] as const;
+export const SORTIERUNGEN = ["titel", "zuletzt", "spielzeit", "wertung", "release"] as const;
 
 /**
  * Die natuerliche Richtung je Kriterium (Stufe 20e). Beim Titel ist das A-Z,
- * bei "zuletzt gespielt" und der Spielzeit das Gegenteil - "aufsteigend" ist
- * also nicht fuer jedes Kriterium das Erwartete.
+ * bei "zuletzt gespielt", der Spielzeit, der Kritikerwertung (beste zuerst)
+ * und dem Erscheinungsdatum (neuestes zuerst, beide seit 20e-b) das
+ * Gegenteil - "aufsteigend" ist also nicht fuer jedes Kriterium das Erwartete.
  */
 export const SORTIER_NATUERLICH: Record<(typeof SORTIERUNGEN)[number], "auf" | "ab"> = {
 	titel: "auf",
 	zuletzt: "ab",
 	spielzeit: "ab",
+	wertung: "ab",
+	release: "ab",
 };
 
 /**
@@ -685,13 +688,19 @@ aeenliste haengt
 		// damit "ohne Wert" in BEIDEN Richtungen hinten steht. "Unbekannt" ist
 		// kein hoher Wert, sondern gar keiner (Abschnitt 5.2; PS3 und Vita
 		// liefern grundsaetzlich keine Spielzeit).
+		// Kritikerwertung und Erscheinungsdatum (seit 20e-b) stehen direkt in
+		// `game`, brauchen also keinen Unterselect wie die beiden davor.
 		const umgekehrt = filter.richtung === "auf";
-		const sortierung =
-			filter.sort === "zuletzt"
-				? `${zuletzt} IS NULL, ${zuletzt} ${umgekehrt ? "ASC" : "DESC"}, g.sort_title`
-				: filter.sort === "spielzeit"
-					? `${spielzeit} IS NULL, ${spielzeit} ${umgekehrt ? "ASC" : "DESC"}, g.sort_title`
-					: `g.sort_title${filter.richtung === "ab" ? " DESC" : ""}`;
+		const nachWert: Partial<Record<SpieleFilter["sort"], string>> = {
+			zuletzt,
+			spielzeit,
+			wertung: "g.critic_score",
+			release: "g.release_date",
+		};
+		const wert = nachWert[filter.sort];
+		const sortierung = wert
+			? `${wert} IS NULL, ${wert} ${umgekehrt ? "ASC" : "DESC"}, g.sort_title`
+			: `g.sort_title${filter.richtung === "ab" ? " DESC" : ""}`;
 
 		const [zaehlung, seite] = await this.db.batch([
 			this.db.prepare(`SELECT COUNT(*) AS n ${woher}${sucheBedingung}`).bind(...werte),

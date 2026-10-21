@@ -237,7 +237,7 @@ describe("GET /api/plans", () => {
 
 		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=wertung"))).toEqual(["Gut", "Favorit", "Freitext", "Unbewertet"]);
 		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=titel"))).toEqual(["Favorit", "Freitext", "Gut", "Unbewertet"]);
-		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=release"))).toEqual(["Favorit", "Gut", "Freitext", "Unbewertet"]);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=release"))).toEqual(["Gut", "Favorit", "Freitext", "Unbewertet"]);
 		expect((await hole(a, "/api/plans?kind=wunsch&favorit=1")).eintraege).toHaveLength(1);
 	});
 

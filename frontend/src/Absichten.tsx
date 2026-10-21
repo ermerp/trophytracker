@@ -3,7 +3,7 @@ import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, gebrauchtpreis, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
 import { Preis } from './Preis'
 import { StorePreis } from './StorePreis'
-import { nachZahl, umgekehrt, type Richtung } from './Sortierung'
+import { SORTIERBAR, SORTIERTEXT, SORTIER_NATUERLICH, VERGLEICH, type Richtung, type Sortierung } from './vergleich'
 import type { Ansichtsart } from './Ansicht'
 import type { ChipGruppe } from './Chips'
 import { Cover, PlattformChip, ZustandsZeile } from './SpielTeile'
@@ -30,67 +30,10 @@ import { Zeichen, type ZeichenName } from './Symbole'
  * Sortierung und Filter liegen in der URL, wie in der Sammlung.
  */
 
-/** Was jede Liste anbietet. To-Do hat zusätzlich die eigene Reihenfolge. */
-export const SORTIERBAR = {
-  favorit: 'Favoriten zuerst, dann Wertung',
-  wertung: 'Kritikerwertung',
-  preis: 'Gebrauchtpreis',
-  titel: 'Titel',
-  release: 'Erscheinungsdatum',
-  angelegt: 'zuletzt angelegt',
-} as const
-export const SORTIERTEXT = { ...SORTIERBAR, position: 'eigene Reihenfolge' } as const
-/** Was alle Listen ausser To-Do anbieten – „eigene Reihenfolge" gibt es nur dort. */
-export type ListenSortierung = keyof typeof SORTIERBAR
-export type Sortierung = keyof typeof SORTIERTEXT
+export { SORTIERBAR, SORTIERTEXT, SORTIER_NATUERLICH, VERGLEICH, type ListenSortierung, type Sortierung } from './vergleich'
 
 // Seit Stufe 19d ohne 'ohne': Jeder Eintrag hängt an einem Release (Abschnitt 5).
 const PLATTFORM_FILTER = PLATTFORMEN
-
-/** Dieselbe Ordnung wie im Worker, damit eine Änderung die Kachel sofort an ihren Platz rückt. */
-const nachTitel = (a: PlanEintrag, b: PlanEintrag) => a.titel.localeCompare(b.titel, 'de') || a.id - b.id
-/** Was bei welchem Kriterium die natürliche Reihenfolge ist (Stufe 20e). */
-export const SORTIER_NATUERLICH: Record<Sortierung, Richtung> = {
-  favorit: 'ab',
-  wertung: 'ab',
-  preis: 'auf',
-  titel: 'auf',
-  release: 'auf',
-  angelegt: 'ab',
-  position: 'auf',
-}
-
-/**
- * Der Vergleicher zur Wahl. Die Richtung geht hinein, statt das Ergebnis
- * umzukehren – sonst stünden absteigend die Einträge **ohne** Wert vorn, und
- * „unbekannt" ist kein hoher Wert, sondern gar keiner (5.2).
- */
-export function VERGLEICH(sortierung: Sortierung, richtung: Richtung): (a: PlanEintrag, b: PlanEintrag) => number {
-  switch (sortierung) {
-    case 'titel':
-      return richtung === 'auf' ? nachTitel : umgekehrt(nachTitel)
-    case 'wertung':
-      return nachZahl((e: PlanEintrag) => e.kritik, richtung === 'auf' ? 'ab' : 'auf', nachTitel)
-    case 'preis':
-      return nachZahl((e: PlanEintrag) => e.preisCents, richtung, nachTitel)
-    case 'position':
-      return nachZahl((e: PlanEintrag) => e.position, richtung, (a, b) => a.id - b.id)
-    case 'angelegt': {
-      const auf = (a: PlanEintrag, b: PlanEintrag) => a.angelegtAm.localeCompare(b.angelegtAm) || a.id - b.id
-      return richtung === 'auf' ? umgekehrt(auf) : auf
-    }
-    case 'release': {
-      // Ohne Datum ans Ende, in beiden Richtungen.
-      const jahr = (e: PlanEintrag) => (e.erscheinungsdatum ? Number(e.erscheinungsdatum.replaceAll('-', '')) : null)
-      return nachZahl(jahr, richtung, nachTitel)
-    }
-    default: {
-      const auf = (a: PlanEintrag, b: PlanEintrag) =>
-        Number(a.favorit) - Number(b.favorit) || nachZahl((e: PlanEintrag) => e.kritik, 'ab', nachTitel)(a, b)
-      return richtung === 'ab' ? umgekehrt(auf) : auf
-    }
-  }
-}
 
 /** Die Liste im Dativ, für Meldungen und Rückfragen. */
 export const LISTE_DATIV: Record<PlanArt, string> = {

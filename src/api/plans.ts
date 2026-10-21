@@ -246,8 +246,16 @@ const vergleicher: Record<Sortierung, (a: Eintrag, b: Eintrag) => number> = {
 	titel: nachTitel,
 	// Juengste zuerst.
 	angelegt: (a, b) => b.angelegtAm.localeCompare(a.angelegtAm) || b.id - a.id,
-	// Naechstes Erscheinungsdatum zuerst; ohne Datum ans Ende.
-	release: (a, b) => (a.erscheinungsdatum ?? "9999").localeCompare(b.erscheinungsdatum ?? "9999") || nachTitel(a, b),
+	// Neuestes Erscheinungsdatum zuerst (seit 20e-b, Entscheidung des Nutzers
+	// vom 21.10.2026); ohne Datum ans Ende.
+	release: (a, b) =>
+		a.erscheinungsdatum === b.erscheinungsdatum
+			? nachTitel(a, b)
+			: a.erscheinungsdatum === null
+				? 1
+				: b.erscheinungsdatum === null
+					? -1
+					: b.erscheinungsdatum.localeCompare(a.erscheinungsdatum) || nachTitel(a, b),
 	// Manuelle Reihenfolge (To-Do); ohne Position ans Ende, dort nach Id.
 	position: (a, b) => (a.position ?? Infinity) - (b.position ?? Infinity) || a.id - b.id,
 	// Guenstigstes zuerst; OHNE Preis ans Ende - "unbekannt" ist keine 0

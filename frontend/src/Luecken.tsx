@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { STATUSTEXT, anfrage, gebrauchtpreis, marktBefund, type DiscFassung, type PlayStatus } from './api'
 import { Preis } from './Preis'
-import { nachZahl, Sortierleiste, umgekehrt, type Richtung } from './Sortierung'
+import { Sortierleiste, type Richtung } from './Sortierung'
+import { LUECKEN_NATUERLICH, LUECKEN_SORTIERUNG, lueckenVergleich, type LueckenSortierung } from './vergleich'
 import { Reiter } from './Absichten'
 import { Chips, type ChipGruppe } from './Chips'
 import { Kopfzeile } from './Kopfzeile'
@@ -47,6 +48,10 @@ type Luecke = {
   discQuelle: string | null
   fortschritt: number
   platin: boolean
+  /** Kritikerwertung des Spiels; null heisst unbekannt (seit 20e-b, zum Sortieren). */
+  kritik: number | null
+  /** Erscheinungsdatum des Spiels als ISO-Datum; null heisst unbekannt (seit 20e-b). */
+  erscheinungsdatum: string | null
   eigenerStatus: PlayStatus | null
   besterGebrauchtpreisCents: number | null
   gebrauchtpreisAnbieter: string | null
@@ -67,47 +72,6 @@ type Luecke = {
 function nachBefund(zeilen: readonly Luecke[]): Luecke[] {
   const rang = (l: Luecke) => (l.marktRohangebote === 0 ? 0 : l.marktRohangebote === null ? 1 : 2)
   return [...zeilen].sort((a, b) => rang(a) - rang(b) || a.titel.localeCompare(b.titel, 'de'))
-}
-
-/**
- * Sortierung der Lückenliste (Stufe 20e, nachgereicht am 02.10.2026).
- *
- * Die Ansicht hatte als einzige Liste gar keine – sie kam aus der Datenbank
- * nach Titel und blieb so. Für den Gebrauchtpreis ist das zu wenig: „Was
- * fülle ich als Nächstes auf" ist genau die Frage, die ein Preis beantwortet.
- *
- * Gilt nur für die obere Liste. Der zweite Block bleibt nach seinem Befund
- * geordnet – dort ist „eBay kennt kein Angebot" die Reihenfolge, die ihn
- * abarbeitbar macht, und ein Preis steht dort ohnehin selten.
- */
-const LUECKEN_SORTIERUNG = {
-  titel: 'Titel',
-  preis: 'Gebrauchtpreis',
-  fortschritt: 'Fortschritt',
-} as const
-type LueckenSortierung = keyof typeof LUECKEN_SORTIERUNG
-
-/** Was bei welchem Kriterium die natürliche Reihenfolge ist. */
-const LUECKEN_NATUERLICH: Record<LueckenSortierung, Richtung> = {
-  titel: 'auf',
-  preis: 'auf',
-  fortschritt: 'ab',
-}
-
-const nachLueckenTitel = (a: Luecke, b: Luecke) =>
-  a.titel.localeCompare(b.titel, 'de') || a.plattform.localeCompare(b.plattform)
-
-/**
- * Der Vergleicher zur Wahl – die Richtung geht hinein, statt das Ergebnis
- * umzukehren: Ohne Preis bleibt in beiden Richtungen hinten (5.2).
- */
-function lueckenVergleich(sortierung: LueckenSortierung, richtung: Richtung) {
-  if (sortierung === 'titel') return richtung === 'auf' ? nachLueckenTitel : umgekehrt(nachLueckenTitel)
-  const wert =
-    sortierung === 'preis'
-      ? (l: Luecke) => l.besterGebrauchtpreisCents
-      : (l: Luecke) => l.fortschritt
-  return nachZahl(wert, richtung, nachLueckenTitel)
 }
 
 /** Die beiden Umschalter der Ansicht, als Chips wie überall sonst (Stufe 19). */
@@ -263,7 +227,7 @@ export function Luecken() {
           </div>
           {lueckenOffen && (
           <ul className="kandidatenliste">
-            {[...daten.luecken].sort(lueckenVergleich(sortierung, richtung)).map((l) => (
+            {[...daten.luecken].sort(lueckenVergleich<Luecke>(sortierung, richtung)).map((l) => (
               <LueckeZeile key={l.releaseId} l={l} onGeaendert={() => void laden()}>
                 {l.verworfen ? (
                   <button type="button" className="klein" disabled={laeuft} onClick={() => wiederZeigen(l)}>wieder als Lücke zeigen</button>

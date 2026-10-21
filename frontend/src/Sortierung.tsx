@@ -18,7 +18,10 @@ import { Zeichen } from './Symbole'
  * Richtung landet in der URL – so bleibt sie sauber.
  */
 
-export type Richtung = 'auf' | 'ab'
+import type { Richtung } from './vergleich'
+
+// Die Vergleicher stehen seit 20e-b ohne React in `vergleich.ts`, damit ein Test sie erreicht.
+export { nachZahl, umgekehrt, type Richtung } from './vergleich'
 
 export type SortierleisteProps<T extends string> = {
   /** Beschriftung je Wert, in Anzeigereihenfolge. */
@@ -28,35 +31,6 @@ export type SortierleisteProps<T extends string> = {
   wert: T
   richtung: Richtung
   waehlen: (wert: T, richtung: Richtung) => void
-}
-
-/** Kehrt einen Vergleicher um – für Kriterien ohne „unbekannt", etwa den Titel. */
-export function umgekehrt<E>(vergleich: (a: E, b: E) => number) {
-  return (a: E, b: E) => vergleich(b, a)
-}
-
-/**
- * Nach einer Zahl sortieren – **„unbekannt" bleibt in beiden Richtungen am
- * Ende**.
- *
- * Das ist der Grund, warum es diese Hilfe gibt und die Listen ihre
- * Vergleicher nicht einfach umkehren: Beim ersten Versuch (02.10.2026)
- * standen absteigend sortiert die Releases *ohne* Preis vorn. „Unbekannt" ist
- * aber kein hoher Wert, sondern gar keiner – Abschnitt 5.2 stellt Unbewertete
- * hinten an, und das gilt unabhängig von der Richtung.
- *
- * `dann` ist der Stichentscheid und dreht sich nie mit: Zwei gleich teure
- * Spiele sollen nicht die Plätze tauschen, nur weil die Richtung wechselt.
- */
-export function nachZahl<E>(wert: (e: E) => number | null, richtung: Richtung, dann: (a: E, b: E) => number) {
-  return (a: E, b: E) => {
-    const x = wert(a)
-    const y = wert(b)
-    if (x === null && y === null) return dann(a, b)
-    if (x === null) return 1
-    if (y === null) return -1
-    return (richtung === 'auf' ? x - y : y - x) || dann(a, b)
-  }
 }
 
 export function Sortierleiste<T extends string>({ texte, natuerlich, wert, richtung, waehlen }: SortierleisteProps<T>) {
