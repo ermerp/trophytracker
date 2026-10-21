@@ -300,3 +300,5 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 21.10.2026 | **Markt-Lage mit 19 ms ist ein Beobachtungspunkt:** Wiederholt sie sich, wird sie vor dem Index-Nachtrag untersucht | [16.2](spec/16-2-cpu-und-betrieb.md) |
 | 21.10.2026 | Abschnitt 15 wird **im Zuge von 20j** aufgeteilt, sobald er 15 KB überschreitet, nicht vorher (heute 14,8 KB) | [15](spec/15-repository-deployment.md) |
 | 21.10.2026 | Sammlung und Lücken sortieren auch nach **Kritikerwertung** (beste zuerst) und **Erscheinungsdatum**; das Erscheinungsdatum steht in **allen** Listen auf „neueste zuerst" | [5.2](spec/05-1-favorit-und-sortierung.md) |
+| 21.10.2026 | Werte, nach denen sortiert wird, sichtbar machen: **in Stufe 2 der finalen Stufen** (Redesign), nicht vorher | [16.4](spec/16-4-finale-stufen.md) |
+| 21.10.2026 | **Veraltete Ansichten aufräumen** (`/trophaeen` und was die Durchsicht findet) als einer der nächsten Schritte, nach 20j | [16.2](spec/16-2-offene-stufen.md) |

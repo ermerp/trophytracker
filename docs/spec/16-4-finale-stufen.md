@@ -34,6 +34,10 @@ Die **Leseansichten** final durchgehen, in allen drei Breiten, dazu drei Dinge, 
 - **Leere Zustände** – jede Liste mit null Einträgen.
 - **Offline** – die PWA hält alle Leseansichten vor; systematisch geprüft wurde das zuletzt in Stufe 18, vor Dashboard, Trophäenliste, Spieldetail-Umbau und Preisen.
 - **Das Gerät des Nutzers** für die sicheren Bereiche. `env(safe-area-inset-*)` ist headless null – in 19c wurde dasselbe Verhalten dreimal falsch erklärt, bevor es gemessen war.
+- **Was eine Sortierung ordnet, steht auch da** (Vermerk des Nutzers vom 21.10.2026): Seit 20e-b
+  sortieren Sammlung und Lücken nach Kritikerwertung und Erscheinungsdatum, aber weder die Kachel
+  der Sammlung noch die Zeile der Lücken zeigt einen der beiden Werte. Im Redesign klären, ob und
+  wie sie erscheinen; „unbekannt" gilt auch hier (Abschnitt 13).
 
 **Abgrenzung zu den Tests:** Die 786 automatischen Tests prüfen Verhalten und laufen bei jedem Deploy. Was sie nicht sehen können, ist, ob etwas **auffindbar** ist – und genau das war am 02.10.2026 dreimal der Fehler (Block B ließ sich nicht öffnen, die Preissortierung war nicht zu finden, das native Auswahlfeld passte nicht ins Bild). Keiner davon wäre je rot geworden. Die Handprüfung richtet sich deshalb auf Auffindbarkeit, Verständlichkeit und Wegelänge, nicht auf Funktion.
 

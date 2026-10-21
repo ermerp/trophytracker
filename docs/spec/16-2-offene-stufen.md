@@ -13,7 +13,11 @@ unten ausdrücklich als offen.
 **Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026).
 
 **Reihenfolge** (Entscheidung des Nutzers vom 20.10.2026): **20j – Store in eine GitHub Action**
-nach dem Muster von 20i (Plan freigegeben, Zeitplan am Vorabend vorgegeben am 21.10.2026, Planung ab 22.10.; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) → falls sich die
+nach dem Muster von 20i (Plan freigegeben, Zeitplan am Vorabend vorgegeben am 21.10.2026, Planung ab 22.10.; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) →
+**veraltete Ansichten aufräumen** (Vorgabe des Nutzers vom 21.10.2026): `/trophaeen`, die
+Rohliste von Sony aus Stufe 3, steht nur noch unter „Werkzeuge" und zeigt nichts, was Sammlung
+und Spieldetail nicht besser zeigen – entfernen, und dabei alle Ansichten darauf prüfen, ob es
+weitere solche gibt (13.1 nennt sie nicht alle) → falls sich die
 Markt-Lage mit 19 ms wiederholt, ihre Untersuchung (Beobachtungspunkt, ebenda) → **Index-Nachtrag** für die
 Auswahlen des Lage-Batches, mit dem Bestand der Lesekosten-Messung und dem Ziel, den
 Wartungs-Leerlauf (rund 1 800 Zeilen je Aufruf) zu senken → **18m-b** → **neu bewerten: Nachtläufe
