@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 116 | 21.10.2026 | **Nachtrag: Doku aufgeteilt, Token `github-store`.** 13-1-ansichten, 07-7-psn-weitere-daten und 07-7-einzeltrophaeen über 15 KB geteilt, nur verschoben; `github-store` mit `STORE_ACCESS_CLIENT_ID`/`_SECRET` für 20j eingetragen (15); Leerlauf-Zeilen im Test seit 20i 1 788, Tabelle als Stand 18.10. gekennzeichnet (16.2) |
 | 115 | 21.10.2026 | **Nachtrag 20i-c: Nacht zum 21.10.** 20i-b wirkt: 431 geprüft, Rückfall leer, je Portion Median 3 / max. 12 ms; GitHub verschiebt Haupt- und Rückfalllauf gleich um rund 5 h. Store-Zeitplan für 20j am Vorabend vorgegeben, Abhängigkeit vom Sync geprüft (Store keine, Markt `progress_pct`), Markt-Vorziehen offen; Markt-Lage 19 ms als Beobachtungspunkt (7.3, 16.2) |
 | 114 | 20.10.2026 | **Nachtrag: Abschluss der Sitzung.** Zugang läuft bewusst aus (7.1); Lehre zu geschätzten Optionen und Testdaten, Prüfregel für Gestaltung geschärft (CLAUDE.md, lehren.md) |
 | 113 | 20.10.2026 | **Nachtrag 19-d: Tabellen nebeneinander erst ab 72 rem.** Mit den echten Zahlen brauchen „Bestand je Plattform" und „Anteil je Stufe" 472 px, bei 1024 px waren links 440 (13.2) |

@@ -56,10 +56,10 @@ Fünf Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
 | 21.09.2026 | **Offene Scans abschaffen** (Stufe 17d): „Ein Code ohne seine Hülle lässt sich später nicht mehr zuordnen" | [9.3](spec/09-barcode.md) |
 | 22.09.2026 | Sortierung nach **Spielzeit**; Titel ohne Spielzeit ans Ende | [5.2](spec/05-1-favorit-und-sortierung.md) |
 | 22.09.2026 | Rückmeldung: die **ganze Karte** ist der Anfasser, die Pfeilknöpfe fallen weg | [5.4](spec/05-4-todo-und-kopplung.md) |
-| 22.09.2026 | Beim digitalen Besitz nur **zwei** Zustände: `kauf` schlägt `plus` | [7.7](spec/07-7-psn-weitere-daten.md) |
-| 22.09.2026 | Die PS+-Seite ist eine **Momentaufnahme**; `kauf` wird nie entfernt | [7.7](spec/07-7-psn-weitere-daten.md) |
-| 22.09.2026 | **Keine Rohablage** für Spielzeit und Kaufliste | [7.7](spec/07-7-psn-weitere-daten.md) |
-| 22.09.2026 | Ein erkannter Kauf erledigt einen Wunsch nur, wenn der Wunsch „nur digital" ist | [7.7](spec/07-7-psn-weitere-daten.md) |
+| 22.09.2026 | Beim digitalen Besitz nur **zwei** Zustände: `kauf` schlägt `plus` | [7.7](spec/07-7-ps-plus-gegen-kauf.md) |
+| 22.09.2026 | Die PS+-Seite ist eine **Momentaufnahme**; `kauf` wird nie entfernt | [7.7](spec/07-7-ps-plus-gegen-kauf.md) |
+| 22.09.2026 | **Keine Rohablage** für Spielzeit und Kaufliste | [7.7](spec/07-7-ps-plus-gegen-kauf.md) |
+| 22.09.2026 | Ein erkannter Kauf erledigt einen Wunsch nur, wenn der Wunsch „nur digital" ist | [7.7](spec/07-7-ps-plus-gegen-kauf.md) |
 | 22.09.2026 | 19c ist Vorbedingung für 19b; 19b kommt **nach** der Oberfläche | [16](spec/16-1-abgeschlossene-stufen.md) |
 | 22.09.2026 | Die Notiz steht nicht mehr auf der Karte, nur im Spieldetail | [13](spec/13-1-ansichten.md) |
 | 23.09.2026 | Das Dashboard wird als **19a** aus Stufe 19 herausgelöst | [16](spec/16-1-abgeschlossene-stufen.md) |
@@ -85,7 +85,7 @@ Fünf Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
 | 29.09.2026 | **Sonys Anmeldung wird nicht nachgebaut** – kein Passwort, kein Headless-Browser, keine Erweiterung | [7.1](spec/07-1-psn-trophaeen.md) |
 | 29.09.2026 | Rückmeldung: nichts heraussuchen, der **ganze** eingefügte Text wird geprüft | [7.1](spec/07-1-psn-trophaeen.md) |
 | 29.09.2026 | Seine Idee: `psn_zugang` zeichnet auf, wie lange ein Zugang **hält** | [7.1](spec/07-1-psn-trophaeen.md) |
-| 01.10.2026 | Erstbefüllung **nachts plus Portionsknopf**, mit Pause und Abbruch bei `429` | [7.7](spec/07-7-einzeltrophaeen.md) |
+| 01.10.2026 | Erstbefüllung **nachts plus Portionsknopf**, mit Pause und Abbruch bei `429` | [7.7](spec/07-7-einzeltrophaeen-bau.md) |
 | 01.10.2026 | **Keine Rohablage** für die Einzeltrophäen | [7.7](spec/07-7-einzeltrophaeen.md) |
 | 01.10.2026 | Gruppen und Trophäen-Level in **dieselbe** Stufe | [7.7](spec/07-7-einzeltrophaeen.md) |
 | 01.10.2026 | Seltenheitsstufe und Fortschrittszähler je Trophäe sind im Umfang | [7.7](spec/07-7-einzeltrophaeen.md) |
@@ -100,8 +100,8 @@ Fünf Entscheidungen kehren eine frühere um. Sie stehen unten als Paar.
 | 01.10.2026 | Der Feed hat zwei Quellen, das Protokoll behält **eine** | [8.5](spec/08-5-aenderungsprotokoll.md) |
 | 01.10.2026 | Verdichtung im Feed je Spiel und Tag, **Platin für sich** | [8.5](spec/08-5-aenderungsprotokoll.md) |
 | 01.10.2026 | Breite am Desktop: **80 rem** | [13](spec/13-3-gestaltung-und-pwa.md) |
-| 01.10.2026 | **Der Feed bleibt, wie er ist** – drei Eingriffe verworfen | [7.7](spec/07-7-einzeltrophaeen.md) |
-| 01.10.2026 | Rückmeldung: der Fortschritt zählt den **Bestand**, nicht den Druck | [7.7](spec/07-7-einzeltrophaeen.md) |
+| 01.10.2026 | **Der Feed bleibt, wie er ist** – drei Eingriffe verworfen | [7.7](spec/07-7-einzeltrophaeen-bau.md) |
+| 01.10.2026 | Rückmeldung: der Fortschritt zählt den **Bestand**, nicht den Druck | [7.7](spec/07-7-einzeltrophaeen-bau.md) |
 | 01.10.2026 | Sein Hinweis auf die Zeilenlese-Grenze (4,16 von 5 Mio.) | [7.7](spec/07-7-einzeltrophaeen.md) |
 | 02.10.2026 | **Händlerpreis zuerst**, sonst der günstigste geprüfte Markttreffer | [7.3](spec/07-3-ebay.md) |
 | 02.10.2026 | Skalierte Wortgrenze: „lieber kein Vorschlag als ein falscher" | [7.3](spec/07-3-ebay.md) |

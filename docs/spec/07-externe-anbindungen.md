@@ -10,5 +10,7 @@
 | [7.4 PSN Store-Preise](07-4-store-preise.md) | Stufe 21: Produkt-Id, Lesen der Seite, Zuschnitt, Befunde |
 | [7.5 Kritikerwertungen](07-5-kritikerwertungen.md) | IGDB als Quelle, Metacritic ausgeschlossen |
 | [7.6 IGDB-Abgleich](07-6-igdb.md) | Suche, Plattformfilter, Kandidaten, Auffrischen |
-| [7.7 PSN jenseits der Trophäen](07-7-psn-weitere-daten.md) | Spielzeit, Kaufliste, PS+ gegen Kauf |
-| [7.7 – Einzeltrophäen](07-7-einzeltrophaeen.md) | Stufe 19b: Messung, Tabellen, Anzeige |
+| [7.7 PSN jenseits der Trophäen](07-7-psn-weitere-daten.md) | Spielzeit und Kaufliste |
+| [7.7 – gekauft oder PS+](07-7-ps-plus-gegen-kauf.md) | PS+ gegen Kauf |
+| [7.7 – Einzeltrophäen](07-7-einzeltrophaeen.md) | Stufe 19b: Messung, Statistiken, Dashboard-Block |
+| [7.7 – Einzeltrophäen: Bau](07-7-einzeltrophaeen-bau.md) | Stufe 19b: Tabellen, Routen, Feed, Anzeige |

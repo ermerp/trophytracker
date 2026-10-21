@@ -135,14 +135,15 @@ Produktion 412 Zeilen je Aufruf liest, obwohl ihr Kommentar `idx_release_store` 
 **Der Bestand der Lesekosten-Messung kommt in den Index-Nachtrag** (Entscheidung des Nutzers vom
 20.10.2026; Vorgabe vom 18.10.2026, „spätestens mit 20i"; dort nicht umgesetzt, weil
 der Testbestand an rund 15 Stellen Release-Id = Spiel-Id und genau 430 Releases voraussetzt, und weil
-die Marktauswahl mit ihren 59 nie geprüften Releases seit 20i nicht mehr im Lage-Batch steht – der
-Wartungsleerlauf liest im Test jetzt 1 788 statt 2 218 Zeilen). **Der Nachtrag soll auch den
+die Marktauswahl mit ihren 59 nie geprüften Releases seit 20i nicht mehr im Lage-Batch steht). **Der Nachtrag soll auch den
 Wartungs-Leerlauf senken** (rund 1 800 Zeilen je Aufruf); seine CPU blieb am 20.10. ohne die
 Marktauswahl bei Median 7 ms ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)). **Beobachtungspunkt
 (Vorgabe des Nutzers vom 21.10.2026):** Die Lage der Markt-Action (`GET /api/sync/markt/lage`) brauchte
 am 21.10. **19 ms in SEA**, am 20.10. 7 ms in IAD, bei 431 gegen 411 fälligen Releases. Wiederholt
-sich das, wird es **vor** dem Index-Nachtrag untersucht. Der Test liest im Wartungsleerlauf 2 218 Zeilen, die Produktion rund 2 590 – die drei
-Auswahlen des Lage-Batches, exakt gemessen am 18.10.2026 über `meta.rows_read`, dieselben Anweisungen
+sich das, wird es **vor** dem Index-Nachtrag untersucht. Der Test liest im Wartungsleerlauf seit 20i
+**1 788 Zeilen** – die 2 218 der Tabelle ohne die Zeile Gebrauchtpreise, die nicht mehr im Lage-Batch
+steht. **Die Tabelle ist der Stand vom 18.10.2026, vor 20i:** Test 2 218, Produktion rund 2 590, die drei
+Auswahlen des Lage-Batches, exakt gemessen über `meta.rows_read`, dieselben Anweisungen
 aus dem Code (die Marktauswahl mit verschobener Frist, damit nichts fällig ist wie im Leerlauf):
 
 | Auswahl | Test | Produktion | Plan | Woran der Abstand liegt |
