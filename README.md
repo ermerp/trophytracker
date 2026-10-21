@@ -54,7 +54,7 @@ erfasste Discs, nächtliche Läufe seit dem 20.09.2026.
 | Gebrauchtpreise | Zwei eBay-Suchen je Release (Händler, Markt), Titelabgleich Pflicht, als Link aufs Angebot, sortierbar; ein untaugliches Angebot lässt sich verwerfen und zurücknehmen | [7.3](docs/spec/07-3-ebay.md) |
 | Preisverlauf | Diagramm je Release im Spieldetail: eine Treppe je Kanal (Händler, Markt, Store), verdichtet beim Lesen, verworfene Angebote bleiben draußen | [6](docs/spec/06-marktdaten.md) |
 | Store-Preise | Neupreis der digitalen Fassung aus der gerenderten Produktseite, „im PS-Plus-Katalog", Angebote mit Grundpreis | [7.4](docs/spec/07-4-store-preise.md) |
-| Spielzeit und digitaler Besitz | Aus PSN ergänzt, nie importiert; `kauf` schlägt `plus`, PS+ ist eine Momentaufnahme | [7.7](docs/spec/07-7-psn-weitere-daten.md) |
+| Spielzeit und digitaler Besitz | Aus PSN ergänzt, nie importiert; `kauf` schlägt `plus`, PS+ ist eine Momentaufnahme | [7.7](docs/spec/07-7-psn-weitere-daten.md), [PS+](docs/spec/07-7-ps-plus-gegen-kauf.md) |
 | Einzeltrophäen | 18 355 Trophäen mit Seltenheit, Stufe und Fortschrittszähler; Liste je Release, Level und Jahre im Dashboard | [7.7](docs/spec/07-7-einzeltrophaeen.md) |
 | Dashboard | Kennzahlen je Plattform, Trophäen je Stufe, Feed aus zwei Quellen; Betriebswarnungen rot, „zur Kenntnis" und Zählendes an der Glocke | [13](docs/spec/13-1-ansichten.md) |
 | Spiel anlegen | Aus der Sammlung oder beim Scannen, mit IGDB-Suche oder ohne IGDB-Eintrag | [9.2](docs/spec/09-barcode.md) |
@@ -229,6 +229,8 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
    | `CF_ACCESS_CLIENT_SECRET` | dasselbe Token, Secret-Teil | 8 | **nach einem Jahr** |
    | `MARKT_ACCESS_CLIENT_ID` | Service Token `github-markt` für die Gebrauchtpreis-Action | 20i | **nach einem Jahr** |
    | `MARKT_ACCESS_CLIENT_SECRET` | dasselbe Token, Secret-Teil | 20i | **nach einem Jahr** |
+   | `STORE_ACCESS_CLIENT_ID` | Service Token `github-store` für die Store-Preis-Action | 20j | **nach einem Jahr** |
+   | `STORE_ACCESS_CLIENT_SECRET` | dasselbe Token, Secret-Teil | 20j | **nach einem Jahr** |
    | `EBAY_CLIENT_ID` | eBay App ID für die Gebrauchtpreis-Action | 20i | nein |
    | `EBAY_CLIENT_SECRET` | eBay Cert ID, dasselbe Keyset | 20i | nein |
 
@@ -501,6 +503,7 @@ eines zurückziehen lässt, ohne das andere zu treffen.
 | `claude-code` | Prüfungen gegen die Produktion nach einem Deploy | `.dev.vars` (lokal, gitignored) |
 | `github-backup` | Backup-Action ab Stufe 8 | GitHub Secrets `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` |
 | `github-markt` | Gebrauchtpreis-Action ab Stufe 20i | GitHub Secrets `MARKT_ACCESS_CLIENT_ID` / `MARKT_ACCESS_CLIENT_SECRET` |
+| `github-store` | Store-Preis-Action ab Stufe 20j | GitHub Secrets `STORE_ACCESS_CLIENT_ID` / `STORE_ACCESS_CLIENT_SECRET` |
 
 Dazu ein **GitHub**-Token, der mit Cloudflare nichts zu tun hat:
 

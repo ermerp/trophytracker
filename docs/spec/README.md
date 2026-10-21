@@ -34,8 +34,10 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 7.4 | [07-4-store-befunde.md](07-4-store-befunde.md) | was ohne Preis dasteht, Nachpflegeliste, Anzeige |
 | 7.5 | [07-5-kritikerwertungen.md](07-5-kritikerwertungen.md) | Kritikerwertungen |
 | 7.6 | [07-6-igdb.md](07-6-igdb.md) | IGDB-Abgleich |
-| 7.7 | [07-7-psn-weitere-daten.md](07-7-psn-weitere-daten.md) | Spielzeit, Kaufliste, PS+ gegen Kauf |
-| 7.7 | [07-7-einzeltrophaeen.md](07-7-einzeltrophaeen.md) | Einzeltrophäen: Messung, Tabellen, Anzeige |
+| 7.7 | [07-7-psn-weitere-daten.md](07-7-psn-weitere-daten.md) | Spielzeit und Kaufliste: Messung, Grenzen, Umfang |
+| 7.7 | [07-7-ps-plus-gegen-kauf.md](07-7-ps-plus-gegen-kauf.md) | gekauft oder PS+: zwei Zustände, Momentaufnahme, Handlauf |
+| 7.7 | [07-7-einzeltrophaeen.md](07-7-einzeltrophaeen.md) | Einzeltrophäen: Messung, Statistiken, Dashboard-Block |
+| 7.7 | [07-7-einzeltrophaeen-bau.md](07-7-einzeltrophaeen-bau.md) | Einzeltrophäen: wie es gebaut ist, Feed, Anzeige |
 | 8 | [08-pruefliste-und-import.md](08-pruefliste-und-import.md) | Übersicht Prüfliste und Import |
 | 8.1 | [08-1-pruefliste.md](08-1-pruefliste.md) | die Prüfliste |
 | 8.2 | [08-2-wunschlisten-import.md](08-2-wunschlisten-import.md) | Wunschlisten-Import aus Textdateien |
@@ -53,7 +55,8 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 12 | [12-api-routen.md](12-api-routen.md) | Routen für Sammlung, Besitz, Bewertung, Absichten, Prüfliste; Filter |
 | 12 | [12-api-routen-extern-und-sync.md](12-api-routen-extern-und-sync.md) | Routen für IGDB, Import, Export, Scan, Preise, Sync, Kennzahlen |
 | 13 | [13-frontend.md](13-frontend.md) | Übersicht Frontend |
-| 13 | [13-1-ansichten.md](13-1-ansichten.md) | die 19 Ansichten |
+| 13 | [13-1-ansichten.md](13-1-ansichten.md) | die Ansichten: Dashboard bis Wunschliste |
+| 13 | [13-1-ansichten-listen-und-werkzeuge.md](13-1-ansichten-listen-und-werkzeuge.md) | die Ansichten: To-Do bis Einstellungen |
 | 13 | [13-2-darstellungsregeln.md](13-2-darstellungsregeln.md) | Navigation, Routing, Darstellungsregeln |
 | 13 | [13-3-gestaltung-und-pwa.md](13-3-gestaltung-und-pwa.md) | Gestaltung, Tokens, PWA, App-Symbol |
 | 14 | [14-backup-export.md](14-backup-export.md) | Sicherung, Wiederherstellung, CSV-Export |

@@ -24,6 +24,8 @@ Benötigte GitHub Secrets:
 | `CF_ACCESS_CLIENT_SECRET` | Service Token `github-backup` (15.3) | 8 | **nach einem Jahr** |
 | `MARKT_ACCESS_CLIENT_ID` | Service Token `github-markt` (15.3), Gebrauchtpreis-Action | 20i | **nach einem Jahr** |
 | `MARKT_ACCESS_CLIENT_SECRET` | Service Token `github-markt` (15.3) | 20i | **nach einem Jahr** |
+| `STORE_ACCESS_CLIENT_ID` | Service Token `github-store` (15.3), Store-Preis-Action | 20j | **nach einem Jahr** |
+| `STORE_ACCESS_CLIENT_SECRET` | Service Token `github-store` (15.3) | 20j | **nach einem Jahr** |
 | `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` | Gebrauchtpreis-Action (7.3) | 20i | nein |
 
 **GitHub Secrets sind seit 20i auch für eBay ein Ort** (Entscheidung des Nutzers vom 19.10.2026),
@@ -109,7 +111,7 @@ Eine dokumentierte Einschränkung: Worker-Level-Access unterstützt keine WebSoc
 
 Folgen:
 
-- Es gibt ein eigenes Service Token `github-backup` an der Access-Richtlinie, getrennt von dem, mit dem die Produktion nach einem Deploy geprüft wird, und seit 20i ein drittes, `github-markt`, für die Gebrauchtpreis-Action. Getrennt, damit sich eines zurückziehen lässt, ohne die anderen zu treffen.
+- Es gibt ein eigenes Service Token `github-backup` an der Access-Richtlinie, getrennt von dem, mit dem die Produktion nach einem Deploy geprüft wird, seit 20i ein drittes, `github-markt`, für die Gebrauchtpreis-Action, und für 20j ein viertes, `github-store`, für die Store-Preis-Action (eingerichtet, die Action noch nicht gebaut). Getrennt, damit sich eines zurückziehen lässt, ohne die anderen zu treffen.
 - Die Action sendet `CF-Access-Client-Id` und `CF-Access-Client-Secret` als Header.
 - **Der Worker trägt keine eigene Token-Prüfung.** `/api/export/*`, `/api/backup/*` und seit 20i `/api/sync/markt/{lage,ergebnisse,ausgang}` sind gewöhnliche Routen; Access steht davor.
 - Ein abgelaufenes Service Token äussert sich als `302` auf die Login-Seite, nicht als `401`. Die Action prüft deshalb zusätzlich den Inhalt der Antwort, nicht nur den Status – eine HTML-Loginseite ist kein JSON.
