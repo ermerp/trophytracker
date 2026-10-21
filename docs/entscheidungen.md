@@ -298,3 +298,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 20.10.2026 | **Der Zugang vom 29.09. läuft bewusst aus** – echte Lebensdauer messen, die rote Warnung einmal echt sehen, dann sofort erneuern | [7.1](spec/07-1-psn-trophaeen.md) |
 | 21.10.2026 | **20j – Zeitplan des Stores:** auch mit fünf Stunden Verspätung vor 05:00 UTC fertig, also der Hauptlauf am Vorabend; ob der Markt genauso vorgezogen wird, ist zur Entscheidung vorgeschlagen (offen). Planung ab 22.10. | [16.2](spec/16-2-cpu-und-betrieb.md) |
 | 21.10.2026 | **Markt-Lage mit 19 ms ist ein Beobachtungspunkt:** Wiederholt sie sich, wird sie vor dem Index-Nachtrag untersucht | [16.2](spec/16-2-cpu-und-betrieb.md) |
+| 21.10.2026 | Abschnitt 15 wird **im Zuge von 20j** aufgeteilt, sobald er 15 KB überschreitet, nicht vorher (heute 14,8 KB) | [15](spec/15-repository-deployment.md) |
