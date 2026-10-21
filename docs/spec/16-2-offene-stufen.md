@@ -13,12 +13,13 @@ unten ausdrücklich als offen.
 **Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026).
 
 **Reihenfolge** (Entscheidung des Nutzers vom 20.10.2026): **20j – Store in eine GitHub Action**
-nach dem Muster von 20i (Plan freigegeben, gebaut nach der Auswertung am 21.10.; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) → **Index-Nachtrag** für die
+nach dem Muster von 20i (Plan freigegeben, Zeitplan am Vorabend vorgegeben am 21.10.2026, Planung ab 22.10.; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) → falls sich die
+Markt-Lage mit 19 ms wiederholt, ihre Untersuchung (Beobachtungspunkt, ebenda) → **Index-Nachtrag** für die
 Auswahlen des Lage-Batches, mit dem Bestand der Lesekosten-Messung und dem Ziel, den
 Wartungs-Leerlauf (rund 1 800 Zeilen je Aufruf) zu senken → **18m-b** → **neu bewerten: Nachtläufe
 bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster fast leer → **20g**.
 Gebaut sind 18k-b (Kaufliste gebündelt, CPU um den 25.10. messen), 20i (Markt als Action, erste
-volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
+volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; erste Nacht 21.10. wie gebaut; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
 Am 02.11.2026 wird das Budget arbeitender Aufrufe neu bewertet. Fest sind die Abhängigkeiten:
 
 - **20g kommt nach 20i**; der Allzeittief-Auslöser bliebe bis zum 03.11.2026 ohnehin still
