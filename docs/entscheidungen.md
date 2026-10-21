@@ -299,3 +299,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 21.10.2026 | **20j – Zeitplan des Stores:** auch mit fünf Stunden Verspätung vor 05:00 UTC fertig, also der Hauptlauf am Vorabend; ob der Markt genauso vorgezogen wird, ist zur Entscheidung vorgeschlagen (offen). Planung ab 22.10. | [16.2](spec/16-2-cpu-und-betrieb.md) |
 | 21.10.2026 | **Markt-Lage mit 19 ms ist ein Beobachtungspunkt:** Wiederholt sie sich, wird sie vor dem Index-Nachtrag untersucht | [16.2](spec/16-2-cpu-und-betrieb.md) |
 | 21.10.2026 | Abschnitt 15 wird **im Zuge von 20j** aufgeteilt, sobald er 15 KB überschreitet, nicht vorher (heute 14,8 KB) | [15](spec/15-repository-deployment.md) |
+| 21.10.2026 | Sammlung und Lücken sortieren auch nach **Kritikerwertung** (beste zuerst) und **Erscheinungsdatum**; das Erscheinungsdatum steht in **allen** Listen auf „neueste zuerst" | [5.2](spec/05-1-favorit-und-sortierung.md) |

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { PlanEintrag } from "../frontend/src/api";
-import { LUECKEN_NATUERLICH, SORTIER_NATUERLICH, VERGLEICH, lueckenVergleich, type LueckeSortierfelder, type Sortierung } from "../frontend/src/vergleich";
+import { LUECKEN_NATUERLICH, SORTIER_NATUERLICH, VERGLEICH, lueckenVergleich, type LueckeSortierfelder, type PlanSortierfelder, type Sortierung } from "../frontend/src/vergleich";
 
 /**
  * Die Vergleicher der Listen (Stufe 20e-b). Bis dahin hat sie nie ein Test
@@ -11,8 +10,8 @@ import { LUECKEN_NATUERLICH, SORTIER_NATUERLICH, VERGLEICH, lueckenVergleich, ty
  */
 
 let id = 0;
-const eintrag = (titel: string, felder: Partial<PlanEintrag> = {}): PlanEintrag =>
-	({ id: ++id, titel, kritik: null, erscheinungsdatum: null, angelegtAm: "2026-01-01T00:00:00Z", favorit: false, preisCents: null, position: null, ...felder }) as PlanEintrag;
+const eintrag = (titel: string, felder: Partial<PlanSortierfelder> = {}): PlanSortierfelder =>
+	({ id: ++id, titel, kritik: null, erscheinungsdatum: null, angelegtAm: "2026-01-01T00:00:00Z", favorit: false, preisCents: null, position: null, ...felder });
 
 const liste = [
 	eintrag("Mittel", { kritik: 80, erscheinungsdatum: "2015-03-24", angelegtAm: "2026-02-01T00:00:00Z" }),

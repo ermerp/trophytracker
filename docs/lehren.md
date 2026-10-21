@@ -759,3 +759,21 @@ Abschnitts. Zwei Stunden vorher war am selben Ablauf schon der Diff vor dem Schr
 gegangen (Eintrag oben).
 → Was die Vorlage einschränkt, fällt nur weg, wenn das jemand ausdrücklich sagt (Regel in
 CLAUDE.md, Arbeitsweise).
+
+---
+
+## Ein Vergleicher, den nie jemand ausgeführt hat
+
+**21.10.2026 (Nachtrag 20e-b) – drei Sortierungen 19 Tage lang verkehrt herum.**
+Mit der gemeinsamen Sortierleiste (02.10.2026) bekam jeder Vergleicher der Listen
+eine Richtung. In Wunschliste, Backlog und Kaufliste standen danach in der
+natürlichen Richtung – der, die man ohne Klick sieht – die Kritikerwertung mit der
+schlechtesten zuerst, „zuletzt angelegt" mit dem ältesten zuerst und die
+Standardsortierung „Favoriten zuerst" mit den Unbewerteten vor den Bewerteten. Der
+Worker sortierte richtig; die Oberfläche sortierte mit der Richtung nach und drehte
+es wieder um. Kein Test hat die Vergleicher je ausgeführt – sie lagen in einer
+React-Datei. Aufgefallen ist es beim Lesen für eine andere Änderung und erst
+belegt, als die Vergleicher mit vier erfundenen Einträgen liefen.
+→ Logik wird getestet, wo sie steht, auch im Frontend: Die Vergleicher stehen ohne
+React in `frontend/src/vergleich.ts`, `test/vergleich.spec.ts` prüft beide
+Richtungen (Regel in CLAUDE.md, Arbeitsweise „Testen, was Logik ist"; 5.2).

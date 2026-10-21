@@ -1,5 +1,3 @@
-import type { PlanEintrag } from './api'
-
 /**
  * Die Vergleicher der Listen, ohne React – damit ein Test sie erreicht
  * (Stufe 20e-b).
@@ -65,8 +63,24 @@ export const SORTIERTEXT = { ...SORTIERBAR, position: 'eigene Reihenfolge' } as 
 export type ListenSortierung = keyof typeof SORTIERBAR
 export type Sortierung = keyof typeof SORTIERTEXT
 
+/**
+ * Was die Listen zum Sortieren brauchen – ein Ausschnitt von `PlanEintrag`.
+ * Eigener Typ statt eines Imports aus `api.ts`: Der zieht DOM-Typen in die
+ * Typprüfung der Tests, die gegen die Worker-Typen läuft.
+ */
+export type PlanSortierfelder = {
+  id: number
+  titel: string
+  kritik: number | null
+  erscheinungsdatum: string | null
+  angelegtAm: string
+  favorit: boolean
+  preisCents: number | null
+  position: number | null
+}
+
 /** Dieselbe Ordnung wie im Worker, damit eine Änderung die Kachel sofort an ihren Platz rückt. */
-const nachTitel = (a: PlanEintrag, b: PlanEintrag) => a.titel.localeCompare(b.titel, 'de') || a.id - b.id
+const nachTitel = (a: PlanSortierfelder, b: PlanSortierfelder) => a.titel.localeCompare(b.titel, 'de') || a.id - b.id
 /**
  * Was bei welchem Kriterium die natürliche Reihenfolge ist (Stufe 20e). Das
  * Erscheinungsdatum steht seit 20e-b auf „neueste zuerst" (Entscheidung des
@@ -87,28 +101,28 @@ export const SORTIER_NATUERLICH: Record<Sortierung, Richtung> = {
  * umzukehren – sonst stünden absteigend die Einträge **ohne** Wert vorn, und
  * „unbekannt" ist kein hoher Wert, sondern gar keiner (5.2).
  */
-export function VERGLEICH(sortierung: Sortierung, richtung: Richtung): (a: PlanEintrag, b: PlanEintrag) => number {
+export function VERGLEICH<E extends PlanSortierfelder>(sortierung: Sortierung, richtung: Richtung): (a: E, b: E) => number {
   switch (sortierung) {
     case 'titel':
       return richtung === 'auf' ? nachTitel : umgekehrt(nachTitel)
     case 'wertung':
-      return nachZahl((e: PlanEintrag) => e.kritik, richtung, nachTitel)
+      return nachZahl((e: E) => e.kritik, richtung, nachTitel)
     case 'preis':
-      return nachZahl((e: PlanEintrag) => e.preisCents, richtung, nachTitel)
+      return nachZahl((e: E) => e.preisCents, richtung, nachTitel)
     case 'position':
-      return nachZahl((e: PlanEintrag) => e.position, richtung, (a, b) => a.id - b.id)
+      return nachZahl((e: E) => e.position, richtung, (a, b) => a.id - b.id)
     case 'angelegt': {
-      const auf = (a: PlanEintrag, b: PlanEintrag) => a.angelegtAm.localeCompare(b.angelegtAm) || a.id - b.id
+      const auf = (a: E, b: E) => a.angelegtAm.localeCompare(b.angelegtAm) || a.id - b.id
       return richtung === 'auf' ? auf : umgekehrt(auf)
     }
     case 'release':
       // Ohne Datum ans Ende, in beiden Richtungen.
-      return nachZahl((e: PlanEintrag) => datumZahl(e.erscheinungsdatum), richtung, nachTitel)
+      return nachZahl((e: E) => datumZahl(e.erscheinungsdatum), richtung, nachTitel)
     default: {
       // Die Favoriten drehen sich mit, die Wertung darunter auch – die
       // Unbewerteten bleiben in beiden Richtungen am Ende ihrer Gruppe.
-      const favorit = (a: PlanEintrag, b: PlanEintrag) => Number(b.favorit) - Number(a.favorit)
-      const kritik = nachZahl((e: PlanEintrag) => e.kritik, richtung, nachTitel)
+      const favorit = (a: E, b: E) => Number(b.favorit) - Number(a.favorit)
+      const kritik = nachZahl((e: E) => e.kritik, richtung, nachTitel)
       return (a, b) => (richtung === 'ab' ? favorit(a, b) : favorit(b, a)) || kritik(a, b)
     }
   }
