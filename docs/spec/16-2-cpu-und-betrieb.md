@@ -55,7 +55,9 @@ sinnvollen Portion gegen dieses Budget:
   **Erste Nacht mit voller Last (20.10.2026):** 411 Releases in 69 Portionen, CPU je Portion Median 2,
   P90 4, höchstens 15 ms – im Budget; **die Portion bleibt bei 6**, mehr verbieten die 50 Anweisungen.
   GitHub startete den Lauf 5 h 14 min zu spät (07:31 statt 02:17); daraus Nachtrag **20i-b**: Frist
-  12 statt 20 Stunden, Rückfall um 08:17, Warnung bei leeren Läufen (7.3, [Betriebswarnungen](16-2-betriebswarnungen.md)). Der Neuabruf eines einzelnen Releases (20h) bleibt im Worker.
+  12 statt 20 Stunden, Rückfall um 08:17, Warnung bei leeren Läufen (7.3, [Betriebswarnungen](16-2-betriebswarnungen.md)). **Nacht zum 21.10.2026:**
+  20i-b wirkt wie gebaut – 431 geprüft, Rückfall leer, je Portion Median 3, höchstens 12 ms; beide
+  Läufe kamen wieder gut fünf Stunden zu spät (7.3). Der Neuabruf eines einzelnen Releases (20h) bleibt im Worker.
 - **Kaufliste → gebündelt wie 18k – gebaut in 18k-b (19.10.2026):** bis dahin je Eintrag zwei bis
   drei D1-Aufrufe nacheinander, bis zu 150 Abfragen je Aufruf gegen die dokumentierten 50. Jetzt ein
   Lese-Batch (`releasesNachSchluesseln` mit `mitKauf`) und ein Schreib-Batch (`berechtigungenErkennen`,
@@ -67,9 +69,26 @@ sinnvollen Portion gegen dieses Budget:
   dann ins Budget passt, ist offen.
 - **Store → GitHub Action nach dem Muster von 20i: Stufe 20j** (Entscheidungen des Nutzers vom
   20.10.2026; Plan freigegeben, gebaut erst nach der Auswertung der Nacht zum 21.10., damit die
-  Frist-Änderung aus 20i-b für sich gemessen wird). Wie beim Markt: **Frist 12 Stunden**, Lauf um
-  **01:47 UTC** mit **Rückfall um 07:47** (versetzt zum Markt, nicht zur vollen Stunde), **eigene
-  Workflow-Datei** und **eigenes Service Token `github-store`** (15.3). Die Concept-Ids holt der
+  Frist-Änderung aus 20i-b für sich gemessen wird). Wie beim Markt: **Frist 12 Stunden**, **eigene
+  Workflow-Datei** und **eigenes Service Token `github-store`** (15.3). **Zeitplan** (Vorgabe des
+  Nutzers vom 21.10.2026, ersetzt 01:47 / 07:47): **auch mit fünf Stunden Verspätung vor 05:00 UTC
+  fertig, also der Hauptlauf am Vorabend** – GitHub verschiebt beide Läufe gleich weit (7.3). Bei der
+  größten gemessenen Verspätung (5 h 30 min) muss der Rückfall spätestens gegen 23:15 UTC geplant sein.
+  **Geprüft am 21.10.2026, was ein Lauf vor dem Sync bedeutet:** Der **Store** braucht nichts aus der
+  Nacht – seine Ziele sind offene Absichten und `nein`-Releases ohne erkannten Kauf
+  (`zuPruefenBaustein`); im PSN-Fenster stand er nur wegen der Kette. Der Kauf aus der Kaufliste
+  (wöchentlich, nach dem Sync) schließt ein Release einen Lauf später aus, wie heute. Der **Markt**
+  braucht den Sync: Ein Release wird erst Lücke, wenn `trophy_progress.progress_pct > 0` (`FAELLIG_IN_AUSWAHL`) –
+  ein frisch begonnenes Spiel käme pünktlich am Vorabend rund 17 Stunden nach dem Sync dran; schon
+  heute läuft 02:17 pünktlich *vor* dem Sync (23 Stunden), nur verspätet danach. Ein Lauf, der in
+  den Sync fällt, liest einen älteren Stand, mehr nicht. Der **Preisverlauf** verträgt den Wechsel des
+  UTC-Tags: geschrieben wird nur bei Änderung, der Tageseimer nimmt den letzten Punkt (6, 20f).
+  **Mitzuprüfen:** Die 26 h der Warnung `markt_geprueft` liegen schon heute unter dem größten Abstand
+  zweier prüfender Läufe (pünktlich 02:17, am Folgetag 07:37: 29 h 20 min), sie kann dazwischen grundlos
+  erscheinen (gefolgert, nicht beobachtet). **Vorschlag, offen:** Store 20:47 mit Rückfall 22:47,
+  Markt ebenso vorgezogen auf 20:17 / 22:17 – der Markt endet heute um 07:48 und verfehlt damit die
+  Vorgabe „bis 05:00" (unten) selbst.
+  Die Concept-Ids holt der
   Worker über eine eigene Route – die IGDB-Zugangsdaten bleiben im Worker (7.6); der Einzelabruf
   einer Adresse bleibt im Worker wie der Neuabruf in 20h. Ein Release je Aufruf ist im Cron die
   Untergrenze, rund die Hälfte läge über 10 ms; am 20.10. 29–41 ms je Aufruf zu zehn Releases. Ein Probelauf aus GitHub Actions am 19.10.2026
@@ -119,7 +138,10 @@ der Testbestand an rund 15 Stellen Release-Id = Spiel-Id und genau 430 Releases 
 die Marktauswahl mit ihren 59 nie geprüften Releases seit 20i nicht mehr im Lage-Batch steht – der
 Wartungsleerlauf liest im Test jetzt 1 788 statt 2 218 Zeilen). **Der Nachtrag soll auch den
 Wartungs-Leerlauf senken** (rund 1 800 Zeilen je Aufruf); seine CPU blieb am 20.10. ohne die
-Marktauswahl bei Median 7 ms ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)). Der Test liest im Wartungsleerlauf 2 218 Zeilen, die Produktion rund 2 590 – die drei
+Marktauswahl bei Median 7 ms ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)). **Beobachtungspunkt
+(Vorgabe des Nutzers vom 21.10.2026):** Die Lage der Markt-Action (`GET /api/sync/markt/lage`) brauchte
+am 21.10. **19 ms in SEA**, am 20.10. 7 ms in IAD, bei 431 gegen 411 fälligen Releases. Wiederholt
+sich das, wird es **vor** dem Index-Nachtrag untersucht. Der Test liest im Wartungsleerlauf 2 218 Zeilen, die Produktion rund 2 590 – die drei
 Auswahlen des Lage-Batches, exakt gemessen am 18.10.2026 über `meta.rows_read`, dieselben Anweisungen
 aus dem Code (die Marktauswahl mit verschobener Frist, damit nichts fällig ist wie im Leerlauf):
 

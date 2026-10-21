@@ -18,7 +18,11 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   ~5 ms. **Nacht zum 20.10.2026**, die erste ohne Marktauswahl im Lage-Batch (im Test 1 788 statt
   2 218 Zeilen): Wartungs-Leerlauf 4–12 ms, **Median 7** (n = 25; SJC 5–12, Median 9, gegen 4,5 am
   18.10.; DFW 5–9), vier über 10 – **keine Wirkung sichtbar**, das Budget für den Leerlauf (Median um 5,
-  P99 unter 10) bleibt verfehlt. PSN-Leerlauf 4–11, Median 5 (n = 13; EWR 4–5, IAD 5–11, ORD 5–8). Am 18.10. **gab es den PSN-Leerlauf nicht:** In einer Kaufliste-Nacht
+  P99 unter 10) bleibt verfehlt. PSN-Leerlauf 4–11, Median 5 (n = 13; EWR 4–5, IAD 5–11, ORD 5–8).
+  **Nacht zum 21.10.2026:** Wartungs-Leerlauf 4–14 ms, Median 6,8 (n = 34; DFW 5,2 gegen 6,5, SJC 8,8
+  gegen 9,4, LAX 8,6 gegen 6,9) – je Standort unverändert, das Budget weiter verfehlt; PSN-Leerlauf
+  5–14, Median 6,1 (n = 14; EWR 5,6, ORD 6,4, IAD 13,9). `rows_read_24h` 129 870,
+  `rows_written_24h` 3 638 (keine Kaufliste-Nacht). Am 18.10. **gab es den PSN-Leerlauf nicht:** In einer Kaufliste-Nacht
   belegt die Arbeit alle 36 Aufrufe (Sync 11, Spielzeit 2, Besitz 15, Level 1, Store 7, der Store
   fertig im letzten); Vergleichswerte vom 17.10.: EWR 11,5 ms, IAD ~16, ATL ~17, ORD ~13,5. Sync,
   Store und Markt blieben je Standort unverändert – 18j spart den Rahmen, nicht die Arbeit. **Die
@@ -35,9 +39,10 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   (`GESPIELTE_JE_SEITE`). **Gemessen in der Nacht zum 19.10.2026:** EWR 18,6 ms (200 Titel), IAD
   29,3 ms (179) gegen EWR 115–150 und ORD 119–148 vorher – **rund 85 % weniger**, aber doppelt so
   viel wie erwartet und weiter über 10. **Nacht zum 20.10.2026:** IAD 22 ms (200 Titel), ORD 24 (179).
+  **Nacht zum 21.10.:** IAD 30 (200), ATL 20 (179).
 - **Sync** (5–6 Abfragen, ein Batch mit 104 Anweisungen): rund 4 ms D1, 3 ms Rechnen, dazu die
   echte Seite aus dem Netz – grenzwertig. **Nacht zum 20.10.2026:** Abruf 12–16 ms, Normalisierung
-  11–21, Median 13 (n = 9); Level 11.
+  11–21, Median 13 (n = 9); Level 11. **Nacht zum 21.10.:** 9–20, Median 13 (n = 11); Level 13.
 - **Store** (je Release ein Batch, die Seite als Strom): rund 1 ms D1 plus 3 ms Lesen je Release;
   **ein Release je Aufruf** trägt, zehn nicht. Am Stück zu lesen wäre billiger, aber dann wird die
   ganze Seite geholt (380 KB bis 1,4 MB, 7.4). **Leser gebaut in 18l (18.10.2026):** weiter ein
@@ -53,18 +58,20 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   Produktionsmaß nicht zu sehen.** Ins Budget von ~5 ms passt kein Release, denn der Leerlauf allein
   braucht es; ein Release je Aufruf läge bei rund 7 (EWR) bis 12 ms (IAD). **Nacht zum 20.10.2026**,
   die erste mit 20 Stunden Frist: am Stück 04:10–04:45, 79 Releases in acht Aufrufen, `offen=0`, 29–41
-  ms je Aufruf (EWR 29–39, IAD 34–41). **Der Store geht in eine GitHub Action** (Entscheidung des
+  ms je Aufruf (EWR 29–39, IAD 34–41). **Nacht zum 21.10.:** wieder 04:10–04:45, acht Aufrufe,
+  `offen=0`, **33–103 ms**, Median 48 – je Standort: IAD 38/43 wie am Vortag, ATL 33–65, MIA 35,
+  **ORD 71/103**; der Anstieg kommt vom Standort, nicht vom Code. **Der Store geht in eine GitHub Action** (Entscheidung des
   Nutzers vom 20.10.2026, [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
 - **Gebrauchtpreise – seit 20i eine GitHub Action:** Im Cron lag die Grundlast eines Aufrufs (vier
   Abfragen, Sammlung laden und vorbereiten) schon bei 5–8 ms, jedes Release kostete 3–4 ms mehr (94 ms
   für 20 mit echter D1), und **kein** Cron-Aufruf traf eine warme Instanz (0 von 28 im Minutentakt).
   Verworfen damit auch der Wortindex **als eine Zeile** (Berechnetes, das gespeichert würde). Als
-  Action in der Nacht zum 20.10.2026: je Portion von sechs Releases Median 2, P90 4, höchstens 15 ms
-  ([7.3](07-3-ebay-betrieb.md)).
+  Action in der Nacht zum 20.10.2026: je Portion von sechs Releases Median 2, P90 4, höchstens 15 ms,
+  am 21.10. Median 3, P90 6, höchstens 12 ([7.3](07-3-ebay-betrieb.md)).
 - **IGDB-Auffrischen** (Frist sieben Tage, 50 Spiele je Aufruf, 10.1 Schritt 12) – **erstmals gemessen
   in der Nacht zum 20.10.2026:** neun Aufrufe von 06:05 bis 06:45, **20–54 ms**, Median 34 (MIA 25–28,
   EWR 28, IAD 39, SJC 20, vier ohne Standort 34–54); acht mit Logzeile, darin 370 angefragt und 369
-  aktualisiert.
+  aktualisiert. Am 21.10. ein Aufruf, 47 Spiele, 28 ms (EWR).
   Einmal je Woche, aber jeder Aufruf über dem Budget; Ursache nicht untersucht. Bleibt im Worker
   (16.2) – ob das so bleibt, ist offen.
 
