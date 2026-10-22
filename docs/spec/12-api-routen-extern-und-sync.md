@@ -73,10 +73,6 @@ POST   /api/sync/markt/verwerfen/ruecknahme
 GET    /api/sync/markt/verwerfen/:releaseId
                                       { verworfene[] } mit itemId, titel, preisCents, verworfenAm – fuer die
                                       Tafel am Preis; die Listen tragen nur die Anzahl
-POST   /api/sync/store                eine Portion Store-Preise (10 Releases, Stufe 21); KEIN 503-Pfad -
-                                      der Store braucht keine Zugangsdaten; { status, geprueft, mitPreis,
-                                      imAngebot, imPlusKatalog, zugeordnet, ohneTreffer, nochOffen,
-                                      anfragen, weiter }
 GET    /api/sync/store                { mitPreis, imAngebot, imPlusKatalog, geprueft, ohneId, ohneWebstore }
 POST   /api/sync/store/:releaseId     EIN Release jetzt pruefen, ohne Frist (Stufe 21d); Koerper optional
                                       { adresse } – kopierte Store-Adresse (Produkt oder Concept) oder blosse

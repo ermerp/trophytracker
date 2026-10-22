@@ -448,7 +448,7 @@ type StoreStand = {
 /** Ein Eintrag der Nachpflegeliste (`GET /api/sync/store/offen`, Stufe 21d). */
 type StoreOffen = { releaseId: number; gameId: number; titel: string; plattform: string }
 
-/** Was eine Portion zurueckgibt (`POST /api/sync/store`). */
+/** Was der Einzelabruf zurueckgibt (`POST /api/sync/store/:releaseId`, Stufe 21d). */
 type StoreAntwort = {
   status: 'erfolg' | 'fehler'
   geprueft: number
@@ -482,7 +482,6 @@ export function Einstellungen() {
   const [trophText, setTrophText] = useState<string | null>(null)
   const [markt, setMarkt] = useState<MarktStand | null>(null)
   const [store, setStore] = useState<StoreStand | null>(null)
-  const [storeText, setStoreText] = useState<string | null>(null)
   const [storeOffen, setStoreOffen] = useState<StoreOffen[] | null>(null)
 
   const statusLaden = useCallback(async () => {
@@ -757,41 +756,6 @@ export function Einstellungen() {
     }
   }
 
-  /**
-   * Store-Preise holen (Stufe 21). Zehn Releases je Aufruf, höchstens vierzig
-   * Fremdanfragen – beim ersten Mal kostet ein Release bis zu vier (Concept
-   * und bis zu drei Produktseiten), danach genau eine.
-   *
-   * Zeitgrenze am `fetch` aus demselben Grund wie oben: Eine Anfrage, die nie
-   * antwortet, ließe die Oberfläche still warten.
-   */
-  async function storeHolen() {
-    setMeldung(null)
-    setStoreText('Store-Preise werden geholt …')
-    setLaeuft(true)
-    let geprueft = 0
-    let preise = 0
-    let angebote = 0
-    try {
-      for (;;) {
-        const antwort = await fetch('/api/sync/store', { method: 'POST', signal: AbortSignal.timeout(60_000) })
-        const daten = (await antwort.json()) as StoreAntwort
-        if (!antwort.ok) throw new Error(daten.meldung ?? daten.fehler ?? 'Der Abruf der Store-Preise ist fehlgeschlagen.')
-        geprueft += daten.geprueft
-        preise += daten.mitPreis
-        angebote += daten.imAngebot
-        setStoreText(`${geprueft} Releases geprüft, ${preise} mit Preis, ${angebote} im Angebot …`)
-        if (!daten.weiter || daten.geprueft === 0) break
-      }
-      setStoreText(`Fertig: ${geprueft} Releases geprüft, ${preise} mit Preis, ${angebote} im Angebot.`)
-    } catch (fehler) {
-      setStoreText(`Angehalten nach ${geprueft} Releases: ${fehler instanceof Error ? fehler.message : 'unbekannter Fehler'}`)
-    } finally {
-      setLaeuft(false)
-      await storeStandLaden()
-    }
-  }
-
   const zugang = status?.zugang
 
   return (
@@ -880,19 +844,19 @@ export function Einstellungen() {
           : `${store.geprueft} Releases gefragt, ${store.mitPreis} mit Preis, ${store.imAngebot} im Angebot, ` +
             `${store.imPlusKatalog} im PS Plus-Katalog.`}
       </p>
-      <button type="button" onClick={storeHolen} disabled={laeuft}>
-        Store-Preise jetzt holen
-      </button>
-      {storeText && (
-        <p className="zeile" role="status">
-          {storeText}
-        </p>
-      )}
       <p className="zeile">
         Gefragt wird der PlayStation Store, und zwar nur für offene Wünsche, die Kaufliste und Titel ohne
         Disc-Fassung – nicht für die ganze Sammlung. Genommen wird der Kaufpreis, nie der Preis eines
         Probespiels oder eines Abos; liegt ein Titel im PS Plus-Katalog, steht das daneben. Zugangsdaten
-        braucht es nicht. Der Schritt läuft sonst nachts im PSN-Fenster mit, zehn Releases je Aufruf.
+        braucht es nicht.
+      </p>
+      <p className="zeile">
+        Die Preise holt jeden Abend um 20:47 UTC eine GitHub Action, alle fälligen Releases in einem Lauf.
+        Von Hand starten:{' '}
+        <a href="https://github.com/ermerp/trophytracker/actions/workflows/store.yml" target="_blank" rel="noreferrer noopener">
+          Store-Preise in GitHub Actions
+        </a>{' '}
+        → „Run workflow“. Ihr letzter Lauf steht im Verlauf unten.
       </p>
       {storeOffen !== null && storeOffen.length > 0 && (
         <StoreNachpflege eintraege={storeOffen} laeuft={laeuft} onFertig={storeStandLaden} />

@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { erstelleStoreClient } from "../src/psn/store";
 import { conceptSeite, htmlAntwort, produktSeite } from "./store-fake";
 import { marktLauf } from "../src/sync/markt-lauf";
+import { storeLauf } from "../src/sync/store-lauf";
 import { createApp, createScheduled } from "../src/index";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
@@ -492,10 +493,19 @@ describe("Dichtheitsprüfung", () => {
 			await createScheduled(psnKaputt, igdb)(wartung, env, ctx);
 		}
 
-		// Der Store laeuft im PSN-Fenster und wirft hier einen Fehlertext
-		// voller Markierungen zurueck (Stufe 21). Sein Statuscode darf in die
-		// Meldung, der Koerper nicht.
-		await createScheduled(psnKaputt, () => igdbMarkiert(), () => storeKaputt())(ereignis, env, ctx);
+		// Der Store laeuft seit 20j als Action und wirft hier einen Fehlertext
+		// voller Markierungen zurueck (Stufe 21). In Ergebnis und Verlauf darf
+		// davon nichts - ein Abruffehler laesst das Release nur faellig.
+		await env.DB.batch([
+			env.DB.prepare("INSERT OR IGNORE INTO game (id, title, sort_title, store_concept_id) VALUES (9002, 'Erfunden', 'erfunden', '1')"),
+			env.DB.prepare("INSERT OR IGNORE INTO release (id, game_id, platform) VALUES (9002, 9002, 'PS4')"),
+			env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin, status) VALUES ('wunsch', 9002, 'manuell', 'offen')"),
+		]);
+		const storeApp = createApp(psnKaputt, () => igdbMarkiert());
+		const storeErgebnis = await storeLauf((pfad, init) => Promise.resolve(storeApp.request(pfad, init, env)), storeKaputt());
+		// Sonst bewiese der Lauf nichts: Der Store muss gefragt und gescheitert sein.
+		expect(storeErgebnis.uebersprungen).toBeGreaterThan(0);
+		ausgabe.push(JSON.stringify(storeErgebnis));
 
 		// Und der Fall, um den es in 18e geht: Fehlerantworten mit markiertem
 		// Koerper, deren Statuscode jetzt woertlich in Meldung und Verlauf

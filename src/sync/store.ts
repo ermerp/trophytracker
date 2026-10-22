@@ -8,22 +8,18 @@ import { StoreAbrufError, type StoreClient } from "../psn/store";
 /**
  * PSN Store-Preise (Abschnitt 7.4, Stufe 21).
  *
- * Laeuft im PSN-Fenster, aber ausserhalb der Zugangspruefung: Es ist Sonys
- * Schnittstelle, sie braucht aber **kein Token**. Ein abgelaufenes NPSSO
- * legt den Trophaeen-Sync still, nicht die Preise.
+ * Seit Stufe 20j laeuft der Nachtlauf als GitHub Action (`storeLauf`,
+ * src/sync/store-lauf.ts), nicht mehr im PSN-Fenster. Hier steht, was beide
+ * Wege teilen: die Pruefung EINES Releases (`pruefeZiel`) - und der
+ * Einzelabruf, der im Worker bleibt (21d). Es ist Sonys Schnittstelle, sie
+ * braucht aber **kein Token**; ein abgelaufenes NPSSO legt die Preise nicht
+ * still.
  *
- * Die Portion ist nach der Zahl der FREMDANFRAGEN geschnitten, nicht nach
- * Dauer (CLAUDE.md: 50 je Aufruf auf dem Free Tier). Ein Release kostet beim
- * ersten Mal bis zu vier Anfragen - eine Concept-Seite und bis zu drei
- * Produktseiten -, danach genau eine. Weil der erste Lauf und der
- * Dauerbetrieb damit weit auseinanderliegen, zaehlt der Schritt seine
- * Anfragen selbst und hoert auf, bevor die naechste Runde sie ueberziehen
- * koennte. Das ist verlaesslicher als eine Portionsgroesse, die den
- * schlimmsten Fall erraten muss.
+ * Im Worker zaehlt der Einzelabruf seine FREMDANFRAGEN selbst (CLAUDE.md: 50
+ * je Aufruf auf dem Free Tier). Ein Release kostet beim ersten Mal bis zu
+ * vier Anfragen - eine Concept-Seite und bis zu drei Produktseiten -, danach
+ * genau eine.
  */
-
-/** Releases je Aufruf, wenn die Anfragen reichen. */
-export const RELEASES_JE_AUFRUF = 10;
 
 /**
  * Hoechstzahl eigener Fremdanfragen je Aufruf. Vierzig von fuenfzig - die
@@ -94,25 +90,13 @@ export type StoreSchrittErgebnis = {
 	meldung?: string;
 };
 
-export async function storeSchritt(
-	repos: Repositories,
-	store: StoreClient,
-	igdb: IgdbClient,
-	n = RELEASES_JE_AUFRUF,
-	// Vom Lage-Batch des Cron gelesen (Stufe 18j) - mit DERSELBEN Auswahl wie
-	// der Knopf, der sie hier selbst liest (`zuPruefenBaustein`).
-	ziele?: ZuPruefen[],
-): Promise<StoreSchrittErgebnis> {
-	return portion(repos, store, igdb, ziele ?? (await repos.store.zuPruefen(n)), n);
-}
-
 /**
  * EIN Release jetzt pruefen - ohne Frist, ohne Zuschnitt (Nachtrag 21d).
  *
- * Derselbe Weg wie im Nachtlauf, nur mit einer einelementigen Portion: Wer
- * von Hand eine Adresse eintraegt, soll den Preis sofort sehen. Zwei Eingaenge
- * auf dieselbe Maschinerie - damit kann die Auswahlregel nicht auseinander
- * laufen.
+ * Dieselbe Pruefung wie im Nachtlauf (`pruefeZiel`), nur mit einer
+ * einelementigen Portion: Wer von Hand eine Adresse eintraegt, soll den Preis
+ * sofort sehen. Zwei Eingaenge auf dieselbe Maschinerie - damit kann die
+ * Regel nicht auseinander laufen.
  *
  * `null` heisst: Dieses Release gibt es nicht.
  */

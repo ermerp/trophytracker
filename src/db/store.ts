@@ -54,6 +54,25 @@ const FAELLIG_VON =
 	"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') ";
 
 /**
+ * Seit wann das am laengsten ungepruefte Ziel auf dem Stand ist - fuer
+ * das Sicherheitsnetz der Warnung `store_leer` (Stufe 20j, Rueckfrage des
+ * Nutzers vom 22.10.2026).
+ *
+ * **Bewusst NICHT ueber `ZIELE_CTE` und `FAELLIG_VON`:** Liefert die
+ * Auswahl durch einen Fehler immer 0, findet die Lage nichts, die
+ * Zaehlung im Ausgang (`ausgangLage`) ebenso - und der leere Lauf gaelte als "auf
+ * dem Stand". Diese Abfrage teilt keinen Text mit der Auswahl; sie nimmt
+ * die offenen Absichten ohne gekaufte Berechtigung, also den Kern des
+ * Zuschnitts. Ein Ziel ohne Stempel zaehlt ab dem Anlegen der Absicht,
+ * sonst warnte jeder neue Wunsch bis zum naechsten Abend. Die
+ * `nein`-Releases ohne Absicht deckt das Netz nicht ab (heute keine, 7.4).
+ */
+const AELTESTER_STEMPEL =
+	"SELECT MIN(COALESCE(r.store_geprueft_am, pe.created_at)) AS am FROM plan_entry pe " +
+	"JOIN release r ON r.id = pe.release_id WHERE pe.status = 'offen' " +
+	"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf')";
+
+/**
  * Was die Action je Release zurueckmeldet (Stufe 20j): ein Preis oder ein
  * Befund. `unlesbar` kommt nie an - es stempelt nicht, also gibt es nichts
  * zu schreiben.
@@ -152,14 +171,23 @@ export class StoreRepository {
 		return eins(statement, (e) => zeilen<ZuPruefen>(e));
 	}
 
+
+
 	/**
-	 * Wie viele Releases JETZT faellig sind - dieselbe Bedingung wie die
-	 * Auswahl. Fuer den Ausgang der Action (Stufe 20j): Ein leerer Lauf, bei
-	 * dem nichts faellig ist, ist auf dem Stand und kein Befund.
+	 * Was der Ausgang der Action braucht, in EINEM D1-Aufruf: die Zahl der
+	 * Faelligen (aus der Auswahl) und der aelteste Stempel (ausdruecklich
+	 * nicht aus der Auswahl, `AELTESTER_STEMPEL`). Unabhaengig voneinander, also ein
+	 * Batch (CLAUDE.md).
 	 */
-	async faelligeAnzahl(): Promise<number> {
-		const z = await this.db.prepare(ZIELE_CTE + "SELECT COUNT(*) AS n " + FAELLIG_VON).first<{ n: number }>();
-		return z?.n ?? 0;
+	async ausgangLage(): Promise<{ faellig: number; aeltester: string | null }> {
+		const [f, a] = await this.db.batch([
+			this.db.prepare(ZIELE_CTE + "SELECT COUNT(*) AS n " + FAELLIG_VON),
+			this.db.prepare(AELTESTER_STEMPEL),
+		]);
+		return {
+			faellig: (f.results[0] as { n: number } | undefined)?.n ?? 0,
+			aeltester: (a.results[0] as { am: string | null } | undefined)?.am ?? null,
+		};
 	}
 
 	/**

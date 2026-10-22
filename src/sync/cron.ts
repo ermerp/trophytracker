@@ -14,8 +14,6 @@ import {
 } from "./igdb";
 import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis } from "./besitz";
 import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
-import { RELEASES_JE_AUFRUF as STORE_JE_AUFRUF, storeSchritt, type StoreSchrittErgebnis } from "./store";
-import { meldungFuer as storeMeldung, type StoreClient } from "../psn/store";
 import {
 	eineListe,
 	jahreSchritt,
@@ -151,7 +149,6 @@ export type CronErgebnis = {
 		| "jahre"
 		| "igdb_auffrischen"
 		| "igdb_physisch"
-		| "store"
 		| "nichts";
 	/** angekuendigt -> erschienen (8.4), in jedem Aufruf. */
 	erschienen: number;
@@ -169,7 +166,6 @@ export type CronErgebnis = {
 	trophaeen?: ListenErgebnis;
 	level?: number;
 	jahre?: number;
-	store?: StoreSchrittErgebnis;
 	auffrischen?: AuffrischErgebnis;
 	physisch?: PhysischErgebnis;
 };
@@ -182,7 +178,6 @@ export type CronKandidat =
 	| "besitz"
 	| "trophaeen"
 	| "level"
-	| "store"
 	| "jahre"
 	| "igdb_auffrischen"
 	| "igdb_physisch";
@@ -197,7 +192,7 @@ export const CRON_STAENDE = [SCHLUESSEL_SPIELZEIT, SCHLUESSEL_BESITZ, SCHLUESSEL
  *
  * Eine Liste statt eines Schritts, weil ein faelliger Schritt trotzdem leer
  * ausgehen kann - das Level, wenn PSN keines nennt; die Jahre, wenn es keine
- * Trophaeen gibt; der Store, wenn keine Anfrage etwas pruefte. Dann versucht
+ * Trophaeen gibt. Dann versucht
  * `cronSchritt` den naechsten, genau wie bis 18j die Kette der `if`s.
  */
 export function entscheide(
@@ -207,7 +202,7 @@ export function entscheide(
 	const raus: CronKandidat[] = [];
 	const stand = (s: string) => lage.einstellungen.get(s) ?? null;
 	if (lage.psn) {
-		const { laufend, heutige, zugang, naechsteListe, storeZiele } = lage.psn;
+		const { laufend, heutige, zugang, naechsteListe } = lage.psn;
 		// 2. Ein laufender Lauf wird fortgesetzt - und sonst nichts.
 		if (laufend) return ["sync"];
 		const mitZugang = zugang.eingerichtet && zugang.status !== "abgelaufen";
@@ -219,7 +214,6 @@ export function entscheide(
 			if (naechsteListe) raus.push("trophaeen");
 			if (levelStandAus(stand(SCHLUESSEL_LEVEL))?.standAm !== k.heute) raus.push("level");
 		}
-		if (storeZiele.length > 0) raus.push("store");
 	}
 	if (lage.wartung) {
 		const { zumAuffrischen, zurDisc } = lage.wartung;
@@ -244,7 +238,6 @@ export function lageLesen(
 		schluessel: CRON_STAENDE,
 		haengtNachStunden: HAENGT_NACH_STUNDEN,
 		rohantwortenLaeufe: ROHANTWORTEN_LAEUFE,
-		storeJeAufruf: STORE_JE_AUFRUF,
 		igdbJeAufruf: AUFFRISCHEN_JE_AUFRUF,
 		auffrischFristTage: AUFFRISCH_FRIST_TAGE,
 	});
@@ -261,7 +254,6 @@ export async function cronSchritt(
 	repos: Repositories,
 	psn: PsnClient,
 	igdb: IgdbClient,
-	store: StoreClient,
 	optionen: { heute?: string; bereich?: CronBereich; lage?: CronLage } = {},
 ): Promise<CronErgebnis> {
 	const heute = optionen.heute ?? heuteIso();
@@ -327,20 +319,6 @@ export async function cronSchritt(
 					}
 				} catch (fehler) {
 					return { ...basis, getan: "nichts", meldung: "Der PSN-Abruf ist fehlgeschlagen." };
-				}
-				break;
-			}
-
-			// 8. Store-Preise (7.4): ausserhalb der Zugangspruefung - der Store
-			//    antwortet ohne Token -, mit eigenem try/catch wie IGDB (18b).
-			case "store": {
-				try {
-					const preise = await storeSchritt(repos, store, igdb, STORE_JE_AUFRUF, lage.psn?.storeZiele);
-					if (preise.geprueft > 0 || preise.status === "fehler") {
-						return { ...basis, getan: "store", store: preise };
-					}
-				} catch (fehler) {
-					return { ...basis, getan: "nichts", meldung: storeMeldung(fehler) };
 				}
 				break;
 			}
@@ -568,7 +546,8 @@ function syncFaellig(heutige: readonly SyncLauf[]): boolean {
 /**
  * Die Zahlen eines Ausgangs fuer `cron_stand` (Stufe 18j). Nur was war - ob
  * es schlimm ist, entscheiden die Betriebswarnungen beim Lesen (16.2).
- * `offen` ist der Rest des Schritts nach diesem Aufruf, wo es einen gibt.
+ * Einen Rest (`offen`) meldete im Cron nur der Store-Schritt; seit 20j steht
+ * er in der Action, und ihr Ausgang traegt ihn (`POST /api/sync/store/ausgang`).
  */
 export function cronFakt(am: string, e: CronErgebnis): CronFakt {
 	const meldung = Boolean(
@@ -576,12 +555,10 @@ export function cronFakt(am: string, e: CronErgebnis): CronFakt {
 			e.sync?.meldung ||
 			e.spielzeit?.meldung ||
 			e.besitz?.meldung ||
-			e.store?.meldung ||
 			e.auffrischen?.meldung ||
 			e.physisch?.meldung,
 	);
-	const offen = e.store?.nochOffen;
-	return { am, getan: e.getan, meldung, ...(offen === undefined ? {} : { offen }) };
+	return { am, getan: e.getan, meldung };
 }
 
 /**
@@ -627,23 +604,6 @@ export function cronLogzeile(e: CronErgebnis): string {
 	}
 	if (e.level) teile.push(`level=${e.level}`);
 	if (e.jahre) teile.push(`jahre=${e.jahre}`);
-	if (e.store) {
-		// Fuenf Zahlen, weil sie fuenf Dinge sagen: `geprueft` ist die Portion,
-		// `preis` was einen Kaufknopf hatte, `angebot` die Rabatte, `plus` die
-		// Katalogtitel und `zugeordnet` die Releases, die erstmals eine
-		// Produkt-Id bekamen. `anfragen` ist die Bilanz gegen die 50 je Aufruf.
-		teile.push(
-			`store=${e.store.status}`,
-			`geprueft=${e.store.geprueft}`,
-			`preis=${e.store.mitPreis}`,
-			`angebot=${e.store.imAngebot}`,
-			`plus=${e.store.imPlusKatalog}`,
-			`zugeordnet=${e.store.zugeordnet}`,
-			`anfragen=${e.store.anfragen}`,
-			`offen=${e.store.nochOffen}`,
-		);
-		if (e.store.meldung) teile.push(`meldung="${e.store.meldung}"`);
-	}
 	if (e.spielzeit) {
 		teile.push(
 			`spielzeit=${e.spielzeit.status}`,

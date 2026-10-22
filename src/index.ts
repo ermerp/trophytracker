@@ -139,7 +139,6 @@ function ebayJeInstanz(): (env: Env) => EbayClient {
 export function createScheduled(
 	psnFactory: () => PsnClient = () => erstellePsnClient(),
 	igdbFactory: (env: Env) => IgdbClient = igdbJeInstanz(),
-	storeFactory: () => StoreClient = () => erstelleStoreClient(),
 ): ExportedHandlerScheduledHandler<Env> {
 	return async (event, env) => {
 		if (!env.NPSSO_KEY) {
@@ -160,7 +159,7 @@ export function createScheduled(
 			// braucht - stirbt dieser Aufruf danach an der CPU-Grenze, meldet ihn
 			// der naechste, der durchkommt.
 			lage = await lageLesen(repos, bereich, heute, new Date());
-			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env), storeFactory(), {
+			const ergebnis = await cronSchritt(repos, psnFactory(), igdbFactory(env), {
 				bereich,
 				heute,
 				lage,

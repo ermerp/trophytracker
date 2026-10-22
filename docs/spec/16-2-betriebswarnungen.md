@@ -30,7 +30,7 @@ Die CPU der Route wird nach dem Deploy an `workersInvocationsAdaptive` gemessen.
 | Letzter Ausgang eines Bereichs mit Meldung, jünger als 24 h (außer dem schon gemeldeten Sync) | zur Kenntnis |
 | Kaufliste mit `fehlerAm` von heute oder gestern | zur Kenntnis |
 | Markt-Action: jüngster Ausgang ohne Meldung mit `geprueft = 0` **und** seit über **26 h** kein Lauf mit `geprueft > 0` (`markt_geprueft`, 20i-b) – ein einzelner leerer Lauf ist der normale Rückfall um 08:17; nach einem Tag müsste bei zwölf Stunden Frist alles fällig sein. Ein Ausgang ohne `geprueft` (vor 20i-b) schweigt | zur Kenntnis |
-| Store-Action (`store_leer`, 20j): dasselbe mit **30 h**; `store_geprueft` setzt **auch ein leerer Lauf ohne Meldung, nach dem nichts fällig ist** – das liest die Ausgangs-Route selbst. Sonst meldete die Warnung nach einem Probelauf am Nachmittag sicher: Er stempelt alles, beide Abendläufe finden nichts, der nächste prüfende kommt nach gut 33 h | zur Kenntnis |
+| Store-Action (`store_leer`, 20j): dasselbe mit **30 h**; `store_geprueft` setzt **auch ein leerer Lauf ohne Meldung, nach dem nichts fällig ist** – das liest die Ausgangs-Route selbst. Sonst meldete die Warnung nach einem Probelauf am Nachmittag sicher: Er stempelt alles, beide Abendläufe finden nichts, der nächste prüfende kommt nach gut 33 h. **Sicherheitsnetz** (Rückfrage des Nutzers vom 22.10.2026): „nichts fällig" kommt aus derselben Auswahl wie die Lage – liefert sie durch einen Fehler immer 0, gälte jeder leere Lauf als auf dem Stand. Deshalb meldet `store_leer` auch, wenn der **älteste Prüfstempel** der Ziele älter als **42 h** ist (12 h Frist + 30 h: seit über 30 h fällig und nicht geprüft) – aus einer eigenen Abfrage ohne gemeinsamen Text mit der Auswahl (`AELTESTER_STEMPEL`: offene Absichten ohne gekaufte Berechtigung, ohne Stempel ab dem Anlegen der Absicht; die `nein`-Releases ohne Absicht deckt sie nicht ab). 30 h auf den Stempel selbst hätten nach dem Probelauf angeschlagen (33,5 h). Defektprobe am 22.10.2026: Auswahl auf 0 gesetzt – die Warnung kommt; ohne das Netz bleibt sie aus | zur Kenntnis |
 | Schritt nach Fensterschluss nicht fertig (`offen > 0`), bei Markt- und Store-Action nach ihrem Ausgang | zur Kenntnis, **scharf seit 20i** – bis dahin ruhte die Regel, weil die Wartung jede Nacht mit Rest schloss (`offen=18` am 18.10.) |
 
 **Das Zugangsende ist nicht Sonys Datum** (Entscheidung des Nutzers vom 18.10.2026, nachdem der Plan
@@ -39,6 +39,12 @@ Die CPU der Route wird nach dem Deploy an `workersInvocationsAdaptive` gemessen.
 lesen dieselbe Rechnung. Zeiten und Daten im Satz stehen in Ortszeit (Europe/Berlin). **Kurze Fehler,
 die sich im nächsten Aufruf selbst beheben, zeigt 18m nicht:** `cron_stand` hält je Bereich nur den
 letzten Ausgang (Nachtrag 18m-b, unten) – mit den Ausnahmen `markt_geprueft` aus 20i-b und `store_geprueft` aus 20j.
+
+**Bekannte Lücke im Sicherheitsnetz der Store-Action** (vermerkt am 22.10.2026): Der älteste
+Prüfstempel kommt aus den offenen Absichten. Releases mit `physical_release_status = 'nein'` **ohne**
+offene Absicht gehören zum Zuschnitt (7.4), werden vom Netz aber nicht gesehen – bleiben nur sie
+ungeprüft und sagt die Auswahl fälschlich „nichts fällig", kommt keine Warnung. Heute steht bei
+keinem Release ein `nein` (7.4); die Lücke wächst, sobald Block B der Lückenansicht abgearbeitet ist.
 
 **Darstellung, am Prototyp entschieden:** Rot steht als Block auf der Seite – er ersetzt den gelben
 Block – und oben in der Tafel; „zur Kenntnis" still, ohne eigenen Farbton, nur hinter der Glocke; die

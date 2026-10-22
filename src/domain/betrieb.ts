@@ -28,7 +28,15 @@ export type ZugangFakt = {
 };
 
 /** Der letzte Ausgang eines Bereichs - wie `CronFakt` in src/db/sync.ts. */
-export type AusgangFakt = { am: string; getan: string; meldung: boolean; offen?: number; geprueft?: number };
+export type AusgangFakt = {
+	am: string;
+	getan: string;
+	meldung: boolean;
+	offen?: number;
+	geprueft?: number;
+	/** Store-Action (20j): seit wann das am laengsten ungepruefte Ziel auf dem Stand ist (UTC). */
+	aeltester?: string;
+};
 
 /** Der Stand unter `cron_stand` - wie `CronStand` in src/db/sync.ts. */
 export type StandFakt = {
@@ -118,6 +126,15 @@ export const STILL_NACH_STUNDEN = 26;
  */
 export const ACTION_STILL_NACH_STUNDEN = 30;
 
+/**
+ * Ab diesem Alter des aeltesten Prueftstempels ist ein Store-Ziel seit ueber
+ * 30 Stunden FAELLIG und nicht geprueft: 12 Stunden Frist
+ * (`STORE_FRIST_STUNDEN`, src/db/store.ts) plus die 30 von oben. Nicht 30 auf
+ * den Stempel selbst - ein Probelauf um 16:47 stempelt alles, und der naechste
+ * pruefende Lauf kommt verspaetet erst nach rund 33,5 Stunden. Ein Test haelt
+ * die Summe fest.
+ */
+export const STORE_ZIEL_ALT_NACH_STUNDEN = 42;
 /** Ab wann ein Bereich als still gilt - die Store-Action mit ihrer eigenen Schwelle. */
 const STILL_NACH: Record<"psn" | "wartung" | "markt" | "store", number> = {
 	psn: STILL_NACH_STUNDEN,
@@ -458,7 +475,21 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 	// leerer Lauf, nach dem nichts faellig ist: Nach einem Probelauf am
 	// Nachmittag finden die Laeufe am Abend nichts, und das ist kein Befund.
 	const storeAusgang = f.stand.store;
-	if (storeAusgang?.geprueft === 0 && !storeAusgang.meldung) {
+	// Das Sicherheitsnetz (Rueckfrage des Nutzers vom 22.10.2026): Ob etwas
+	// faellig ist, sagt die Auswahl - ist sie kaputt und sagt immer "nichts",
+	// gaelte jeder leere Lauf als auf dem Stand. Der aelteste Stempel kommt aus
+	// einer eigenen Abfrage (`AELTESTER_STEMPEL`, src/db/store.ts) und schlaegt dann trotzdem an.
+	const aeltester = storeAusgang?.aeltester ? zeitAus(storeAusgang.aeltester) : null;
+	const aeltesterStunden = aeltester ? (f.jetzt.getTime() - aeltester.getTime()) / STUNDE_MS : 0;
+	if (storeAusgang && !storeAusgang.meldung && aeltester && aeltesterStunden > STORE_ZIEL_ALT_NACH_STUNDEN) {
+		raus.push({
+			art: "store_leer",
+			stufe: "kenntnis",
+			text: `${BEREICH.store.wer} läuft, aber ein Release wurde seit ${Math.floor(aeltesterStunden)} Stunden nicht geprüft, zuletzt am ${datum(aeltester)} um ${uhrzeit(aeltester)}.`,
+			ziel: "einstellungen",
+			zielText: "Verlauf",
+		});
+	} else if (storeAusgang?.geprueft === 0 && !storeAusgang.meldung) {
 		const zuletzt = f.stand.store_geprueft;
 		const stunden = zuletzt ? alterStunden(zuletzt.am) : Number.POSITIVE_INFINITY;
 		if (stunden > ACTION_STILL_NACH_STUNDEN) {
