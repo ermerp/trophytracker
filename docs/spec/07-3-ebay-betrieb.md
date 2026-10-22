@@ -7,11 +7,12 @@
 20i-b, Entscheidung vom 20.10.2026), dazu von Hand über `workflow_dispatch`; der Knopf in den
 Einstellungen ist entfallen. **GitHub verschiebt den Start regelmäßig um rund fünf Stunden, und
 Haupt- und Rückfalllauf um denselben Betrag:** 02:17 kam am 20.10.2026 um 07:31 (5 h 14 min), am
-21.10. um 07:37 (5 h 20 min), der Rückfall 08:17 am 21.10. um 13:47 (5 h 30 min). Der Rückfall
+21.10. um 07:37 (5 h 20 min), am 22.10. um 07:33 (5 h 16 min), der Rückfall 08:17 am 21.10. und am
+22.10. jeweils um 13:47 (5 h 30 min). Der Rückfall
 fängt also keine Verspätung auf, nur einen ausgefallenen Lauf; wer einen Zeitplan setzt, rechnet mit
 dem verspäteten Start. Der Rückfall prüft dank der Frist nur, was der erste nicht geschafft hat;
-zwei Läufe zugleich stellt die `concurrency`-Gruppe hintereinander. Ob der Markt deshalb auf den
-Vorabend rückt, ist offen ([16.2](16-2-cpu-und-betrieb.md), 20j).
+zwei Läufe zugleich stellt die `concurrency`-Gruppe hintereinander. Der Markt rückt deshalb auf den
+Vorabend, 20:17 / 22:17, eine Nacht nach 20j (Entscheidung vom 22.10.2026, [16.2](16-2-cpu-und-betrieb.md)).
 Bis 20i lief er im Wartungsfenster des Cron, zwanzig Releases je Aufruf; dort blieb **kein einzelnes
 Release unter 10 ms CPU**, und 431 Aufrufe passten in keinen Takt (Gesamtrechnung in
 [16.2](16-2-cpu-und-betrieb.md)).
@@ -41,8 +42,10 @@ alle Aufrufe IAD): 411 Releases in 69 Portionen, 494 s, 231 mit Preis, 115 ohne 
 Portion bleibt bei 6** – das Budget (16.2) ist eingehalten. **Erste Nacht mit zwölf Stunden Frist**
 (21.10.2026, alle Aufrufe SEA): 431 Releases in 72 Portionen, 600 s, 248 mit Preis, 120 ohne Angebot,
 eine Disc-Fassung belegt, 0 offen; der Rückfall fand 0, `markt_geprueft` gesetzt, keine Warnung. Je
-Portion Median 3, P90 6, höchstens 12 ms (67 von 72 erfasst). **Die Lage brauchte 19 ms** – ein
-Einzelwert an einem neuen Standort, beobachtet in [16.2](16-2-cpu-und-betrieb.md).
+Portion Median 3, P90 6, höchstens 12 ms (67 von 72 erfasst). **22.10.2026** (MSP, dann ORD): 431
+in 72 Portionen, 475 s, 246 mit Preis, 121 ohne Angebot, 0 offen, Rückfall leer; je Portion Median 2,
+P90 4, höchstens 13 ms (71 von 72 erfasst). **Die Lage brauchte 19 ms (SEA) und 18 ms (MSP)** gegen
+7 ms (IAD) am 20.10. – untersucht in [16.2](16-2-cpu-und-betrieb.md).
 
 **Takt: täglich** (Entscheidung des Nutzers vom 02.10.2026). Nicht, weil Gebrauchtpreise sich täglich bewegen — sie tun es nicht —, sondern weil der Verlauf (20f) und der Preisalarm (20g) Punkte brauchen: Ein gleitender Median ist nur über genügend Werte robust gegen den einzelnen Verkäufer, der eine Disc für drei Euro einstellt, und melden kann ein Alarm nur, was er gesehen hat.
 
