@@ -29,7 +29,7 @@
 
 Alles andere landet mit seinen Kandidaten in `igdb_candidate` und wartet in der Prüfansicht. **Gemessen am 14.09.2026 gegen die 420 Spiele der Produktion:** 372 eindeutig, 5 echt mehrdeutig (etwa MediEvil als Remake oder Portierung, Tekken 6), 32 mit Kandidaten ohne Schlüsseltreffer (Abkürzungen, römische Ziffern, fehlende Untertitel), 11 ohne Treffer. In der Stichprobe aller automatischen Treffer keine Fehlzuordnung. Die Messung lief als Skript außerhalb des Repositories; ins Repository kamen nur die Zahlen.
 
-**Was eine Verknüpfung schreibt.** `igdb_id`, `igdb_slug`, `cover_url` (264 × 374, `t_cover_big`), `release_date` aus `first_release_date`, `release_status` daraus abgeleitet (Datum in der Zukunft → `angekuendigt`, keines → `unbekannt`, nie `erschienen` ohne Datum), `critic_score` (gerundetes `aggregated_rating`) und `critic_score_count` mit `critic_source = 'igdb'`, dazu `igdb_matched_at`, `igdb_matched_source` und `igdb_synced_at`.
+**Was eine Verknüpfung schreibt.** `igdb_id`, `igdb_slug`, `cover_url` (264 × 374, `t_cover_big`), `release_date` aus `first_release_date`, `release_status` daraus abgeleitet (Datum in der Zukunft → `angekuendigt`, keines → `unbekannt`, nie `erschienen` ohne Datum), `critic_score` (gerundetes `aggregated_rating`) und `critic_score_count` mit `critic_source = 'igdb'`, `user_score` (gerundetes `rating`) und `user_score_count` (seit 20k, 7.5), dazu `igdb_matched_at`, `igdb_matched_source` und `igdb_synced_at`.
 
 **Entscheidungen des Nutzers, alle gespeichert und alle korrigierbar** (CLAUDE.md):
 

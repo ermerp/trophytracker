@@ -15,7 +15,7 @@ unten ausdrücklich als offen.
 **Reihenfolge** (Entscheidung des Nutzers vom 20.10.2026): **20j – Store in eine GitHub Action**
 nach dem Muster von 20i (gebaut am 22.10.2026, [7.4](07-4-store-preise.md); der Store-Schritt im Worker geht erst nach einem fehlerfreien Probelauf über `workflow_dispatch` und spätestens um 20:30 UTC desselben Tages vom Netz, sonst eine Nacht später; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) →
 am 23.10. **der Markt auf 20:17 / 22:17** mit neu berechneter Schwelle von `markt_geprueft`
-(Entscheidung vom 22.10.2026, eine Änderung je Nacht) → in einer eigenen Nacht der
+(Entscheidung vom 22.10.2026, eine Änderung je Nacht) → **20k – Spielerwertung** (gebaut am 22.10.2026 auf `stufe-20k-spielerwertung`, [5.2](05-1-favorit-und-sortierung.md), [7.5](07-5-kritikerwertungen.md); Deploy erst nach der Nachtauswertung des 23.10., weil Migration und Auffrischen das Wartungsfenster berühren – in welche Nacht neben dem Markt, entscheidet der Nutzer; danach den Altbestand über „Auffrischen" füllen) → in einer eigenen Nacht der
 **Vorwärm-Versuch** für die Kaltstart-Vermutung (die Store-Lage brauchte 13 ms bei 79 Zeilen in IAD,
 an den Zeilen liegt es nicht; [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)); ein Markt-Lage-Schritt
 gegen die Zeilen entfällt damit vorerst →

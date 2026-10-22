@@ -2,7 +2,7 @@
 
 ### 8.3 Nachpflege fehlender Metadaten (Use Case 12)
 
-Einträge ohne IGDB-Zuordnung haben kein Cover, keine Kritikerwertung und kein Erscheinungsdatum. Sie funktionieren in allen Listen, stehen aber bei der Sortierung nach Wertung oder Datum am Ende (5.2).
+Einträge ohne IGDB-Zuordnung haben kein Cover, keine Spieler- oder Kritikerwertung und kein Erscheinungsdatum. Sie funktionieren in allen Listen, stehen aber bei der Sortierung nach Wertung oder Datum am Ende (5.2).
 
 Die Ansicht „Ohne Zuordnung" (`/ohne-zuordnung`, Werkzeug in den Einstellungen, seit Stufe 11) sammelt sie listenübergreifend aus `v_ohne_igdb` – Freitext aus Wunschliste, To-Do, Backlog und Kaufliste sowie Spiele der Sammlung ohne IGDB-Id – mit demselben IGDB-Suchfeld zum Nachziehen, gruppiert nach `zustand`: Freitext ohne Spiel, Spiele in der IGDB-Zuordnung (mit Link auf deren Kandidaten), noch nicht gesuchte Spiele (der Abgleich läuft in den Einstellungen) und **abgelehnte Spiele hinter einem Umschalter**, standardmäßig ausgeblendet – die Ablehnung ist eine gespeicherte Entscheidung, „Doch suchen" nimmt sie zurück (Entscheidung des Nutzers vom 15.09.2026, schließt den offenen Punkt aus 7.6).
 

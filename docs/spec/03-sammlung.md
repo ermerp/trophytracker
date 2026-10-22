@@ -22,6 +22,11 @@ CREATE TABLE game (
   critic_source      TEXT,              -- 'igdb' | 'opencritic' | 'manuell'
   critic_updated_at  TEXT,
 
+  -- Spielerwertung der IGDB-Nutzer (7.5, Migration 0035): nur aus IGDB,
+  -- deshalb ohne Quellenspalte. Sortiert die Listen (5.2).
+  user_score         INTEGER,           -- 0-100
+  user_score_count   INTEGER,           -- Anzahl Stimmen
+
   -- Buchführung des IGDB-Abgleichs (7.6, Migration 0010). Kein Statusfeld:
   -- die Zustände sind aus den Zeitstempeln ableitbar.
   igdb_slug           TEXT,             -- für den Link auf igdb.com
@@ -49,6 +54,8 @@ CREATE TABLE igdb_candidate (
   game_type    TEXT,                    -- Anzeigetext: 'Hauptspiel', 'DLC', 'Remake', ...
   critic_score INTEGER,
   critic_score_count INTEGER,
+  user_score   INTEGER,                 -- seit Migration 0035
+  user_score_count INTEGER,
   position     INTEGER NOT NULL,        -- Reihenfolge der IGDB-Antwort
   fetched_at   TEXT NOT NULL,
   UNIQUE (game_id, igdb_id)
