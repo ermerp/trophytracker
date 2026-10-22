@@ -39,7 +39,7 @@ GET    /api/upcoming                  { anzahl, eintraege[] } aus v_erscheint_ba
 GET    /api/events?quelle=&limit=50&vor=<id>   { quelle, limit, weiter, ereignisse[] } aus game_event, neueste zuerst (8.5, Stufe 16): id, zeitpunkt, quelle, spielId, releaseId, titel, art, feld, alt, neu, detail, text (zur Lesezeit gebildet); vor = id der letzten gezeigten Zeile (Keyset)
 GET    /api/games/:id/events?limit=20&vor=<id> dasselbe für ein Spiel (idx_event_game); 404 ohne Spiel
 
-GET    /api/gaps?verworfene=1&unbekannte=1  { anzahl, verworfen, unbekannt, luecken[], moeglich[] } aus v_luecken; verworfene und unbekannte nur mit Parameter
+GET    /api/gaps?verworfene=1&unbekannte=1  { anzahl, verworfen, unbekannt, luecken[], moeglich[] } aus v_luecken, je Zeile seit 20e-b `kritik` und `erscheinungsdatum` aus `game`; verworfene und unbekannte nur mit Parameter
                                       je Zeile seit Stufe 20 gebrauchtpreisAnbieter, marktGeprueftAm und
                                       marktRohangebote (0 = eBay kennt nichts, null = ungeprueft) und
                                       gebrauchtpreisUrl (Stufe 20e), je Zeile planId des verworfenen Kaufeintrags

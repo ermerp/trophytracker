@@ -3,7 +3,7 @@
 ## 12. API-Routen
 
 ```
-GET    /api/games                     Liste mit Filtern; sort=titel|zuletzt|spielzeit&richtung=auf|ab –
+GET    /api/games                     Liste mit Filtern; sort=titel|zuletzt|spielzeit|wertung|release&richtung=auf|ab –
                                       die einzige Liste, die in SQL sortiert (Stufe 20e)
 GET    /api/games/:id                 Detail: Releases, Copies, Trophäen, Status, Preise; seit Stufe 10 `plaene` (offene Absichten am Spiel und seinen Releases)
 POST   /api/games                     Body: { titel | igdbId, plattform, trotzdem? } – 409 mit Kandidaten bei gleichem Titelschlüssel;

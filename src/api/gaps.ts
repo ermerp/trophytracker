@@ -44,6 +44,9 @@ function lueckeAntwort(z: LueckeZeile) {
 		marktGeprueftAm: z.markt_geprueft_am,
 		/** 0 = eBay kennt in der Plattform-Kategorie nichts, null = ungeprueft. */
 		marktRohangebote: z.markt_rohangebote,
+		/** null heisst unbekannt - zum Sortieren (Stufe 20e-b). */
+		kritik: z.critic_score,
+		erscheinungsdatum: z.release_date,
 		verworfen: z.verworfen === 1,
 		planId: z.plan_id,
 	};

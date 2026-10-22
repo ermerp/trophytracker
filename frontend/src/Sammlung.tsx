@@ -93,18 +93,26 @@ const GRUPPEN: readonly ChipGruppe[] = [
 	},
 ]
 
-const SORTIERTEXT = { titel: 'Titel', zuletzt: 'zuletzt gespielt', spielzeit: 'Spielzeit' } as const
+const SORTIERTEXT = {
+	titel: 'Titel',
+	zuletzt: 'zuletzt gespielt',
+	spielzeit: 'Spielzeit',
+	wertung: 'Kritikerwertung',
+	release: 'Erscheinungsdatum',
+} as const
 type SammlungSortierung = keyof typeof SORTIERTEXT
 
 /**
- * Die natürliche Richtung je Kriterium – beim Titel A–Z, bei den beiden
- * anderen das Gegenteil. Steht gleichlautend im Worker (`src/db/games.ts`),
+ * Die natürliche Richtung je Kriterium – beim Titel A–Z, bei allen
+ * anderen das Gegenteil (beste Wertung, neuestes Datum zuerst). Steht gleichlautend im Worker (`src/db/games.ts`),
  * weil die Sammlung als einzige Liste in SQL sortiert.
  */
 const SAMMLUNG_NATUERLICH: Record<SammlungSortierung, Richtung> = {
 	titel: 'auf',
 	zuletzt: 'ab',
 	spielzeit: 'ab',
+	wertung: 'ab',
+	release: 'ab',
 }
 
 /** Der weiteste Trophäenstand eines Spiels – der Balken am Cover fasst zusammen, die Zeilen darunter nennen jeden einzeln. */
