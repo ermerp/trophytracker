@@ -73,7 +73,7 @@ const stand = async (id: number) =>
 		.bind(id)
 		.first<{ produkt: string | null; preis: number | null; befund: string | null; wann: string | null }>();
 
-const cronStand = async () => (await repos().sync.cronStand()) as Record<string, { getan: string; meldung: boolean; offen?: number; geprueft?: number }>;
+const cronStand = async () => (await repos().sync.cronStand()) as Record<string, { getan: string; meldung: boolean; offen?: number; geprueft?: number; aeltester?: string }>;
 
 /** Ein Store mit einer Concept-Seite und einer kaeuflichen Produktseite. */
 const storeMitPreis = (cents = 1999) =>
