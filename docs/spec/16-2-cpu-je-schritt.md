@@ -22,7 +22,12 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   **Nacht zum 21.10.2026:** Wartungs-Leerlauf 4–14 ms, Median 6,8 (n = 34; DFW 5,2 gegen 6,5, SJC 8,8
   gegen 9,4, LAX 8,6 gegen 6,9) – je Standort unverändert, das Budget weiter verfehlt; PSN-Leerlauf
   5–14, Median 6,1 (n = 14; EWR 5,6, ORD 6,4, IAD 13,9). `rows_read_24h` 129 870,
-  `rows_written_24h` 3 638 (keine Kaufliste-Nacht). Am 18.10. **gab es den PSN-Leerlauf nicht:** In einer Kaufliste-Nacht
+  `rows_written_24h` 3 638 (keine Kaufliste-Nacht). **Nacht zum 22.10.:** Wartungs-Leerlauf 4–15 ms,
+  Median 6,3 (n = 30; DFW 6,1, LAX 8,3, SJC 9,8), fünf über 10; PSN-Leerlauf 4–10, Median 6,5 (n = 14),
+  keiner über 10. Je Standort über die Nächte 20.–22.10. (Leerlauf, Median): EWR 4,8, DFW 5,6, IAD 6,1,
+  ORD/ATL 7,2, LAX 7,6, MIA 7,9, SJC 9,8, SEA 10,7 (n = 2) – der langsamste Standort braucht knapp das
+  Doppelte des schnellsten. `rows_read_24h` 382 042, davon die Nacht (03–09 UTC) rund 128 000; der Rest
+  ist App-Nutzung am Abend des 21.10. (Zähler von Statistik und Einstellungen, Stichprobe der D1-Analytics). Am 18.10. **gab es den PSN-Leerlauf nicht:** In einer Kaufliste-Nacht
   belegt die Arbeit alle 36 Aufrufe (Sync 11, Spielzeit 2, Besitz 15, Level 1, Store 7, der Store
   fertig im letzten); Vergleichswerte vom 17.10.: EWR 11,5 ms, IAD ~16, ATL ~17, ORD ~13,5. Sync,
   Store und Markt blieben je Standort unverändert – 18j spart den Rahmen, nicht die Arbeit. **Die
@@ -39,10 +44,11 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   (`GESPIELTE_JE_SEITE`). **Gemessen in der Nacht zum 19.10.2026:** EWR 18,6 ms (200 Titel), IAD
   29,3 ms (179) gegen EWR 115–150 und ORD 119–148 vorher – **rund 85 % weniger**, aber doppelt so
   viel wie erwartet und weiter über 10. **Nacht zum 20.10.2026:** IAD 22 ms (200 Titel), ORD 24 (179).
-  **Nacht zum 21.10.:** IAD 30 (200), ATL 20 (179).
+  **Nacht zum 21.10.:** IAD 30 (200), ATL 20 (179). **22.10.:** ORD 29 (200), ORD 21 (179).
 - **Sync** (5–6 Abfragen, ein Batch mit 104 Anweisungen): rund 4 ms D1, 3 ms Rechnen, dazu die
   echte Seite aus dem Netz – grenzwertig. **Nacht zum 20.10.2026:** Abruf 12–16 ms, Normalisierung
-  11–21, Median 13 (n = 9); Level 11. **Nacht zum 21.10.:** 9–20, Median 13 (n = 11); Level 13.
+  11–21, Median 13 (n = 9); Level 11. **Nacht zum 21.10.:** 9–20, Median 13 (n = 11); Level 13. **22.10.:** 10–30, Median 17 (n = 11; ORD 25,
+  IAD 21, EWR 10); Level ORD 20.
 - **Store** (je Release ein Batch, die Seite als Strom): rund 1 ms D1 plus 3 ms Lesen je Release;
   **ein Release je Aufruf** trägt, zehn nicht. Am Stück zu lesen wäre billiger, aber dann wird die
   ganze Seite geholt (380 KB bis 1,4 MB, 7.4). **Leser gebaut in 18l (18.10.2026):** weiter ein
@@ -60,14 +66,28 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   die erste mit 20 Stunden Frist: am Stück 04:10–04:45, 79 Releases in acht Aufrufen, `offen=0`, 29–41
   ms je Aufruf (EWR 29–39, IAD 34–41). **Nacht zum 21.10.:** wieder 04:10–04:45, acht Aufrufe,
   `offen=0`, **33–103 ms**, Median 48 – je Standort: IAD 38/43 wie am Vortag, ATL 33–65, MIA 35,
-  **ORD 71/103**; der Anstieg kommt vom Standort, nicht vom Code. **Der Store geht in eine GitHub Action** (Entscheidung des
+  **ORD 71/103**; der Anstieg kommt vom Standort, nicht vom Code. **22.10.:** dieselbe Zeit, 79 geprüft,
+  29–76 ms, Median 41 (EWR 29–46, ATL 37–52, IAD 76). **Der Store geht in eine GitHub Action** (Entscheidung des
   Nutzers vom 20.10.2026, [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
 - **Gebrauchtpreise – seit 20i eine GitHub Action:** Im Cron lag die Grundlast eines Aufrufs (vier
   Abfragen, Sammlung laden und vorbereiten) schon bei 5–8 ms, jedes Release kostete 3–4 ms mehr (94 ms
   für 20 mit echter D1), und **kein** Cron-Aufruf traf eine warme Instanz (0 von 28 im Minutentakt).
   Verworfen damit auch der Wortindex **als eine Zeile** (Berechnetes, das gespeichert würde). Als
   Action in der Nacht zum 20.10.2026: je Portion von sechs Releases Median 2, P90 4, höchstens 15 ms,
-  am 21.10. Median 3, P90 6, höchstens 12 ([7.3](07-3-ebay-betrieb.md)).
+  am 21.10. Median 3, P90 6, höchstens 12, am 22.10. Median 2, P90 4, höchstens 13 ([7.3](07-3-ebay-betrieb.md)).
+- **Die Lage der Markt-Action** (`GET /api/sync/markt/lage`) – 7 ms (IAD, 20.10.), 19 (SEA, 21.10.),
+  18 ms (MSP, 22.10.); **untersucht am 22.10.2026**. Sie ist **ein** D1-Aufruf mit drei Anweisungen und
+  liest in der Produktion **1 954 Zeilen** (Auswahl 1 473 für 431 Ziele, alle 479 Spieltitel, Sperrliste
+  2; im Leerlauf liest die Auswahl 596), Antwort rund 64 KB. Gemessen in einem Messworker mit
+  Wegwerf-D1 (DUS, erfundene Zeilen gleicher Form, kalt = erste Anfrage einer frischen Version):
+  **910 zurückgegebene Zeilen kosten kalt 3–6, warm 2–5 ms**, 80 Zeilen kalt 3–4, warm 2; dieselbe
+  Antwort ohne D1 kalt 2, warm 1. **Teuer ist das Umwandeln der D1-Zeilen, nicht das JSON**; baut
+  SQLite das JSON selbst (`json_group_array`, eine Zeile statt 910), sinkt es in DUS um rund 1 ms –
+  so groß wie die Streuung zwischen zwei Runden. **Erklärt ist der Wert nur zum Teil:** Der
+  Standortfaktor aus dem Leerlauf (SEA rund 1,75 × IAD) macht aus 7 ms rund 12; der Rest ist eine
+  **Vermutung** – eine kalte Instanz der Anwendung: Die erste Portion einer frischen Instanz kostete
+  10–13 ms (ORD, SEA) statt 2–3, am 20.10. in IAD nur 4, und dort war auch die Lage billig.
+  Messworker und Wegwerf-D1 sind gelöscht.
 - **IGDB-Auffrischen** (Frist sieben Tage, 50 Spiele je Aufruf, 10.1 Schritt 12) – **erstmals gemessen
   in der Nacht zum 20.10.2026:** neun Aufrufe von 06:05 bis 06:45, **20–54 ms**, Median 34 (MIA 25–28,
   EWR 28, IAD 39, SJC 20, vier ohne Standort 34–54); acht mit Logzeile, darin 370 angefragt und 369

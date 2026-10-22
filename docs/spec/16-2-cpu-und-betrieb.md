@@ -57,7 +57,7 @@ sinnvollen Portion gegen dieses Budget:
   GitHub startete den Lauf 5 h 14 min zu spät (07:31 statt 02:17); daraus Nachtrag **20i-b**: Frist
   12 statt 20 Stunden, Rückfall um 08:17, Warnung bei leeren Läufen (7.3, [Betriebswarnungen](16-2-betriebswarnungen.md)). **Nacht zum 21.10.2026:**
   20i-b wirkt wie gebaut – 431 geprüft, Rückfall leer, je Portion Median 3, höchstens 12 ms; beide
-  Läufe kamen wieder gut fünf Stunden zu spät (7.3). Der Neuabruf eines einzelnen Releases (20h) bleibt im Worker.
+  Läufe kamen wieder gut fünf Stunden zu spät (7.3), am 22.10. ebenso. Der Neuabruf eines einzelnen Releases (20h) bleibt im Worker.
 - **Kaufliste → gebündelt wie 18k – gebaut in 18k-b (19.10.2026):** bis dahin je Eintrag zwei bis
   drei D1-Aufrufe nacheinander, bis zu 150 Abfragen je Aufruf gegen die dokumentierten 50. Jetzt ein
   Lese-Batch (`releasesNachSchluesseln` mit `mitKauf`) und ein Schreib-Batch (`berechtigungenErkennen`,
@@ -83,11 +83,14 @@ sinnvollen Portion gegen dieses Budget:
   heute läuft 02:17 pünktlich *vor* dem Sync (23 Stunden), nur verspätet danach. Ein Lauf, der in
   den Sync fällt, liest einen älteren Stand, mehr nicht. Der **Preisverlauf** verträgt den Wechsel des
   UTC-Tags: geschrieben wird nur bei Änderung, der Tageseimer nimmt den letzten Punkt (6, 20f).
-  **Mitzuprüfen:** Die 26 h der Warnung `markt_geprueft` liegen schon heute unter dem größten Abstand
-  zweier prüfender Läufe (pünktlich 02:17, am Folgetag 07:37: 29 h 20 min), sie kann dazwischen grundlos
-  erscheinen (gefolgert, nicht beobachtet). **Vorschlag, offen:** Store 20:47 mit Rückfall 22:47,
-  Markt ebenso vorgezogen auf 20:17 / 22:17 – der Markt endet heute um 07:48 und verfehlt damit die
-  Vorgabe „bis 05:00" (unten) selbst.
+  **Entschieden am 22.10.2026:** Store um **20:47 mit Rückfall 22:47 UTC**. Der Markt rückt ebenso auf
+  **20:17 / 22:17**, aber **eine Nacht nach 20j** – eine Änderung je Nacht; im selben Schritt wird die
+  Schwelle von `markt_geprueft` neu berechnet: Normalabstand plus größte beobachtete Verspätung. Die 26 h
+  liegen schon heute unter dem größten Abstand zweier prüfender Läufe (pünktlich 02:17, am Folgetag
+  07:37: 29 h 20 min) und können dazwischen grundlos erscheinen (gefolgert, nicht beobachtet). Der
+  Markt endet heute um 07:48 und verfehlt damit die Vorgabe „bis 05:00" (unten) selbst. **Der
+  Store-Schritt im Worker wird erst abgeschaltet**, wenn ein Lauf über `workflow_dispatch`
+  vollständig und fehlerfrei durchgelaufen ist.
   Die Concept-Ids holt der
   Worker über eine eigene Route – die IGDB-Zugangsdaten bleiben im Worker (7.6); der Einzelabruf
   einer Adresse bleibt im Worker wie der Neuabruf in 20h. Ein Release je Aufruf ist im Cron die
@@ -137,10 +140,10 @@ Produktion 412 Zeilen je Aufruf liest, obwohl ihr Kommentar `idx_release_store` 
 der Testbestand an rund 15 Stellen Release-Id = Spiel-Id und genau 430 Releases voraussetzt, und weil
 die Marktauswahl mit ihren 59 nie geprüften Releases seit 20i nicht mehr im Lage-Batch steht). **Der Nachtrag soll auch den
 Wartungs-Leerlauf senken** (rund 1 800 Zeilen je Aufruf); seine CPU blieb am 20.10. ohne die
-Marktauswahl bei Median 7 ms ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)). **Beobachtungspunkt
-(Vorgabe des Nutzers vom 21.10.2026):** Die Lage der Markt-Action (`GET /api/sync/markt/lage`) brauchte
-am 21.10. **19 ms in SEA**, am 20.10. 7 ms in IAD, bei 431 gegen 411 fälligen Releases. Wiederholt
-sich das, wird es **vor** dem Index-Nachtrag untersucht. Der Test liest im Wartungsleerlauf seit 20i
+Marktauswahl bei Median 7 ms ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)). **Die Lage der
+Markt-Action** brauchte am 21. und 22.10. 19 und 18 ms (SEA, MSP) gegen 7 ms (IAD) am 20.10.; untersucht
+am 22.10. als Teil der Planung von 20j (Vorgabe des Nutzers), Ergebnis in
+[16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md). Der Test liest im Wartungsleerlauf seit 20i
 **1 788 Zeilen** – die 2 218 der Tabelle ohne die Zeile Gebrauchtpreise, die nicht mehr im Lage-Batch
 steht. **Die Tabelle ist der Stand vom 18.10.2026, vor 20i:** Test 2 218, Produktion rund 2 590, die drei
 Auswahlen des Lage-Batches, exakt gemessen über `meta.rows_read`, dieselben Anweisungen
