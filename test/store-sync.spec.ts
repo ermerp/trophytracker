@@ -3,7 +3,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createRepositories } from "../src/db";
 import { titelSchluessel } from "../src/domain/titel";
 import { erstelleIgdbClient } from "../src/igdb/client";
-import { FREMDANFRAGEN_HOECHSTENS, einesPruefen, storeSchritt } from "../src/sync/store";
+import { einesPruefen } from "../src/sync/store";
+import { storeLauf } from "../src/sync/store-lauf";
+import { createApp } from "../src/index";
+import { erstelleEbayClient } from "../src/ebay/client";
+import { erstellePsnClient } from "../src/psn/client";
+import type { IgdbClient } from "../src/igdb/client";
+import type { StoreClient } from "../src/psn/store";
+import { fakeFetch } from "./psn-fake";
 import { conceptSeite, fakeStore, htmlAntwort, produktSeite } from "./store-fake";
 
 /**
@@ -152,7 +159,22 @@ describe("Der Zuschnitt", () => {
 	});
 });
 
-describe("storeSchritt", () => {
+/**
+ * Ein Lauf der Store-Action gegen die ECHTEN Routen (Stufe 20j): Seit der
+ * Schritt eine Action ist, schreibt er nur noch ueber den Worker - geprueft
+ * wird deshalb der ganze Weg, nicht das Repository allein. Die Concept-Ids
+ * holt der Worker mit seinem IGDB-Client.
+ */
+const schritt = (store: StoreClient, igdb: IgdbClient) => {
+	const app = createApp(
+		() => erstellePsnClient(fakeFetch([]).fetch),
+		() => igdb,
+		() => erstelleEbayClient(null),
+	);
+	return storeLauf((pfad, init) => Promise.resolve(app.request(pfad, init, env)), store);
+};
+
+describe("Store-Lauf (Action gegen die Routen)", () => {
 	const PRODUKT = "EP9000-CUSA13323_00-GHOSTSHIP0000000";
 
 	beforeEach(async () => {
@@ -179,7 +201,7 @@ describe("storeSchritt", () => {
 		await spiel(1, "Ghost of Tsushima", { conceptId: "235227" });
 		await absicht(1);
 		const { client, aufrufe } = storeMit(1999);
-		const e = await storeSchritt(repos(), client, igdbOhne());
+		const e = await schritt(client, igdbOhne());
 
 		expect(e).toMatchObject({ status: "erfolg", geprueft: 1, mitPreis: 1, zugeordnet: 1, anfragen: 2 });
 		expect(await stand(1)).toMatchObject({ produkt: PRODUKT, preis: 1999, grund: 1999, sale: 0, befund: "preis" });
@@ -191,14 +213,14 @@ describe("storeSchritt", () => {
 		await spiel(1, "Ghost of Tsushima", { conceptId: "235227", produktId: PRODUKT });
 		await absicht(1);
 		const { client, aufrufe } = storeMit(1999);
-		await storeSchritt(repos(), client, igdbOhne());
+		await schritt(client, igdbOhne());
 		expect(aufrufe).toHaveLength(1);
 	});
 
 	it("protokolliert die Produkt-Id als Zuordnung, aber nicht den Preis", async () => {
 		await spiel(1, "Ghost of Tsushima", { conceptId: "235227" });
 		await absicht(1);
-		await storeSchritt(repos(), storeMit(1999).client, igdbOhne());
+		await schritt(storeMit(1999).client, igdbOhne());
 		expect(await ereignisse()).toEqual([
 			{
 				source: "sync",
@@ -214,21 +236,21 @@ describe("storeSchritt", () => {
 	it("schreibt kein zweites Ereignis, wenn die Produkt-Id gleich bleibt", async () => {
 		await spiel(1, "Ghost of Tsushima", { conceptId: "235227" });
 		await absicht(1);
-		await storeSchritt(repos(), storeMit(1999).client, igdbOhne());
+		await schritt(storeMit(1999).client, igdbOhne());
 		await fristAbgelaufen();
-		await storeSchritt(repos(), storeMit(1499).client, igdbOhne());
+		await schritt(storeMit(1499).client, igdbOhne());
 		expect(await ereignisse()).toHaveLength(1);
 	});
 
 	it("schreibt den Verlauf nur bei geaendertem Preis", async () => {
 		await spiel(1, "Ghost of Tsushima", { conceptId: "235227" });
 		await absicht(1);
-		await storeSchritt(repos(), storeMit(1999).client, igdbOhne());
+		await schritt(storeMit(1999).client, igdbOhne());
 		await fristAbgelaufen();
-		await storeSchritt(repos(), storeMit(1999).client, igdbOhne());
+		await schritt(storeMit(1999).client, igdbOhne());
 		expect(await verlauf(1)).toHaveLength(1);
 		await fristAbgelaufen();
-		await storeSchritt(repos(), storeMit(1499, { grundCents: 1999 }).client, igdbOhne());
+		await schritt(storeMit(1499, { grundCents: 1999 }).client, igdbOhne());
 		const reihe = await verlauf(1);
 		expect(reihe).toHaveLength(2);
 		// Eigener Kanal, und `kanal` bleibt leer: Der trennt haendler von markt
@@ -239,7 +261,7 @@ describe("storeSchritt", () => {
 	it("merkt sich den PS-Plus-Katalog und nimmt trotzdem den Kaufpreis", async () => {
 		await spiel(1, "Ghost of Tsushima", { conceptId: "235227" });
 		await absicht(1);
-		const e = await storeSchritt(repos(), storeMit(1999, { plus: true }).client, igdbOhne());
+		const e = await schritt(storeMit(1999, { plus: true }).client, igdbOhne());
 		expect(e).toMatchObject({ imPlusKatalog: 1, mitPreis: 1 });
 		expect(await stand(1)).toMatchObject({ plus: 1, preis: 1999 });
 	});
@@ -249,9 +271,10 @@ describe("storeSchritt", () => {
 		await spiel(2, "Ghost of Tsushima", { igdbId: 78 });
 		await absicht(1);
 		await absicht(2);
-		const e = await storeSchritt(repos(), storeMit(1999).client, igdbMit({ 77: "235227", 78: "235227" }));
-		// 1 IGDB + 1 Concept (gepuffert, beide Spiele teilen es) + 2 Produkte
-		expect(e.anfragen).toBe(4);
+		const e = await schritt(storeMit(1999).client, igdbMit({ 77: "235227", 78: "235227" }));
+		// 1 Concept (gepuffert, beide Spiele teilen es) + 2 Produkte; die
+		// IGDB-Anfrage stellt der Worker und zaehlt hier nicht mit.
+		expect(e.anfragen).toBe(3);
 		expect(
 			await env.DB.prepare("SELECT store_concept_id AS c, store_concept_am AS am FROM game ORDER BY id").all(),
 		).toMatchObject({ results: [{ c: "235227" }, { c: "235227" }] });
@@ -261,7 +284,7 @@ describe("storeSchritt", () => {
 		// Ohne den Stempel fragte der Schritt es jede Nacht erneut.
 		await spiel(1, "Ein unbekanntes Spiel", { igdbId: 77 });
 		await absicht(1);
-		const e = await storeSchritt(repos(), storeMit(1999).client, igdbMit({ 77: null }));
+		const e = await schritt(storeMit(1999).client, igdbMit({ 77: null }));
 		expect(e).toMatchObject({ mitPreis: 0, ohneTreffer: 1 });
 		expect(await stand(1)).toMatchObject({ befund: "ohne_id", preis: null });
 		const g = await env.DB.prepare("SELECT store_concept_id AS c, store_concept_am AS am FROM game WHERE id = 1").first<{
@@ -278,7 +301,7 @@ describe("storeSchritt", () => {
 		const kaputt = erstelleIgdbClient({ clientId: "id", clientSecret: { offenlegen: () => "g" } as never }, (async () => {
 			throw new Error("IGDB weg");
 		}) as unknown as typeof fetch);
-		const e = await storeSchritt(repos(), storeMit(1999).client, kaputt);
+		const e = await schritt(storeMit(1999).client, kaputt);
 		expect(e.mitPreis).toBe(1);
 	});
 
@@ -289,7 +312,7 @@ describe("storeSchritt", () => {
 		const { client } = fakeStore([
 			[/\/concept\//, () => htmlAntwort(conceptSeite("231840", [], { standard: null, angekuendigt: true }))],
 		]);
-		await storeSchritt(repos(), client, igdbOhne());
+		await schritt(client, igdbOhne());
 		expect(await stand(1)).toMatchObject({ befund: "delistet", preis: null });
 	});
 
@@ -301,7 +324,7 @@ describe("storeSchritt", () => {
 		await spiel(1, "Dying Light", { conceptId: "201129" });
 		await absicht(1);
 		const { client } = fakeStore([[/\/concept\//, () => htmlAntwort("", 302)]]);
-		const e = await storeSchritt(repos(), client, igdbOhne());
+		const e = await schritt(client, igdbOhne());
 
 		expect(e).toMatchObject({ geprueft: 1, ohneTreffer: 1 });
 		expect(await stand(1)).toMatchObject({ befund: "ohne_id" });
@@ -320,7 +343,7 @@ describe("storeSchritt", () => {
 			[/en-gb\/concept\//, () => htmlAntwort(conceptSeite("201129", [{ id: "EP1018-CUSA02010_00-DL1BASEPSPLUS000", name: "Dying Light" }]))],
 			[/\/concept\//, () => htmlAntwort("", 302)],
 		]);
-		const e = await storeSchritt(repos(), client, igdbOhne());
+		const e = await schritt(client, igdbOhne());
 
 		expect(e).toMatchObject({ geprueft: 1, ohneTreffer: 1 });
 		expect(await stand(1)).toMatchObject({ befund: "regional" });
@@ -333,7 +356,7 @@ describe("storeSchritt", () => {
 		await spiel(1, "Kaputte Concept-Id", { conceptId: "999999" });
 		await absicht(1);
 		const { client } = fakeStore([[/\/concept\//, () => htmlAntwort("", 302)]]);
-		await storeSchritt(repos(), client, igdbOhne());
+		await schritt(client, igdbOhne());
 		expect(await stand(1)).toMatchObject({ befund: "ohne_id" });
 		expect((await repos().store.ohneZuordnung()).map((x) => x.titel)).toEqual(["Kaputte Concept-Id"]);
 	});
@@ -342,7 +365,7 @@ describe("storeSchritt", () => {
 		await spiel(1, "Irgendein Spiel", { conceptId: "99" });
 		await absicht(1);
 		const { client } = fakeStore([[/\/concept\//, () => htmlAntwort("<html>nichts</html>")]]);
-		await storeSchritt(repos(), client, igdbOhne());
+		await schritt(client, igdbOhne());
 		expect(await stand(1)).toMatchObject({ befund: null, wann: null });
 		expect(await repos().store.zuPruefen(10)).toHaveLength(1);
 	});
@@ -367,7 +390,7 @@ describe("storeSchritt", () => {
 					),
 			],
 		]);
-		await storeSchritt(repos(), client, igdbOhne());
+		await schritt(client, igdbOhne());
 		expect(await stand(1)).toMatchObject({ befund: "ohne_kauf", preis: null, plus: 1 });
 	});
 
@@ -386,7 +409,7 @@ describe("storeSchritt", () => {
 					),
 			],
 		]);
-		const e = await storeSchritt(repos(), client, igdbOhne());
+		const e = await schritt(client, igdbOhne());
 		expect(e).toMatchObject({ mitPreis: 0, ohneTreffer: 1 });
 		expect(await stand(1)).toMatchObject({ befund: "fremd", preis: null });
 	});
@@ -399,7 +422,7 @@ describe("storeSchritt", () => {
 		await absicht(1);
 		await absicht(2);
 		const { client, aufrufe } = storeMit(1999);
-		const e = await storeSchritt(repos(), client, igdbMit({ 77: "235227", 78: "235227" }));
+		const e = await schritt(client, igdbMit({ 77: "235227", 78: "235227" }));
 
 		expect(e).toMatchObject({ geprueft: 2, mitPreis: 0, ohneTreffer: 2, anfragen: 0 });
 		// Kein einziger Abruf - weder Store noch IGDB.
@@ -414,7 +437,7 @@ describe("storeSchritt", () => {
 	it("prueft ein einzelnes Release sofort, ohne auf die Frist zu warten", async () => {
 		await spiel(1, "Ghost of Tsushima", { conceptId: "235227" });
 		await absicht(1);
-		await storeSchritt(repos(), storeMit(1999).client, igdbOhne());
+		await schritt(storeMit(1999).client, igdbOhne());
 		// Die Portion sieht es jetzt nicht mehr - die Tagesfrist laeuft.
 		expect(await repos().store.zuPruefen(10)).toEqual([]);
 
@@ -457,7 +480,7 @@ describe("storeSchritt", () => {
 		await env.DB.prepare("INSERT INTO release (id, game_id, platform, physical_release_status) VALUES (2, 1, 'PS5', 'unbekannt')").run();
 		await absicht(2);
 		const { client, aufrufe } = storeMit(1999);
-		await storeSchritt(repos(), client, igdbOhne());
+		await schritt(client, igdbOhne());
 		expect(aufrufe.filter((a) => String(a.url).includes("/concept/"))).toHaveLength(1);
 	});
 
@@ -465,7 +488,7 @@ describe("storeSchritt", () => {
 		await spiel(1, "Ghost of Tsushima", { conceptId: "235227" });
 		await absicht(1);
 		const { client } = fakeStore([[/\/concept\//, () => htmlAntwort("<html>nichts</html>")]]);
-		const e = await storeSchritt(repos(), client, igdbOhne());
+		const e = await schritt(client, igdbOhne());
 		expect(e.geprueft).toBe(0);
 		expect(await stand(1)).toMatchObject({ befund: null, wann: null });
 		expect(await repos().store.zuPruefen(10)).toHaveLength(1);
@@ -481,7 +504,7 @@ describe("storeSchritt", () => {
 			[/\/concept\//, () => htmlAntwort(conceptSeite("235227", [{ id: PRODUKT, name: "Ghost of Tsushima" }]))],
 			[/\/product\//, () => htmlAntwort(produktSeite(PRODUKT, [{ typ: "ADD_TO_CART", produktId: PRODUKT }], { name: "Ghost of Tsushima" }))],
 		]);
-		const e = await storeSchritt(repos(), client, igdbOhne());
+		const e = await schritt(client, igdbOhne());
 		expect(e.mitPreis).toBe(1);
 		// Das gescheiterte Release bleibt ungestempelt.
 		expect(await stand(1)).toMatchObject({ wann: null });
@@ -511,20 +534,8 @@ describe("storeSchritt", () => {
 			[new RegExp(tot), () => htmlAntwort(produktSeite(tot, [{ typ: "UNAVAILABLE", produktId: tot, ohnePreis: true }]))],
 			[new RegExp(lebt), () => htmlAntwort(produktSeite(lebt, [{ typ: "ADD_TO_CART", produktId: lebt, grundCents: 1999 }], { name: "Mass Effect: Andromeda Standard Recruit" }))],
 		]);
-		const e = await storeSchritt(repos(), client, igdbOhne());
+		const e = await schritt(client, igdbOhne());
 		expect(e.mitPreis).toBe(1);
 		expect(await stand(1)).toMatchObject({ produkt: lebt, preis: 1999, name: "Mass Effect: Andromeda Standard Recruit" });
-	});
-
-	it("bleibt unter den erlaubten Fremdanfragen", async () => {
-		// Zehn Releases, jedes mit Concept und Produkt: 20 Anfragen, weit
-		// unter der Grenze. Der Test haelt die Bilanz fest, nicht die Grenze.
-		for (let i = 1; i <= 10; i++) {
-			await spiel(i, "Ghost of Tsushima", { conceptId: "235227" });
-			await absicht(i);
-		}
-		const e = await storeSchritt(repos(), storeMit(1999).client, igdbOhne());
-		expect(e.geprueft).toBe(10);
-		expect(e.anfragen).toBeLessThanOrEqual(FREMDANFRAGEN_HOECHSTENS);
 	});
 });

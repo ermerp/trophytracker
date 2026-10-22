@@ -11,7 +11,6 @@ import { CRON_PSN, CRON_WARTUNG, cronSchritt, entscheide, lageLesen } from "../s
 import { zaehlendeDb } from "./d1-zaehler";
 import { fakeIgdb } from "./igdb-fake";
 import { fakeFetch } from "./psn-fake";
-import { storeOhne } from "./store-fake";
 
 /**
  * Stufe 18j: ein Lese- und ein Schreib-Batch je Cron-Aufruf (10.1).
@@ -37,7 +36,7 @@ const marken = async () =>
 async function aufrufZaehlen(cron: string): Promise<number> {
 	const zaehler = zaehlendeDb(env.DB);
 	const ereignis = { scheduledTime: Date.now(), cron, noRetry() {} };
-	await createScheduled(psnStumm, () => igdbOhne(), () => storeOhne())(
+	await createScheduled(psnStumm, () => igdbOhne())(
 		ereignis,
 		{ ...env, DB: zaehler.db },
 		createExecutionContext(),
@@ -222,7 +221,7 @@ describe("cron_stand: die Fakten fuer die Betriebswarnungen (Stufe 18j)", () => 
 				JSON.stringify({ standAm: HEUTE, jahre: [] }),
 			),
 		]);
-		await createScheduled(psnStumm, () => igdbOhne(), () => storeOhne())(
+		await createScheduled(psnStumm, () => igdbOhne())(
 			{ scheduledTime: Date.now(), cron: CRON_WARTUNG, noRetry() {} },
 			env,
 			createExecutionContext(),
@@ -241,7 +240,7 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 	const lage = (psn: Partial<NonNullable<CronLage["psn"]>> = {}, einstellungen: Record<string, string> = {}): CronLage => ({
 		verlauf: [],
 		einstellungen: new Map(Object.entries(einstellungen)),
-		psn: { abgebrochen: 0, laufend: null, heutige: [lauf], zugang, naechsteListe: null, storeZiele: [], ...psn },
+		psn: { abgebrochen: 0, laufend: null, heutige: [lauf], zugang, naechsteListe: null, ...psn },
 	});
 	const k = { heute: HEUTE, igdbKonfiguriert: true };
 	const fertig = {
@@ -253,7 +252,8 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 	it.each<[string, CronLage, string[]]>([
 		["ein laufender Lauf - und sonst nichts", lage({ laufend: { ...lauf, status: "laufend" } }), ["sync"]],
 		["kein Lauf von heute", lage({ heutige: [] }), ["sync_starten"]],
-		["ohne Zugang kein neuer Lauf, aber der Store", lage({ heutige: [], zugang: { ...zugang, eingerichtet: false }, storeZiele: [{} as never] }), ["store"]],
+		// Seit 20j laeuft der Store als Action: ohne Zugang hat das PSN-Fenster nichts mehr zu tun.
+		["ohne Zugang kein neuer Lauf - und seit 20j auch kein Store", lage({ heutige: [], zugang: { ...zugang, eingerichtet: false } }), []],
 		["nach dem Sync die ganze PSN-Kette", lage(), ["spielzeit", "besitz", "level"]],
 		["alles getan", lage({}, fertig), []],
 		["eine Liste offen", lage({ naechsteListe: { npCommunicationId: "NPWR0", npServiceName: "trophy" } }, fertig), ["trophaeen"]],
@@ -274,7 +274,7 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 });
 
 describe("Knopf und Cron sehen dieselbe Auswahl (Stufe 18j, Vorgabe des Nutzers)", () => {
-	it("Store, IGDB und Einzeltrophaeen: der Lage-Batch liefert, was die Repository-Methode liefert", async () => {
+	it("IGDB und Einzeltrophaeen: der Lage-Batch liefert, was die Repository-Methode liefert", async () => {
 		await env.DB.batch([
 			env.DB.prepare(
 				"INSERT INTO game (id, title, sort_title, igdb_id) VALUES (1, 'Erfunden A', 'erfunden a', 101), (2, 'Erfunden B', 'erfunden b', 102)",
@@ -291,12 +291,10 @@ describe("Knopf und Cron sehen dieselbe Auswahl (Stufe 18j, Vorgabe des Nutzers)
 		const r = repos();
 		const lage = await lageLesen(r, "alles", HEUTE);
 
-		expect(lage.psn?.storeZiele).toEqual(await r.store.zuPruefen(10));
 		expect(lage.wartung?.zumAuffrischen).toEqual(await r.igdb.zumAuffrischen(50, 7));
 		expect(lage.wartung?.zurDisc).toEqual(await r.igdb.zurDiscPruefung(50));
 		expect(lage.psn?.naechsteListe).toEqual((await r.trophaeen.naechsteZumFuellen(1))[0]);
 		// Und die Auswahlen sind nicht leer - sonst bewiese der Vergleich nichts.
-		expect(lage.psn?.storeZiele.map((z) => z.releaseId).sort()).toEqual([1, 2]);
 		expect(lage.psn?.naechsteListe?.npCommunicationId).toBe("NPWR00001_00");
 	});
 });
@@ -337,7 +335,7 @@ describe("die Daueraufgaben im Lage-Batch", () => {
 
 	it("ein Aufruf ohne Lage liest sie selbst - so rufen ihn Tests und nichts sonst", async () => {
 		// Ohne Trophaeen gibt es keine Jahre - der Schritt faellt durch.
-		const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), storeOhne(), { bereich: "wartung", heute: HEUTE });
+		const e = await cronSchritt(repos(), psnStumm(), igdbOhne(), { bereich: "wartung", heute: HEUTE });
 		expect(e.getan).toBe("nichts");
 	});
 });

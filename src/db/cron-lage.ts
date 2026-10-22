@@ -2,7 +2,6 @@ import type { Baustein } from "./baustein";
 import type { CredentialAnzeige, CredentialsRepository } from "./credentials";
 import type { GamesRepository } from "./games";
 import type { IgdbRepository } from "./igdb";
-import type { StoreRepository, ZuPruefen as StoreZiel } from "./store";
 import { CRON_SCHLUESSEL, verlaufAus, type CronMarke, type SyncLauf, type SyncRepository } from "./sync";
 import type { TrophaeenRepository, ZuFuellen } from "./trophaeen";
 
@@ -44,7 +43,6 @@ export type LageOptionen = {
 	schluessel: readonly string[];
 	haengtNachStunden: number;
 	rohantwortenLaeufe: number;
-	storeJeAufruf: number;
 	igdbJeAufruf: number;
 	auffrischFristTage: number;
 };
@@ -59,7 +57,6 @@ export type CronLage = {
 		heutige: SyncLauf[];
 		zugang: CredentialAnzeige;
 		naechsteListe: ZuFuellen | null;
-		storeZiele: StoreZiel[];
 	};
 	wartung?: {
 		erschienen: number;
@@ -73,7 +70,6 @@ type Quellen = {
 	sync: SyncRepository;
 	credentials: CredentialsRepository;
 	trophaeen: TrophaeenRepository;
-	store: StoreRepository;
 	games: GamesRepository;
 	igdb: IgdbRepository;
 };
@@ -118,7 +114,6 @@ export class CronLageRepository {
 					heutige: merke(this.q.sync.laeufeSeitBaustein(o.heute)),
 					zugang: merke(this.q.credentials.anzeigeBaustein()),
 					liste: merke(this.q.trophaeen.naechsteZumFuellenBaustein(1)),
-					store: merke(this.q.store.zuPruefenBaustein(o.storeJeAufruf)),
 				}
 			: null;
 		const w = wartung
@@ -154,7 +149,6 @@ export class CronLageRepository {
 							heutige: wert<SyncLauf[]>(p.heutige),
 							zugang: wert<CredentialAnzeige>(p.zugang),
 							naechsteListe: wert<ZuFuellen[]>(p.liste)[0] ?? null,
-							storeZiele: wert<StoreZiel[]>(p.store),
 						},
 					}
 				: {}),

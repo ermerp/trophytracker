@@ -12,7 +12,6 @@ import { zaehlendeDb } from "./d1-zaehler";
 import { fakeIgdb } from "./igdb-fake";
 import { fakeFetch, jsonAntwort } from "./psn-fake";
 import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt } from "../src/sync/besitz";
-import { storeOhne } from "./store-fake";
 import { MARKT_JE_POST } from "../src/sync/markt";
 import { STORE_JE_POST } from "../src/sync/store";
 
@@ -1560,7 +1559,6 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			await createScheduled(
 				() => erstellePsnClient(fakeFetch([]).fetch),
 				() => fakeIgdb([[]], { zugang: null }).client,
-				() => storeOhne(),
 			)({ scheduledTime: Date.now(), cron, noRetry() {} }, { ...env, DB: zaehler.db }, createExecutionContext());
 			return { aufrufe: zaehler.aufrufe(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
 		};

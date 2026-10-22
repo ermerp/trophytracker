@@ -8,7 +8,7 @@ bis dahin einen). Der Free Tier erlaubt fünf je Konto – gegen Cloudflares Dok
 
 | Eintrag | Ausdruck | Aufrufe | Arbeit |
 |---|---|---|---|
-| PSN | `*/5 3-5 * * *` | 36 (05–08 Uhr MESZ) | Hänger abbrechen, Sync-Schritt, Spielzeit, Kaufliste, Einzeltrophäen, Store-Preise |
+| PSN | `*/5 3-5 * * *` | 36 (05–08 Uhr MESZ) | Hänger abbrechen, Sync-Schritt, Spielzeit, Kaufliste, Einzeltrophäen, Level (Store-Preise seit 20j als Action, 7.4) |
 | Wartung | `*/5 6-8 * * *` | 36 (08–11 Uhr MESZ) | erschienene Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, Trophäen je Jahr, alte Rohantworten – die **Gebrauchtpreise** laufen seit Stufe 20i als GitHub Action um 02:17 UTC (7.3) |
 
 **Warum aufgeteilt.** Ein Fenster trug die Arbeit nicht mehr: elf Aufrufe Sync, zwei Spielzeit,
@@ -91,10 +91,9 @@ sie werden deshalb alle in derselben Nacht wieder fällig und brauchen bei fünf
 vor** dem Schritt, wo seine 24-Stunden-Frist noch läuft. Genau sie nehmen den IGDB-Schub auf, der
 bis zu **neun** kostet – **an einer Schub-Nacht steht die Wartung bei 35 von 36.**
 
-Im PSN-Fenster ist es die **Kaufliste**: elf Sync, zwei Spielzeit und fünfzehn Kaufliste sind 28,
-dann bleiben acht für die Store-Preise, die zehn brauchen. Der Store-Schritt steht als letzter in
-der Kette und verliert an einer solchen Nacht rund zwei Aufrufe, also etwa zwanzig Releases ohne
-frischen Preis. In **einem** Fenster wären es 39 von 36 – dieselbe Rechnung wie 37 von 36 in 18e.
+Im PSN-Fenster ist es die **Kaufliste**: elf Sync, zwei Spielzeit und fünfzehn Kaufliste sind 28.
+Bis 20j blieben dann acht für die Store-Preise, die zehn brauchten; seitdem läuft der Store als
+Action, und die acht Aufrufe sind frei. In **einem** Fenster wären es 39 von 36 – dieselbe Rechnung wie 37 von 36 in 18e.
 
 **Die Decke des täglichen Preistakts**: 20 Releases je Aufruf × 26 bis 33 nutzbare Aufrufe =
 **520 bis 660 Releases**, im Zuschnitt sind **431**. Was das für den Wunschlisten-Import bedeutet,

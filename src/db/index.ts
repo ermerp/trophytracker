@@ -55,7 +55,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		store,
 		// Die Lage eines Cron-Aufrufs in einem Batch (Stufe 18j) - aus den
 		// Bausteinen derselben Repositories, die die Knoepfe einzeln benutzen.
-		cronLage: new CronLageRepository(db, { sync, credentials, trophaeen, store, games, igdb }),
+		cronLage: new CronLageRepository(db, { sync, credentials, trophaeen, games, igdb }),
 		// Die Fakten der Betriebswarnungen in einem Batch (Stufe 18m).
 		betrieb: new BetriebRepository(db, { sync, credentials }),
 		ownership: new OwnershipRepository(db, events),

@@ -3,7 +3,7 @@ import { meldungFuer } from "../psn/store";
 import { OHNE_WEBSTORE, PRODUKT_ID, STORE_BEFUNDE, storeAdresse, type StoreErgebnis } from "../domain/store";
 import { storeConceptIds } from "../domain/igdb";
 import { STORE_LAGE_HOECHSTENS, type Rueckbefund, type StoreRueckmeldung } from "../db/store";
-import { einesPruefen, storeActionZeile, storeSchritt, STORE_JE_POST, type StoreActionErgebnis } from "../sync/store";
+import { einesPruefen, storeActionZeile, STORE_JE_POST, type StoreActionErgebnis } from "../sync/store";
 import { liesJson } from "./validierung";
 import type { AppEnv } from "../types";
 
@@ -61,10 +61,9 @@ function rueckmeldungAus(roh: unknown): StoreRueckmeldung | null {
  * Zugangsdaten und deshalb kein 503-Pfad** - der Store antwortet ohne
  * Anmeldung, und ein abgelaufenes NPSSO betrifft ihn nicht.
  *
- * Der Knopf ist kein Luxus, sondern die Regel aus CLAUDE.md: Ergebnisse
- * einer Messung werden nie per Skript eingetragen - fehlt der Weg in der
- * Oberflaeche, wird er gebaut. Geschrieben wird ausschliesslich ueber
- * denselben Pfad wie im Cron.
+ * Der Nachtlauf ist seit 20j eine GitHub Action und schreibt ueber die
+ * Routen unten; der Portions-Knopf ist mit dem Schritt im Worker entfallen
+ * (Entscheidung des Nutzers vom 22.10.2026). Von Hand bleibt der Einzelabruf.
  */
 export const storeRoutes = new Hono<AppEnv>()
 	/**
@@ -196,20 +195,6 @@ export const storeRoutes = new Hono<AppEnv>()
 			fakt: [{ bereich: "store", wert }, ...(aufStand ? [{ bereich: "store_geprueft", wert }] : [])],
 		});
 		return c.json(ergebnis);
-	})
-
-	/**
-	 * Eine Portion holen: zehn Releases, hoechstens vierzig Fremdanfragen.
-	 * Die Oberflaeche ruft nach, solange `weiter` gesetzt ist.
-	 */
-	.post("/store", async (c) => {
-		try {
-			const ergebnis = await storeSchritt(c.var.repos, c.var.store, c.var.igdb);
-			return c.json(ergebnis, ergebnis.status === "fehler" ? 502 : 200);
-		} catch (fehler) {
-			// Nur eigene Texte, kein Fremdtext - er koennte ein Geheimnis zitieren.
-			return c.json({ fehler: meldungFuer(fehler) }, 502);
-		}
 	})
 
 	/**
