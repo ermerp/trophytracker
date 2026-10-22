@@ -14,9 +14,11 @@ unten ausdrücklich als offen.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 20.10.2026): **20j – Store in eine GitHub Action**
 nach dem Muster von 20i (gebaut am 22.10.2026, [7.4](07-4-store-preise.md); der Store-Schritt im Worker geht erst nach einem fehlerfreien Probelauf über `workflow_dispatch` und spätestens um 20:30 UTC desselben Tages vom Netz, sonst eine Nacht später; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) →
-eine Nacht danach **der Markt auf 20:17 / 22:17** mit neu berechneter Schwelle von `markt_geprueft`
-(Entscheidung vom 22.10.2026, eine Änderung je Nacht) → ob die **Markt-Lage** einen eigenen Schritt
-bekommt, ist zurückgestellt, bis die Store-Lage gemessen ist (Entscheidung vom 22.10.2026, [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)) →
+am 23.10. **der Markt auf 20:17 / 22:17** mit neu berechneter Schwelle von `markt_geprueft`
+(Entscheidung vom 22.10.2026, eine Änderung je Nacht) → in einer eigenen Nacht der
+**Vorwärm-Versuch** für die Kaltstart-Vermutung (die Store-Lage brauchte 13 ms bei 79 Zeilen in IAD,
+an den Zeilen liegt es nicht; [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)); ein Markt-Lage-Schritt
+gegen die Zeilen entfällt damit vorerst →
 **veraltete Ansichten aufräumen** (Vorgabe des Nutzers vom 21.10.2026): `/trophaeen`, die
 Rohliste von Sony aus Stufe 3, steht nur noch unter „Werkzeuge" und zeigt nichts, was Sammlung
 und Spieldetail nicht besser zeigen – entfernen, und dabei alle Ansichten darauf prüfen, ob es

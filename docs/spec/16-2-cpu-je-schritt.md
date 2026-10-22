@@ -89,8 +89,10 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   10–13 ms (ORD, SEA) statt 2–3, am 20.10. in IAD nur 4, und dort war auch die Lage billig.
   Messworker und Wegwerf-D1 sind gelöscht. **Zurückgestellt** (Entscheidung vom 22.10.2026): eine
   Verbesserung der Markt-Lage (etwa `json_group_array`), bis die Store-Lage gemessen ist – sie hat
-  79 statt 910 Zeilen; bleibt sie klar darunter, hängt es an den Zeilen. **Idee für danach, nicht
-  in 20j:** ein Vorwärm-Aufruf der Action vor dem Lage-Aufruf, um die Kaltstart-Vermutung zu prüfen.
+  79 statt 910 Zeilen; bleibt sie klar darunter, hängt es an den Zeilen. **Vorwärm-Versuch, nach
+  20j in einer eigenen Nacht:** ein Vorwärm-Aufruf der Action vor dem Lage-Aufruf, um die
+  Kaltstart-Vermutung zu prüfen – **die Store-Lage mit 13 ms bei 79 Zeilen in IAD (unten) stützt
+  sie**, weil es an den Zeilen nicht liegen kann.
   **Store-Lage im Probelauf vom 22.10.2026:** 13 ms in IAD bei **79** Zeilen (ein D1-Aufruf, eine
   Abfrage) – die Markt-Lage brauchte dort am 20.10. 7 ms bei 910. **An der Zeilenzahl liegt es also
   nicht**; das stützt die Kaltstart-Vermutung, belegt ist sie nicht. Portionen der Store-Action: Median

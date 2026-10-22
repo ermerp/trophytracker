@@ -777,3 +777,32 @@ belegt, als die Vergleicher mit vier erfundenen Einträgen liefen.
 → Logik wird getestet, wo sie steht, auch im Frontend: Die Vergleicher stehen ohne
 React in `frontend/src/vergleich.ts`, `test/vergleich.spec.ts` prüft beide
 Richtungen (Regel in CLAUDE.md, Arbeitsweise „Testen, was Logik ist"; 5.2).
+
+---
+
+## Ein Netz aus demselben Garn
+
+**22.10.2026 (Stufe 20j) – die Warnung prüfte mit der Auswahl, die sie prüfen sollte.**
+Damit ein leerer Lauf der Store-Action nach dem Probelauf nicht warnt, ließ ich die
+Ausgangs-Route zählen, was noch fällig ist – mit derselben Bedingung wie die Lage.
+Der Nutzer fragte nach: Liefert die Auswahl durch einen Fehler immer 0, findet die
+Lage nichts, die Zählung sagt „nichts fällig", und die Warnung käme nie. Davor hatte
+ich schon geschrieben, die Warnung käme nach dem Probelauf „nur im Grenzfall"; seine
+Rechnung zeigte rund 33 Stunden, also sicher. Behoben mit dem ältesten Prüfstempel
+aus einer eigenen Abfrage (42 h); die Defektprobe – Auswahl auf 0 – zeigt, dass die
+Warnung kommt, und ohne das Netz nicht.
+→ Ob nichts zu tun ist, prüft eine Warnung nicht mit der Auswahl, die die Arbeit
+findet (Regel in CLAUDE.md, „Ein Schritt, der ruht, sagt warum"; 16.2).
+
+---
+
+## Typgeprüft war nur die Hälfte
+
+**22.10.2026 (Stufe 20j) – der Deploy von Teil B scheiterte am Typecheck von `test/`.**
+Nach dem Einbau des Sicherheitsnetzes prüfte ich die Typen mit `npx tsc --noEmit -p .`
+– das nimmt nur `src/`. Ein Test las ein neues Feld aus einem zu eng getypten
+Stand; die Pipeline brach bei `npm run typecheck` ab, deployt wurde nichts. Der
+Befehl, der `src/` und `test/` prüft, steht in CLAUDE.md unter „Befehle" und ist
+derselbe, den `deploy.yml` ruft.
+→ Vor dem Merge laufen die Befehle der Pipeline selbst (`npm run typecheck`), keine
+Teilmenge (CLAUDE.md, „Was berichtet wird, kommt aus der Sache selbst").
