@@ -40,6 +40,12 @@ lesen dieselbe Rechnung. Zeiten und Daten im Satz stehen in Ortszeit (Europe/Ber
 die sich im nächsten Aufruf selbst beheben, zeigt 18m nicht:** `cron_stand` hält je Bereich nur den
 letzten Ausgang (Nachtrag 18m-b, unten) – mit den Ausnahmen `markt_geprueft` aus 20i-b und `store_geprueft` aus 20j.
 
+**Bekannte Lücke im Sicherheitsnetz der Store-Action** (vermerkt am 22.10.2026): Der älteste
+Prüfstempel kommt aus den offenen Absichten. Releases mit `physical_release_status = 'nein'` **ohne**
+offene Absicht gehören zum Zuschnitt (7.4), werden vom Netz aber nicht gesehen – bleiben nur sie
+ungeprüft und sagt die Auswahl fälschlich „nichts fällig", kommt keine Warnung. Heute steht bei
+keinem Release ein `nein` (7.4); die Lücke wächst, sobald Block B der Lückenansicht abgearbeitet ist.
+
 **Darstellung, am Prototyp entschieden:** Rot steht als Block auf der Seite – er ersetzt den gelben
 Block – und oben in der Tafel; „zur Kenntnis" still, ohne eigenen Farbton, nur hinter der Glocke; die
 Glocke zählt die höchste Stufe, seit dem 20.10.2026 in der Rangfolge Rot vor Gelb (Posten) vor Grau (Kenntnis). Einzelheiten in 13.2; der Preisalarm aus 20g bekommt eine eigene
