@@ -278,6 +278,29 @@ describe("Routen der Store-Action (Stufe 20j)", () => {
 			expect((await cronStand()).store_geprueft).toBeUndefined();
 		});
 
+		it("meldet ein seit ueber 30 Stunden faelliges Ziel, auch wenn die Auswahl 'nichts faellig' sagt (Sicherheitsnetz)", async () => {
+			// Der Fall, gegen den das Netz steht: Ein Ziel ist seit 43 Stunden
+			// ungeprueft, und ein Lauf endet leer. Mit heiler Auswahl ist es
+			// faellig; mit einer kaputten (immer 0) setzte die Route
+			// store_geprueft - die Warnung muss trotzdem kommen, ueber den
+			// aeltesten Stempel aus einer eigenen Abfrage.
+			await spiel(1, "Ghost of Tsushima");
+			await env.DB.prepare("UPDATE release SET store_geprueft_am = datetime('now', '-43 hours')").run();
+			await ende(0);
+			expect((await cronStand()).store?.aeltester).toBeTruthy();
+			const w = (await (await app()("/api/betrieb/warnungen")).json()) as { warnungen: Array<{ art: string; text: string }> };
+			expect(w.warnungen.filter((x) => x.art === "store_leer").map((x) => x.text)).toEqual([
+				expect.stringMatching(/^Die Store-Preis-Action läuft, aber ein Release wurde seit 43 Stunden nicht geprüft/),
+			]);
+		});
+
+		it("zaehlt ein Ziel ohne Stempel ab dem Anlegen der Absicht - ein neuer Wunsch warnt nicht", async () => {
+			await spiel(1, "Ghost of Tsushima");
+			await ende(0);
+			const w = (await (await app()("/api/betrieb/warnungen")).json()) as { warnungen: Array<{ art: string; text: string }> };
+			expect(w.warnungen.map((x) => x.text).filter((t) => t.includes("seit") && t.includes("nicht geprüft"))).toEqual([]);
+		});
+
 		it("weist Fremdtext als Fehler ab - er koennte ein Geheimnis zitieren", async () => {
 			expect((await ende(0, "Token abc123 abgelehnt")).status).toBe(400);
 		});

@@ -190,7 +190,18 @@ export const storeRoutes = new Hono<AppEnv>()
 			...(meldung ? { meldung } : {}),
 		};
 		const aufStand = ergebnis.geprueft > 0 || (!meldung && ergebnis.nochOffen === 0);
-		const wert = { am, getan: "store", meldung: meldung !== undefined, offen: ergebnis.nochOffen, geprueft: ergebnis.geprueft };
+		// Das Sicherheitsnetz, unabhaengig von der Auswahl: Seit wann ist das
+		// am laengsten ungepruefte Ziel auf dem Stand? Daran haengt `store_leer`
+		// auch dann, wenn die Auswahl selbst kaputt ist und "nichts faellig" sagt.
+		const aeltester = await c.var.repos.store.aeltesterZielStempel();
+		const wert = {
+			am,
+			getan: "store",
+			meldung: meldung !== undefined,
+			offen: ergebnis.nochOffen,
+			geprueft: ergebnis.geprueft,
+			...(aeltester ? { aeltester } : {}),
+		};
 		await c.var.repos.sync.cronAusgangVermerken(am, storeActionZeile(ergebnis), undefined, {
 			fakt: [{ bereich: "store", wert }, ...(aufStand ? [{ bereich: "store_geprueft", wert }] : [])],
 		});

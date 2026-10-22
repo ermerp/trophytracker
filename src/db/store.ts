@@ -163,6 +163,31 @@ export class StoreRepository {
 	}
 
 	/**
+	 * Seit wann das am laengsten ungepruefte Ziel auf dem Stand ist - fuer
+	 * das Sicherheitsnetz der Warnung `store_leer` (Stufe 20j, Rueckfrage des
+	 * Nutzers vom 22.10.2026).
+	 *
+	 * **Bewusst NICHT ueber `ZIELE_CTE` und `FAELLIG_VON`:** Liefert die
+	 * Auswahl durch einen Fehler immer 0, findet die Lage nichts, die
+	 * Zaehlung `faelligeAnzahl` ebenso - und der leere Lauf gaelte als "auf
+	 * dem Stand". Diese Abfrage teilt keinen Text mit der Auswahl; sie nimmt
+	 * die offenen Absichten ohne gekaufte Berechtigung, also den Kern des
+	 * Zuschnitts. Ein Ziel ohne Stempel zaehlt ab dem Anlegen der Absicht,
+	 * sonst warnte jeder neue Wunsch bis zum naechsten Abend. Die
+	 * `nein`-Releases ohne Absicht deckt das Netz nicht ab (heute keine, 7.4).
+	 */
+	async aeltesterZielStempel(): Promise<string | null> {
+		const z = await this.db
+			.prepare(
+				"SELECT MIN(COALESCE(r.store_geprueft_am, pe.created_at)) AS am FROM plan_entry pe " +
+					"JOIN release r ON r.id = pe.release_id WHERE pe.status = 'offen' " +
+					"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf')",
+			)
+			.first<{ am: string | null }>();
+		return z?.am ?? null;
+	}
+
+	/**
 	 * Welche der Ids es als Release gibt - fuer die Schreibroute der Action,
 	 * die eine unbekannte Id uebergeht und zaehlt, statt sie anzulegen.
 	 * Hoechstens STORE_JE_POST Ids, weit unter 100 Binds.

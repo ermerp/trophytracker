@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+	ACTION_STILL_NACH_STUNDEN,
 	FENSTERREGEL_SCHARF,
+	STORE_ZIEL_ALT_NACH_STUNDEN,
 	fensterOffen,
 	urteile,
 	zugangsende,
@@ -8,6 +10,7 @@ import {
 	type StandFakt,
 	type ZugangFakt,
 } from "../src/domain/betrieb";
+import { STORE_FRIST_STUNDEN } from "../src/db/store";
 
 /**
  * Die Regeln der Betriebswarnungen (Stufe 18m, 16.2) - rein, ohne D1. Die
@@ -355,6 +358,36 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 			const w = urteile(mitStore({ store: leer, store_geprueft: geprueft }, "2026-10-18T07:01:00Z"));
 			expect(w.map((x) => `${x.art}:${x.stufe}`)).toEqual(["store_leer:kenntnis"]);
 			expect(w[0].text).toBe("Die Store-Preis-Action läuft, ist aber seit 30 Stunden nicht auf dem Stand, zuletzt am 17.10. um 03:00.");
+		});
+
+		describe("Sicherheitsnetz: der aelteste Stempel, unabhaengig von der Auswahl", () => {
+			// Ein leerer Lauf, nach dem die (kaputte) Auswahl "nichts faellig" sagt:
+			// store_geprueft ist frisch - die alte Regel schwiege.
+			const kaputt = (aeltester: string, jetzt: string) =>
+				mitStore({ store: { ...leer, am: "2026-10-18 02:00", aeltester }, store_geprueft: { ...leer, am: "2026-10-18 02:00" } }, jetzt);
+			const meldungen = (aeltester: string, jetzt: string) => urteile(kaputt(aeltester, jetzt));
+
+			it("rechnet 12 Stunden Frist plus 30 - die Entscheidung vom 22.10.2026 auf 'faellig und nicht geprueft'", () => {
+				expect(STORE_ZIEL_ALT_NACH_STUNDEN).toBe(STORE_FRIST_STUNDEN + ACTION_STILL_NACH_STUNDEN);
+			});
+
+			it("schweigt bei genau 42 Stunden und meldet danach", () => {
+				expect(arten(kaputt("2026-10-16 15:38", "2026-10-18T09:38:00Z"))).toEqual([]);
+				const w = meldungen("2026-10-16 15:37", "2026-10-18T09:38:00Z");
+				expect(w.map((x) => `${x.art}:${x.stufe}`)).toEqual(["store_leer:kenntnis"]);
+				expect(w[0].text).toBe("Die Store-Preis-Action läuft, aber ein Release wurde seit 42 Stunden nicht geprüft, zuletzt am 16.10. um 17:37.");
+			});
+
+			it("schweigt nach einem Probelauf am Nachmittag - auch wenn der naechste Lauf spaet kommt", () => {
+				// Probe 16:47, beide Abendlaeufe leer, naechster pruefender Lauf
+				// verspaetet um 02:17 uebermorgen: 33,5 Stunden.
+				expect(arten(kaputt("2026-10-16 16:47", "2026-10-18T02:16:00Z"))).toEqual([]);
+			});
+
+			it("ueberlaesst einen gescheiterten Lauf der Meldung", () => {
+				const w = urteile(mitStore({ store: { ...leer, meldung: true, aeltester: "2026-10-10 00:00" } }));
+				expect(w.map((x) => x.art)).toEqual(["meldung"]);
+			});
 		});
 
 		it("meldet einen Lauf ohne Ausgang zur Kenntnis", () => {
