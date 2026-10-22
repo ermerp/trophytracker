@@ -43,6 +43,14 @@ export type StandFakt = {
 	 * der Rueckfall um 08:17 ist - und der prueft dann nichts.
 	 */
 	markt_geprueft?: AusgangFakt;
+	/** Die Store-Action (Stufe 20j), wie die Markt-Action. */
+	store?: AusgangFakt;
+	store_begonnen?: AusgangFakt;
+	/**
+	 * Der letzte Lauf der Store-Action, nach dem der Store auf dem Stand war:
+	 * etwas geprueft, oder ohne Meldung und danach nichts faellig (20j).
+	 */
+	store_geprueft?: AusgangFakt;
 	ohneAusgang?: { anzahl: number; von: string; bis: string; bereich: string; gekappt?: boolean; gemeldetAm: string };
 };
 
@@ -59,6 +67,7 @@ export const BETRIEB_ARTEN = [
 	"meldung",
 	"kaufliste",
 	"markt_leer",
+	"store_leer",
 	"fenster_offen",
 ] as const;
 export type BetriebArt = (typeof BETRIEB_ARTEN)[number];
@@ -100,6 +109,22 @@ export type BetriebFakten = {
 
 /** Ohne vermerkten Ausgang laenger als das, und der Bereich gilt als still (Entscheidung vom 18.10.2026). */
 export const STILL_NACH_STUNDEN = 26;
+/**
+ * Dasselbe fuer die Store-Action (Entscheidung des Nutzers vom 22.10.2026):
+ * Normalabstand plus groesste beobachtete Verspaetung, 24 h + 5 h 30 (7.3),
+ * aufgerundet. 26 reichten nicht: Der Rueckfall liegt nur zwei Stunden nach
+ * dem Hauptlauf, und zwischen einem puenktlichen Rueckfall um 22:47 und dem
+ * maximal verspaeteten Hauptlauf am naechsten Abend liegen 27 h 30.
+ */
+export const ACTION_STILL_NACH_STUNDEN = 30;
+
+/** Ab wann ein Bereich als still gilt - die Store-Action mit ihrer eigenen Schwelle. */
+const STILL_NACH: Record<"psn" | "wartung" | "markt" | "store", number> = {
+	psn: STILL_NACH_STUNDEN,
+	wartung: STILL_NACH_STUNDEN,
+	markt: STILL_NACH_STUNDEN,
+	store: ACTION_STILL_NACH_STUNDEN,
+};
 /** Vorlauf vor dem erwarteten Ende des Zugangs: zur Kenntnis / rot. */
 export const ZUGANG_KENNTNIS_TAGE = 14;
 export const ZUGANG_ROT_TAGE = 3;
@@ -119,7 +144,7 @@ export const FENSTERREGEL_SCHARF = true;
 
 /**
  * Ende der beiden Cron-Fenster in UTC-Stunden (wrangler.jsonc: 3-5 und 6-8).
- * Die Markt-Action hat kein Fenster: Ihr Rest zaehlt ab ihrem Ausgang.
+ * Markt- und Store-Action haben kein Fenster: Ihr Rest zaehlt ab ihrem Ausgang.
  */
 const FENSTERENDE_STUNDE: Record<string, number> = { psn: 6, wartung: 9 };
 
@@ -134,6 +159,7 @@ const BEREICH: Record<string, { wer: string; wo: string }> = {
 	psn: { wer: "Das PSN-Fenster", wo: "im PSN-Fenster" },
 	wartung: { wer: "Die Wartung", wo: "in der Wartung" },
 	markt: { wer: "Die Gebrauchtpreis-Action", wo: "der Gebrauchtpreis-Action" },
+	store: { wer: "Die Store-Preis-Action", wo: "der Store-Preis-Action" },
 };
 
 /** Was ein Aufruf getan hat, so wie es in der Oberflaeche heisst. */
@@ -262,7 +288,7 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 	// --- Die Automatik selbst ------------------------------------------------
 	// Ein Bereich ohne Ausgang seit ueber 26 Stunden. Fehlt der Stand ganz,
 	// hat der Cron seit 18j nie etwas vermerkt - das ist dasselbe Schweigen.
-	const bereiche = ["psn", "wartung", "markt"] as const;
+	const bereiche = ["psn", "wartung", "markt", "store"] as const;
 	if ((["psn", "wartung"] as const).every((b) => !f.stand[b])) {
 		raus.push({
 			art: "automatik_still",
@@ -278,7 +304,7 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 		for (const b of bereiche) {
 			const fakt = f.stand[b];
 			const stunden = fakt ? alterStunden(fakt.am) : Number.POSITIVE_INFINITY;
-			if (stunden <= STILL_NACH_STUNDEN) continue;
+			if (stunden <= STILL_NACH[b]) continue;
 			const zuletzt = fakt ? zeitAus(fakt.am) : null;
 			raus.push({
 				art: "automatik_still",
@@ -381,22 +407,26 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 		});
 	}
 
-	// Ein Lauf der Markt-Action, der begonnen und keinen Ausgang hat.
-	const begonnen = f.stand.markt_begonnen;
-	if (
-		begonnen &&
-		(!f.stand.markt || f.stand.markt.am < begonnen.am) &&
-		alterStunden(begonnen.am) > MARKT_OHNE_AUSGANG_STUNDEN &&
-		alterStunden(begonnen.am) <= HINWEIS_STUNDEN
-	) {
-		const am = zeitAus(begonnen.am);
-		raus.push({
-			art: "ohne_ausgang",
-			stufe: "kenntnis",
-			text: `Der Lauf ${BEREICH.markt.wo}${am ? ` von ${uhrzeit(am)}` : ""} ist ohne Ausgang geblieben.`,
-			ziel: "einstellungen",
-			zielText: "Verlauf",
-		});
+	// Ein Lauf einer Action, der begonnen und keinen Ausgang hat (Markt 20i,
+	// Store 20j). Ein Store-Lauf dauert ebenfalls Minuten - dieselbe Stunde.
+	for (const b of ["markt", "store"] as const) {
+		const begonnen = f.stand[`${b}_begonnen`];
+		const ausgang = f.stand[b];
+		if (
+			begonnen &&
+			(!ausgang || ausgang.am < begonnen.am) &&
+			alterStunden(begonnen.am) > MARKT_OHNE_AUSGANG_STUNDEN &&
+			alterStunden(begonnen.am) <= HINWEIS_STUNDEN
+		) {
+			const am = zeitAus(begonnen.am);
+			raus.push({
+				art: "ohne_ausgang",
+				stufe: "kenntnis",
+				text: `Der Lauf ${BEREICH[b].wo}${am ? ` von ${uhrzeit(am)}` : ""} ist ohne Ausgang geblieben.`,
+				ziel: "einstellungen",
+				zielText: "Verlauf",
+			});
+		}
 	}
 
 	// Die Markt-Action laeuft, prueft aber nichts (Nachtrag 20i-b). Ein
@@ -417,6 +447,28 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 				text: am
 					? `${BEREICH.markt.wer} läuft, hat aber seit ${Math.floor(stunden)} Stunden kein Release geprüft, zuletzt am ${datum(am)} um ${uhrzeit(am)}.`
 					: `${BEREICH.markt.wer} läuft, hat aber noch kein Release geprüft.`,
+				ziel: "einstellungen",
+				zielText: "Verlauf",
+			});
+		}
+	}
+
+	// Die Store-Action laeuft, ist aber nicht auf dem Stand (Stufe 20j) -
+	// wie oben, mit ihrer eigenen Schwelle. `store_geprueft` setzt auch ein
+	// leerer Lauf, nach dem nichts faellig ist: Nach einem Probelauf am
+	// Nachmittag finden die Laeufe am Abend nichts, und das ist kein Befund.
+	const storeAusgang = f.stand.store;
+	if (storeAusgang?.geprueft === 0 && !storeAusgang.meldung) {
+		const zuletzt = f.stand.store_geprueft;
+		const stunden = zuletzt ? alterStunden(zuletzt.am) : Number.POSITIVE_INFINITY;
+		if (stunden > ACTION_STILL_NACH_STUNDEN) {
+			const am = zuletzt ? zeitAus(zuletzt.am) : null;
+			raus.push({
+				art: "store_leer",
+				stufe: "kenntnis",
+				text: am
+					? `${BEREICH.store.wer} läuft, ist aber seit ${Math.floor(stunden)} Stunden nicht auf dem Stand, zuletzt am ${datum(am)} um ${uhrzeit(am)}.`
+					: `${BEREICH.store.wer} läuft, hat aber noch kein Release geprüft.`,
 				ziel: "einstellungen",
 				zielText: "Verlauf",
 			});
@@ -462,20 +514,20 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
  */
 export function fensterOffen(stand: StandFakt, jetzt: Date): Betriebswarnung[] {
 	const raus: Betriebswarnung[] = [];
-	for (const b of ["psn", "wartung", "markt"] as const) {
+	for (const b of ["psn", "wartung", "markt", "store"] as const) {
 		const fakt = stand[b];
 		if (!fakt || !fakt.offen) continue;
 		const am = zeitAus(fakt.am);
 		if (!am) continue;
 		const ende =
-			b === "markt"
+			b === "markt" || b === "store"
 				? am.getTime()
 				: Date.UTC(am.getUTCFullYear(), am.getUTCMonth(), am.getUTCDate(), FENSTERENDE_STUNDE[b]);
 		if (jetzt.getTime() < ende || jetzt.getTime() - ende > HINWEIS_STUNDEN * STUNDE_MS) continue;
 		raus.push({
 			art: "fenster_offen",
 			stufe: "kenntnis",
-			text: `${SCHRITT[fakt.getan] ?? fakt.getan}: ${fakt.offen} ${fakt.offen === 1 ? "Eintrag blieb" : "Einträge blieben"} ${b === "markt" ? "nach dem Lauf" : "bei Fensterschluss"} offen.`,
+			text: `${SCHRITT[fakt.getan] ?? fakt.getan}: ${fakt.offen} ${fakt.offen === 1 ? "Eintrag blieb" : "Einträge blieben"} ${b === "markt" || b === "store" ? "nach dem Lauf" : "bei Fensterschluss"} offen.`,
 			ziel: "einstellungen",
 			zielText: "Verlauf",
 		});

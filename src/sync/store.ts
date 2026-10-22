@@ -1,7 +1,7 @@
 import type { Repositories } from "../db";
 import type { ZuPruefen } from "../db/store";
 import { storeConceptIds } from "../domain/igdb";
-import { OHNE_WEBSTORE, produktReihe, type StoreBefund } from "../domain/store";
+import { OHNE_WEBSTORE, produktReihe, type StoreBefund, type StoreErgebnis } from "../domain/store";
 import type { IgdbClient } from "../igdb/client";
 import { StoreAbrufError, type StoreClient } from "../psn/store";
 
@@ -39,6 +39,45 @@ export const FREMDANFRAGEN_HOECHSTENS = 40;
  * Kandidat traegt den Preis (gemessen am 02.10.2026).
  */
 export const PRODUKTE_JE_RELEASE = 3;
+
+/**
+ * Releases je POST der Store-Action (Stufe 20j). Ein Preis kostet drei
+ * Anweisungen, ein Befund eine - zehn Preise sind also 30, mit der Abfrage
+ * davor 31 von den 50 je Aufruf, die D1 dokumentiert. Startwert wie
+ * `MARKT_JE_POST`, nach den ersten Laeufen an der gemessenen CPU je POST
+ * angepasst.
+ */
+export const STORE_JE_POST = 10;
+
+/** Was ein Lauf der Store-Action vermerkt (Stufe 20j) - nur Zahlen und feste Texte. */
+export type StoreActionErgebnis = {
+	status: "erfolg" | "fehler";
+	geprueft: number;
+	mitPreis: number;
+	imAngebot: number;
+	imPlusKatalog: number;
+	zugeordnet: number;
+	ohneTreffer: number;
+	/** Wie viele Releases nach dem Lauf noch faellig sind - dieselbe Bedingung wie die Auswahl. */
+	nochOffen: number;
+	meldung?: string;
+};
+
+/** Die Verlaufszeile eines Laufs der Store-Action, im Format der Cron-Zeilen. */
+export function storeActionZeile(e: StoreActionErgebnis): string {
+	const teile = [
+		"cron: store bereich=action",
+		`store=${e.status}`,
+		`geprueft=${e.geprueft}`,
+		`preis=${e.mitPreis}`,
+		`angebot=${e.imAngebot}`,
+		`plus=${e.imPlusKatalog}`,
+		`zugeordnet=${e.zugeordnet}`,
+		`offen=${e.nochOffen}`,
+	];
+	if (e.meldung) teile.push(`meldung="${e.meldung}"`);
+	return teile.join(" ");
+}
 
 export type StoreSchrittErgebnis = {
 	status: "erfolg" | "fehler";
@@ -145,111 +184,25 @@ async function portion(
 	let ohneTreffer = 0;
 
 	for (const ziel of ziele) {
-		// PS3 und Vita: Befund ohne einen einzigen Abruf (21d). Der Web-Store
-		// fuehrt fuer sie keine Produktseiten mehr - dreifach gemessen am
-		// 03.10.2026 (OHNE_WEBSTORE). Hier zu fragen waere Verkehr fuer eine
-		// Antwort, die feststeht. Steht vor der Budgetpruefung, weil dieser
-		// Fall nichts kostet.
-		if (OHNE_WEBSTORE.includes(ziel.plattform)) {
-			await repos.store.befundSchreiben(ziel.releaseId, "plattform");
-			geprueft++;
-			ohneTreffer++;
-			continue;
-		}
-
 		// Aufhoeren, bevor die naechste Runde das Budget ueberzieht. Die
 		// uebrigen Releases bleiben ungestempelt und kommen beim naechsten
-		// Aufruf wieder.
-		if (anfragen + 1 + PRODUKTE_JE_RELEASE > FREMDANFRAGEN_HOECHSTENS) break;
+		// Aufruf wieder. PS3 und Vita kosten nichts und laufen trotzdem durch.
+		if (!OHNE_WEBSTORE.includes(ziel.plattform) && anfragen + 1 + PRODUKTE_JE_RELEASE > FREMDANFRAGEN_HOECHSTENS) break;
 
-		let befund: StoreBefund = "unlesbar";
-		// Ueberlebt den Weg bis zum Stempel: Ein Titel ohne Kaufknopf kann im
-		// PS-Plus-Katalog liegen, und das soll nicht verlorengehen (21e).
-		let nurKatalog = false;
-		try {
-			// 1. Eine bekannte Produkt-Id ist der billige Weg: eine Anfrage.
-			if (ziel.produktId !== null) {
-				const ergebnis = await store.holePreis(ziel.produktId);
-				anfragen++;
-				if (ergebnis === "nur_katalog") nurKatalog = true;
-				else if (ergebnis) {
-					const { neuZugeordnet } = await repos.store.preisSchreiben(ziel, ergebnis);
-					geprueft++;
-					mitPreis++;
-					if (ergebnis.istSale) imAngebot++;
-					if (ergebnis.imPlusKatalog) imPlusKatalog++;
-					if (neuZugeordnet) zugeordnet++;
-					continue;
-				}
-				// Die gespeicherte Id traegt keinen Kaufknopf mehr. Mit einer
-				// Concept-Id laesst sich das aufloesen, ohne sie nicht.
-				befund = "ohne_kauf";
-			}
-
-			// 2. Sonst ueber das Concept aufloesen.
-			if (ziel.conceptId === null) {
-				befund = ziel.produktId === null ? "ohne_id" : befund;
-			} else {
-				let stand = conceptPuffer.get(ziel.conceptId);
-				if (stand === undefined) {
-					stand = await store.holeConcept(ziel.conceptId);
-					anfragen++;
-					conceptPuffer.set(ziel.conceptId, stand);
-				}
-				// Drei verschiedene Antworten, drei verschiedene Befunde
-				// (Nachtrag 21e): Eine Seite, die es gar nicht gibt, ist
-				// endgueltig und gehoert in die Nachpflege; eine, die wir nicht
-				// lesen konnten, ist einen weiteren Versuch wert. Vorher waren
-				// beide `unlesbar` - und *Dying Light* versuchte es fuenf
-				// Naechte lang vergeblich, weil IGDBs Concept 201129 im
-				// deutschen Store mit 302 antwortet.
-				if (stand === "fehlt") {
-					// Gibt es die Seite anderswo? Eine Anfrage, nur hier (21f).
-					// Antwortet ein anderer Store mit Produkten, liegt es an der
-					// REGION und nicht am Spiel - und dann gibt es nichts
-					// nachzutragen, also gehoert es auch nicht in die
-					// Nachpflegeliste. Ohne diese Unterscheidung stuende dort
-					// ein Posten, an dem niemand arbeiten kann.
-					befund = (await store.kenntAndereRegion(ziel.conceptId)) ? "regional" : "ohne_id";
-					anfragen++;
-				}
-				else if (stand === null) befund = "unlesbar";
-				else if (stand.ohneProdukt) befund = "delistet";
-				else {
-					const reihe = produktReihe(stand.produkte, ziel.titel, ziel.plattform, stand.standardId);
-					befund = reihe.length === 0 ? "fremd" : "ohne_kauf";
-					for (const produkt of reihe.slice(0, PRODUKTE_JE_RELEASE)) {
-						if (anfragen >= FREMDANFRAGEN_HOECHSTENS) break;
-						const ergebnis = await store.holePreis(produkt.id);
-						anfragen++;
-						if (ergebnis === "nur_katalog") {
-							nurKatalog = true;
-							continue;
-						}
-						if (!ergebnis) continue;
-						const { neuZugeordnet } = await repos.store.preisSchreiben(ziel, ergebnis);
-						geprueft++;
-						mitPreis++;
-						if (ergebnis.istSale) imAngebot++;
-						if (ergebnis.imPlusKatalog) imPlusKatalog++;
-						if (neuZugeordnet) zugeordnet++;
-						befund = "preis";
-						break;
-					}
-					if (befund === "preis") continue;
-				}
-			}
-		} catch (fehler) {
-			if (fehler instanceof StoreAbrufError) {
-				// Ein einzelner Fehlschlag darf die Portion nicht kosten:
-				// ungestempelt, morgen wieder faellig (wie Stufe 20).
-				continue;
-			}
-			throw fehler;
+		const aus = await pruefeZiel(store, ziel, conceptPuffer, FREMDANFRAGEN_HOECHSTENS - anfragen);
+		anfragen += aus.anfragen;
+		if (aus.art === "abruffehler") continue;
+		if (aus.art === "preis") {
+			const { neuZugeordnet } = await repos.store.preisSchreiben(ziel, aus.ergebnis);
+			geprueft++;
+			mitPreis++;
+			if (aus.ergebnis.istSale) imAngebot++;
+			if (aus.ergebnis.imPlusKatalog) imPlusKatalog++;
+			if (neuZugeordnet) zugeordnet++;
+			continue;
 		}
-
-		await repos.store.befundSchreiben(ziel.releaseId, befund, nurKatalog);
-		if (befund !== "unlesbar") {
+		await repos.store.befundSchreiben(ziel.releaseId, aus.befund, aus.nurKatalog);
+		if (aus.befund !== "unlesbar") {
 			geprueft++;
 			ohneTreffer++;
 		}
@@ -271,6 +224,104 @@ async function portion(
 		anfragen,
 		weiter: ziele.length === n,
 	};
+}
+
+/** Was die Pruefung EINES Releases ergab - geschrieben wird erst danach. */
+export type ZielAusgang = { anfragen: number } & (
+	| { art: "preis"; ergebnis: StoreErgebnis }
+	| { art: "befund"; befund: StoreBefund; nurKatalog: boolean }
+	/** Ein einzelner Fehlschlag: ungestempelt, beim naechsten Lauf wieder faellig (wie Stufe 20). */
+	| { art: "abruffehler" }
+);
+
+/**
+ * EIN Release beim Store pruefen, ohne zu schreiben (Stufe 20j).
+ *
+ * Derselbe Weg fuer den Worker (Einzelabruf, 21d) und die Store-Action (in
+ * Node, ohne CPU-Grenze): Wie aus Produkt-Id, Concept und Region ein Preis
+ * oder ein Befund wird, steht nur hier. Geschrieben wird beim Aufrufer - im
+ * Worker sofort, in der Action ueber `POST /api/sync/store/ergebnisse`.
+ *
+ * `hoechstens` begrenzt die Anfragen dieses Releases; die Action hat keine
+ * Grenze je Aufruf und gibt `Infinity`.
+ */
+export async function pruefeZiel(
+	store: StoreClient,
+	ziel: ZuPruefen,
+	conceptPuffer: Map<string, Awaited<ReturnType<StoreClient["holeConcept"]>>>,
+	hoechstens = Number.POSITIVE_INFINITY,
+): Promise<ZielAusgang> {
+	// PS3 und Vita: Befund ohne einen einzigen Abruf (21d). Der Web-Store
+	// fuehrt fuer sie keine Produktseiten mehr - dreifach gemessen am
+	// 03.10.2026 (OHNE_WEBSTORE). Hier zu fragen waere Verkehr fuer eine
+	// Antwort, die feststeht.
+	if (OHNE_WEBSTORE.includes(ziel.plattform)) return { art: "befund", befund: "plattform", nurKatalog: false, anfragen: 0 };
+
+	let anfragen = 0;
+	let befund: StoreBefund = "unlesbar";
+	// Ueberlebt den Weg bis zum Stempel: Ein Titel ohne Kaufknopf kann im
+	// PS-Plus-Katalog liegen, und das soll nicht verlorengehen (21e).
+	let nurKatalog = false;
+	try {
+		// 1. Eine bekannte Produkt-Id ist der billige Weg: eine Anfrage.
+		if (ziel.produktId !== null) {
+			const ergebnis = await store.holePreis(ziel.produktId);
+			anfragen++;
+			if (ergebnis === "nur_katalog") nurKatalog = true;
+			else if (ergebnis) return { art: "preis", ergebnis, anfragen };
+			// Die gespeicherte Id traegt keinen Kaufknopf mehr. Mit einer
+			// Concept-Id laesst sich das aufloesen, ohne sie nicht.
+			befund = "ohne_kauf";
+		}
+
+		// 2. Sonst ueber das Concept aufloesen.
+		if (ziel.conceptId === null) {
+			befund = ziel.produktId === null ? "ohne_id" : befund;
+		} else {
+			let stand = conceptPuffer.get(ziel.conceptId);
+			if (stand === undefined) {
+				stand = await store.holeConcept(ziel.conceptId);
+				anfragen++;
+				conceptPuffer.set(ziel.conceptId, stand);
+			}
+			// Drei verschiedene Antworten, drei verschiedene Befunde
+			// (Nachtrag 21e): Eine Seite, die es gar nicht gibt, ist
+			// endgueltig und gehoert in die Nachpflege; eine, die wir nicht
+			// lesen konnten, ist einen weiteren Versuch wert. Vorher waren
+			// beide `unlesbar` - und *Dying Light* versuchte es fuenf
+			// Naechte lang vergeblich, weil IGDBs Concept 201129 im
+			// deutschen Store mit 302 antwortet.
+			if (stand === "fehlt") {
+				// Gibt es die Seite anderswo? Eine Anfrage, nur hier (21f).
+				// Antwortet ein anderer Store mit Produkten, liegt es an der
+				// REGION und nicht am Spiel - und dann gibt es nichts
+				// nachzutragen, also gehoert es auch nicht in die
+				// Nachpflegeliste. Ohne diese Unterscheidung stuende dort
+				// ein Posten, an dem niemand arbeiten kann.
+				befund = (await store.kenntAndereRegion(ziel.conceptId)) ? "regional" : "ohne_id";
+				anfragen++;
+			} else if (stand === null) befund = "unlesbar";
+			else if (stand.ohneProdukt) befund = "delistet";
+			else {
+				const reihe = produktReihe(stand.produkte, ziel.titel, ziel.plattform, stand.standardId);
+				befund = reihe.length === 0 ? "fremd" : "ohne_kauf";
+				for (const produkt of reihe.slice(0, PRODUKTE_JE_RELEASE)) {
+					if (anfragen >= hoechstens) break;
+					const ergebnis = await store.holePreis(produkt.id);
+					anfragen++;
+					if (ergebnis === "nur_katalog") {
+						nurKatalog = true;
+						continue;
+					}
+					if (ergebnis) return { art: "preis", ergebnis, anfragen };
+				}
+			}
+		}
+	} catch (fehler) {
+		if (fehler instanceof StoreAbrufError) return { art: "abruffehler", anfragen };
+		throw fehler;
+	}
+	return { art: "befund", befund, nurKatalog, anfragen };
 }
 
 function leer(teil: { status: "erfolg" | "fehler"; meldung?: string }): StoreSchrittErgebnis {

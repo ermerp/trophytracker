@@ -432,6 +432,29 @@ describe("Dichtheitsprüfung", () => {
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({ art: "ende", geprueft: 0, mitPreis: 0, discBelegt: 0, ohneAngebot: 0, fehler: "zugang" }),
 			}),
+			// Die Routen der Store-Action (Stufe 20j), mit Fehlerpfaden - die
+			// Concept-Route ruft IGDB und ist damit auch ein IGDB-Pfad.
+			await ruf(app, "/api/sync/store/lage"),
+			await ruf(app, "/api/sync/store/concepts", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ releaseIds: [1, 2, 3] }),
+			}),
+			await ruf(app, "/api/sync/store/ergebnisse", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ ergebnisse: [{ releaseId: 1, befund: "delistet", nurKatalog: false }] }),
+			}),
+			await ruf(app, "/api/sync/store/ergebnisse", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ ergebnisse: "kaputt" }),
+			}),
+			await ruf(app, "/api/sync/store/ausgang", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ art: "ende", geprueft: 0, mitPreis: 0, imAngebot: 0, imPlusKatalog: 0, zugeordnet: 0, ohneTreffer: 0, fehler: "app" }),
+			}),
 			// Der Preisverlauf (Stufe 20f): die eine lesende Route auf price_snapshot.
 			await ruf(app, "/api/releases/1/preise"),
 			await ruf(app, "/api/releases/0/preise"),

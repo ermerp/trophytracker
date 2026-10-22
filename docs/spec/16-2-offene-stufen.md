@@ -13,10 +13,10 @@ unten ausdrücklich als offen.
 **Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026).
 
 **Reihenfolge** (Entscheidung des Nutzers vom 20.10.2026): **20j – Store in eine GitHub Action**
-nach dem Muster von 20i (Plan freigegeben, Zeitplan 20:47 / 22:47 entschieden am 22.10.2026; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) →
+nach dem Muster von 20i (gebaut am 22.10.2026, [7.4](07-4-store-preise.md); der Store-Schritt im Worker geht erst nach einem fehlerfreien Probelauf über `workflow_dispatch` und spätestens um 20:30 UTC desselben Tages vom Netz, sonst eine Nacht später; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) →
 eine Nacht danach **der Markt auf 20:17 / 22:17** mit neu berechneter Schwelle von `markt_geprueft`
 (Entscheidung vom 22.10.2026, eine Änderung je Nacht) → ob die **Markt-Lage** einen eigenen Schritt
-bekommt, entscheidet der Plan von 20j (offen; untersucht am 22.10., [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)), nicht in derselben Nacht wie 20j →
+bekommt, ist zurückgestellt, bis die Store-Lage gemessen ist (Entscheidung vom 22.10.2026, [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)) →
 **veraltete Ansichten aufräumen** (Vorgabe des Nutzers vom 21.10.2026): `/trophaeen`, die
 Rohliste von Sony aus Stufe 3, steht nur noch unter „Werkzeuge" und zeigt nichts, was Sammlung
 und Spieldetail nicht besser zeigen – entfernen, und dabei alle Ansichten darauf prüfen, ob es

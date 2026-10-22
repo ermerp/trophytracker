@@ -238,7 +238,9 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
    `.github/workflows/markt.yml`, und die läuft **nur über `schedule` und
    `workflow_dispatch`, nie über `pull_request` oder `pull_request_target`** –
    die Secrets dürfen keinem fremden Code begegnen
-   (`test/markt-action.spec.ts` hält das fest).
+   (`test/markt-action.spec.ts` hält das fest). Dasselbe gilt für `github-store`
+   und `.github/workflows/store.yml`, die Store-Preis-Action (20:47 / 22:47 UTC,
+   `test/store-action.spec.ts`).
 
    Die drei ablaufenden Werte sind der wahrscheinlichste Grund, aus dem die
    Sicherung eines Tages unbemerkt ausbleibt. `BACKUP_REPO_TOKEN` ist ein
