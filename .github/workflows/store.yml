@@ -1,0 +1,60 @@
+name: Store-Preise
+
+# Der Store-Schritt als GitHub Action (Stufe 20j, Abschnitt 7.4 und 16.2),
+# nach dem Muster der Markt-Action (markt.yml, 20i).
+#
+# Im Worker kostete ein Aufruf zu zehn Releases 29-103 ms CPU, und ein
+# Release je Aufruf haette die Nacht nicht getragen. Hier fragt der Lauf den
+# Store ohne CPU-Grenze; geschrieben wird ausschliesslich ueber die Routen des
+# Workers (/api/sync/store/*), mit dem Service Token 'github-store' - kein
+# zweiter Zugriffsweg auf die Datenbank. Der Store braucht keine Zugangsdaten.
+#
+# NUR schedule und workflow_dispatch, NIE pull_request oder
+# pull_request_target (dieselbe Bedingung wie fuer die Markt-Action): Das
+# Secret darf keinem fremden Code begegnen. test/store-action.spec.ts haelt das.
+#
+# Das Log ist oeffentlich - das Skript gibt nur Zahlen aus.
+
+on:
+  schedule:
+    # 20:47 UTC am Vorabend (Entscheidung des Nutzers vom 22.10.2026): GitHub
+    # verschiebt den Start um rund fuenf Stunden (7.3), und auch dann soll der
+    # Lauf vor 05:00 UTC fertig sein. Nicht zur vollen Stunde.
+    - cron: "47 20 * * *"
+    # 22:47 UTC: Rueckfall. Dank der Frist von 12 Stunden (STORE_FRIST_STUNDEN)
+    # prueft er nur, was der erste nicht geschafft hat; laufen beide zugleich,
+    # stellt die concurrency-Gruppe unten den zweiten an.
+    - cron: "47 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Zwei Laeufe zugleich fragten dieselben Releases doppelt. Anstellen.
+concurrency:
+  group: store
+  cancel-in-progress: false
+
+jobs:
+  store:
+    name: Store-Preise holen
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx esbuild scripts/store-action.ts --bundle --platform=node --format=esm --outfile=store-action.mjs --log-level=warning
+
+      - name: Lauf
+        env:
+          APP_URL: https://trophytracker.philipp-ermer-bvb.workers.dev
+          CF_ACCESS_CLIENT_ID: ${{ secrets.STORE_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.STORE_ACCESS_CLIENT_SECRET }}
+        run: node store-action.mjs

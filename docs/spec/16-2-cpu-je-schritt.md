@@ -87,7 +87,10 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   Standortfaktor aus dem Leerlauf (SEA rund 1,75 × IAD) macht aus 7 ms rund 12; der Rest ist eine
   **Vermutung** – eine kalte Instanz der Anwendung: Die erste Portion einer frischen Instanz kostete
   10–13 ms (ORD, SEA) statt 2–3, am 20.10. in IAD nur 4, und dort war auch die Lage billig.
-  Messworker und Wegwerf-D1 sind gelöscht.
+  Messworker und Wegwerf-D1 sind gelöscht. **Zurückgestellt** (Entscheidung vom 22.10.2026): eine
+  Verbesserung der Markt-Lage (etwa `json_group_array`), bis die Store-Lage gemessen ist – sie hat
+  79 statt 910 Zeilen; bleibt sie klar darunter, hängt es an den Zeilen. **Idee für danach, nicht
+  in 20j:** ein Vorwärm-Aufruf der Action vor dem Lage-Aufruf, um die Kaltstart-Vermutung zu prüfen.
 - **IGDB-Auffrischen** (Frist sieben Tage, 50 Spiele je Aufruf, 10.1 Schritt 12) – **erstmals gemessen
   in der Nacht zum 20.10.2026:** neun Aufrufe von 06:05 bis 06:45, **20–54 ms**, Median 34 (MIA 25–28,
   EWR 28, IAD 39, SJC 20, vier ohne Standort 34–54); acht mit Logzeile, darin 370 angefragt und 369

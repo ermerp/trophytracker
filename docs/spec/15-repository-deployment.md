@@ -31,7 +31,8 @@ Benötigte GitHub Secrets:
 **GitHub Secrets sind seit 20i auch für eBay ein Ort** (Entscheidung des Nutzers vom 19.10.2026),
 unter einer Bedingung: Die Action, die sie trägt, läuft **nur über `schedule` und
 `workflow_dispatch`, nie über `pull_request` oder `pull_request_target`** – sonst könnte Code aus
-einem fremden Pull Request sie lesen. `test/markt-action.spec.ts` liest den Workflow und hält es fest.
+einem fremden Pull Request sie lesen. `test/markt-action.spec.ts` und `test/store-action.spec.ts` lesen
+den Workflow und halten es fest; die Store-Action (`store.yml`, 20j) trägt nur ihr Service Token.
 
 Die drei ablaufenden Werte sind der wahrscheinlichste Grund, aus dem die Sicherung eines Tages unbemerkt ausbleibt. Genau dagegen steht die Altersanzeige aus 14.2.
 
@@ -111,45 +112,11 @@ Eine dokumentierte Einschränkung: Worker-Level-Access unterstützt keine WebSoc
 
 Folgen:
 
-- Es gibt ein eigenes Service Token `github-backup` an der Access-Richtlinie, getrennt von dem, mit dem die Produktion nach einem Deploy geprüft wird, seit 20i ein drittes, `github-markt`, für die Gebrauchtpreis-Action, und für 20j ein viertes, `github-store`, für die Store-Preis-Action (eingerichtet, die Action noch nicht gebaut). Getrennt, damit sich eines zurückziehen lässt, ohne die anderen zu treffen.
+- Es gibt ein eigenes Service Token `github-backup` an der Access-Richtlinie, getrennt von dem, mit dem die Produktion nach einem Deploy geprüft wird, seit 20i ein drittes, `github-markt`, für die Gebrauchtpreis-Action, und seit 20j ein viertes, `github-store`, für die Store-Preis-Action. Getrennt, damit sich eines zurückziehen lässt, ohne die anderen zu treffen.
 - Die Action sendet `CF-Access-Client-Id` und `CF-Access-Client-Secret` als Header.
-- **Der Worker trägt keine eigene Token-Prüfung.** `/api/export/*`, `/api/backup/*` und seit 20i `/api/sync/markt/{lage,ergebnisse,ausgang}` sind gewöhnliche Routen; Access steht davor.
+- **Der Worker trägt keine eigene Token-Prüfung.** `/api/export/*`, `/api/backup/*` seit 20i `/api/sync/markt/{lage,ergebnisse,ausgang}` und seit 20j `/api/sync/store/{lage,concepts,ergebnisse,ausgang}` sind gewöhnliche Routen; Access steht davor.
 - Ein abgelaufenes Service Token äussert sich als `302` auf die Login-Seite, nicht als `401`. Die Action prüft deshalb zusätzlich den Inhalt der Antwort, nicht nur den Status – eine HTML-Loginseite ist kein JSON.
 
 **Falls Access nicht eingerichtet wird**, bleibt das Bearer-Token die Mindestanforderung – aber dann gehört ein Hinweis in die README, dass die Anwendung öffentlich erreichbar ist und ihre Sicherheit an einem einzigen Geheimnis hängt.
 
-### 15.4 Kostenmodell und Schutz vor ungewollten Kosten
-
-Alle genutzten Dienste liegen im Free-Tier. Entscheidend ist, **wie** Cloudflare
-mit dem Überschreiten umgeht: Die Free-Pläne rechnen nicht in eine Überziehung
-hinein, sondern blocken hart.
-
-| Dienst | Free-Grenze | Bei Überschreitung |
-|---|---|---|
-| Workers | 100.000 Anfragen/Tag | Fehler 1027 bzw. 429, keine Abrechnung |
-| Workers (Fremdanfragen) | 50 je Aufruf | weitere `fetch` schlagen fehl – gegen die Dokumentation geprüft am 01.10.2026 |
-| Workers Static Assets | im Workers-Kontingent | 429 statt Auslieferung |
-| D1 | 5 GB, 5 Mio. gelesene / 100.000 geschriebene Zeilen pro Tag | Abfragen schlagen fehl, keine Abrechnung |
-| Zero Trust Access | 50 Sitze | Weitere Nutzer werden abgewiesen |
-
-Der Wechsel in einen Bezahlmodus ist damit immer eine **ausdrückliche Handlung**
-(Upgrade-Klick), kein Nebeneffekt von Nutzung. Für eine Single-User-Anwendung
-sind die Grenzen ohnehin um Größenordnungen entfernt: ein Sitz von 50, und ein
-Trophäen-Sync erzeugt einige hundert Anfragen, nicht hunderttausend. Die 72 Cron-Aufrufe je
-Nacht (10.1, zwei Einträge von fünf erlaubten) zählen als Anfragen. **Gemessen am 01.10.2026:
-116 040 gelesene und 799 geschriebene Zeilen in 24 Stunden**; die Rechnung aus den Einzelkosten und
-die jüngsten 24-Stunden-Messungen stehen in 10.1 („Die Lesekosten sinken mit der Aufteilung"). **Die CPU-Grenze je Aufruf dagegen hält kein Cron-Schritt ein** (10.1, „Was ein
-Aufruf wirklich an CPU kostet"). Von den beiden Grenzen ist die **Schreibgrenze** die
-engere, sobald eine Stufe den Bestand einmal durchschreibt: Stufe 19b käme mit 18 355 Trophäen
-auf rund 37 000 Schreibungen (7.7).
-
-Nicht abgedeckt von dieser Zusicherung sind Dienste, die es gar keinen Free-Tier
-gibt – wer später etwa Workers Paid für Cron-Häufigkeiten oder R2 hinzunimmt,
-trifft diese Entscheidung bewusst. Für den in Abschnitt 2 beschriebenen Stack
-ist das nicht nötig.
-
-### 15.5 Was das Teilen wert ist
-
-Das Repo ist ohne deine Daten vollständig nachvollziehbar: Schema, Migrations, Matching-Logik und die Anbindungen sind der interessante Teil, die Sammlung ist es nicht. Wer das Projekt nachbauen will, legt eine eigene D1-Datenbank an und trägt sein eigenes NPSSO ein.
-
-Sinnvoll für die README: Setup-Anleitung, Liste der benötigten Secrets, der Wiederherstellungsablauf aus 14.3 und ein ausdrücklicher Hinweis darauf, dass die PSN-Anbindung inoffiziell ist.
+Kosten und Teilen stehen in [15-4-kosten-und-teilen.md](15-4-kosten-und-teilen.md).

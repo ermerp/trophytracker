@@ -14,6 +14,7 @@ import { fakeFetch, jsonAntwort } from "./psn-fake";
 import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt } from "../src/sync/besitz";
 import { storeOhne } from "./store-fake";
 import { MARKT_JE_POST } from "../src/sync/markt";
+import { STORE_JE_POST } from "../src/sync/store";
 
 /** Das UTC-Datum, mit dem die Staende als "heute" gelten. */
 const HEUTE_UTC = new Date().toISOString().slice(0, 10);
@@ -1097,6 +1098,84 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("DELETE FROM digital_entitlement"),
 			env.DB.prepare("DELETE FROM price_snapshot"),
 			env.DB.prepare("UPDATE release SET store_geprueft_am = NULL, psn_product_id = NULL"),
+		]);
+	});
+
+	it("misst die Routen der Store-Action als Route, mit Arbeit und im Leerlauf (Stufe 20j)", async () => {
+		// Die Lage holt die Action zweimal je Abend (Lauf und Rueckfall), den
+		// Ausgang ebenso; die Schreibroute laeuft je Portion - bei 79 Faelligen
+		// acht Mal. Der Rueckfall findet nichts: Er ist der Leerlauf.
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("DELETE FROM digital_entitlement"),
+			env.DB.prepare("UPDATE release SET store_geprueft_am = NULL, psn_product_id = NULL"),
+		]);
+		const wunsch = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin, status) VALUES ('wunsch', ?, 'manuell', 'offen')");
+		const gekauft = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source, herkunft) VALUES (?, 'kauf', 'psn')");
+		await env.DB.batch([
+			...Array.from({ length: 90 }, (_, i) => wunsch.bind(i + 1)),
+			...Array.from({ length: 20 }, (_, i) => gekauft.bind(i + 1)),
+		]);
+		const app = createApp(
+			() => erstellePsnClient(fakeFetch([]).fetch),
+			() => fakeIgdb([[]], { zugang: null }).client,
+		);
+		const route = async (pfad: string, koerper?: unknown) => {
+			const zaehler = zaehlendeDb(env.DB);
+			const antwort = await app.request(
+				pfad,
+				koerper === undefined
+					? undefined
+					: { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(koerper) },
+				{ ...env, DB: zaehler.db },
+			);
+			return { antwort: (await antwort.json()) as Record<string, unknown>, aufrufe: zaehler.aufrufe(), anweisungen: zaehler.anweisungen(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
+		};
+		const zahlen = { geprueft: STORE_JE_POST, mitPreis: STORE_JE_POST, imAngebot: 0, imPlusKatalog: 0, zugeordnet: STORE_JE_POST, ohneTreffer: 0 };
+
+		const lage = await route("/api/sync/store/lage");
+		const ziele = lage.antwort.ziele as Array<{ releaseId: number }>;
+		const portion = await route("/api/sync/store/ergebnisse", {
+			ergebnisse: ziele.slice(0, STORE_JE_POST).map((z) => ({
+				releaseId: z.releaseId,
+				preis: { produktId: "EP9000-CUSA13323_00-GHOSTSHIP0000000", produktName: "Spiel", preisCents: 1999, grundpreisCents: 1999, waehrung: "EUR", istSale: false, imPlusKatalog: false },
+			})),
+		});
+		const ausgang = await route("/api/sync/store/ausgang", { art: "ende", ...zahlen });
+
+		// Der Rueckfall: alles ist gestempelt, nichts faellig.
+		await env.DB.prepare("UPDATE release SET store_geprueft_am = datetime('now')").run();
+		const lageLeer = await route("/api/sync/store/lage");
+		const ausgangLeer = await route("/api/sync/store/ausgang", { art: "ende", ...zahlen, geprueft: 0, mitPreis: 0, zugeordnet: 0 });
+		const ohne = (r: Awaited<ReturnType<typeof route>>) => ({ ...r, antwort: undefined });
+		console.info({
+			storeLage: { ...ohne(lage), ziele: ziele.length },
+			storePortion: ohne(portion),
+			storeAusgang: ohne(ausgang),
+			storeLageLeer: ohne(lageLeer),
+			storeAusgangLeer: ohne(ausgangLeer),
+		});
+
+		expect(ziele.length).toBe(70);
+		expect(lage.aufrufe).toBe(1);
+		expect(lage.anweisungen).toBe(1);
+		expect(lage.gelesen).toBeLessThan(1_000);
+		expect(portion.antwort).toMatchObject({ geprueft: STORE_JE_POST });
+		expect(portion.aufrufe).toBe(2);
+		expect(portion.anweisungen).toBeLessThanOrEqual(50);
+		expect(portion.gelesen).toBeLessThan(500);
+		expect(ausgang.gelesen).toBeLessThan(1_000);
+		expect((lageLeer.antwort.ziele as unknown[]).length).toBe(0);
+		expect(lageLeer.gelesen).toBeLessThan(500);
+		expect(ausgangLeer.gelesen).toBeLessThan(1_000);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("DELETE FROM digital_entitlement"),
+			env.DB.prepare("DELETE FROM price_snapshot"),
+			env.DB.prepare("DELETE FROM game_event"),
+			env.DB.prepare("DELETE FROM app_setting WHERE key = 'cron_stand' OR key = 'cron_verlauf'"),
+			env.DB.prepare("UPDATE release SET store_geprueft_am = NULL, psn_product_id = NULL, store_price_cents = NULL, store_base_price_cents = NULL, store_befund = NULL, store_produkt_name = NULL"),
 		]);
 	});
 

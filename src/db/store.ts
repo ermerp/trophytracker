@@ -23,13 +23,45 @@ import type { EventRepository } from "./events";
  * Taeglich, wie der Gebrauchtpreis seit 20e - und hier mit mehr Grund:
  * Store-Angebote laufen ab. Gemessen am 02.10.2026 standen 18 von 57 Titeln
  * gerade im Angebot, und ein Rabatt, den man zwei Tage spaeter erfaehrt, ist
- * keiner. Zwanzig Stunden statt eines Tages seit Stufe 20i, aus demselben
- * Grund wie damals beim Markt (der seit 20i-b zwoelf hat, weil GitHub seinen
- * Start verschiebt - der Cron hier ist puenktlich): In der Nacht zum 19.10.2026
+ * keiner. Zwoelf Stunden seit Stufe 20j, wie der Markt seit 20i-b: Der
+ * Store laeuft seitdem als GitHub Action, und GitHub verschiebt den Start um
+ * rund fuenf Stunden (7.3). Mit zwoelf ist nach jedem Lauf des Vortags alles
+ * faellig, und der Rueckfall zwei Stunden nach einem puenktlichen Lauf findet
+ * nichts. Vorher zwanzig (20i) und ein Tag: In der Nacht zum 19.10.2026
  * pruefte der Store um 04:10 neun Releases und lief erst ab 05:30 weiter -
  * zur Uhrzeit, zu der er am Vortag geprueft hatte.
  */
-export const STORE_FRIST_STUNDEN = 20;
+export const STORE_FRIST_STUNDEN = 12;
+
+/**
+ * Releases je Lage fuer die Action (Stufe 20j): alle faelligen, nicht eine
+ * Portion. Das Netz gegen einen ausufernden Bestand, nicht die Erwartung
+ * (79 am 22.10.2026) - wie `LAGE_HOECHSTENS` beim Markt.
+ */
+export const STORE_LAGE_HOECHSTENS = 2000;
+
+/**
+ * Welche Releases JETZT gefragt werden - die eine Bedingung fuer Auswahl und
+ * Zaehlung, wie `FAELLIG_IN_AUSWAHL` beim Markt. Begruendung der Form an
+ * `zuPruefen`. Die CTE steht vorn, Spalten und Reihenfolge setzt der Aufrufer.
+ */
+const ZIELE_CTE =
+	"WITH ziele(id) AS (SELECT pe.release_id FROM plan_entry pe WHERE pe.status = 'offen' AND pe.release_id IS NOT NULL " +
+	"UNION SELECT id FROM release WHERE physical_release_status = 'nein') ";
+const FAELLIG_VON =
+	"FROM ziele z JOIN release r ON r.id = z.id JOIN game g ON g.id = r.game_id " +
+	`WHERE (r.store_geprueft_am IS NULL OR r.store_geprueft_am < datetime('now', '-${STORE_FRIST_STUNDEN} hours')) ` +
+	"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') ";
+
+/**
+ * Was die Action je Release zurueckmeldet (Stufe 20j): ein Preis oder ein
+ * Befund. `unlesbar` kommt nie an - es stempelt nicht, also gibt es nichts
+ * zu schreiben.
+ */
+export type Rueckbefund = Exclude<StoreBefund, "preis" | "unlesbar">;
+export type StoreRueckmeldung =
+	| { releaseId: number; preis: StoreErgebnis }
+	| { releaseId: number; befund: Rueckbefund; nurKatalog: boolean };
 
 /**
  * Nach so vielen Tagen wird IGDB erneut nach einer Concept-Id gefragt.
@@ -110,17 +142,63 @@ export class StoreRepository {
 	zuPruefenBaustein(limit: number): Baustein<ZuPruefen[]> {
 		const statement = this.db
 			.prepare(
-				"WITH ziele(id) AS (SELECT pe.release_id FROM plan_entry pe WHERE pe.status = 'offen' AND pe.release_id IS NOT NULL " +
-					"UNION SELECT id FROM release WHERE physical_release_status = 'nein') " +
+				ZIELE_CTE +
 					"SELECT r.id AS releaseId, r.game_id AS gameId, g.igdb_id AS igdbId, g.title AS titel, r.platform AS plattform, " +
 					"g.store_concept_id AS conceptId, g.store_concept_am AS conceptAm, r.psn_product_id AS produktId " +
-					"FROM ziele z JOIN release r ON r.id = z.id JOIN game g ON g.id = r.game_id " +
-					`WHERE (r.store_geprueft_am IS NULL OR r.store_geprueft_am < datetime('now', '-${STORE_FRIST_STUNDEN} hours')) ` +
-					"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') " +
+					FAELLIG_VON +
 					"ORDER BY r.store_geprueft_am, r.id LIMIT ?",
 			)
 			.bind(limit);
 		return eins(statement, (e) => zeilen<ZuPruefen>(e));
+	}
+
+	/**
+	 * Wie viele Releases JETZT faellig sind - dieselbe Bedingung wie die
+	 * Auswahl. Fuer den Ausgang der Action (Stufe 20j): Ein leerer Lauf, bei
+	 * dem nichts faellig ist, ist auf dem Stand und kein Befund.
+	 */
+	async faelligeAnzahl(): Promise<number> {
+		const z = await this.db.prepare(ZIELE_CTE + "SELECT COUNT(*) AS n " + FAELLIG_VON).first<{ n: number }>();
+		return z?.n ?? 0;
+	}
+
+	/**
+	 * Welche der Ids es als Release gibt - fuer die Schreibroute der Action,
+	 * die eine unbekannte Id uebergeht und zaehlt, statt sie anzulegen.
+	 * Hoechstens STORE_JE_POST Ids, weit unter 100 Binds.
+	 */
+	async vorhandene(releaseIds: readonly number[]): Promise<Set<number>> {
+		if (releaseIds.length === 0) return new Set();
+		const { results } = await this.db
+			.prepare(`SELECT id FROM release WHERE id IN (${releaseIds.map(() => "?").join(", ")})`)
+			.bind(...releaseIds)
+			.all<{ id: number }>();
+		return new Set(results.map((z) => z.id));
+	}
+
+	/**
+	 * Die Rueckmeldungen MEHRERER Releases in EINEM Batch (Stufe 20j) - fuer
+	 * die Portionen der Action. Je Release dieselben Anweisungen wie
+	 * `preisSchreiben` (drei: Protokoll, Preis mit Stempel, Verlauf) oder
+	 * `befundSchreiben` (eine), hintereinander.
+	 *
+	 * Scheitert eine Anweisung, scheitert der Batch ganz: Kein Release der
+	 * Portion bekommt Preis oder Stempel, alle bleiben faellig, und der
+	 * naechste Lauf fragt sie neu. Stillstehen kann nur diese Portion.
+	 */
+	async rueckmeldungenSchreiben(liste: readonly StoreRueckmeldung[]): Promise<Array<{ neuZugeordnet: boolean }>> {
+		const teile = liste.map((r) =>
+			"preis" in r ? this.preisAnweisungen(r.releaseId, r.preis) : [this.befundAnweisung(r.releaseId, r.befund, r.nurKatalog)],
+		);
+		if (teile.length === 0) return [];
+		const ergebnisse = await this.db.batch(teile.flat());
+		let pos = 0;
+		return teile.map((t, i) => {
+			const erstes = ergebnisse[pos];
+			pos += t.length;
+			// Nur aus dem Protokoll-Statement, nie als Summe ueber den Batch.
+			return { neuZugeordnet: "preis" in liste[i]! && (erstes?.meta.changes ?? 0) > 0 };
+		});
 	}
 
 	/** Welche Spiele der Portion noch keine Concept-Id haben oder eine alte Frage. */
@@ -171,6 +249,30 @@ export class StoreRepository {
 	 * einmal spuerbar, als sich der falsche Outcast-Preis nach der Korrektur
 	 * nicht erneuern liess.
 	 */
+	/**
+	 * Mehrere Releases per Id, ohne Frist und ohne Zuschnitt - fuer die
+	 * Concept-Route der Action (Stufe 20j), die selbst liest, wer eine
+	 * Concept-Id braucht, statt es dem Aufrufer zu glauben. Hoechstens
+	 * STORE_LAGE_HOECHSTENS Ids, in Stuecken zu 100 Binds.
+	 */
+	async einige(releaseIds: readonly number[]): Promise<ZuPruefen[]> {
+		const stuecke: number[][] = [];
+		for (let i = 0; i < releaseIds.length; i += 100) stuecke.push(releaseIds.slice(i, i + 100));
+		if (stuecke.length === 0) return [];
+		const ergebnisse = await this.db.batch(
+			stuecke.map((ids) =>
+				this.db
+					.prepare(
+						"SELECT r.id AS releaseId, r.game_id AS gameId, g.igdb_id AS igdbId, g.title AS titel, r.platform AS plattform, " +
+							"g.store_concept_id AS conceptId, g.store_concept_am AS conceptAm, r.psn_product_id AS produktId " +
+							`FROM release r JOIN game g ON g.id = r.game_id WHERE r.id IN (${ids.map(() => "?").join(", ")})`,
+					)
+					.bind(...ids),
+			),
+		);
+		return ergebnisse.flatMap((e) => e.results as ZuPruefen[]);
+	}
+
 	async eines(releaseId: number): Promise<ZuPruefen | null> {
 		return this.db
 			.prepare(
@@ -243,14 +345,23 @@ export class StoreRepository {
 	 * Gebrauchtpreisen in 20.
 	 */
 	async preisSchreiben(ziel: ZuPruefen, ergebnis: StoreErgebnis): Promise<{ neuZugeordnet: boolean }> {
-		const anweisungen: D1PreparedStatement[] = [
+		const anweisungen = this.preisAnweisungen(ziel.releaseId, ergebnis);
+		const ergebnisse = await this.db.batch(anweisungen);
+		// Nur aus dem Protokoll-Statement, nie als Summe ueber den Batch -
+		// sonst zaehlen Preis und Verlauf mit (der Fehler aus Stufe 16).
+		return { neuZugeordnet: (ergebnisse[0]?.meta.changes ?? 0) > 0 };
+	}
+
+	/** Die drei Anweisungen eines Preises - fuer `preisSchreiben` und die Portionen der Action. */
+	private preisAnweisungen(releaseId: number, ergebnis: StoreErgebnis): D1PreparedStatement[] {
+		return [
 			this.events.insertSelect(
 				"SELECT 'sync', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'release_geaendert', " +
 					"'psn_product_id', r.psn_product_id, ?, 'store' " +
 					"FROM release r JOIN game g ON g.id = r.game_id " +
 					"WHERE r.id = ? AND (r.psn_product_id IS NULL OR r.psn_product_id <> ?)",
 				ergebnis.produktId,
-				ziel.releaseId,
+				releaseId,
 				ergebnis.produktId,
 			),
 			this.db
@@ -266,14 +377,10 @@ export class StoreRepository {
 					ergebnis.grundpreisCents,
 					ergebnis.istSale ? 1 : 0,
 					ergebnis.imPlusKatalog ? 1 : 0,
-					ziel.releaseId,
+					releaseId,
 				),
-			this.verlaufSchreiben(ziel.releaseId, ergebnis),
+			this.verlaufSchreiben(releaseId, ergebnis),
 		];
-		const ergebnisse = await this.db.batch(anweisungen);
-		// Nur aus dem Protokoll-Statement, nie als Summe ueber den Batch -
-		// sonst zaehlen Preis und Verlauf mit (der Fehler aus Stufe 16).
-		return { neuZugeordnet: (ergebnisse[0]?.meta.changes ?? 0) > 0 };
 	}
 
 	/**
@@ -293,13 +400,17 @@ export class StoreRepository {
 	 */
 	async befundSchreiben(releaseId: number, befund: StoreBefund, imPlusKatalog = false): Promise<void> {
 		if (befund === "unlesbar") return;
-		await this.db
+		await this.befundAnweisung(releaseId, befund, imPlusKatalog).run();
+	}
+
+	/** Die eine Anweisung eines Befunds - fuer `befundSchreiben` und die Portionen der Action. */
+	private befundAnweisung(releaseId: number, befund: StoreBefund, imPlusKatalog: boolean): D1PreparedStatement {
+		return this.db
 			.prepare(
 				"UPDATE release SET store_price_cents = NULL, store_base_price_cents = NULL, store_is_sale = 0, " +
 					"store_plus = ?, store_befund = ?, store_geprueft_am = datetime('now') WHERE id = ?",
 			)
-			.bind(imPlusKatalog ? 1 : 0, befund, releaseId)
-			.run();
+			.bind(imPlusKatalog ? 1 : 0, befund, releaseId);
 	}
 
 	/**

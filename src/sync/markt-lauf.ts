@@ -49,7 +49,8 @@ export type MarktLaufErgebnis = MarktErgebnis & {
 	portionen: number;
 };
 
-async function json<T>(app: AppAufruf, pfad: string, koerper?: unknown): Promise<T> {
+/** Ein Aufruf der Anwendung mit JSON hin und zurueck - auch fuer die Store-Action (Stufe 20j). */
+export async function json<T>(app: AppAufruf, pfad: string, koerper?: unknown): Promise<T> {
 	const antwort = await app(
 		pfad,
 		koerper === undefined

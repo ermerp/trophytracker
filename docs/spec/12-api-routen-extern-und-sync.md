@@ -83,6 +83,21 @@ POST   /api/sync/store/:releaseId     EIN Release jetzt pruefen, ohne Frist (Stu
                                       Id, 400 wenn unlesbar. Speichert und holt den Preis im selben Aufruf
 GET    /api/sync/store/offen          { eintraege } – die Faelle, bei denen Nachpflege etwas bringt
                                       (`ohne_id`, ohne PS3 und Vita); fuer Glocke und Nachpflegeliste
+GET    /api/sync/store/lage           { ziele[] } – alle faelligen Releases fuer die Store-Action (Stufe 20j),
+                                      ein D1-Aufruf mit einer Abfrage, nichts sonst
+POST   /api/sync/store/concepts       Body: { releaseIds } – Concept-Ids aus IGDB fuer die, denen eine fehlt;
+                                      die Route liest selbst, wer eine braucht. { concepts: [{ gameId,
+                                      conceptId }] }, 503 ohne IGDB, 502 bei einem Ausfall (die Action
+                                      macht dann ohne weiter)
+POST   /api/sync/store/ergebnisse     Body: { ergebnisse: [{ releaseId, preis } | { releaseId, befund,
+                                      nurKatalog }] }, 1 bis STORE_JE_POST (10); ein Lese- und ein
+                                      Schreib-Batch. Produkt-Id, Preis und Befund streng geprueft (400),
+                                      unbekannte Id uebergangen und gezaehlt. { geprueft, mitPreis,
+                                      imAngebot, imPlusKatalog, zugeordnet, ohneTreffer, unbekannt }
+POST   /api/sync/store/ausgang        Body: { art: 'begonnen' } oder { art: 'ende', sechs Zahlen, fehler? }
+                                      – Beginn unter `store_begonnen`, Ausgang unter `store` mit
+                                      Verlaufszeile; `store_geprueft`, wenn geprueft > 0 oder ohne Meldung
+                                      nichts mehr faellig ist. Die Meldung ist ein Code, Fremdtext 400
 POST   /api/sync                      ein Schritt; ein neuer Lauf trägt started_by = 'nutzer'
 POST   /api/sync/besitz               eine Seite der Kaufliste, von Hand (Stufe 18e); überspringt die Sieben-Tage-Frist, nicht die Blätterung;
                                       Antwort wie der Cron-Schritt ({ status, geholt, kauf, plus, entfallen, erledigt, weiter, meldung }), 502 bei Fehler

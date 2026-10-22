@@ -43,6 +43,7 @@ async function ruhig() {
 				psn: { am: jetztUtc(1), getan: "store", meldung: false, offen: 0 },
 				wartung: { am: jetztUtc(1), getan: "nichts", meldung: false },
 				markt: { am: jetztUtc(1), getan: "markt", meldung: false, offen: 0 },
+				store: { am: jetztUtc(1), getan: "store", meldung: false, offen: 0 },
 			}),
 			new Date().toISOString(),
 		)

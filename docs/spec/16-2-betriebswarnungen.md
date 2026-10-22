@@ -21,23 +21,24 @@ Die CPU der Route wird nach dem Deploy an `workersInvocationsAdaptive` gemessen.
 
 | Regel | Stufe |
 |---|---|
-| Ein Bereich – PSN, Wartung, seit 20i die Markt-Action – seit über **26 h** ohne vermerkten Ausgang; fehlt der Stand ganz, eine Warnung | rot |
+| Ein Bereich – PSN, Wartung, seit 20i die Markt-Action – seit über **26 h** ohne vermerkten Ausgang, die Store-Action (20j) seit über **30 h** (Normalabstand 24 h plus größte beobachtete Verspätung 5 h 30, Entscheidung vom 22.10.2026 – ihr Rückfall liegt nur zwei Stunden nach dem Hauptlauf, 26 reichten nicht); fehlt der Stand ganz, eine Warnung | rot |
 | Zugang abgelaufen – **sofort**, unabhängig von der Zahl der Nächte; ein Sync, der daran scheitert, wird nicht zusätzlich gemeldet | rot |
 | Zugang endet in ≤ **3** / ≤ **14** Kalendertagen (Ortszeit) – das frühere von Sonys Ankündigung und „eingetragen + kürzeste gemessene Lebensdauer" (7.1) | rot / zur Kenntnis |
 | Nacht-Sync gescheitert, jünger als 24 h: **zwei aufeinanderfolgende UTC-Nächte** / eine | rot / zur Kenntnis |
 | Sicherung älter als acht Tage oder keine (14.2) | rot |
-| Kette ohne Ausgang, gemeldet in den letzten 24 h – und ein Lauf der Markt-Action, der seit über einer Stunde begonnen ist und keinen Ausgang hat (20i) | zur Kenntnis |
+| Kette ohne Ausgang, gemeldet in den letzten 24 h – und ein Lauf der Markt- oder Store-Action, der seit über einer Stunde begonnen ist und keinen Ausgang hat (20i, 20j) | zur Kenntnis |
 | Letzter Ausgang eines Bereichs mit Meldung, jünger als 24 h (außer dem schon gemeldeten Sync) | zur Kenntnis |
 | Kaufliste mit `fehlerAm` von heute oder gestern | zur Kenntnis |
 | Markt-Action: jüngster Ausgang ohne Meldung mit `geprueft = 0` **und** seit über **26 h** kein Lauf mit `geprueft > 0` (`markt_geprueft`, 20i-b) – ein einzelner leerer Lauf ist der normale Rückfall um 08:17; nach einem Tag müsste bei zwölf Stunden Frist alles fällig sein. Ein Ausgang ohne `geprueft` (vor 20i-b) schweigt | zur Kenntnis |
-| Schritt nach Fensterschluss nicht fertig (`offen > 0`), bei der Markt-Action nach ihrem Ausgang | zur Kenntnis, **scharf seit 20i** – bis dahin ruhte die Regel, weil die Wartung jede Nacht mit Rest schloss (`offen=18` am 18.10.) |
+| Store-Action (`store_leer`, 20j): dasselbe mit **30 h**; `store_geprueft` setzt **auch ein leerer Lauf ohne Meldung, nach dem nichts fällig ist** – das liest die Ausgangs-Route selbst. Sonst meldete die Warnung nach einem Probelauf am Nachmittag sicher: Er stempelt alles, beide Abendläufe finden nichts, der nächste prüfende kommt nach gut 33 h | zur Kenntnis |
+| Schritt nach Fensterschluss nicht fertig (`offen > 0`), bei Markt- und Store-Action nach ihrem Ausgang | zur Kenntnis, **scharf seit 20i** – bis dahin ruhte die Regel, weil die Wartung jede Nacht mit Rest schloss (`offen=18` am 18.10.) |
 
 **Das Zugangsende ist nicht Sonys Datum** (Entscheidung des Nutzers vom 18.10.2026, nachdem der Plan
 7.1 übersehen hatte): Sony kündigte rund 60 Tage an, der erste Zugang hielt 25. Für den Zugang vom
 29.09.2026 heißt das „hält vermutlich bis um den 24.10.", Sony nennt den 28.11. Die Einstellungen
 lesen dieselbe Rechnung. Zeiten und Daten im Satz stehen in Ortszeit (Europe/Berlin). **Kurze Fehler,
 die sich im nächsten Aufruf selbst beheben, zeigt 18m nicht:** `cron_stand` hält je Bereich nur den
-letzten Ausgang (Nachtrag 18m-b, unten) – mit der einen Ausnahme `markt_geprueft` aus 20i-b.
+letzten Ausgang (Nachtrag 18m-b, unten) – mit den Ausnahmen `markt_geprueft` aus 20i-b und `store_geprueft` aus 20j.
 
 **Darstellung, am Prototyp entschieden:** Rot steht als Block auf der Seite – er ersetzt den gelben
 Block – und oben in der Tafel; „zur Kenntnis" still, ohne eigenen Farbton, nur hinter der Glocke; die

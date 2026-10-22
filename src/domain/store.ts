@@ -389,8 +389,12 @@ export const OHNE_WEBSTORE: readonly Plattform[] = ["PS3", "PSVITA"];
  */
 export type StoreAdresse = { art: "produkt"; id: string } | { art: "concept"; id: string };
 
-/** Produkt-Ids sehen aus wie EP9000-CUSA13323_00-GHOSTSHIP0000000. */
-const PRODUKT_ID = /^[A-Z]{2}\d{4}-[A-Z]{4}\d{5}_\d{2}-[A-Za-z0-9_]{16}$/;
+/**
+ * Produkt-Ids sehen aus wie EP9000-CUSA13323_00-GHOSTSHIP0000000. Auch die
+ * Schreibroute der Store-Action prueft damit (Stufe 20j; alle 66 Ids der
+ * Produktion passten am 22.10.2026).
+ */
+export const PRODUKT_ID = /^[A-Z]{2}\d{4}-[A-Z]{4}\d{5}_\d{2}-[A-Za-z0-9_]{16}$/;
 
 export function storeAdresse(eingabe: string): StoreAdresse | null {
 	const text = eingabe.trim();
