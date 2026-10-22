@@ -91,6 +91,10 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   Verbesserung der Markt-Lage (etwa `json_group_array`), bis die Store-Lage gemessen ist – sie hat
   79 statt 910 Zeilen; bleibt sie klar darunter, hängt es an den Zeilen. **Idee für danach, nicht
   in 20j:** ein Vorwärm-Aufruf der Action vor dem Lage-Aufruf, um die Kaltstart-Vermutung zu prüfen.
+  **Store-Lage im Probelauf vom 22.10.2026:** 13 ms in IAD bei **79** Zeilen (ein D1-Aufruf, eine
+  Abfrage) – die Markt-Lage brauchte dort am 20.10. 7 ms bei 910. **An der Zeilenzahl liegt es also
+  nicht**; das stützt die Kaltstart-Vermutung, belegt ist sie nicht. Portionen der Store-Action: Median
+  2–3,5, höchstens 9 ms (die jeweils erste je Standort), Concept-Route 2 ms.
 - **IGDB-Auffrischen** (Frist sieben Tage, 50 Spiele je Aufruf, 10.1 Schritt 12) – **erstmals gemessen
   in der Nacht zum 20.10.2026:** neun Aufrufe von 06:05 bis 06:45, **20–54 ms**, Median 34 (MIA 25–28,
   EWR 28, IAD 39, SJC 20, vier ohne Standort 34–54); acht mit Logzeile, darin 370 angefragt und 369
