@@ -18,7 +18,7 @@ import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
 import type { AppEnv } from "../types";
 import { platinAus } from "./antwort";
-import { igdbAntwort, kritikAntwort, ohneZugang } from "./igdb";
+import { igdbAntwort, kritikAntwort, ohneZugang, spielerAntwort } from "./igdb";
 import { exemplarAntwort } from "./ownership";
 import { bewertungAntwort } from "./releases";
 
@@ -212,6 +212,7 @@ export const gameRoutes = new Hono<AppEnv>()
 				bild: z.cover_url ?? z.icon_url,
 				cover: z.cover_url !== null,
 				kritik: z.critic_score,
+				spieler: z.user_score,
 				zuletztGespielt: z.zuletzt_gespielt,
 				spielzeitSekunden: z.spielzeit_s,
 				releases: (releasesJeSpiel.get(z.id) ?? []).map(releaseAntwort),
@@ -442,6 +443,7 @@ export const gameRoutes = new Hono<AppEnv>()
 			igdbId: detail.spiel.igdb_id,
 			igdb: igdbAntwort(detail.spiel),
 			kritik: kritikAntwort(detail.spiel),
+			spieler: spielerAntwort(detail.spiel),
 			erscheinungsdatum: detail.spiel.release_date,
 			releaseStatus: detail.spiel.release_status,
 			plaene: plaene.map((p) => ({

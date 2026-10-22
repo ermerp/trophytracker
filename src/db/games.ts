@@ -63,12 +63,13 @@ export const JA_NEIN = ["ja", "nein"] as const;
 export const PLATIN_FILTER = ["ja", "nein", "nichtverfuegbar"] as const;
 export const DISC_FILTER = ["ja", "nein", "unbekannt"] as const;
 export type DiscFassung = (typeof DISC_FILTER)[number];
-export const SORTIERUNGEN = ["titel", "zuletzt", "spielzeit", "wertung", "release"] as const;
+export const SORTIERUNGEN = ["titel", "zuletzt", "spielzeit", "wertung", "kritik", "release"] as const;
 
 /**
  * Die natuerliche Richtung je Kriterium (Stufe 20e). Beim Titel ist das A-Z,
- * bei "zuletzt gespielt", der Spielzeit, der Kritikerwertung (beste zuerst)
- * und dem Erscheinungsdatum (neuestes zuerst, beide seit 20e-b) das
+ * bei "zuletzt gespielt", der Spielzeit, der Spielerwertung (`wertung`,
+ * seit 20k), der Kritikerwertung (`kritik`; bis 20k hiess sie `wertung`, beide
+ * beste zuerst) und dem Erscheinungsdatum (neuestes zuerst, seit 20e-b) das
  * Gegenteil - "aufsteigend" ist also nicht fuer jedes Kriterium das Erwartete.
  */
 export const SORTIER_NATUERLICH: Record<(typeof SORTIERUNGEN)[number], "auf" | "ab"> = {
@@ -76,6 +77,7 @@ export const SORTIER_NATUERLICH: Record<(typeof SORTIERUNGEN)[number], "auf" | "
 	zuletzt: "ab",
 	spielzeit: "ab",
 	wertung: "ab",
+	kritik: "ab",
 	release: "ab",
 };
 
@@ -115,6 +117,7 @@ export type SpielZeile = {
 	/** Trophaeensymbol als Rueckfall, wenn IGDB kein Cover liefert oder die Zuordnung fehlt. */
 	icon_url: string | null;
 	critic_score: number | null;
+	user_score: number | null;
 	zuletzt_gespielt: string | null;
 	/** Spielzeit ueber alle Releases in Sekunden; null heisst "unbekannt" (7.7). */
 	spielzeit_s: number | null;
@@ -156,6 +159,8 @@ export type SpielDetail = {
 		critic_score_count: number | null;
 		critic_source: string | null;
 		critic_updated_at: string | null;
+		user_score: number | null;
+		user_score_count: number | null;
 		created_at: string;
 	};
 	releases: Array<{
@@ -688,13 +693,14 @@ aeenliste haengt
 		// damit "ohne Wert" in BEIDEN Richtungen hinten steht. "Unbekannt" ist
 		// kein hoher Wert, sondern gar keiner (Abschnitt 5.2; PS3 und Vita
 		// liefern grundsaetzlich keine Spielzeit).
-		// Kritikerwertung und Erscheinungsdatum (seit 20e-b) stehen direkt in
-		// `game`, brauchen also keinen Unterselect wie die beiden davor.
+		// Spieler- und Kritikerwertung und Erscheinungsdatum (seit 20e-b und 20k)
+		// stehen direkt in `game`, brauchen also keinen Unterselect wie die beiden davor.
 		const umgekehrt = filter.richtung === "auf";
 		const nachWert: Partial<Record<SpieleFilter["sort"], string>> = {
 			zuletzt,
 			spielzeit,
-			wertung: "g.critic_score",
+			wertung: "g.user_score",
+			kritik: "g.critic_score",
 			release: "g.release_date",
 		};
 		const wert = nachWert[filter.sort];
@@ -706,7 +712,7 @@ aeenliste haengt
 			this.db.prepare(`SELECT COUNT(*) AS n ${woher}${sucheBedingung}`).bind(...werte),
 			this.db
 				.prepare(
-					`SELECT g.id, g.title, g.sort_title, g.cover_url, g.critic_score,
+					`SELECT g.id, g.title, g.sort_title, g.cover_url, g.critic_score, g.user_score,
 					        (SELECT t3.icon_url FROM trophy_progress t3 JOIN release r3 ON r3.id = t3.release_id
 					          WHERE r3.game_id = g.id AND t3.icon_url IS NOT NULL ORDER BY r3.platform DESC LIMIT 1) AS icon_url,
 					        ${zuletzt} AS zuletzt_gespielt,
@@ -745,7 +751,7 @@ aeenliste haengt
 			.prepare(
 				"SELECT id, title, sort_title, cover_url, igdb_id, igdb_slug, igdb_matched_at, igdb_matched_source, " +
 					"igdb_checked_at, igdb_declined_at, igdb_synced_at, release_date, release_status, " +
-					"critic_score, critic_score_count, critic_source, critic_updated_at, created_at, " +
+					"critic_score, critic_score_count, critic_source, critic_updated_at, user_score, user_score_count, created_at, " +
 					// Die Concept-Id haengt am SPIEL, nicht am Release (21f): Sie
 					// deckt alle Fassungen ab, und die Release-Abfrage joint `game`
 					// gar nicht.

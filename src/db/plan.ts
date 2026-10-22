@@ -34,6 +34,8 @@ export type KaufKandidatZeile = {
 	platform: string | null;
 	cover_url: string | null;
 	critic_score: number | null;
+	/** Spielerwertung (Stufe 20k) - per Join auf game, nicht aus der View. */
+	user_score: number | null;
 	is_favorite: number;
 	bester_gebrauchtpreis_cents: number | null;
 	/** Wer das Angebot stellt - 'rebuy', 'medimops' oder 'eBay' (Stufe 20). */
@@ -65,6 +67,8 @@ export type KandidatZeile = {
 	title: string;
 	cover_url: string | null;
 	critic_score: number | null;
+	/** Spielerwertung (Stufe 20k) - per Join auf game, nicht aus der View. */
+	user_score: number | null;
 	release_id: number;
 	platform: string;
 };
@@ -90,6 +94,7 @@ export type PlanZeile = {
 	platform: string | null;
 	cover_url: string | null;
 	critic_score: number | null;
+	user_score: number | null;
 	release_date: string | null;
 	release_status: string | null;
 	/** Eigene Bewertung am Release (4.2); null am Spiel, bei Freitext oder ohne Zeile. */
@@ -143,12 +148,28 @@ function wert(feld: keyof PlanFelder, felder: PlanFelder): unknown {
 	return felder[feld] ?? null;
 }
 
+/**
+ * Kandidaten der Kaufliste und des Backlogs; exportiert, damit
+ * test/lesekosten.spec.ts dieselbe Abfrage misst. Die Spielerwertung
+ * (Stufe 20k) kommt per Join auf game ueber den Primaerschluessel statt ueber
+ * die View - wie bei den Luecken seit 20e-b, ohne die Views neu anzulegen.
+ */
+export const KAUF_KANDIDATEN =
+	"SELECT k.quelle, k.plan_id, k.release_id, k.game_id, k.title, k.platform, k.cover_url, k.critic_score, " +
+	"g.user_score, k.is_favorite, k.bester_gebrauchtpreis_cents, k.gebrauchtpreis_anbieter, " +
+	"k.gebrauchtpreis_url, k.gebrauchtpreis_item_id, k.gebrauchtpreis_verworfen " +
+	"FROM v_kaufkandidaten k LEFT JOIN game g ON g.id = k.game_id ORDER BY k.quelle, k.title, k.platform";
+
+export const BACKLOG_KANDIDATEN =
+	"SELECT k.game_id, k.title, k.cover_url, k.critic_score, g.user_score, k.release_id, k.platform " +
+	"FROM v_backlog_kandidaten k JOIN game g ON g.id = k.game_id ORDER BY k.title, k.platform";
+
 /** Die Auswahl einer Listenzeile; exportiert, damit test/lesekosten.spec.ts dieselbe Abfrage misst. */
 export const PLAN_AUSWAHL =
 	"SELECT pe.id, pe.kind, pe.release_id, pe.game_id, pe.title_raw, pe.position, " +
 	"pe.is_favorite, pe.note, pe.origin, pe.status, pe.created_at, pe.resolved_at, " +
 	"COALESCE(g.title, pe.title_raw) AS titel, g.id AS spiel_id, r.platform, " +
-	"g.cover_url, g.critic_score, g.release_date, g.release_status, ps.status AS play_status, " +
+	"g.cover_url, g.critic_score, g.user_score, g.release_date, g.release_status, ps.status AS play_status, " +
 	// Alles Index-Lookups je Zeile (idx_plan_release, idx_plan_game, idx_physical_copy_release,
 	// idx_digital_release). Zwei getrennte Unterabfragen statt eines OR: Mit OR nimmt SQLite
 	// idx_plan_offen und liest alle Kaufeintraege je Zeile (gemessen in test/lesekosten.spec.ts).
@@ -474,12 +495,7 @@ export class PlanRepository {
 	/** Kandidaten fuer die Kaufliste aus v_kaufkandidaten (Migration 0018): Luecken zuerst, dann Wuensche. */
 	async kaufKandidaten(): Promise<KaufKandidatZeile[]> {
 		const { results } = await this.db
-			.prepare(
-				"SELECT quelle, plan_id, release_id, game_id, title, platform, cover_url, critic_score, is_favorite, " +
-					"bester_gebrauchtpreis_cents, gebrauchtpreis_anbieter, gebrauchtpreis_url, " +
-					"gebrauchtpreis_item_id, gebrauchtpreis_verworfen " +
-					"FROM v_kaufkandidaten ORDER BY quelle, title, platform",
-			)
+			.prepare(KAUF_KANDIDATEN)
 			.all<KaufKandidatZeile>();
 		return results;
 	}
@@ -497,10 +513,7 @@ export class PlanRepository {
 	/** Kandidaten fuer den Backlog aus v_backlog_kandidaten (Migration 0014). */
 	async backlogKandidaten(): Promise<KandidatZeile[]> {
 		const { results } = await this.db
-			.prepare(
-				"SELECT game_id, title, cover_url, critic_score, release_id, platform " +
-					"FROM v_backlog_kandidaten ORDER BY title, platform",
-			)
+			.prepare(BACKLOG_KANDIDATEN)
 			.all<KandidatZeile>();
 		return results;
 	}

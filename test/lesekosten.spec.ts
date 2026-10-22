@@ -1,5 +1,5 @@
 import { env, SELF } from "cloudflare:test";
-import { PLAN_AUSWAHL } from "../src/db/plan";
+import { BACKLOG_KANDIDATEN, KAUF_KANDIDATEN, PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
 import { CRON_PSN, CRON_WARTUNG, cronFenster } from "../src/sync/cron";
@@ -177,17 +177,19 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	it("misst die Sortierungen der Sammlung als Route (Stufe 20e-b)", async () => {
 		await env.DB.prepare(
 			"UPDATE game SET critic_score = CASE WHEN id % 10 = 0 THEN NULL ELSE 60 + id % 35 END, " +
+				"user_score = CASE WHEN id % 25 = 0 THEN NULL ELSE 55 + id % 40 END, " +
 				"release_date = CASE WHEN id % 12 = 0 THEN NULL ELSE printf('%04d-%02d-15', 2006 + id % 19, 1 + id % 12) END",
 		).run();
 		const gelesen: Record<string, number> = {};
-		for (const sort of ["titel", "zuletzt", "spielzeit", "wertung", "release"]) {
+		for (const sort of ["titel", "zuletzt", "spielzeit", "wertung", "kritik", "release"]) {
 			gelesen[sort] = await routeGelesen(`/api/games?limit=50&sort=${sort}`);
 		}
 		gelesen["release auf"] = await routeGelesen("/api/games?limit=50&sort=release&richtung=auf");
-		await env.DB.prepare("UPDATE game SET critic_score = NULL, release_date = NULL").run();
+		await env.DB.prepare("UPDATE game SET critic_score = NULL, user_score = NULL, release_date = NULL").run();
 		console.info({ sammlungSortierung: gelesen });
 
 		expect(gelesen.wertung).toBeLessThanOrEqual(gelesen.zuletzt!);
+		expect(gelesen.kritik).toBeLessThanOrEqual(gelesen.zuletzt!);
 		expect(gelesen.release).toBeLessThanOrEqual(gelesen.zuletzt!);
 		expect(gelesen.wertung).toBeLessThan(5_000);
 	});
@@ -706,9 +708,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		for (let i = 51; i <= 150; i++) anweisungen.push(backlog.bind(i));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 
-		const kandidaten = await zeilenGelesen(
-			"SELECT game_id, title, cover_url, critic_score, release_id, platform FROM v_backlog_kandidaten ORDER BY title, platform",
-		);
+		const kandidaten = await zeilenGelesen(BACKLOG_KANDIDATEN);
 		const todoListe = await zeilenGelesen(
 			`SELECT pe.id FROM plan_entry pe LEFT JOIN release r ON r.id = pe.release_id
 			 LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id)
@@ -1194,10 +1194,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		for (let i = 3; i <= 90; i += 3) anweisungen.push(kauf.bind(i));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 
-		const kandidaten = await zeilenGelesen(
-			"SELECT quelle, plan_id, release_id, game_id, title, platform, cover_url, critic_score, is_favorite, " +
-				"bester_gebrauchtpreis_cents FROM v_kaufkandidaten ORDER BY quelle, title, platform",
-		);
+		const kandidaten = await zeilenGelesen(KAUF_KANDIDATEN);
 		const kaufliste = await zeilenGelesen(
 			PLAN_AUSWAHL + "WHERE pe.kind = ? AND pe.status = ? ORDER BY pe.position IS NULL, pe.position, pe.id",
 			"kauf",

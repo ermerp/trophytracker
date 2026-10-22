@@ -343,7 +343,7 @@ function IKnopf({
 /**
  * Eine Karte der Absichtslisten – als Kachel oder als Zeile (Stufe 19).
  *
- * Cover, Titel, Plattform, Kritik und Jahr, Favoritenstern und die Knöpfe als
+ * Cover, Titel, Plattform, Wertung (die Spielerwertung, seit 20k) und Jahr, Favoritenstern und die Knöpfe als
  * Symbole. Bei To-Do und Backlog am Release stehen statt „erledigt" die
  * Bewertungen „durchgespielt" und „abgebrochen" (Kopplung, 5.5); nie
  * gestartete kennen stattdessen nur „nicht vorgesehen".
@@ -418,7 +418,7 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
       )}
       {e.art !== 'wunsch' && e.eigenerStatus && <ZustandsZeile status={e.eigenerStatus} klein />}
       <span className="ruhig klein">
-        {e.spielId === null ? 'ohne IGDB-Eintrag' : `Kritik ${e.kritik ?? 'unbekannt'}`}
+        {e.spielId === null ? 'ohne IGDB-Eintrag' : `Wertung ${e.spieler ?? 'unbekannt'}`}
         {e.releaseStatus === 'angekuendigt' && ` · erscheint ${e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'}`}
         {e.releaseStatus !== 'angekuendigt' && e.erscheinungsdatum && ` · ${e.erscheinungsdatum.slice(0, 4)}`}
         {e.art === 'kauf' && e.herkunft && ` · ${HERKUNFTTEXT[e.herkunft] ?? e.herkunft}`}

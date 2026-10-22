@@ -417,6 +417,18 @@ s(
 	"INSERT INTO psn_sync_run (started_at, finished_at, status, titles_seen, started_by) VALUES " +
 		`(datetime('now', '-6 hours'), datetime('now', '-5 hours'), 'erfolg', ${ANZAHL}, 'cron');`,
 );
+// Spieler- und Kritikerwertung (Stufe 20k), getrennt erfunden, damit die
+// beiden Sortierungen sichtbar verschieden ordnen. Jedes zehnte Spiel ohne
+// Spielerwertung, jedes siebte ohne Kritik - "unbekannt" muss im Bild
+// vorkommen. Das Spiel mit allem behaelt seine Kritik (86) und bekommt 79.
+s(
+	"UPDATE game SET user_score = CASE WHEN id % 10 = 0 THEN NULL ELSE 55 + (id * 13) % 40 END, " +
+		"user_score_count = CASE WHEN id % 10 = 0 THEN NULL ELSE 5 + (id * 37) % 900 END, " +
+		"critic_score = CASE WHEN id % 7 = 0 THEN NULL ELSE 60 + (id * 7) % 35 END, " +
+		"critic_score_count = CASE WHEN id % 7 = 0 THEN NULL ELSE 3 + id % 60 END, " +
+		`critic_source = CASE WHEN id % 7 = 0 THEN NULL ELSE 'igdb' END WHERE id <> ${R};`,
+);
+s(`UPDATE game SET user_score = 79, user_score_count = 312 WHERE id = ${R};`);
 s("PRAGMA foreign_keys = ON;");
 
 process.stdout.write(`${zeilen.join("\n")}\n`);

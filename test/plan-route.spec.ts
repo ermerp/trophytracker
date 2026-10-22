@@ -214,10 +214,11 @@ describe("PlanRepository", () => {
 });
 
 describe("GET /api/plans", () => {
-	it("verlangt kind, sortiert Favoriten zuerst und dann nach Wertung, ohne Wertung ans Ende", async () => {
-		await spiel(1, "Gut", [], { critic_score: 90, release_date: "2030-01-01" });
+	it("verlangt kind, sortiert Favoriten zuerst und dann nach Spielerwertung, ohne Wertung ans Ende", async () => {
+		// Spieler- und Kritikerwertung laufen gegeneinander, damit jede Sortierung zeigt, welche sie nimmt (20k).
+		await spiel(1, "Gut", [], { critic_score: 90, user_score: 70, release_date: "2030-01-01" });
 		await spiel(2, "Unbewertet", []);
-		await spiel(3, "Favorit", [], { critic_score: 60, release_date: "2015-05-05" });
+		await spiel(3, "Favorit", [], { critic_score: 60, user_score: 85, release_date: "2015-05-05" });
 		const r = repos().plan;
 		await r.anlegen("wunsch", { gameId: 1 }, "manuell");
 		await r.anlegen("wunsch", { gameId: 2 }, "manuell");
@@ -235,7 +236,8 @@ describe("GET /api/plans", () => {
 		expect(liste.eintraege[0]).not.toHaveProperty("rang");
 		expect(liste.eintraege[0]).not.toHaveProperty("prioritaet");
 
-		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=wertung"))).toEqual(["Gut", "Favorit", "Freitext", "Unbewertet"]);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=wertung"))).toEqual(["Favorit", "Gut", "Freitext", "Unbewertet"]);
+		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=kritik"))).toEqual(["Gut", "Favorit", "Freitext", "Unbewertet"]);
 		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=titel"))).toEqual(["Favorit", "Freitext", "Gut", "Unbewertet"]);
 		expect(titel(await hole(a, "/api/plans?kind=wunsch&sort=release"))).toEqual(["Gut", "Favorit", "Freitext", "Unbewertet"]);
 		expect((await hole(a, "/api/plans?kind=wunsch&favorit=1")).eintraege).toHaveLength(1);
@@ -578,7 +580,7 @@ describe("To-Do, Backlog und Kandidaten (Stufe 12)", () => {
 		expect(await hole(a, "/api/backlog-candidates")).toEqual({
 			anzahl: 1,
 			abgelehnt: 0,
-			kandidaten: [{ releaseId: ps4, spielId: 1, titel: "Bloodborne", plattform: "PS4", bild: "c.jpg", kritik: null }],
+			kandidaten: [{ releaseId: ps4, spielId: 1, titel: "Bloodborne", plattform: "PS4", bild: "c.jpg", kritik: null, spieler: null }],
 		});
 
 		const p = await sende(a, "POST", "/api/plans", { art: "backlog", releaseId: ps4, status: "verworfen" });
@@ -700,7 +702,7 @@ describe("Kaufliste (Stufe 15)", () => {
 	});
 
 	it("GET /api/purchase-candidates liefert Luecken und Wuensche mit Zaehlern; Angekuendigte fehlen", async () => {
-		const [ps4] = await spiel(1, "Persona 5", ["PS4"], { cover_url: "p5.jpg", critic_score: 93 });
+		const [ps4] = await spiel(1, "Persona 5", ["PS4"], { cover_url: "p5.jpg", critic_score: 93, user_score: 89 });
 		await env.DB.prepare("UPDATE release SET physical_release_status = 'ja' WHERE id = ?").bind(ps4).run();
 		await env.DB.prepare(
 			"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, progress_pct, synced_at, release_id) " +
@@ -718,8 +720,8 @@ describe("Kaufliste (Stufe 15)", () => {
 			luecken: 1,
 			wuensche: 1,
 			kandidaten: [
-				{ quelle: "luecke", planId: null, releaseId: ps4, spielId: 1, titel: "Persona 5", plattform: "PS4", bild: "p5.jpg", kritik: 93, favorit: false, besterGebrauchtpreisCents: null, gebrauchtpreisAnbieter: null, gebrauchtpreisUrl: null, gebrauchtpreisItemId: null, gebrauchtpreisVerworfen: 0 },
-				{ quelle: "wunsch", planId: w, releaseId: null, spielId: 3, titel: "Wunsch", plattform: null, bild: null, kritik: null, favorit: true, besterGebrauchtpreisCents: null, gebrauchtpreisAnbieter: null, gebrauchtpreisUrl: null, gebrauchtpreisItemId: null, gebrauchtpreisVerworfen: 0 },
+				{ quelle: "luecke", planId: null, releaseId: ps4, spielId: 1, titel: "Persona 5", plattform: "PS4", bild: "p5.jpg", kritik: 93, spieler: 89, favorit: false, besterGebrauchtpreisCents: null, gebrauchtpreisAnbieter: null, gebrauchtpreisUrl: null, gebrauchtpreisItemId: null, gebrauchtpreisVerworfen: 0 },
+				{ quelle: "wunsch", planId: w, releaseId: null, spielId: 3, titel: "Wunsch", plattform: null, bild: null, kritik: null, spieler: null, favorit: true, besterGebrauchtpreisCents: null, gebrauchtpreisAnbieter: null, gebrauchtpreisUrl: null, gebrauchtpreisItemId: null, gebrauchtpreisVerworfen: 0 },
 			],
 		});
 

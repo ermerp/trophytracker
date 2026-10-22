@@ -53,6 +53,7 @@ type Spiel = {
 	/** true: `bild` ist das IGDB-Cover (Hochformat), sonst das Trophäensymbol. */
 	cover: boolean
 	kritik: number | null
+	spieler: number | null
 	zuletztGespielt: string | null
 	releases: Release[]
 }
@@ -97,7 +98,8 @@ const SORTIERTEXT = {
 	titel: 'Titel',
 	zuletzt: 'zuletzt gespielt',
 	spielzeit: 'Spielzeit',
-	wertung: 'Kritikerwertung',
+	wertung: 'Spielerwertung',
+	kritik: 'Kritikerwertung',
 	release: 'Erscheinungsdatum',
 } as const
 type SammlungSortierung = keyof typeof SORTIERTEXT
@@ -112,6 +114,7 @@ const SAMMLUNG_NATUERLICH: Record<SammlungSortierung, Richtung> = {
 	zuletzt: 'ab',
 	spielzeit: 'ab',
 	wertung: 'ab',
+	kritik: 'ab',
 	release: 'ab',
 }
 

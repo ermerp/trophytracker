@@ -46,6 +46,8 @@ function lueckeAntwort(z: LueckeZeile) {
 		marktRohangebote: z.markt_rohangebote,
 		/** null heisst unbekannt - zum Sortieren (Stufe 20e-b). */
 		kritik: z.critic_score,
+		/** Spielerwertung (Stufe 20k); null heisst unbekannt. */
+		spieler: z.user_score,
 		erscheinungsdatum: z.release_date,
 		verworfen: z.verworfen === 1,
 		planId: z.plan_id,

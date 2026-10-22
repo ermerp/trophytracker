@@ -105,7 +105,7 @@ export function Kaufliste() {
         <div>
           {ziel ? <Link to={ziel} className="titel">{k.titel}</Link> : <span className="titel">{k.titel}</span>}
           <div className="ruhig klein">
-            {k.plattform ?? 'Plattform fehlt'} · Kritik {k.kritik ?? 'unbekannt'}
+            {k.plattform ?? 'Plattform fehlt'} · Wertung {k.spieler ?? 'unbekannt'}
             {k.quelle === 'luecke' && (
               <>
                 {' · '}Gebraucht{' '}

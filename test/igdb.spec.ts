@@ -32,6 +32,8 @@ function kandidat(ueberschreiben: Partial<IgdbKandidat> = {}): IgdbKandidat {
 		typId: 0,
 		criticScore: 91,
 		criticScoreCount: 18,
+		userScore: 85,
+		userScoreCount: 250,
 		versionParent: null,
 		parentGame: null,
 		...ueberschreiben,
@@ -51,6 +53,8 @@ describe("normalisiereTreffer", () => {
 			typId: 0,
 			criticScore: 91,
 			criticScoreCount: 18,
+			userScore: 85,
+			userScoreCount: 250,
 			versionParent: null,
 			parentGame: null,
 		});
@@ -65,6 +69,8 @@ describe("normalisiereTreffer", () => {
 			typ: null,
 			criticScore: null,
 			criticScoreCount: null,
+			userScore: null,
+			userScoreCount: null,
 		});
 	});
 
@@ -95,6 +101,14 @@ describe("normalisiereTreffer", () => {
 
 	it("rundet die Kritikerwertung", () => {
 		expect(normalisiereTreffer(spielRoh({ aggregated_rating: 87.5 }))?.criticScore).toBe(88);
+	});
+
+	it("nimmt die Spielerwertung aus rating, getrennt von der Kritikerwertung (Stufe 20k)", () => {
+		expect(normalisiereTreffer(spielRoh({ rating: 71.4, rating_count: 3, aggregated_rating: undefined }))).toMatchObject({
+			userScore: 71,
+			userScoreCount: 3,
+			criticScore: null,
+		});
 	});
 });
 
@@ -149,6 +163,8 @@ describe("releaseStatusAus", () => {
 			igdbId: 1,
 			releaseStatus: "angekuendigt",
 			criticScore: 91,
+			userScore: 85,
+			userScoreCount: 250,
 		});
 	});
 });

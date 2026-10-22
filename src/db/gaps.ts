@@ -6,7 +6,7 @@
  * Disc-Fassungen; die Ansicht trennt beides. `plan_id` ist der verworfene
  * Kaufeintrag fuer "Rueckgaengig" (DELETE /api/plans/:id) - ein
  * Index-Lookup je Zeile ueber idx_plan_release, kein Tabellenscan.
- * Kritikerwertung und Erscheinungsdatum kommen seit Stufe 20e-b ueber einen
+ * Wertungen und Erscheinungsdatum kommen seit Stufe 20e-b (Spielerwertung seit 20k) ueber einen
  * Join auf `game` je Zeile (Primaerschluessel) statt ueber die View - so
  * braucht das Sortieren keine Migration.
  */
@@ -43,6 +43,7 @@ export type LueckeZeile = {
 	markt_rohangebote: number | null;
 	/** Kritikerwertung und Erscheinungsdatum des Spiels - zum Sortieren der Liste (Stufe 20e-b). */
 	critic_score: number | null;
+	user_score: number | null;
 	release_date: string | null;
 };
 
@@ -57,7 +58,7 @@ export class GapsRepository {
 				        l.eigener_status, l.verworfen, l.bester_gebrauchtpreis_cents,
 				        l.gebrauchtpreis_anbieter, l.gebrauchtpreis_url, l.gebrauchtpreis_item_id,
 				        l.gebrauchtpreis_verworfen, l.markt_geprueft_am, l.markt_rohangebote,
-				        g.critic_score, g.release_date,
+				        g.critic_score, g.user_score, g.release_date,
 				        (SELECT pe.id FROM plan_entry pe WHERE pe.release_id = l.release_id
 				           AND pe.kind = 'kauf' AND pe.status = 'verworfen' ORDER BY pe.id LIMIT 1) AS plan_id
 				 FROM v_luecken l

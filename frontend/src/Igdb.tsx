@@ -140,7 +140,7 @@ export function Igdb() {
     <section>
       <h2>IGDB</h2>
       <p className="zeile">
-        Cover, Kritikerwertung und Erscheinungsdatum kommen von IGDB. Automatisch verknüpft wird
+        Cover, Spieler- und Kritikerwertung und Erscheinungsdatum kommen von IGDB. Automatisch verknüpft wird
         nur ein eindeutiger Treffer; alles andere wartet in der{' '}
         <Link to="/igdb">IGDB-Zuordnung</Link>.
       </p>

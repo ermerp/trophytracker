@@ -21,6 +21,8 @@ export function spielRoh(ueberschreiben: Partial<IgdbSpielRoh> = {}): IgdbSpielR
 		first_release_date: 1427155200, // 2015-03-24
 		aggregated_rating: 91.11,
 		aggregated_rating_count: 18,
+		rating: 84.6,
+		rating_count: 250,
 		platforms: [48],
 		game_type: 0,
 		...ueberschreiben,

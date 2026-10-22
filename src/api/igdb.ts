@@ -28,6 +28,7 @@ function kandidatAntwort(k: IgdbKandidat) {
 		plattformen: k.plattformen,
 		typ: k.typ,
 		kritik: k.criticScore === null ? null : { wert: k.criticScore, anzahl: k.criticScoreCount },
+		spieler: k.userScore === null ? null : { wert: k.userScore, anzahl: k.userScoreCount },
 	};
 }
 
@@ -41,6 +42,7 @@ function kandidatZeileAntwort(z: KandidatZeile) {
 		plattformen: z.platforms ? z.platforms.split(",") : [],
 		typ: z.game_type,
 		kritik: z.critic_score === null ? null : { wert: z.critic_score, anzahl: z.critic_score_count },
+		spieler: z.user_score === null ? null : { wert: z.user_score, anzahl: z.user_score_count },
 	};
 }
 
@@ -66,6 +68,12 @@ export function kritikAntwort(spiel: SpielDetail["spiel"]) {
 		quelle: spiel.critic_source,
 		standVom: spiel.critic_updated_at,
 	};
+}
+
+/** Spielerwertung (IGDB-Nutzer, Stufe 20k) - oder null, nie 0. */
+export function spielerAntwort(spiel: SpielDetail["spiel"]) {
+	if (spiel.user_score === null) return null;
+	return { wert: spiel.user_score, anzahl: spiel.user_score_count };
 }
 
 export function ohneZugang(c: { json: (o: unknown, s: 503) => Response }) {

@@ -319,6 +319,25 @@ describe("IgdbRepository: Entscheidungen des Nutzers", () => {
 		expect((await zeile(2))?.cover_url).toContain("/neu.jpg");
 	});
 
+	it("schreibt die Spielerwertung beim Verknuepfen und Auffrischen immer, auch neben manueller Kritik, und leert sie beim Loesen (20k)", async () => {
+		await spiel(1, "Bloodborne", "bloodborne", ["PS4"]);
+		await env.DB.prepare("UPDATE game SET critic_score = 77, critic_source = 'manuell' WHERE id = 1").run();
+		const r = repos();
+		await igdbAbgleichSchritt(r, fakeIgdb([[spielRoh()]]).client);
+		expect(await zeile(1)).toMatchObject({ user_score: 85, user_score_count: 250, critic_score: 77 });
+
+		await igdbAuffrischSchritt(r, fakeIgdb([[spielRoh({ rating: 62.2, rating_count: 300 })]]).client);
+		expect(await zeile(1)).toMatchObject({ user_score: 62, user_score_count: 300, critic_score: 77 });
+
+		// IGDB nennt keine mehr: unbekannt, nicht der alte Wert.
+		await igdbAuffrischSchritt(r, fakeIgdb([[spielRoh({ rating: undefined, rating_count: undefined })]]).client);
+		expect(await zeile(1)).toMatchObject({ user_score: null, user_score_count: null });
+
+		await igdbAuffrischSchritt(r, fakeIgdb([[spielRoh()]]).client);
+		await r.igdb.verknuepfungLoesen(1);
+		expect(await zeile(1)).toMatchObject({ user_score: null, user_score_count: null, critic_score: 77 });
+	});
+
 	it("verknuepfen uebernimmt den IGDB-Namen nur bei Spielen ohne Trophaeenliste, auffrischen nie", async () => {
 		await spiel(1, "Baldurs Gate 3", "baldurs gate 3", ["PS5"]);
 		await spiel(2, "Ragnarok", "ragnarok", ["PS5"]);
@@ -327,7 +346,7 @@ describe("IgdbRepository: Entscheidungen des Nutzers", () => {
 				"VALUES ('NPWR2', 'trophy', 'Ragnarok', 'PS5', '2026-01-01', (SELECT id FROM release WHERE game_id = 2))",
 		).run();
 		const r = repos();
-		const meta = (name: string) => ({ igdbId: 5, name, igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt" as const, criticScore: null, criticScoreCount: null });
+		const meta = (name: string) => ({ igdbId: 5, name, igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt" as const, criticScore: null, criticScoreCount: null, userScore: null, userScoreCount: null });
 
 		await r.igdb.verknuepfen(1, meta("Baldur's Gate 3™"), "manuell");
 		expect(await zeile(1)).toMatchObject({ title: "Baldur's Gate 3", sort_title: "baldurs gate 3" });
@@ -346,7 +365,7 @@ describe("IgdbRepository: Entscheidungen des Nutzers", () => {
 		await spiel(3, "Abgelehnt", "abgelehnt", ["PS4"]);
 		const r = repos();
 		await r.igdb.kandidatenSetzen(1, []);
-		await r.igdb.verknuepfen(2, { igdbId: 5, name: "Fuenf", igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt", criticScore: null, criticScoreCount: null }, "manuell");
+		await r.igdb.verknuepfen(2, { igdbId: 5, name: "Fuenf", igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt", criticScore: null, criticScoreCount: null, userScore: null, userScoreCount: null }, "manuell");
 		await r.igdb.ablehnen(3);
 
 		await r.games.umbenennen(1, "Neu");
@@ -391,6 +410,7 @@ describe("Routen", () => {
 				plattformen: ["PS4"],
 				typ: "Hauptspiel",
 				kritik: { wert: 91, anzahl: 18 },
+				spieler: { wert: 85, anzahl: 250 },
 			},
 		]);
 		expect((await json(await a.request("/api/igdb/search?q=", {}, env))).body).toEqual({ treffer: [], weg: "keiner" });
@@ -414,7 +434,7 @@ describe("Routen", () => {
 		expect(offen.body.gesamt).toBe(1);
 		expect(offen.body.spiele[0]).toMatchObject({ id: 1, titel: "MediEvil", plattformen: ["PS4"] });
 		expect(offen.body.spiele[0].kandidaten.map((k: any) => k.igdbId)).toEqual([1, 2]);
-		expect(offen.body.spiele[0].kandidaten[0]).toMatchObject({ typ: "Remake", kritik: { wert: 91, anzahl: 18 } });
+		expect(offen.body.spiele[0].kandidaten[0]).toMatchObject({ typ: "Remake", kritik: { wert: 91, anzahl: 18 }, spieler: { wert: 85, anzahl: 250 } });
 
 		const link = await json(
 			await a.request("/api/unmatched/spiel/1/link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ igdbId: 2 }) }, env),
@@ -462,9 +482,9 @@ describe("Routen", () => {
 		await spiel(2, "Abgelehnt", "abgelehnt", ["PS4"]);
 		await spiel(3, "Verknuepft", "verknuepft", ["PS4"]);
 		const r = repos();
-		await r.igdb.kandidatenSetzen(1, [{ igdbId: 9, name: "X", slug: null, coverUrl: null, releaseDate: null, plattformen: [], typ: null, typId: null, criticScore: null, criticScoreCount: null, versionParent: null, parentGame: null }]);
+		await r.igdb.kandidatenSetzen(1, [{ igdbId: 9, name: "X", slug: null, coverUrl: null, releaseDate: null, plattformen: [], typ: null, typId: null, criticScore: null, criticScoreCount: null, userScore: null, userScoreCount: null, versionParent: null, parentGame: null }]);
 		await r.igdb.ablehnen(2);
-		await r.igdb.verknuepfen(3, { igdbId: 5, name: "Fuenf", igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt", criticScore: null, criticScoreCount: null }, "manuell");
+		await r.igdb.verknuepfen(3, { igdbId: 5, name: "Fuenf", igdbSlug: null, coverUrl: null, releaseDate: null, releaseStatus: "unbekannt", criticScore: null, criticScoreCount: null, userScore: null, userScoreCount: null }, "manuell");
 
 		const a = app(fakeIgdb([[]]).client);
 		expect((await json(await a.request("/api/igdb/erneut-suchen", { method: "POST" }, env))).body).toEqual({ zurueckgesetzt: 1 });

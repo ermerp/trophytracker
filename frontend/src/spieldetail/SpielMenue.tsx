@@ -41,10 +41,17 @@ export function SpielMenue({
               {spiel.igdb.verknuepftAm && ` · ${zeitpunkt(spiel.igdb.verknuepftAm)}`}
             </span>
           </p>
+          {spiel.spieler && (
+            <p className="menuezeile">
+              <span className="still">
+                Spieler {spiel.spieler.wert} von 100 · {spiel.spieler.anzahl ?? '?'} Stimmen
+              </span>
+            </p>
+          )}
           {spiel.kritik && (
             <p className="menuezeile">
               <span className="still">
-                {spiel.kritik.wert} von 100 · {spiel.kritik.anzahl ?? '?'} Wertungen ·{' '}
+                Kritiker {spiel.kritik.wert} von 100 · {spiel.kritik.anzahl ?? '?'} Wertungen ·{' '}
                 {KRITIKQUELLE[spiel.kritik.quelle ?? ''] ?? 'Quelle unbekannt'}
               </span>
             </p>

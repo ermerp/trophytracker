@@ -67,7 +67,7 @@ export const HAUPTSPIEL_ARTIG = new Set<number>([0, 3, 4, 8, 9, 10, 11]);
 /** Die Felder, die der Client bei jeder Anfrage anfordert. */
 export const IGDB_FELDER =
 	"name,slug,cover.image_id,first_release_date,aggregated_rating,aggregated_rating_count," +
-	"platforms,game_type,parent_game,version_parent";
+	"rating,rating_count,platforms,game_type,parent_game,version_parent";
 
 /** Rohform eines Spiels, wie IGDB sie mit IGDB_FELDER liefert. */
 export type IgdbSpielRoh = {
@@ -78,6 +78,9 @@ export type IgdbSpielRoh = {
 	first_release_date?: number;
 	aggregated_rating?: number;
 	aggregated_rating_count?: number;
+	/** Wertung der IGDB-Nutzer - in der Oberflaeche die Spielerwertung (Stufe 20k). */
+	rating?: number;
+	rating_count?: number;
 	platforms?: number[];
 	game_type?: number;
 	parent_game?: number;
@@ -96,6 +99,8 @@ export type IgdbKandidat = {
 	typId: number | null;
 	criticScore: number | null;
 	criticScoreCount: number | null;
+	userScore: number | null;
+	userScoreCount: number | null;
 	versionParent: number | null;
 	parentGame: number | null;
 };
@@ -150,6 +155,8 @@ export function normalisiereTreffer(roh: IgdbSpielRoh): IgdbKandidat | null {
 		criticScore: typeof roh.aggregated_rating === "number" ? Math.round(roh.aggregated_rating) : null,
 		criticScoreCount:
 			typeof roh.aggregated_rating_count === "number" ? roh.aggregated_rating_count : null,
+		userScore: typeof roh.rating === "number" ? Math.round(roh.rating) : null,
+		userScoreCount: typeof roh.rating_count === "number" ? roh.rating_count : null,
 		versionParent: roh.version_parent ?? null,
 		parentGame: roh.parent_game ?? null,
 	};
@@ -350,6 +357,8 @@ export type IgdbMetadaten = {
 	releaseStatus: ReleaseStatus;
 	criticScore: number | null;
 	criticScoreCount: number | null;
+	userScore: number | null;
+	userScoreCount: number | null;
 };
 
 export function metadatenAus(k: IgdbKandidat, heute: string): IgdbMetadaten {
@@ -362,6 +371,8 @@ export function metadatenAus(k: IgdbKandidat, heute: string): IgdbMetadaten {
 		releaseStatus: releaseStatusAus(k.releaseDate, heute),
 		criticScore: k.criticScore,
 		criticScoreCount: k.criticScoreCount,
+		userScore: k.userScore,
+		userScoreCount: k.userScoreCount,
 	};
 }
 

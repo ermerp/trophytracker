@@ -73,7 +73,7 @@ export function KandidatenListe({
                 {k.erscheinungsdatum ? k.erscheinungsdatum.slice(0, 4) : 'Datum unbekannt'}
                 {k.typ && ` · ${k.typ}`}
                 {k.plattformen.length > 0 && ` · ${k.plattformen.join(', ')}`}
-                {k.kritik && ` · Kritik ${k.kritik.wert}`}
+                {k.spieler && ` · Wertung ${k.spieler.wert}`}
               </span>
               {link && (
                 <a href={link} target="_blank" rel="noreferrer" className="zeile">
