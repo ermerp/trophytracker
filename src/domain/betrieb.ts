@@ -478,7 +478,7 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 	// Das Sicherheitsnetz (Rueckfrage des Nutzers vom 22.10.2026): Ob etwas
 	// faellig ist, sagt die Auswahl - ist sie kaputt und sagt immer "nichts",
 	// gaelte jeder leere Lauf als auf dem Stand. Der aelteste Stempel kommt aus
-	// einer eigenen Abfrage (`aeltesterZielStempel`) und schlaegt dann trotzdem an.
+	// einer eigenen Abfrage (`AELTESTER_STEMPEL`, src/db/store.ts) und schlaegt dann trotzdem an.
 	const aeltester = storeAusgang?.aeltester ? zeitAus(storeAusgang.aeltester) : null;
 	const aeltesterStunden = aeltester ? (f.jetzt.getTime() - aeltester.getTime()) / STUNDE_MS : 0;
 	if (storeAusgang && !storeAusgang.meldung && aeltester && aeltesterStunden > STORE_ZIEL_ALT_NACH_STUNDEN) {

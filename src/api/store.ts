@@ -178,6 +178,7 @@ export const storeRoutes = new Hono<AppEnv>()
 		}
 		const zahl = (k: (typeof felder)[number]) => koerper[k] as number;
 		const meldung = typeof fehler === "string" ? STORE_MELDUNG[fehler as keyof typeof STORE_MELDUNG] : undefined;
+		const lageNachher = await c.var.repos.store.ausgangLage();
 		const ergebnis: StoreActionErgebnis = {
 			status: meldung ? "fehler" : "erfolg",
 			geprueft: zahl("geprueft"),
@@ -186,14 +187,14 @@ export const storeRoutes = new Hono<AppEnv>()
 			imPlusKatalog: zahl("imPlusKatalog"),
 			zugeordnet: zahl("zugeordnet"),
 			ohneTreffer: zahl("ohneTreffer"),
-			nochOffen: await c.var.repos.store.faelligeAnzahl(),
+			nochOffen: lageNachher.faellig,
 			...(meldung ? { meldung } : {}),
 		};
 		const aufStand = ergebnis.geprueft > 0 || (!meldung && ergebnis.nochOffen === 0);
 		// Das Sicherheitsnetz, unabhaengig von der Auswahl: Seit wann ist das
 		// am laengsten ungepruefte Ziel auf dem Stand? Daran haengt `store_leer`
 		// auch dann, wenn die Auswahl selbst kaputt ist und "nichts faellig" sagt.
-		const aeltester = await c.var.repos.store.aeltesterZielStempel();
+		const { aeltester } = lageNachher;
 		const wert = {
 			am,
 			getan: "store",
