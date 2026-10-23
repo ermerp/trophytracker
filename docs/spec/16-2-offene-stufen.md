@@ -25,7 +25,10 @@ Wartungs-Leerlauf (rund 2 000 Zeilen je Aufruf, 23.10.2026) zu senken – er rü
 gegen die Zeilen entfällt vorerst → **veraltete Ansichten aufräumen** (Vorgabe des Nutzers vom
 21.10.2026): `/trophaeen`, die Rohliste von Sony aus Stufe 3, steht nur noch unter „Werkzeuge" und
 zeigt nichts, was Sammlung und Spieldetail nicht besser zeigen – entfernen, und dabei alle Ansichten
-darauf prüfen, ob es weitere solche gibt (13.1 nennt sie nicht alle) → **18m-b** → **neu bewerten: Nachtläufe
+darauf prüfen, ob es weitere solche gibt (13.1 nennt sie nicht alle). **Sie braucht keinen eigenen
+Nachtplatz und kann an jedem Tag parallel laufen** (geprüft am 23.10.2026): `/trophaeen` liest nur
+`GET /api/trophies` und damit `trophies.liste`, die sonst niemand ruft, auch kein Cron-Schritt. Das gilt
+für diese Ansicht; jede weitere, die dabei wegfallen soll, wird ebenso geprüft → **18m-b** → **neu bewerten: Nachtläufe
 bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster fast leer → **20g**.
 Gebaut sind 18k-b (Kaufliste gebündelt, CPU um den 25.10. messen), 20i (Markt als Action, erste
 volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; erste Nacht 21.10. wie gebaut; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
