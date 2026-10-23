@@ -14,17 +14,18 @@ unten ausdrücklich als offen.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 20.10.2026): **20j – Store in eine GitHub Action**
 nach dem Muster von 20i (gebaut am 22.10.2026, [7.4](07-4-store-preise.md); der Store-Schritt im Worker geht erst nach einem fehlerfreien Probelauf über `workflow_dispatch` und spätestens um 20:30 UTC desselben Tages vom Netz, sonst eine Nacht später; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) →
-am 23.10. **der Markt auf 20:17 / 22:17** mit neu berechneter Schwelle von `markt_geprueft`
-(Entscheidung vom 22.10.2026, eine Änderung je Nacht) → in einer eigenen Nacht der
-**Vorwärm-Versuch** für die Kaltstart-Vermutung (die Store-Lage brauchte 13 ms bei 79 Zeilen in IAD,
-an den Zeilen liegt es nicht; [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)); ein Markt-Lage-Schritt
-gegen die Zeilen entfällt damit vorerst →
-**veraltete Ansichten aufräumen** (Vorgabe des Nutzers vom 21.10.2026): `/trophaeen`, die
-Rohliste von Sony aus Stufe 3, steht nur noch unter „Werkzeuge" und zeigt nichts, was Sammlung
-und Spieldetail nicht besser zeigen – entfernen, und dabei alle Ansichten darauf prüfen, ob es
-weitere solche gibt (13.1 nennt sie nicht alle) → **Index-Nachtrag** für die
+**der Markt auf 20:17 / 22:17** mit Schwelle 30 h für `markt_geprueft` und Stillstand (Nachtrag
+**20i-c**, gebaut am 23.10.2026, erste Abende 23.10.; Entscheidung vom 22.10.2026, eine Änderung je Nacht) →
+**20k – Spielerwertung** erst am 24.10. nach der Nachtauswertung: Sie ändert das Auffrischen, das das
+Wartungsfenster jede Nacht ruft (`src/db/igdb.ts`; geprüft am 23.10.2026) → **Index-Nachtrag** für die
 Auswahlen des Lage-Batches, mit dem Bestand der Lesekosten-Messung und dem Ziel, den
-Wartungs-Leerlauf (rund 1 800 Zeilen je Aufruf) zu senken → **18m-b** → **neu bewerten: Nachtläufe
+Wartungs-Leerlauf (rund 2 000 Zeilen je Aufruf, 23.10.2026) zu senken – er rückt vor, weil der
+**Vorwärm-Versuch gestrichen** ist: „Ausgang begonnen" läuft schon vor jeder Lage
+([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md), Entscheidung vom 23.10.2026); ein Markt-Lage-Schritt
+gegen die Zeilen entfällt vorerst → **veraltete Ansichten aufräumen** (Vorgabe des Nutzers vom
+21.10.2026): `/trophaeen`, die Rohliste von Sony aus Stufe 3, steht nur noch unter „Werkzeuge" und
+zeigt nichts, was Sammlung und Spieldetail nicht besser zeigen – entfernen, und dabei alle Ansichten
+darauf prüfen, ob es weitere solche gibt (13.1 nennt sie nicht alle) → **18m-b** → **neu bewerten: Nachtläufe
 bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster fast leer → **20g**.
 Gebaut sind 18k-b (Kaufliste gebündelt, CPU um den 25.10. messen), 20i (Markt als Action, erste
 volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; erste Nacht 21.10. wie gebaut; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).

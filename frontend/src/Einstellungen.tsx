@@ -830,7 +830,7 @@ export function Einstellungen() {
         entscheidest weiter nur du.
       </p>
       <p className="zeile">
-        Die Preise holt jede Nacht um 02:17 UTC eine GitHub Action, alle fälligen Releases in einem Lauf.
+        Die Preise holt jeden Abend um 20:17 UTC eine GitHub Action, alle fälligen Releases in einem Lauf.
         Von Hand starten:{' '}
         <a href="https://github.com/ermerp/trophytracker/actions/workflows/markt.yml" target="_blank" rel="noreferrer noopener">
           Gebrauchtpreise in GitHub Actions

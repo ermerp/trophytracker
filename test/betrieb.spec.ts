@@ -84,6 +84,17 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 			expect(store("2026-10-19T04:48:00Z")).toEqual(["Die Store-Preis-Action ist seit 30 Stunden nicht gelaufen, zuletzt am 18.10. um 00:47."]);
 		});
 
+		it("laesst der Markt-Action ebenso 30 Stunden statt 26 (Nachtrag 20i-c)", () => {
+			const stand = ruhig().stand;
+			const markt = (jetzt: string) =>
+				urteile(ruhig({ jetzt: new Date(jetzt), stand: { ...stand, markt: { ...stand.markt!, am: "2026-10-17 22:17" } } }))
+					.filter((w) => w.art === "automatik_still" && w.text.startsWith("Die Gebrauchtpreis-Action"))
+					.map((w) => w.text);
+			expect(markt("2026-10-19T01:47:00Z")).toEqual([]);
+			expect(markt("2026-10-19T04:17:00Z")).toEqual([]);
+			expect(markt("2026-10-19T04:18:00Z")).toEqual(["Die Gebrauchtpreis-Action ist seit 30 Stunden nicht gelaufen, zuletzt am 18.10. um 00:17."]);
+		});
+
 		it("meldet einen fehlenden Bereich, und einen ganz fehlenden Stand nur einmal", () => {
 			expect(arten(ruhig({ stand: { psn: ruhig().stand.psn, markt: ruhig().stand.markt, store: ruhig().stand.store } }))).toEqual(["automatik_still:rot"]);
 			const leer = urteile(ruhig({ stand: {} }));
@@ -288,29 +299,30 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 		});
 
 		describe("laeuft, prueft aber nichts (Nachtrag 20i-b)", () => {
-			// 18.10.2026, 09:38 UTC: der Rueckfall um 08:17 war der juengste Ausgang.
+			// 18.10.2026, 09:38 UTC: der Rueckfall war der juengste Ausgang.
 			const leer = { am: "2026-10-18 08:23", getan: "markt", meldung: false, offen: 0, geprueft: 0 };
 
-			it("schweigt an einem normalen Tag: 02:17 prueft alles, 08:17 nichts", () => {
+			it("schweigt an einem normalen Tag: der Hauptlauf prueft alles, der Rueckfall nichts", () => {
 				const w = urteile(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-18 02:25", geprueft: 411 } }));
 				expect(w).toEqual([]);
 			});
 
-			it("meldet zur Kenntnis, wenn seit ueber 26 Stunden kein Lauf etwas geprueft hat", () => {
-				const w = urteile(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 07:37", geprueft: 411 } }));
+			it("meldet zur Kenntnis, wenn seit ueber 30 Stunden kein Lauf etwas geprueft hat (Nachtrag 20i-c)", () => {
+				const w = urteile(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 03:37", geprueft: 411 } }));
 				expect(w).toEqual([
 					{
 						art: "markt_leer",
 						stufe: "kenntnis",
-						text: "Die Gebrauchtpreis-Action läuft, hat aber seit 26 Stunden kein Release geprüft, zuletzt am 17.10. um 09:37.",
+						text: "Die Gebrauchtpreis-Action läuft, hat aber seit 30 Stunden kein Release geprüft, zuletzt am 17.10. um 05:37.",
 						ziel: "einstellungen",
 						zielText: "Verlauf",
 					},
 				]);
 			});
 
-			it("schweigt bei genau 26 Stunden", () => {
-				expect(arten(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 07:38", geprueft: 3 } }))).toEqual([]);
+			it("schweigt bei genau 30 Stunden - auch bei 27 h 30 zwischen puenktlichem Rueckfall und verspaetetem Hauptlauf", () => {
+				expect(arten(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 06:10", geprueft: 3 } }))).toEqual([]);
+				expect(arten(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 03:38", geprueft: 3 } }))).toEqual([]);
 			});
 
 			it("meldet, wenn noch nie ein Lauf etwas geprueft hat", () => {

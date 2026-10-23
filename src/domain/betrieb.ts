@@ -48,7 +48,7 @@ export type StandFakt = {
 	/**
 	 * Der letzte Lauf der Markt-Action, der etwas geprueft hat (Nachtrag
 	 * 20i-b). Eigener Bereich, weil der letzte Ausgang an einem normalen Tag
-	 * der Rueckfall um 08:17 ist - und der prueft dann nichts.
+	 * der Rueckfall um 22:17 ist - und der prueft dann nichts.
 	 */
 	markt_geprueft?: AusgangFakt;
 	/** Die Store-Action (Stufe 20j), wie die Markt-Action. */
@@ -118,11 +118,13 @@ export type BetriebFakten = {
 /** Ohne vermerkten Ausgang laenger als das, und der Bereich gilt als still (Entscheidung vom 18.10.2026). */
 export const STILL_NACH_STUNDEN = 26;
 /**
- * Dasselbe fuer die Store-Action (Entscheidung des Nutzers vom 22.10.2026):
- * Normalabstand plus groesste beobachtete Verspaetung, 24 h + 5 h 30 (7.3),
- * aufgerundet. 26 reichten nicht: Der Rueckfall liegt nur zwei Stunden nach
- * dem Hauptlauf, und zwischen einem puenktlichen Rueckfall um 22:47 und dem
- * maximal verspaeteten Hauptlauf am naechsten Abend liegen 27 h 30.
+ * Dasselbe fuer Store- und Markt-Action (Entscheidungen des Nutzers vom
+ * 22.10. und 23.10.2026): Normalabstand plus groesste beobachtete
+ * Verspaetung, 24 h + 5 h 30 (7.3), aufgerundet. 26 reichten nicht: Der
+ * Rueckfall liegt nur zwei Stunden nach dem Hauptlauf, und zwischen einem
+ * puenktlichen Rueckfall um 22:47 (Markt 22:17) und dem maximal verspaeteten
+ * Hauptlauf am naechsten Abend liegen 27 h 30. Die kleinere Verspaetung am
+ * Abend (2 h 11 bis 2 h 49 am 22.10.2026) aendert daran nichts.
  */
 export const ACTION_STILL_NACH_STUNDEN = 30;
 
@@ -135,11 +137,11 @@ export const ACTION_STILL_NACH_STUNDEN = 30;
  * die Summe fest.
  */
 export const STORE_ZIEL_ALT_NACH_STUNDEN = 42;
-/** Ab wann ein Bereich als still gilt - die Store-Action mit ihrer eigenen Schwelle. */
+/** Ab wann ein Bereich als still gilt - die beiden Actions mit ihrer eigenen Schwelle. */
 const STILL_NACH: Record<"psn" | "wartung" | "markt" | "store", number> = {
 	psn: STILL_NACH_STUNDEN,
 	wartung: STILL_NACH_STUNDEN,
-	markt: STILL_NACH_STUNDEN,
+	markt: ACTION_STILL_NACH_STUNDEN,
 	store: ACTION_STILL_NACH_STUNDEN,
 };
 /** Vorlauf vor dem erwarteten Ende des Zugangs: zur Kenntnis / rot. */
@@ -447,8 +449,8 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 	}
 
 	// Die Markt-Action laeuft, prueft aber nichts (Nachtrag 20i-b). Ein
-	// einzelner leerer Lauf ist normal - der Rueckfall um 08:17 findet nach
-	// einem puenktlichen Lauf nichts. Erst wenn seit ueber 26 Stunden kein
+	// einzelner leerer Lauf ist normal - der Rueckfall um 22:17 findet nach
+	// einem puenktlichen Lauf nichts. Erst wenn seit ueber 30 Stunden kein
 	// Lauf etwas geprueft hat, muesste die Auswahl etwas enthalten haben:
 	// Bei zwoelf Stunden Frist ist nach einem Tag jedes Release faellig.
 	// Ein Ausgang ohne `geprueft` (vor 20i-b) sagt nichts und schweigt.
@@ -456,7 +458,7 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 	if (markt?.geprueft === 0 && !markt.meldung) {
 		const zuletzt = f.stand.markt_geprueft;
 		const stunden = zuletzt ? alterStunden(zuletzt.am) : Number.POSITIVE_INFINITY;
-		if (stunden > STILL_NACH_STUNDEN) {
+		if (stunden > ACTION_STILL_NACH_STUNDEN) {
 			const am = zuletzt ? zeitAus(zuletzt.am) : null;
 			raus.push({
 				art: "markt_leer",
