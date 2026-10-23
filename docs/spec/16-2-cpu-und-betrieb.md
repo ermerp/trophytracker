@@ -46,7 +46,7 @@ sinnvollen Portion gegen dieses Budget:
   und 431 Aufrufe passten in keinen Takt. **Weg A** (Entscheidung des Nutzers vom 19.10.2026): Die
   Action schreibt über Routen des Workers in Portionen, nicht direkt über die D1-Schnittstelle – die
   Regeln zu `src/db/` und zum Protokoll bleiben, kein kontoweites Token mit Schreibrecht in GitHub.
-  Lauf um 02:17 UTC mit Rückfall um 08:17 (20i-b), Portion `MARKT_JE_POST = 6` (43 Anweisungen),
+  Lauf seit 20i-c um 20:17 UTC mit Rückfall um 22:17 (vorher 02:17 / 08:17), Portion `MARKT_JE_POST = 6` (43 Anweisungen),
   Einzelheiten in [7.3](07-3-ebay-betrieb.md). **Erster Lauf am 19.10.2026, 11:41 UTC** per `workflow_dispatch`, alle
   Aufrufe in IAD: 20 Releases in 4 Portionen, 15 mit Preis, nichts übersprungen; CPU je Aufruf Beginn
   5 ms, Lage 6 ms, Portionen **16 / 4 / ~4 / ~4 ms** (zwei aus der Minutensumme der Analytics
@@ -84,12 +84,12 @@ sinnvollen Portion gegen dieses Budget:
   heute läuft 02:17 pünktlich *vor* dem Sync (23 Stunden), nur verspätet danach. Ein Lauf, der in
   den Sync fällt, liest einen älteren Stand, mehr nicht. Der **Preisverlauf** verträgt den Wechsel des
   UTC-Tags: geschrieben wird nur bei Änderung, der Tageseimer nimmt den letzten Punkt (6, 20f).
-  **Entschieden am 22.10.2026:** Store um **20:47 mit Rückfall 22:47 UTC**. Der Markt rückt ebenso auf
-  **20:17 / 22:17**, aber **eine Nacht nach 20j** – eine Änderung je Nacht; im selben Schritt wird die
-  Schwelle von `markt_geprueft` neu berechnet: Normalabstand plus größte beobachtete Verspätung. Die 26 h
-  liegen schon heute unter dem größten Abstand zweier prüfender Läufe (pünktlich 02:17, am Folgetag
-  07:37: 29 h 20 min) und können dazwischen grundlos erscheinen (gefolgert, nicht beobachtet). Der
-  Markt endet heute um 07:48 und verfehlt damit die Vorgabe „bis 05:00" (unten) selbst. **Der
+  **Entschieden am 22.10.2026:** Store um **20:47 mit Rückfall 22:47 UTC**, der Markt eine Nacht
+  später auf **20:17 / 22:17** – gebaut als Nachtrag **20i-c** (23.10.2026), erste Abende 23.10.;
+  Stillstand und `markt_leer` nach **30 h** wie beim Store (Entscheidung vom 23.10.2026: 24 h plus
+  größte Verspätung 5 h 30; die kleinere am Abend ändert daran nichts). Die 26 h lagen unter dem größten
+  Abstand zweier prüfender Läufe (pünktlich 02:17, am Folgetag 07:37: 29 h 20 min). Bis dahin endete
+  der Markt um 07:38–07:48 und verfehlte die Vorgabe „bis 05:00" (unten) selbst. **Der
   Store-Schritt im Worker wird erst abgeschaltet**, wenn ein Lauf über `workflow_dispatch`
   vollständig und fehlerfrei durchgelaufen ist.
   Die Concept-Ids holt der

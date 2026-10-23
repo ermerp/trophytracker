@@ -59,7 +59,7 @@ Store; seit 20i schreibt die Markt-Action ihren Ausgang als Bereich `markt` und 
 als `markt_begonnen`, über `POST /api/sync/markt/ausgang`, mit einer Zeile `cron: markt bereich=action …`
 im selben Verlauf; seit 20i-b trägt der Ausgang `geprueft`, und ein Lauf mit `geprueft > 0` steht im
 selben Statement zusätzlich als `markt_geprueft` – der jüngste Ausgang ist an einem normalen Tag der
-leere Rückfall um 08:17) und die zuletzt gemeldete Kette ohne Ausgang (`ohneAusgang`: Anzahl, von, bis, Bereich,
+leere Rückfall um 22:17) und die zuletzt gemeldete Kette ohne Ausgang (`ohneAusgang`: Anzahl, von, bis, Bereich,
 `gemeldetAm`). Das ist die Grundlage der Betriebswarnungen ([16.2](16-2-betriebswarnungen.md)): **Die
 Fakten schreibt der Cron, das Urteil entsteht beim Lesen** – die Textzeile ist Anzeige, kein Datum,
 und sie zu zerlegen bräche beim nächsten Umbau. Geschrieben wird mit `json_set` beim eigenen Bereich,

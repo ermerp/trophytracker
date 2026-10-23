@@ -2,17 +2,18 @@
 
 ### 7.3 Umfang, Takt und Betrieb der Gebrauchtpreise
 
-**Der Schritt läuft als GitHub Action** (`.github/workflows/markt.yml`, Stufe 20i), täglich um
-**02:17 UTC** (Entscheidung des Nutzers vom 19.10.2026) und als **Rückfall um 08:17 UTC** (Nachtrag
-20i-b, Entscheidung vom 20.10.2026), dazu von Hand über `workflow_dispatch`; der Knopf in den
-Einstellungen ist entfallen. **GitHub verschiebt den Start regelmäßig um rund fünf Stunden, und
-Haupt- und Rückfalllauf um denselben Betrag:** 02:17 kam am 20.10.2026 um 07:31 (5 h 14 min), am
-21.10. um 07:37 (5 h 20 min), am 22.10. um 07:33 (5 h 16 min), der Rückfall 08:17 am 21.10. und am
-22.10. jeweils um 13:47 (5 h 30 min). Der Rückfall
-fängt also keine Verspätung auf, nur einen ausgefallenen Lauf; wer einen Zeitplan setzt, rechnet mit
-dem verspäteten Start. Der Rückfall prüft dank der Frist nur, was der erste nicht geschafft hat;
-zwei Läufe zugleich stellt die `concurrency`-Gruppe hintereinander. Der Markt rückt deshalb auf den
-Vorabend, 20:17 / 22:17, eine Nacht nach 20j (Entscheidung vom 22.10.2026, [16.2](16-2-cpu-und-betrieb.md)).
+**Der Schritt läuft als GitHub Action** (`.github/workflows/markt.yml`, Stufe 20i), seit Nachtrag
+20i-c (23.10.2026) täglich um **20:17 UTC** mit **Rückfall um 22:17 UTC** (Entscheidung vom
+22.10.2026, [16.2](16-2-cpu-und-betrieb.md)), dazu von Hand über `workflow_dispatch`; der Knopf in den
+Einstellungen ist entfallen. Bis dahin lief er um 02:17 mit Rückfall 08:17 (20i, 20i-b). **GitHub
+verschiebt den Start regelmäßig, und Haupt- und Rückfalllauf um denselben Betrag:** 02:17 kam am
+20.10.2026 um 07:31 (5 h 14 min), am 21.10. um 07:37 (5 h 20 min), am 22.10. um 07:33 (5 h 16 min),
+am 23.10. um 07:30 (5 h 13 min), der Rückfall 08:17 am 21.10. und am 22.10. jeweils um 13:47
+(5 h 30 min); die Store-Action am Abend des 22.10. 2 h 49 und 2 h 11 (7.4). Der Rückfall fängt also
+keine Verspätung auf, nur einen ausgefallenen Lauf; wer einen Zeitplan setzt, rechnet mit dem
+verspäteten Start. Der Rückfall prüft dank der Frist nur, was der erste nicht geschafft hat; zwei
+Läufe zugleich stellt die `concurrency`-Gruppe hintereinander. Still gilt die Action wie der Store
+erst nach **30 h** (24 h plus 5 h 30, aufgerundet; [Betriebswarnungen](16-2-betriebswarnungen.md)).
 Bis 20i lief er im Wartungsfenster des Cron, zwanzig Releases je Aufruf; dort blieb **kein einzelnes
 Release unter 10 ms CPU**, und 431 Aufrufe passten in keinen Takt (Gesamtrechnung in
 [16.2](16-2-cpu-und-betrieb.md)).
@@ -34,7 +35,7 @@ festlegt: was in der Lückenansicht auftaucht oder auf einer offenen Absicht ste
 nach **12 Stunden** erneut fällig (`MARKT_FRIST_STUNDEN`, seit 20i-b; in 20i 20 Stunden, davor ein
 Tag). Zwölf, weil der Start wandert: Nach dem Lauf um 07:31 am 20.10. wäre mit 20 Stunden am
 nächsten Morgen um 02:17 nichts fällig gewesen – ein Tag ohne Punkte, still. Mit zwölf ist nach
-jedem Lauf des Vortags alles fällig, und der Rückfall sechs Stunden nach einem pünktlichen Lauf
+jedem Lauf des Vortags alles fällig, und der Rückfall zwei Stunden nach einem pünktlichen Lauf
 findet nichts. Mit 24 Stunden (bis 20i) rutschte, was am Vortag spät geprüft war, hinter das Fenster
 (`offen=16` am 17.10., `offen=19` am 19.10.2026). **Erster Lauf unter voller Last** (20.10.2026,
 alle Aufrufe IAD): 411 Releases in 69 Portionen, 494 s, 231 mit Preis, 115 ohne Angebot, nichts

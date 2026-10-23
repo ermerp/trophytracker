@@ -24,7 +24,12 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   5–14, Median 6,1 (n = 14; EWR 5,6, ORD 6,4, IAD 13,9). `rows_read_24h` 129 870,
   `rows_written_24h` 3 638 (keine Kaufliste-Nacht). **Nacht zum 22.10.:** Wartungs-Leerlauf 4–15 ms,
   Median 6,3 (n = 30; DFW 6,1, LAX 8,3, SJC 9,8), fünf über 10; PSN-Leerlauf 4–10, Median 6,5 (n = 14),
-  keiner über 10. Je Standort über die Nächte 20.–22.10. (Leerlauf, Median): EWR 4,8, DFW 5,6, IAD 6,1,
+  keiner über 10. **Nacht zum 23.10., die erste ohne Store im PSN-Fenster:** alle 72 `ok`; PSN-Leerlauf
+  3–8, Median 5 (n = 22; EWR 4,4, IAD 5,7, ATL 7,1), keiner über 10; das PSN-Fenster las 14 231 statt
+  27 607 Zeilen, je Leerlauf-Aufruf rund 142 (189 weniger, die Store-Auswahl). Wartungs-Leerlauf 3–16,
+  Median 5 (n = 33; DFW 5,0, SJC 9,6), vier über 10, alle SJC/LAX – unverändert, rund 2 000 Zeilen je
+  Aufruf. Sync 10–20, Spielzeit 26 und 30 ms. `rows_read_24h` 686 129, davon die Nacht rund 115 000,
+  der Rest Deploys und Probelauf am 22.10. Je Standort über die Nächte 20.–22.10. (Leerlauf, Median): EWR 4,8, DFW 5,6, IAD 6,1,
   ORD/ATL 7,2, LAX 7,6, MIA 7,9, SJC 9,8, SEA 10,7 (n = 2) – der langsamste Standort braucht knapp das
   Doppelte des schnellsten. `rows_read_24h` 382 042, davon die Nacht (03–09 UTC) rund 128 000; der Rest
   ist App-Nutzung am Abend des 21.10. (Zähler von Statistik und Einstellungen, Stichprobe der D1-Analytics). Am 18.10. **gab es den PSN-Leerlauf nicht:** In einer Kaufliste-Nacht
@@ -89,14 +94,18 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   10–13 ms (ORD, SEA) statt 2–3, am 20.10. in IAD nur 4, und dort war auch die Lage billig.
   Messworker und Wegwerf-D1 sind gelöscht. **Zurückgestellt** (Entscheidung vom 22.10.2026): eine
   Verbesserung der Markt-Lage (etwa `json_group_array`), bis die Store-Lage gemessen ist – sie hat
-  79 statt 910 Zeilen; bleibt sie klar darunter, hängt es an den Zeilen. **Vorwärm-Versuch, nach
-  20j in einer eigenen Nacht:** ein Vorwärm-Aufruf der Action vor dem Lage-Aufruf, um die
-  Kaltstart-Vermutung zu prüfen – **die Store-Lage mit 13 ms bei 79 Zeilen in IAD (unten) stützt
-  sie**, weil es an den Zeilen nicht liegen kann.
+  79 statt 910 Zeilen; bleibt sie klar darunter, hängt es an den Zeilen. **Der Vorwärm-Versuch ist
+  gestrichen** (Entscheidung vom 23.10.2026): Beide Actions rufen vor der Lage schon „Ausgang begonnen"
+  auf – das ist der geplante Vorwärm-Aufruf. Am 22./23.10. trafen beide denselben Standort (IAD, DFW),
+  0,3 s nacheinander über dieselbe Verbindung, und die Store-Lage brauchte trotzdem 13 ms in IAD, bei
+  **null** fälligen Zeilen (DFW 6). Ob dieselbe Instanz antwortete, zeigt die Telemetry nicht – das
+  zeigte sie einem eigens eingebauten Vorwärm-Aufruf ebenso wenig. Die Markt-Lage brauchte am 23.10.
+  9 ms in IAD bei 1 954 Zeilen: Weder Zeilen noch Vorwärmen erklären die Streuung; offen.
   **Store-Lage im Probelauf vom 22.10.2026:** 13 ms in IAD bei **79** Zeilen (ein D1-Aufruf, eine
   Abfrage) – die Markt-Lage brauchte dort am 20.10. 7 ms bei 910. **An der Zeilenzahl liegt es also
-  nicht**; das stützt die Kaltstart-Vermutung, belegt ist sie nicht. Portionen der Store-Action: Median
-  2–3,5, höchstens 9 ms (die jeweils erste je Standort), Concept-Route 2 ms.
+  nicht** (zum Vorwärmen oben). Portionen der Store-Action: Median 2–3,5, höchstens 9 ms (die jeweils
+  erste je Standort), Concept-Route 2 ms. **Erste Abende, 22.10.2026** (beide leer): „Ausgang begonnen"
+  7 ms, Lage 13 (IAD) / 6 ms (DFW), **Ausgang „ende" mit drei D1-Aufrufen 6 / 4 ms** – im Budget.
 - **IGDB-Auffrischen** (Frist sieben Tage, 50 Spiele je Aufruf, 10.1 Schritt 12) – **erstmals gemessen
   in der Nacht zum 20.10.2026:** neun Aufrufe von 06:05 bis 06:45, **20–54 ms**, Median 34 (MIA 25–28,
   EWR 28, IAD 39, SJC 20, vier ohne Standort 34–54); acht mit Logzeile, darin 370 angefragt und 369

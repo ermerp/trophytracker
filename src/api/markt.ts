@@ -137,7 +137,7 @@ export const marktRoutes = new Hono<AppEnv>()
 			...(meldung ? { meldung } : {}),
 		};
 		// Der letzte pruefende Lauf steht eigens (Nachtrag 20i-b): Der juengste
-		// Ausgang ist an einem normalen Tag der leere Rueckfall um 08:17.
+		// Ausgang ist an einem normalen Tag der leere Rueckfall um 22:17.
 		const wert = { am, getan: "markt", meldung: meldung !== undefined, offen: ergebnis.nochOffen, geprueft: ergebnis.geprueft };
 		await c.var.repos.sync.cronAusgangVermerken(am, marktZeile(ergebnis), undefined, {
 			fakt: [
