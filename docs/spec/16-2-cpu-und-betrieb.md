@@ -145,7 +145,7 @@ Marktauswahl bei Median 7 ms ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)).
 Markt-Action** brauchte am 21. und 22.10. 19 und 18 ms (SEA, MSP) gegen 7 ms (IAD) am 20.10.; untersucht
 am 22.10. als Teil der Planung von 20j (Vorgabe des Nutzers), Ergebnis in
 [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md). Der Test liest im Wartungsleerlauf seit 20i
-**1 788 Zeilen** – die 2 218 der Tabelle ohne die Zeile Gebrauchtpreise, die nicht mehr im Lage-Batch
+**1 788 Zeilen** (seit 18n 1 789: ein Schlüssel mehr) – die 2 218 der Tabelle ohne die Zeile Gebrauchtpreise, die nicht mehr im Lage-Batch
 steht. **Die Tabelle ist der Stand vom 18.10.2026, vor 20i:** Test 2 218, Produktion rund 2 590, die drei
 Auswahlen des Lage-Batches, exakt gemessen über `meta.rows_read`, dieselben Anweisungen
 aus dem Code (die Marktauswahl mit verschobener Frist, damit nichts fällig ist wie im Leerlauf):

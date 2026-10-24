@@ -19,14 +19,10 @@ nach dem Muster von 20i (gebaut am 22.10.2026, [7.4](07-4-store-preise.md); der 
 **20k – Spielerwertung** (gebaut am 22.10.2026, deployt am 24.10. nach der Nachtauswertung, weil sie das
 Auffrischen ändert, das das Wartungsfenster jede Nacht ruft; [5.2](05-1-favorit-und-sortierung.md),
 [7.5](07-5-kritikerwertungen.md); den Altbestand füllt „Auffrischen") → **18n – Obergrenze fürs
-IGDB-Auffrischen** (Vorgabe des Nutzers vom 24.10.2026): Am 24.10. trugen 420 von 478 Stempeln den
-20.10., nach dem Auffrischen von Hand alle den 24.10. – ohne Grenze frischt eine Nacht je Woche
-rund zehn Aufrufe zu 20–54 ms auf. Höchstens ⌈verknüpfte Spiele ÷ 200⌉ Aufrufe zu 50 je Nacht
-(Frist sieben Tage plus 75 % Puffer: ein voller Stau ist bei jeder Größe nach höchstens vier Nächten
-abgebaut, simuliert am 24.10.2026); die Stempel bleiben in Gruppen, die Grenze kappt nur. Dazu
-`auffrischen_stau` zur Kenntnis (grau), wenn der älteste Auffrischstempel älter als 11 Tage ist
-(eigene Abfrage über einen Teilindex auf `igdb_synced_at`, nicht die Auswahl). Eigene Nacht: Deploy
-am 25.10. nach der Nachtauswertung, scharf spätestens in der Nacht zum 01.11. → **Index-Nachtrag** für die
+IGDB-Auffrischen** (Vorgabe des Nutzers vom 24.10.2026, gebaut am 24.10.): höchstens ⌈verknüpfte
+Spiele ÷ 200⌉ Aufrufe je Nacht ([10.1](10-1-cron-schritte.md) Schritt 12) und `auffrischen_stau` zur
+Kenntnis (grau) ab 11 Tagen ([Betriebswarnungen](16-2-betriebswarnungen.md)). Eigene Nacht: Deploy am
+25.10. nach der Nachtauswertung, scharf spätestens in der Nacht zum 01.11. → **Index-Nachtrag** für die
 Auswahlen des Lage-Batches, mit dem Bestand der Lesekosten-Messung und dem Ziel, den
 Wartungs-Leerlauf (rund 2 000 Zeilen je Aufruf, 23.10.2026) zu senken – er rückt vor, weil der
 **Vorwärm-Versuch gestrichen** ist: „Ausgang begonnen" läuft schon vor jeder Lage
