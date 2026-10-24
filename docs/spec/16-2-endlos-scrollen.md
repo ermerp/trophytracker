@@ -2,7 +2,7 @@
 
 ## 16. Endlos-Scrollen in der Sammlung und im Änderungsprotokoll (Stufe 22)
 
-Wunsch des Nutzers vom 24.10.2026, die Entscheidungen vom selben Tag, **gebaut am 24.10.2026**
+Wunsch des Nutzers vom 24.10.2026, die Entscheidungen vom selben Tag, **gebaut und vom Nutzer abgenommen am 24.10.2026**
 (Stufe 22). Kein Cron-Code betroffen: `GET /api/games` liest `games.spieleListe`, die sonst niemand
 ruft; deshalb kein Nachtplatz.
 
