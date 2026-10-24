@@ -1,8 +1,12 @@
 import { quelleAusMatch, type EreignisQuelle } from "../domain/ereignis";
 import type { IgdbKandidat, IgdbMetadaten } from "../domain/igdb";
 import { anzeigeTitel, titelSchluessel, type Plattform } from "../domain/titel";
-import { eins, einzeln, zeilen, type Baustein } from "./baustein";
+import { eins, einzeln, ersteZeile, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
+
+/** Exportiert, damit die Lesekosten-Messung die Abfrage aus dem Code nimmt (CLAUDE.md). */
+export const AELTESTER_AUFFRISCH_STEMPEL =
+	"SELECT MIN(igdb_synced_at) AS am FROM game WHERE igdb_id IS NOT NULL";
 
 export type UngeprueftesSpiel = {
 	id: number;
@@ -267,6 +271,43 @@ export class IgdbRepository {
 			)
 			.bind(n);
 		return eins(statement, (e) => zeilen<{ id: number; igdb_id: number }>(e));
+	}
+
+	/**
+	 * Einen Auffrisch-Aufruf der Nacht zaehlen (Stufe 18n) - VOR der Arbeit:
+	 * Ein Abbruch durch die Laufzeit erreicht kein `catch` (10.1), und ein
+	 * Zaehler danach liesse genau die teuren Aufrufe ungezaehlt, die die
+	 * Grenze begrenzen soll. Ein gescheiterter Aufruf zaehlt also mit.
+	 *
+	 * Der erste Aufruf eines UTC-Tags legt den Stand an und zaehlt dabei die
+	 * verknuepften Spiele (ueber den Teilindex aus 0036); jeder weitere zaehlt
+	 * nur hoch, die Zahl der Spiele gilt fuer die ganze Nacht. Die Grenze
+	 * rechnet `auffrischGrenze` daraus (src/sync/cron.ts), nicht SQL - die
+	 * Formel steht an einer Stelle. Kein Protokoll: ein Arbeitsstand wie der
+	 * der Spielzeit, keine Nutzerdaten (8.5).
+	 */
+	async auffrischAufrufZaehlen(schluessel: string, heute: string): Promise<void> {
+		await this.db
+			.prepare(
+				"INSERT INTO app_setting (key, value) " +
+					"SELECT ?1, json_object('datum', ?2, 'aufrufe', 1, 'spiele', COUNT(*)) FROM game WHERE igdb_id IS NOT NULL " +
+					"ON CONFLICT(key) DO UPDATE SET value = CASE WHEN json_extract(app_setting.value, '$.datum') = ?2 " +
+					"THEN json_set(app_setting.value, '$.aufrufe', json_extract(app_setting.value, '$.aufrufe') + 1) " +
+					"ELSE excluded.value END",
+			)
+			.bind(schluessel, heute)
+			.run();
+	}
+
+	/**
+	 * Der aelteste Auffrischstempel der verknuepften Spiele - fuer die Warnung
+	 * `auffrischen_stau` (Stufe 18n). Ausdruecklich NICHT aus der Auswahl
+	 * (`zumAuffrischenBaustein`): Ist die kaputt und findet nichts, soll die
+	 * Warnung trotzdem anschlagen (CLAUDE.md, wie `AELTESTER_STEMPEL` beim
+	 * Store). Spiele ohne Stempel zaehlt MIN nicht; das Verknuepfen stempelt.
+	 */
+	aeltesterAuffrischStempelBaustein(): Baustein<string | null> {
+		return eins(this.db.prepare(AELTESTER_AUFFRISCH_STEMPEL), (e) => ersteZeile<{ am: string | null }>(e)?.am ?? null);
 	}
 
 	/**

@@ -57,7 +57,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		// Bausteinen derselben Repositories, die die Knoepfe einzeln benutzen.
 		cronLage: new CronLageRepository(db, { sync, credentials, trophaeen, games, igdb }),
 		// Die Fakten der Betriebswarnungen in einem Batch (Stufe 18m).
-		betrieb: new BetriebRepository(db, { sync, credentials }),
+		betrieb: new BetriebRepository(db, { sync, credentials, igdb }),
 		ownership: new OwnershipRepository(db, events),
 		besitz: new BesitzRepository(db, events),
 		plan,

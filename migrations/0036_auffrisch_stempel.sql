@@ -1,0 +1,14 @@
+-- Migration 0036: Teilindex auf den Auffrischstempel (Stufe 18n)
+--
+-- Die Warnung `auffrischen_stau` liest bei jedem Oeffnen des Dashboards den
+-- aeltesten Auffrischstempel der verknuepften Spiele (MIN), der Zaehler der
+-- Nacht ihre Zahl (COUNT). Ohne Index laesen beide die ganze game-Tabelle
+-- (478 verknuepfte Spiele am 24.10.2026); mit ihm liest MIN eine Zeile.
+--
+-- Teilindex wie idx_game_angekuendigt: Nur verknuepfte Spiele werden je
+-- aufgefrischt. Die Auswahl des Auffrisch-Schritts (`zumAuffrischenBaustein`)
+-- nutzt ihn noch nicht - ihr ORDER BY beginnt mit `igdb_synced_at IS NOT
+-- NULL`; sie stellt der Index-Nachtrag um und misst sie dort (16.2).
+--
+-- Rein additiv, keine Daten; der alte Worker merkt nichts davon.
+CREATE INDEX idx_game_auffrisch_stempel ON game(igdb_synced_at) WHERE igdb_id IS NOT NULL;

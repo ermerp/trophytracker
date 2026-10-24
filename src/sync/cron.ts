@@ -116,6 +116,49 @@ export const HAENGT_NACH_STUNDEN = 3;
 export const AUFFRISCH_FRIST_TAGE = 7;
 
 /**
+ * Obergrenze des Auffrischens je Nacht (Stufe 18n, Vorgabe des Nutzers vom
+ * 24.10.2026): ein Aufruf zu AUFFRISCHEN_JE_AUFRUF je angefangene 200
+ * verknuepfte Spiele. Das ist Spiele / 7 Tage plus 75 % Puffer, auf ganze
+ * Aufrufe aufgerundet - und garantiert bei jeder Bestandsgroesse, dass ein
+ * voller Stau (alle Stempel vom selben Tag) nach hoechstens vier Naechten
+ * abgebaut ist (simuliert am 24.10.2026). Ohne Grenze frischte eine Nacht je
+ * Woche alles auf einmal auf: am 20.10.2026 neun Aufrufe zu 20-54 ms.
+ */
+export const AUFFRISCH_SPIELE_JE_NACHTAUFRUF = 200;
+
+/** Wie viele Auffrisch-Aufrufe eine Nacht mit so vielen verknuepften Spielen hat. */
+export function auffrischGrenze(spiele: number): number {
+	return Math.ceil(spiele / AUFFRISCH_SPIELE_JE_NACHTAUFRUF);
+}
+
+/** Der Zaehler der Nacht in app_setting (Stufe 18n), geschrieben von `auffrischAufrufZaehlen`. */
+export const SCHLUESSEL_AUFFRISCHEN = "igdb_auffrischen_nacht";
+export type AuffrischNacht = { datum: string; aufrufe: number; spiele: number };
+
+/** Der gespeicherte Zaehler, gelesen; unlesbar zaehlt wie keiner. */
+export function auffrischNachtAus(stand: string | null): AuffrischNacht | null {
+	if (!stand) return null;
+	try {
+		const roh = JSON.parse(stand) as Partial<AuffrischNacht>;
+		if (typeof roh.datum !== "string" || typeof roh.aufrufe !== "number" || typeof roh.spiele !== "number") return null;
+		return { datum: roh.datum, aufrufe: roh.aufrufe, spiele: roh.spiele };
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Ist die Grenze dieser Nacht erreicht? `null` heisst "nein": Ein Zaehler von
+ * gestern oder keiner laesst den ersten Aufruf zu, der dann zaehlt.
+ */
+export function auffrischenGekappt(stand: string | null, heute: string): { aufrufe: number; grenze: number } | null {
+	const nacht = auffrischNachtAus(stand);
+	if (!nacht || nacht.datum !== heute) return null;
+	const grenze = auffrischGrenze(nacht.spiele);
+	return nacht.aufrufe >= grenze ? { aufrufe: nacht.aufrufe, grenze } : null;
+}
+
+/**
  * Wie oft die beiden PSN-Zusatzabrufe laufen (7.7, Stufe 18c).
  *
  * Spielzeit taeglich: Sie aendert sich, sobald gespielt wird, und kostet nur
@@ -167,6 +210,8 @@ export type CronErgebnis = {
 	level?: number;
 	jahre?: number;
 	auffrischen?: AuffrischErgebnis;
+	/** Auffrischen waere faellig, aber die Grenze der Nacht ist erreicht (Stufe 18n). */
+	auffrischenGekappt?: { aufrufe: number; grenze: number };
 	physisch?: PhysischErgebnis;
 };
 
@@ -183,7 +228,13 @@ export type CronKandidat =
 	| "igdb_physisch";
 
 /** Die Schluessel aus app_setting, die die Entscheidung braucht. */
-export const CRON_STAENDE = [SCHLUESSEL_SPIELZEIT, SCHLUESSEL_BESITZ, SCHLUESSEL_LEVEL, SCHLUESSEL_JAHRE] as const;
+export const CRON_STAENDE = [
+	SCHLUESSEL_SPIELZEIT,
+	SCHLUESSEL_BESITZ,
+	SCHLUESSEL_LEVEL,
+	SCHLUESSEL_JAHRE,
+	SCHLUESSEL_AUFFRISCHEN,
+] as const;
 
 /**
  * Welche Schritte faellig sind, in der Reihenfolge, in der sie versucht
@@ -218,7 +269,8 @@ export function entscheide(
 	if (lage.wartung) {
 		const { zumAuffrischen, zurDisc } = lage.wartung;
 		if (jahreStandAus(stand(SCHLUESSEL_JAHRE))?.standAm !== k.heute) raus.push("jahre");
-		if (k.igdbKonfiguriert && zumAuffrischen.length > 0) raus.push("igdb_auffrischen");
+		if (k.igdbKonfiguriert && zumAuffrischen.length > 0 && !auffrischenGekappt(stand(SCHLUESSEL_AUFFRISCHEN), k.heute))
+			raus.push("igdb_auffrischen");
 		if (k.igdbKonfiguriert && zurDisc.length > 0) raus.push("igdb_physisch");
 	}
 	return raus;
@@ -264,13 +316,20 @@ export async function cronSchritt(
 	// Zeile JEDES Aufrufs, wenn sie etwas getan haben (geloescht= seit 18j,
 	// Entscheidung des Nutzers vom 17.10.2026) - Aufraeumen ist kein eigener
 	// Schritt mehr.
-	const basis: Pick<CronErgebnis, "erschienen" | "abgebrochen" | "bereich" | "geloescht"> = {
+	const stand = (s: string) => lage.einstellungen.get(s) ?? null;
+	// Ein Schritt, der ruht, sagt warum (CLAUDE.md): Faellig, aber die Grenze
+	// der Nacht ist erreicht, steht an der Zeile jedes weiteren Aufrufs.
+	const gekappt =
+		igdb.konfiguriert() && (lage.wartung?.zumAuffrischen.length ?? 0) > 0
+			? auffrischenGekappt(stand(SCHLUESSEL_AUFFRISCHEN), heute)
+			: null;
+	const basis: Pick<CronErgebnis, "erschienen" | "abgebrochen" | "bereich" | "geloescht" | "auffrischenGekappt"> = {
 		erschienen: lage.wartung?.erschienen ?? 0,
 		abgebrochen: lage.psn?.abgebrochen ?? 0,
 		bereich,
 		...(lage.wartung?.geloescht ? { geloescht: lage.wartung.geloescht } : {}),
+		...(gekappt ? { auffrischenGekappt: gekappt } : {}),
 	};
-	const stand = (s: string) => lage.einstellungen.get(s) ?? null;
 
 	for (const kandidat of entscheide(lage, {
 		heute,
@@ -339,6 +398,9 @@ export async function cronSchritt(
 			case "igdb_physisch": {
 				try {
 					if (kandidat === "igdb_auffrischen") {
+						// Gezaehlt wird vor der Arbeit (Stufe 18n): Was die Laufzeit
+						// abbricht, soll die Grenze trotzdem verbrauchen.
+						await repos.igdb.auffrischAufrufZaehlen(SCHLUESSEL_AUFFRISCHEN, heute);
 						const auffrischen = await igdbAuffrischSchritt(
 							repos,
 							igdb,
@@ -640,6 +702,9 @@ export function cronLogzeile(e: CronErgebnis): string {
 			`ohneAntwort=${e.auffrischen.ohneAntwort ?? 0}`,
 		);
 		if (e.auffrischen.meldung) teile.push(`meldung="${e.auffrischen.meldung}"`);
+	}
+	if (e.auffrischenGekappt) {
+		teile.push(`auffrischen=grenze`, `aufrufe=${e.auffrischenGekappt.aufrufe}/${e.auffrischenGekappt.grenze}`);
 	}
 	if (e.meldung) teile.push(`meldung="${e.meldung}"`);
 	if (e.physisch) {

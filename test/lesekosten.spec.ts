@@ -2,7 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { BACKLOG_KANDIDATEN, KAUF_KANDIDATEN, PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
-import { CRON_PSN, CRON_WARTUNG, cronFenster } from "../src/sync/cron";
+import { CRON_PSN, CRON_WARTUNG, cronFenster, SCHLUESSEL_AUFFRISCHEN } from "../src/sync/cron";
 import { createExecutionContext } from "cloudflare:test";
 import { createRepositories } from "../src/db";
 import { Geheimnis } from "../src/domain/secret";
@@ -1612,6 +1612,20 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		console.info({ betrieb });
 		expect(betrieb.aufrufe).toBe(1);
 		expect(betrieb.gelesen).toBeLessThan(30);
+
+		// Der Zaehler des IGDB-Auffrischens (Stufe 18n) laeuft vor jedem
+		// arbeitenden Aufruf und zaehlt die verknuepften Spiele - ueber den
+		// Teilindex aus 0036, also hoechstens so viele Zeilen wie Spiele,
+		// nie die ganze Tabelle doppelt. Die Warnung oben liest den aeltesten
+		// Stempel ueber denselben Index: eine Zeile, deshalb blieb sie unter 30.
+		const verknuepft = (await env.DB.prepare("SELECT COUNT(*) AS n FROM game WHERE igdb_id IS NOT NULL").first<{ n: number }>())!.n;
+		const zaehlZaehler = zaehlendeDb(env.DB);
+		await createRepositories(zaehlZaehler.db, env.NPSSO_KEY).igdb.auffrischAufrufZaehlen(SCHLUESSEL_AUFFRISCHEN, "2026-10-24");
+		const auffrischZaehler = { aufrufe: zaehlZaehler.aufrufe(), gelesen: zaehlZaehler.gelesen(), verknuepft };
+		console.info({ auffrischZaehler });
+		expect(auffrischZaehler.aufrufe).toBe(1);
+		expect(auffrischZaehler.gelesen).toBeLessThanOrEqual(verknuepft + 2);
+		await env.DB.prepare("DELETE FROM app_setting WHERE key = ?").bind(SCHLUESSEL_AUFFRISCHEN).run();
 
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM psn_zugang"),

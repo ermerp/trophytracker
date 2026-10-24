@@ -28,6 +28,7 @@ export function betriebFakten(roh: BetriebRoh, jetzt: Date): BetriebFakten {
 		syncLaeufe: roh.syncLaeufe.map((l) => ({ status: l.status, gestartetAm: l.started_at, meldung: l.error_message })),
 		sicherungAm: roh.einstellungen.get(SCHLUESSEL_SICHERUNG) ?? null,
 		kauflisteFehlerAm: besitzStandAus(roh.einstellungen.get(SCHLUESSEL_BESITZ) ?? null).fehlerAm ?? null,
+		auffrischenAeltester: roh.auffrischenAeltester,
 	};
 }
 
