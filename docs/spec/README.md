@@ -68,6 +68,7 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 16 | [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) | CPU-Grenze: Budget, Wege je Schritt, Cron je Minute, Fristen, Index-Nachtrag |
 | 16 | [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md) | CPU-Grenze: was je Schritt folgt, mit den Nachtmessungen |
 | 16 | [16-2-betriebswarnungen.md](16-2-betriebswarnungen.md) | Betriebswarnungen (18m, 18m-b), Nachtläufe bis 05:00 UTC |
+| 16 | [16-2-endlos-scrollen.md](16-2-endlos-scrollen.md) | offen: Endlos-Scrollen in der Sammlung und im Änderungsprotokoll |
 | 16 | [16-4-finale-stufen.md](16-4-finale-stufen.md) | die fünf finalen Stufen |
 | 17 | [17-risiken.md](17-risiken.md) | bekannte Risiken und wie damit umgegangen wird |
 
