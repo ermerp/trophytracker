@@ -195,6 +195,40 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	});
 
 	/**
+	 * Endlos-Scrollen (Stufe 22): Die Sammlung laedt Block fuer Block nach,
+	 * `OFFSET` liest die uebersprungenen Zeilen mit. Gemessen wird ein ganzer
+	 * Durchlauf - alle Bloecke bis zum Ende - nach Titel und nach Wertung,
+	 * jeweils als Route. Dasselbe kostet das stille Neuholen des geladenen
+	 * Bereichs nach der Rueckkehr aus dem Spieldetail.
+	 */
+	it("misst einen ganzen Durchlauf der Sammlung in Bloecken zu 50 (Stufe 22)", async () => {
+		await env.DB.prepare(
+			"UPDATE game SET user_score = CASE WHEN id % 25 = 0 THEN NULL ELSE 55 + id % 40 END",
+		).run();
+		const gesamt = (await env.DB.prepare("SELECT COUNT(*) AS n FROM game").first<{ n: number }>())!.n;
+		const durchlauf: Record<string, { bloecke: number; gelesen: number; ersterBlock: number; letzterBlock: number }> = {};
+		for (const sort of ["titel", "wertung"]) {
+			const je: number[] = [];
+			for (let offset = 0; offset < gesamt; offset += 50) {
+				je.push(await routeGelesen(`/api/games?limit=50&offset=${offset}&sort=${sort}`));
+			}
+			durchlauf[sort] = {
+				bloecke: je.length,
+				gelesen: je.reduce((a, b) => a + b, 0),
+				ersterBlock: je[0],
+				letzterBlock: je.at(-1)!,
+			};
+		}
+		await env.DB.prepare("UPDATE game SET user_score = NULL").run();
+		console.info({ gesamt, durchlauf });
+		// Gemessen am 24.10.2026: 24 315 nach Titel, 54 908 nach Wertung - der
+		// Grundpreis jedes Blocks (Zaehlung, Sortierung ueber den Bestand),
+		// nicht das OFFSET. Bei 5 Mio. am Tag rund 1 % je ganzem Durchlauf.
+		expect(durchlauf.titel.gelesen).toBeLessThan(30_000);
+		expect(durchlauf.wertung.gelesen).toBeLessThan(65_000);
+	});
+
+	/**
 	 * Der Chip-Filter der Sammlung erlaubt seit Stufe 19 mehrere Plattformen.
 	 * Aus `r.platform = ?` wird `r.platform IN (?,?,?,?)` - hoechstens vier
 	 * Werte, derselbe Plan, kein zusaetzlicher Scan. Gemessen, weil ein `IN`

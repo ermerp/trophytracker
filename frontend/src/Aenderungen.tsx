@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { EREIGNIS_QUELLEN, QUELLETEXT, anfrage, type Ereignis, type EreignisQuelle, type EreignisSeite } from './api'
 import { Verlauf } from './Verlauf'
 
@@ -7,6 +7,9 @@ import { Verlauf } from './Verlauf'
  * neueste zuerst, nach Quelle filterbar. Nur lesen – korrigiert wird dort,
  * wo die Änderung entstand. Seitenweise über `vor` (Keyset), nicht über
  * OFFSET: Die Tabelle wächst unbegrenzt.
+ *
+ * Seit Stufe 22 lädt sie kurz vor dem Ende von selbst nach, wie die Sammlung
+ * (16-2-endlos-scrollen.md); bis dahin über den Knopf „ältere laden".
  */
 export function Aenderungen() {
   const [quelle, setQuelle] = useState<EreignisQuelle | ''>('')
@@ -39,6 +42,21 @@ export function Aenderungen() {
     void laden(null)
   }, [laden])
 
+  // Kurz vor dem Ende nachladen - ein Marker unter dem Verlauf, eine Bildschirmhöhe Vorlauf.
+  const marker = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = marker.current
+    if (!el || !weiter || laeuft) return
+    const beobachter = new IntersectionObserver(
+      (e) => {
+        if (e.some((x) => x.isIntersecting)) void laden(ereignisse[ereignisse.length - 1]?.id ?? null)
+      },
+      { rootMargin: '0px 0px 100% 0px' },
+    )
+    beobachter.observe(el)
+    return () => beobachter.disconnect()
+  }, [ereignisse, laden, laeuft, weiter])
+
   return (
     <>
       <h1>Änderungen</h1>
@@ -60,11 +78,10 @@ export function Aenderungen() {
       ) : (
         <Verlauf ereignisse={ereignisse} mitTitel />
       )}
-      {weiter && (
-        <p>
-          <button type="button" disabled={laeuft} onClick={() => void laden(ereignisse[ereignisse.length - 1]?.id ?? null)}>
-            ältere laden
-          </button>
+      <div ref={marker} aria-hidden="true" />
+      {ereignisse.length > 0 && (
+        <p className="ruhig" role="status">
+          {laeuft ? 'lädt …' : weiter ? '' : 'Das sind alle.'}
         </p>
       )}
     </>

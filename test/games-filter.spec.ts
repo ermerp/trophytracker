@@ -243,3 +243,29 @@ describe("GET /api/games – Filter", () => {
 		});
 	});
 });
+
+describe("GET /api/games – eindeutige Reihenfolge (Stufe 22)", () => {
+	/**
+	 * Endlos-Scrollen haengt Block an Block. Stehen gleiche Werte an einer
+	 * Blockgrenze, darf SQLite sie zwischen zwei Abfragen anders ordnen - ein
+	 * Spiel kaeme doppelt, ein anderes gar nicht. Deshalb ist `g.id` der
+	 * letzte Schluessel. Geprueft in Bloecken zu einem Spiel, in beiden
+	 * Richtungen: Absteigend nach Titel liest SQLite den Index rueckwaerts, und
+	 * ohne `g.id` kaemen gleiche Titel dann mit absteigender Id.
+	 */
+	it("ordnet gleiche Werte nach der Id - in jeder Sortierung und Richtung", async () => {
+		await leeren();
+		const ids: number[] = [];
+		for (let i = 0; i < 3; i++) ids.push(await spiel("Gleich", [{ platform: "PS4" }]));
+		await env.DB.prepare("UPDATE game SET user_score = 80").run();
+
+		for (const abfrage of ["", "richtung=ab", "sort=wertung", "sort=wertung&richtung=auf"]) {
+			const gesehen: number[] = [];
+			for (let offset = 0; offset < 3; offset++) {
+				const seite = await hole(`/api/games?limit=1&offset=${offset}&${abfrage}`);
+				gesehen.push(seite.spiele[0].id);
+			}
+			expect(gesehen, abfrage || "titel").toEqual(ids);
+		}
+	});
+});

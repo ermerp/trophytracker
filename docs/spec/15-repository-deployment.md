@@ -52,7 +52,7 @@ Dazu Cloudflare Secrets am Worker (nicht GitHub): `NPSSO_KEY` (Stufe 2) sowie `I
 
 Frontend und API teilen sich damit eine Origin: **kein CORS, ein Deploy-Pfad, eine Access-Richtlinie**. Der Preis sind die automatischen PR-Vorschau-URLs, die ein Pages-Projekt mitbrächte; nachrüstbar wären sie über `wrangler versions upload`, dessen Preview-URLs von derselben Access-Richtlinie abgedeckt sind.
 
-**Worker und Datenbank:** GitHub Action mit `cloudflare/wrangler-action`, ausgelöst durch Push auf `main`. Die Reihenfolge der Schritte ist wichtiger als das Werkzeug:
+**Worker und Datenbank:** GitHub Action mit `cloudflare/wrangler-action`, ausgelöst durch Push auf `main` – **außer bei Pushes, die nur `docs/**`, `README.md` oder `CLAUDE.md` ändern** (`paths-ignore`, Stufe 22, Vorgabe des Nutzers vom 24.10.2026): Kein Test und kein Build liest diese Dateien (geprüft am 24.10.2026), und jeder Deploy liest für die Sicherung rund 115 000 Zeilen. Ein Push mit auch nur einer anderen Datei deployt wie bisher, samt der Doku darin; zu einem reinen Doku-Commit gibt es keinen Lauf. Die Reihenfolge der Schritte ist wichtiger als das Werkzeug:
 
 0. Im Job davor: `npm ci`, `npm run cf-typegen`, `npm run typecheck`, `npm test`, `npm run build`. Die Typprüfung nimmt `src/` und `test/` und hängt seit dem 09.10.2026 dort – vorher prüfte sie **niemand**: vitest transpiliert mit esbuild ohne Typprüfung, und `npm run build` baut nur das Frontend (dessen `tsc -b` darin steckt)
 1. `wrangler d1 export` – Sicherung **vor** jeder Schemaänderung

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Link, useNavigationType, useSearchParams } from 'react-router-dom'
 import {
 	PLATTFORMEN,
 	PLAY_STATUS,
@@ -17,6 +17,7 @@ import { Kopfzeile } from './Kopfzeile'
 import { Sortierleiste, type Richtung } from './Sortierung'
 import { BesitzZeichen, Cover, Fortschritt, PlatinZeichen, PlattformChip, Prozent, ZustandsZeile } from './SpielTeile'
 import { SpielAnlegen } from './SpielAnlegen'
+import { BLOCK, anhaengen, holen, mehrDa, merken, neuholenBloecke, schluessel as schluesselAus, vergessen } from './endlos'
 
 /**
  * Sammlung (Use Case 1): Kachelraster oder Zeilen, Filter als Chips.
@@ -30,9 +31,16 @@ import { SpielAnlegen } from './SpielAnlegen'
  *
  * Die Filter liegen weiterhin in der URL, damit „Zurück" aus dem Spieldetail
  * den Stand wiederherstellt.
+ *
+ * **Endlos-Scrollen seit Stufe 22** (16-2-endlos-scrollen.md): Kurz vor dem
+ * Ende lädt die Liste den nächsten Block nach, statt zu blättern. Ändert sich
+ * ein Filter oder die Sortierung, beginnt sie von vorn. Beim „Zurück" aus dem
+ * Spieldetail (POP) zeigt sie sofort, was geladen war, an derselben Stelle,
+ * und holt den Bereich still neu (`endlos.ts`).
  */
 
-const SEITE = 50
+/** Wie früh nachgeladen wird: eine Bildschirmhöhe vor dem Ende. */
+const VORLAUF = '0px 0px 100% 0px'
 
 type Release = {
 	id: number
@@ -59,6 +67,7 @@ type Spiel = {
 }
 
 type Antwort = { gesamt: number; limit: number; offset: number; spiele: Spiel[] }
+type Liste = { spiele: Spiel[]; gesamt: number }
 
 const GRUPPEN: readonly ChipGruppe[] = [
 	{ param: 'platform', titel: 'Plattform', mehrfach: true, werte: PLATTFORMEN.map((p) => [p, p === 'PSVITA' ? 'Vita' : p] as const) },
@@ -136,39 +145,151 @@ export function Sammlung() {
 		params.get('richtung') === 'ab' || params.get('richtung') === 'auf'
 			? (params.get('richtung') as Richtung)
 			: SAMMLUNG_NATUERLICH[sortierung]
-	const [daten, setDaten] = useState<Antwort | null>(null)
+	const [daten, setDaten] = useState<Liste | null>(null)
 	const [laedt, setLaedt] = useState(false)
 	const [meldung, setMeldung] = useState<string | null>(null)
 	const ansicht = useAnsicht('sammlung')
+	const navigation = useNavigationType()
 
-	const offset = Math.max(0, Number(params.get('offset')) || 0)
+	// Alles außer `offset` bestimmt die Liste; `offset` aus alten Lesezeichen zählt nicht mehr.
+	const name = schluesselAus(params)
+	const abfrageBasis = useCallback(() => {
+		const abfrage = new URLSearchParams(params)
+		abfrage.delete('offset')
+		return abfrage
+	}, [params])
 
-	const laden = useCallback(async () => {
+	// Die aktuelle Liste und Höhe für den Zwischenspeicher - als Ref, damit
+	// das Aufräumen beim Verlassen den letzten Stand sieht, nicht den beim Anlegen.
+	const stand = useRef<{ name: string; daten: Liste | null; scrollY: number }>({ name, daten: null, scrollY: 0 })
+	// Welche Liste gerade geladen wird: Eine Antwort für einen alten Filter wird verworfen.
+	const aktuell = useRef(name)
+	const wiederherstellen = useRef<number | null>(null)
+
+	const block = useCallback(
+		async (offset: number, limit: number) => {
+			const abfrage = abfrageBasis()
+			abfrage.set('limit', String(limit))
+			abfrage.set('offset', String(offset))
+			return anfrage<Antwort>(`/api/games?${abfrage}`)
+		},
+		[abfrageBasis],
+	)
+
+	/** Von vorn: der erste Block. */
+	const neuLaden = useCallback(async () => {
+		const fuer = name
 		setLaedt(true)
 		try {
-			const abfrage = new URLSearchParams(params)
-			abfrage.set('limit', String(SEITE))
-			setDaten(await anfrage<Antwort>(`/api/games?${abfrage}`))
+			const a = await block(0, BLOCK)
+			if (aktuell.current === fuer) setDaten({ spiele: a.spiele, gesamt: a.gesamt })
 		} catch (f) {
 			setMeldung(f instanceof Error ? f.message : 'Laden fehlgeschlagen.')
 		} finally {
-			setLaedt(false)
+			if (aktuell.current === fuer) setLaedt(false)
 		}
-	}, [params])
+	}, [block, name])
 
+	/** Den geladenen Bereich still neu holen - nach dem Zurückkommen (Entscheidung vom 24.10.2026). */
+	const stillNeuHolen = useCallback(
+		async (geladen: number) => {
+			const fuer = name
+			setLaedt(true)
+			try {
+				let spiele: Spiel[] = []
+				let gesamt = 0
+				for (const b of neuholenBloecke(geladen)) {
+					const a = await block(b.offset, b.limit)
+					spiele = anhaengen(spiele, a.spiele)
+					gesamt = a.gesamt
+					if (a.spiele.length < b.limit) break
+				}
+				if (aktuell.current === fuer) setDaten({ spiele, gesamt })
+			} catch (f) {
+				setMeldung(f instanceof Error ? f.message : 'Laden fehlgeschlagen.')
+			} finally {
+				if (aktuell.current === fuer) setLaedt(false)
+			}
+		},
+		[block, name],
+	)
+
+	// Eine neue Filterkombination: aus dem Speicher, wenn es ein "Zurück" ist,
+	// sonst von vorn und oben.
 	useEffect(() => {
-		void laden()
-	}, [laden])
+		aktuell.current = name
+		setMeldung(null)
+		const gemerkt = navigation === 'POP' ? holen<Spiel>(name) : null
+		if (gemerkt) {
+			setDaten({ spiele: gemerkt.eintraege, gesamt: gemerkt.gesamt })
+			wiederherstellen.current = gemerkt.scrollY
+			void stillNeuHolen(gemerkt.eintraege.length)
+		} else {
+			setDaten(null)
+			if (stand.current.name !== name) window.scrollTo(0, 0)
+			void neuLaden()
+		}
+		// Nur beim Wechsel der Liste - nicht bei jeder neuen Funktion.
+	}, [name])
 
-	function setzeParam(name: string, wert: string) {
-		const neu = new URLSearchParams(params)
-		if (wert) neu.set(name, wert)
-		else neu.delete(name)
-		if (name !== 'offset') neu.delete('offset')
-		setParams(neu, { replace: true })
+	// Die Höhe erst setzen, wenn die gemerkten Karten im DOM stehen.
+	useLayoutEffect(() => {
+		if (wiederherstellen.current === null || !daten) return
+		window.scrollTo(0, wiederherstellen.current)
+		wiederherstellen.current = null
+	}, [daten])
+
+	// Stand mitschreiben und beim Verlassen merken.
+	useEffect(() => {
+		stand.current = { ...stand.current, name, daten }
+	}, [name, daten])
+	useEffect(() => {
+		const mitschreiben = () => {
+			stand.current.scrollY = window.scrollY
+		}
+		window.addEventListener('scroll', mitschreiben, { passive: true })
+		return () => {
+			window.removeEventListener('scroll', mitschreiben)
+			const { name: n, daten: d, scrollY } = stand.current
+			if (d) merken(n, { eintraege: d.spiele, gesamt: d.gesamt, scrollY })
+		}
+	}, [])
+
+	/** Den nächsten Block anhängen. */
+	const nachladen = useCallback(async () => {
+		if (laedt || !daten || !mehrDa(daten.spiele.length, daten.gesamt)) return
+		const fuer = name
+		setLaedt(true)
+		try {
+			const a = await block(daten.spiele.length, BLOCK)
+			if (aktuell.current === fuer) setDaten({ spiele: anhaengen(daten.spiele, a.spiele), gesamt: a.gesamt })
+		} catch (f) {
+			setMeldung(f instanceof Error ? f.message : 'Laden fehlgeschlagen.')
+		} finally {
+			if (aktuell.current === fuer) setLaedt(false)
+		}
+	}, [block, daten, laedt, name])
+
+	// Kurz vor dem Ende nachladen: ein Marker unter der Liste, eine Bildschirmhöhe Vorlauf.
+	const marker = useRef<HTMLDivElement | null>(null)
+	useEffect(() => {
+		const el = marker.current
+		if (!el) return
+		const beobachter = new IntersectionObserver(
+			(e) => {
+				if (e.some((x) => x.isIntersecting)) void nachladen()
+			},
+			{ rootMargin: VORLAUF },
+		)
+		beobachter.observe(el)
+		return () => beobachter.disconnect()
+	}, [nachladen])
+
+	function angelegt() {
+		vergessen()
+		void neuLaden()
 	}
 
-	const bis = daten ? Math.min(offset + SEITE, daten.gesamt) : 0
 	const filterAktiv = [...params.keys()].some((k) => k !== 'offset' && k !== 'sort')
 
 	return (
@@ -182,7 +303,7 @@ export function Sammlung() {
 			<Chips gruppen={GRUPPEN} />
 
 			<div className="seite">
-				<SpielAnlegen onAngelegt={laden} />
+				<SpielAnlegen onAngelegt={angelegt} />
 
 				{meldung && (
 					<p role="alert" className="auffaellig">
@@ -201,9 +322,7 @@ export function Sammlung() {
 				) : (
 					<>
 						<div className="listenkopf">
-							<span>
-								{offset + 1}–{bis} von {daten.gesamt} Spielen{laedt && ' – lädt …'}
-							</span>
+							<span>{daten.gesamt} {daten.gesamt === 1 ? 'Spiel' : 'Spiele'}</span>
 							<Sortierleiste
 								texte={SORTIERTEXT}
 								natuerlich={SAMMLUNG_NATUERLICH}
@@ -215,7 +334,7 @@ export function Sammlung() {
 									else neu.set('sort', w)
 									if (r === SAMMLUNG_NATUERLICH[w]) neu.delete('richtung')
 									else neu.set('richtung', r)
-									// Eine andere Reihenfolge heisst: wieder von vorn.
+									// Eine andere Reihenfolge heisst: wieder von vorn (neuer Schlüssel).
 									neu.delete('offset')
 									setParams(neu, { replace: true })
 								}}
@@ -232,24 +351,14 @@ export function Sammlung() {
 							)}
 						</ul>
 
-						{daten.gesamt > SEITE && (
-							<p className="blaettern">
-								<button
-									type="button"
-									onClick={() => setzeParam('offset', String(Math.max(0, offset - SEITE)))}
-									disabled={offset === 0 || laedt}
-								>
-									Zurück
-								</button>{' '}
-								<button
-									type="button"
-									onClick={() => setzeParam('offset', String(offset + SEITE))}
-									disabled={bis >= daten.gesamt || laedt}
-								>
-									Weiter
-								</button>
-							</p>
-						)}
+						<div ref={marker} aria-hidden="true" />
+						<p className="ruhig" role="status">
+							{laedt
+								? 'lädt …'
+								: mehrDa(daten.spiele.length, daten.gesamt)
+									? `${daten.spiele.length} von ${daten.gesamt} geladen`
+									: `Alle ${daten.gesamt} geladen.`}
+						</p>
 					</>
 				)}
 			</div>
