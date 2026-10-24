@@ -69,8 +69,8 @@ sinnvollen Portion gegen dieses Budget:
   dann ins Budget passt, ist offen.
 - **Store → GitHub Action nach dem Muster von 20i: Stufe 20j** (Entscheidungen des Nutzers vom
   20.10.2026; **gebaut und deployt am 22.10.2026**: Teil A 15:40 UTC, Probelauf 16:47 fehlerfrei,
-  Teil B – Store aus dem Worker – gegen 16:55; [7.4](07-4-store-preise.md)). Offen: die ersten
-  Abendläufe und die CPU der Ausgangs-Route (drei D1-Aufrufe), ausgewertet ab dem 23.10. Wie beim Markt: **Frist 12 Stunden**, **eigene
+  Teil B – Store aus dem Worker – gegen 16:55; [7.4](07-4-store-preise.md)). Die ersten
+  Abendläufe (22. und 23.10., vollständig) stehen in [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md). Wie beim Markt: **Frist 12 Stunden**, **eigene
   Workflow-Datei** und **eigenes Service Token `github-store`** (15.3). **Zeitplan** (Vorgabe des
   Nutzers vom 21.10.2026, ersetzt 01:47 / 07:47): **auch mit fünf Stunden Verspätung vor 05:00 UTC
   fertig, also der Hauptlauf am Vorabend** – GitHub verschiebt beide Läufe gleich weit (7.3). Bei der
