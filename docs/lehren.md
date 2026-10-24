@@ -806,3 +806,29 @@ Befehl, der `src/` und `test/` prüft, steht in CLAUDE.md unter „Befehle" und 
 derselbe, den `deploy.yml` ruft.
 → Vor dem Merge laufen die Befehle der Pipeline selbst (`npm run typecheck`), keine
 Teilmenge (CLAUDE.md, „Was berichtet wird, kommt aus der Sache selbst").
+
+---
+
+## Grau hieß Gelb
+
+**24.10.2026 (Planung 18n) – ich nannte „zur Kenntnis" gelb.** Im Vorschlag für die
+Warnung `auffrischen_stau` schrieb ich zweimal „gelbe Warnung (zur Kenntnis)". In der
+Glocke ist Gelb der offene Posten, „zur Kenntnis" ist grau (13.2, Rangfolge vom
+20.10.2026); der Nutzer musste korrigieren. Die Spezifikation stand richtig da – ich
+hatte sie nicht gelesen, sondern die Farbe aus der Erinnerung genannt.
+→ Wer eine Stufe oder Farbe der Glocke nennt, nimmt sie aus 13.2, nicht aus der
+Erinnerung (CLAUDE.md, „Was berichtet wird, kommt aus der Sache selbst").
+
+---
+
+## Die Rückmeldung hinter der Leiste
+
+**24.10.2026 (20k) – zehnmal „Metadaten auffrischen" ohne sichtbares Ergebnis.** Nach
+dem Deploy von 20k bat ich den Nutzer, den Knopf zehnmal zu klicken. Er meldete, er habe
+nicht gesehen, ob sich etwas tut: Jeder Klick schrieb dieselbe Zeile „50 von 50", und die
+stand bei 360 px hinter der unteren Leiste (y 750–774, Leiste ab 735). Gewirkt hatten die
+Klicks (478 von 478). Den Knopf hatte seit Stufe 18 niemand nach dem Klick angesehen, und
+ich hatte eine Anleitung dafür gegeben, ohne ihn selbst auszuprobieren. Behoben in 18n-b:
+ein Durchgang mit Fortschritt direkt unter den Knöpfen.
+→ Wer dem Nutzer einen Handgriff aufträgt, sieht vorher an, was danach auf dem Bildschirm
+steht – bei 360 px (CLAUDE.md, „Oberfläche wird angesehen").

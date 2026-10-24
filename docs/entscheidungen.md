@@ -319,3 +319,6 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 23.10.2026 | **„Veraltete Ansichten aufräumen" braucht keinen eigenen Nachtplatz** und kann an jedem Tag parallel laufen – `/trophaeen` fasst keinen Cron-Code an; jede weitere Ansicht, die wegfallen soll, wird ebenso geprüft | [16.2](spec/16-2-offene-stufen.md) |
 | 24.10.2026 | **Der bessere Wartungs-Leerlauf der Nacht zum 24.10. gilt nicht als erreichtes Budget** – er kommt vom Standortwechsel, die Zeilen je Aufruf sind unverändert; Store- und Markt-Lage werden nur weiter beobachtet, keine eigene Untersuchung | [16.2](spec/16-2-cpu-je-schritt.md) |
 | 24.10.2026 | **Reine Nachtauswertungen werden direkt geschrieben, ohne Diff vorab** – einen Diff gibt es nur, wenn sich eine Regel, eine Entscheidung oder der Plan ändert | CLAUDE.md |
+| 24.10.2026 | **Endlos-Scrollen in der Sammlung:** Zwischenspeicher je Filterkombination, beim Zurückkommen sofort anzeigen und den geladenen Bereich still neu holen | [16.2](spec/16-2-endlos-scrollen.md) |
+| 24.10.2026 | **Das Änderungsprotokoll scrollt mit, die Arbeitslisten blättern weiter** – aus ihnen verschwinden Einträge nach jeder Entscheidung | [16.2](spec/16-2-endlos-scrollen.md) |
+| 24.10.2026 | **`g.id` als letzter Sortierschlüssel der Sammlung**, mit Test | [16.2](spec/16-2-endlos-scrollen.md) |
