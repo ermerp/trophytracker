@@ -21,7 +21,15 @@ type AbgleichAntwort = {
   meldung?: string
 }
 
-type AuffrischAntwort = { status: 'erfolg' | 'fehler'; angefragt: number; aktualisiert: number; meldung?: string }
+type AuffrischAntwort = {
+  status: 'erfolg' | 'fehler'
+  angefragt: number
+  aktualisiert: number
+  ohneAntwort?: number
+  meldung?: string
+  seit: string
+  nochOffen: number
+}
 type PhysischAntwort = { status: 'erfolg' | 'fehler'; angefragt: number; gesetzt: number; nochOffen: number; weiter: boolean; meldung?: string }
 
 export function Igdb() {
@@ -92,12 +100,37 @@ export function Igdb() {
     await abgleichen()
   }
 
+  /**
+   * Ein Durchgang über alle verknüpften Spiele (Nachtrag 18n-b): 50 je
+   * Aufruf, bis keines mehr älter ist als der Beginn. Bis dahin holte jeder
+   * Klick 50 und sagte jedes Mal dasselbe – für 478 Spiele zehn Klicks ohne
+   * sichtbaren Fortschritt.
+   */
   async function auffrischen() {
     setLaeuft(true)
     setMeldung(null)
+    setFortschritt('Auffrischen …')
+    let seit: string | undefined
+    let aufgefrischt = 0
+    let ohneAntwort = 0
     try {
-      const a = await anfrage<AuffrischAntwort>('/api/igdb/auffrischen', { methode: 'POST' })
-      setFortschritt(`${a.aktualisiert} von ${a.angefragt} Spielen aufgefrischt.`)
+      for (let runde = 0; runde < 100; runde++) {
+        const a = await anfrage<AuffrischAntwort>('/api/igdb/auffrischen', {
+          methode: 'POST',
+          koerper: seit === undefined ? {} : { seit },
+        })
+        seit = a.seit
+        aufgefrischt += a.aktualisiert
+        ohneAntwort += a.ohneAntwort ?? 0
+        if (a.nochOffen === 0 || a.angefragt === 0) {
+          setFortschritt(
+            `Fertig: ${aufgefrischt} ${aufgefrischt === 1 ? 'Spiel' : 'Spiele'} aufgefrischt` +
+              (ohneAntwort > 0 ? `, ${ohneAntwort} ohne Antwort von IGDB.` : '.'),
+          )
+          break
+        }
+        setFortschritt(`Noch ${a.nochOffen} Spiele … (${aufgefrischt} aufgefrischt)`)
+      }
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Auffrischen fehlgeschlagen.')
     } finally {
@@ -177,16 +210,18 @@ export function Igdb() {
       <button type="button" onClick={discPruefen} disabled={laeuft || !status?.zugangsdaten || status.discOffen === 0}>
         Disc-Fassungen prüfen
       </button>
+      {/* Direkt unter den Knöpfen (Nachtrag 18n-b): Unter dem Erklärtext lag
+          die Rückmeldung bei 360 px hinter der unteren Leiste. */}
+      {fortschritt && <p role="status">{fortschritt}</p>}
+      {meldung && <p role="alert">{meldung}</p>}
       <p className="zeile">
-        „Auffrischen" holt Wertung, Cover und Datum für die 50 am längsten nicht aktualisierten
-        Spiele erneut. „Offene erneut suchen" wiederholt die Suche für alle Spiele zur Prüfung –
+        „Auffrischen" holt Wertung, Cover und Datum für alle verknüpften Spiele erneut, 50 auf
+        einmal, bis alle durch sind. „Offene erneut suchen" wiederholt die Suche für alle Spiele zur Prüfung –
         sinnvoll, wenn die Suchregel besser geworden ist. „Disc-Fassungen prüfen" fragt IGDBs
         Händlereinträge ab und setzt „Disc-Fassung: ja", wo ein physischer Eintrag zur Plattform
         existiert – nie „nein", das bleibt deine Entscheidung; geprüfte Spiele kommen nach 30 Tagen
         wieder dran. Ergebnis: <Link to="/luecken">Lücken</Link>.
       </p>
-      {fortschritt && <p>{fortschritt}</p>}
-      {meldung && <p role="alert">{meldung}</p>}
     </section>
   )
 }

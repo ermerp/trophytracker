@@ -300,6 +300,32 @@ export class IgdbRepository {
 	}
 
 	/**
+	 * Die Uhr der Datenbank (Nachtrag 18n-b): Ein Durchgang "Auffrischen" von
+	 * Hand beginnt hier, und die Stempel schreibt dieselbe Uhr
+	 * (`datetime('now')`). Die Uhr des Workers koennte eine Sekunde abweichen -
+	 * dann gaelten frisch gestempelte Spiele als offen, und der Durchgang
+	 * kaeme nie an sein Ende.
+	 */
+	async datenbankZeit(): Promise<string> {
+		const z = await this.db.prepare("SELECT datetime('now') AS jetzt").first<{ jetzt: string }>();
+		return z!.jetzt;
+	}
+
+	/**
+	 * Verknuepfte Spiele, die seit `seit` nicht aufgefrischt wurden - der Rest
+	 * eines Durchgangs von Hand (Nachtrag 18n-b). Ueber den Teilindex aus 0036.
+	 */
+	async auffrischOffen(seit: string): Promise<number> {
+		const z = await this.db
+			.prepare(
+				"SELECT COUNT(*) AS n FROM game WHERE igdb_id IS NOT NULL AND (igdb_synced_at IS NULL OR igdb_synced_at < ?)",
+			)
+			.bind(seit)
+			.first<{ n: number }>();
+		return z?.n ?? 0;
+	}
+
+	/**
 	 * Der aelteste Auffrischstempel der verknuepften Spiele - fuer die Warnung
 	 * `auffrischen_stau` (Stufe 18n). Ausdruecklich NICHT aus der Auswahl
 	 * (`zumAuffrischenBaustein`): Ist die kaputt und findet nichts, soll die

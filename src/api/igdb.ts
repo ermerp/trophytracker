@@ -9,6 +9,10 @@ import { igdbAbgleichSchritt, igdbAuffrischSchritt, igdbPhysischSchritt, kandida
 import { KeinePlattformError, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
 import type { AppEnv } from "../types";
 import { eintragAntwort } from "./plans";
+import { liesJson } from "./validierung";
+
+/** Ein Zeitpunkt, wie D1 ihn mit `datetime('now')` schreibt (UTC). */
+const D1_ZEITPUNKT = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
 /**
  * Abschnitt 12: IGDB-Suche, Abgleich und Pruefansicht (7.6).
@@ -158,11 +162,27 @@ export const igdbRoutes = new Hono<AppEnv>()
 	 * auf `erschienen` (8.4, Stufe 15) - bis der Cron in Stufe 18 das
 	 * taeglich tut. `erschienen` nennt die Anzahl.
 	 */
+	//
+	// Ein Durchgang von Hand (Nachtrag 18n-b): Der erste Aufruf ohne `seit`
+	// beginnt ihn und bekommt den Zeitpunkt zurueck, jeder weitere reicht ihn
+	// mit. `nochOffen` zaehlt die verknuepften Spiele, die seitdem nicht
+	// aufgefrischt wurden - die Oberflaeche ruft, bis es 0 ist. Bis dahin
+	// holte jeder Klick 50 Spiele und sagte jedes Mal "50 von 50"; fuer 478
+	// Spiele hiess das zehn Klicks ohne sichtbaren Fortschritt (24.10.2026).
 	.post("/auffrischen", async (c) => {
 		if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
+		// Ohne Koerper wie bisher: ein neuer Durchgang.
+		const koerper = (c.req.header("content-type") ?? "").includes("json") ? await liesJson(c) : {};
+		if (koerper === null) return c.json({ fehler: "Ungültiges JSON." }, 400);
+		// Fehlt `seit`, beginnt ein Durchgang; ein ausdrueckliches null ist kein Zeitpunkt.
+		if (koerper.seit !== undefined && (typeof koerper.seit !== "string" || !D1_ZEITPUNKT.test(koerper.seit))) {
+			return c.json({ fehler: "seit muss ein Zeitpunkt wie 2026-10-24 10:45:05 sein." }, 400);
+		}
+		const seit = (koerper.seit as string | undefined) ?? (await c.var.repos.igdb.datenbankZeit());
 		const erschienen = await c.var.repos.games.erschieneneFreigeben();
 		const ergebnis = await igdbAuffrischSchritt(c.var.repos, c.var.igdb);
-		return c.json({ ...ergebnis, erschienen }, ergebnis.status === "fehler" ? 502 : 200);
+		const nochOffen = await c.var.repos.igdb.auffrischOffen(seit);
+		return c.json({ ...ergebnis, erschienen, seit, nochOffen }, ergebnis.status === "fehler" ? 502 : 200);
 	})
 
 	/**
