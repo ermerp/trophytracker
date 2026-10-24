@@ -502,10 +502,22 @@ describe("cronSchritt", () => {
 			expect(morgen.auffrischenGekappt).toBeUndefined();
 		});
 
-		it("zaehlt vor der Arbeit - auch ein gescheiterter Aufruf verbraucht die Grenze", async () => {
-			// Ein Abbruch durch die Laufzeit erreicht kein catch; nachgestellt
-			// mit einem IGDB-Fehler, der nichts stempelt. Ohne Zaehler davor
-			// liefe derselbe Aufruf die ganze Nacht.
+		it("zaehlt vor der Arbeit - ein Aufruf, den die Laufzeit abbricht, ist schon gezaehlt", async () => {
+			// Ein Abbruch durch die Laufzeit erreicht kein catch und kein Danach.
+			// Nachgestellt mit einem IGDB-Abruf, der nie antwortet: Der Aufruf
+			// steht mitten in der Arbeit, und der Zaehler muss schon stehen -
+			// sonst liefe genau dieser teure Aufruf die ganze Nacht erneut.
+			await spielMitIgdb(1, 11, null);
+			const { client } = fakeIgdb([]);
+			const haengt: typeof client = { ...client, nachIds: () => new Promise(() => {}) };
+			void cronSchritt(repos(), psnStumm(), haengt);
+			await new Promise((r) => setTimeout(r, 200));
+			expect(await nacht()).toEqual({ datum: HEUTE, aufrufe: 1, spiele: 1 });
+		});
+
+		it("zaehlt auch einen gescheiterten Aufruf - ein IGDB-Ausfall verbraucht die Grenze", async () => {
+			// Ein Fehler stempelt nichts; ohne Grenze waehlte jeder Aufruf
+			// der Nacht dieselben Spiele und scheiterte erneut.
 			await spielMitIgdb(1, 11, null);
 			const kaputt = fakeIgdb([new Response("weg", { status: 500 }), new Response("weg", { status: 500 })]).client;
 
