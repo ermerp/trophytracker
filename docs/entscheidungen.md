@@ -322,3 +322,5 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 24.10.2026 | **Endlos-Scrollen in der Sammlung:** Zwischenspeicher je Filterkombination, beim Zurückkommen sofort anzeigen und den geladenen Bereich still neu holen | [16.2](spec/16-2-endlos-scrollen.md) |
 | 24.10.2026 | **Das Änderungsprotokoll scrollt mit, die Arbeitslisten blättern weiter** – aus ihnen verschwinden Einträge nach jeder Entscheidung | [16.2](spec/16-2-endlos-scrollen.md) |
 | 24.10.2026 | **`g.id` als letzter Sortierschlüssel der Sammlung**, mit Test | [16.2](spec/16-2-endlos-scrollen.md) |
+| 24.10.2026 | **Endlos-Scrollen kann ab sofort parallel gebaut werden** (kein Nachtplatz) | [16.2](spec/16-2-endlos-scrollen.md) |
+| 24.10.2026 | **Reine Doku-Pushes deployen nicht** (`paths-ignore` in `deploy.yml` für `docs/**`, `README.md`, `CLAUDE.md`); kommt mit dem nächsten Deploy | [16.2](spec/16-2-offene-stufen.md) |

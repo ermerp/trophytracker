@@ -2,9 +2,8 @@
 
 ## 16. Offen – Endlos-Scrollen in der Sammlung
 
-Wunsch des Nutzers vom 24.10.2026, die Entscheidungen vom selben Tag. **Nicht gebaut; wann es kommt,
-ist offen.** Es braucht keinen Nachtplatz (unten) und kann wie „veraltete Ansichten aufräumen" an
-jedem Tag parallel laufen, auf eigenem Branch.
+Wunsch des Nutzers vom 24.10.2026, die Entscheidungen vom selben Tag. **Nicht gebaut; kann ab sofort
+parallel gebaut werden** (Entscheidung vom 24.10.2026) – kein Nachtplatz (unten), auf eigenem Branch.
 
 **Stand heute:** Die Sammlung lädt 50 Spiele je Seite und blättert mit „Zurück"/„Weiter"
 (`SEITE`, `frontend/src/Sammlung.tsx`); `offset`, Filter und Sortierung stehen in der URL, und ein

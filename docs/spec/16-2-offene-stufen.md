@@ -45,8 +45,12 @@ Am 02.11.2026 wird das Budget arbeitender Aufrufe neu bewertet. Fest sind die Ab
   Bestand im täglichen Takt trägt, und „Cron je Minute"
   ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)); was sie für den täglichen Takt heißt, steht
   unten.
-- **Endlos-Scrollen in der Sammlung** (Wunsch des Nutzers vom 24.10.2026) braucht keinen Nachtplatz;
-  wann es kommt, ist offen ([16-2-endlos-scrollen.md](16-2-endlos-scrollen.md)).
+- **Endlos-Scrollen in der Sammlung** (Wunsch des Nutzers vom 24.10.2026) kann ab sofort parallel
+  gebaut werden, kein Nachtplatz ([16-2-endlos-scrollen.md](16-2-endlos-scrollen.md)).
+- **Doku-Pushes ohne Deploy** (Vorgabe des Nutzers vom 24.10.2026): `deploy.yml` mit `paths-ignore`
+  für `docs/**`, `README.md` und `CLAUDE.md` – kein Test und kein Build liest sie (geprüft am
+  24.10.2026), und jeder Deploy liest für die Sicherung rund 115 000 Zeilen. Kein Nachtplatz, kommt mit
+  dem nächsten Deploy. Zu einem reinen Doku-Commit gibt es dann keinen Workflow-Lauf.
 
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 
