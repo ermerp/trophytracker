@@ -408,8 +408,10 @@ describe("Routen", () => {
 			expect(erste.body).toMatchObject({ angefragt: 50, nochOffen: 10 });
 			expect(erste.body.seit).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
 
+			// Nur die zehn uebrigen, keines dieses Durchgangs ein zweites Mal -
+			// sonst zaehlte die Oberflaeche am Ende mehr Spiele, als es gibt.
 			const zweite = await json(await post(a, { seit: erste.body.seit }));
-			expect(zweite.body).toMatchObject({ angefragt: 50, nochOffen: 0, seit: erste.body.seit });
+			expect(zweite.body).toMatchObject({ angefragt: 10, nochOffen: 0, seit: erste.body.seit });
 		});
 
 		it("beginnt ohne `seit` neu, lehnt ein ausdrueckliches null und Unsinn ab", async () => {

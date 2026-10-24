@@ -5,7 +5,7 @@ import type { PlanArt } from "../db/plan";
 import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, type IgdbKandidat } from "../domain/igdb";
 import { istErlaubtePlattform, plattformenAus, titelSchluessel } from "../domain/titel";
 import { IgdbKonfigError } from "../igdb/client";
-import { igdbAbgleichSchritt, igdbAuffrischSchritt, igdbPhysischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
+import { AUFFRISCHEN_JE_AUFRUF, igdbAbgleichSchritt, igdbAuffrischSchritt, igdbPhysischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
 import { KeinePlattformError, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
 import type { AppEnv } from "../types";
 import { eintragAntwort } from "./plans";
@@ -180,7 +180,8 @@ export const igdbRoutes = new Hono<AppEnv>()
 		}
 		const seit = (koerper.seit as string | undefined) ?? (await c.var.repos.igdb.datenbankZeit());
 		const erschienen = await c.var.repos.games.erschieneneFreigeben();
-		const ergebnis = await igdbAuffrischSchritt(c.var.repos, c.var.igdb);
+		const spiele = await c.var.repos.igdb.zumAuffrischenVor(seit, AUFFRISCHEN_JE_AUFRUF);
+		const ergebnis = await igdbAuffrischSchritt(c.var.repos, c.var.igdb, AUFFRISCHEN_JE_AUFRUF, 0, spiele);
 		const nochOffen = await c.var.repos.igdb.auffrischOffen(seit);
 		return c.json({ ...ergebnis, erschienen, seit, nochOffen }, ergebnis.status === "fehler" ? 502 : 200);
 	})
