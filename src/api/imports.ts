@@ -45,6 +45,7 @@ function kandidatAntwort(k: ImportKandidatZeile) {
 		plattformen: k.platforms ? k.platforms.split(",") : [],
 		typ: k.game_type,
 		kritik: k.critic_score === null ? null : { wert: k.critic_score, anzahl: k.critic_score_count },
+		spieler: k.user_score === null ? null : { wert: k.user_score, anzahl: k.user_score_count },
 	};
 }
 

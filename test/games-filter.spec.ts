@@ -191,16 +191,19 @@ describe("GET /api/games – Filter", () => {
 		]);
 	});
 
-	it("sort=wertung und sort=release: beste bzw. neueste zuerst, ohne Wert in beiden Richtungen am Ende (Stufe 20e-b)", async () => {
+	it("sort=wertung, sort=kritik und sort=release: beste bzw. neueste zuerst, ohne Wert in beiden Richtungen am Ende (Stufe 20e-b, 20k)", async () => {
 		await env.DB.batch([
-			env.DB.prepare("UPDATE game SET critic_score = 92, release_date = '2015-03-24' WHERE title = 'Bloodborne'"),
-			env.DB.prepare("UPDATE game SET critic_score = 92 WHERE title = 'Journey'"),
-			env.DB.prepare("UPDATE game SET critic_score = 90, release_date = '2001-09-24' WHERE title = 'Ico'"),
+			env.DB.prepare("UPDATE game SET critic_score = 92, user_score = 88, release_date = '2015-03-24' WHERE title = 'Bloodborne'"),
+			env.DB.prepare("UPDATE game SET critic_score = 92, user_score = 80 WHERE title = 'Journey'"),
+			env.DB.prepare("UPDATE game SET critic_score = 90, user_score = 88, release_date = '2001-09-24' WHERE title = 'Ico'"),
 			env.DB.prepare("UPDATE game SET release_date = '2013-09-17' WHERE title = 'Grand Theft Auto V'"),
 		]);
-		// Gleichstand (92) entscheidet der Titel, und der dreht sich nicht mit.
-		expect(await titel("sort=wertung")).toEqual(["Bloodborne", "Journey", "Ico", "Grand Theft Auto V", "Journey Collector"]);
-		expect(await titel("sort=wertung&richtung=auf")).toEqual(["Ico", "Bloodborne", "Journey", "Grand Theft Auto V", "Journey Collector"]);
+		// `wertung` ist seit 20k die Spielerwertung; Gleichstand (88) entscheidet der Titel, und der dreht sich nicht mit.
+		expect(await titel("sort=wertung")).toEqual(["Bloodborne", "Ico", "Journey", "Grand Theft Auto V", "Journey Collector"]);
+		expect(await titel("sort=wertung&richtung=auf")).toEqual(["Journey", "Bloodborne", "Ico", "Grand Theft Auto V", "Journey Collector"]);
+		// `kritik` ist die Kritikerwertung (bis 20k unter `wertung`).
+		expect(await titel("sort=kritik")).toEqual(["Bloodborne", "Journey", "Ico", "Grand Theft Auto V", "Journey Collector"]);
+		expect(await titel("sort=kritik&richtung=auf")).toEqual(["Ico", "Bloodborne", "Journey", "Grand Theft Auto V", "Journey Collector"]);
 		expect(await titel("sort=release")).toEqual(["Bloodborne", "Grand Theft Auto V", "Ico", "Journey", "Journey Collector"]);
 		expect(await titel("sort=release&richtung=auf")).toEqual(["Ico", "Grand Theft Auto V", "Bloodborne", "Journey", "Journey Collector"]);
 	});

@@ -276,18 +276,29 @@ export function Spieldetail() {
           <div className="heldtext">
             <TitelFeld titel={spiel.titel} laeuft={laeuft} onSpeichern={umbenennen} />
 
+            {/* Spieler vor Kritiker (Stufe 20k, Entscheidung des Nutzers vom
+                22.10.2026); nebeneinander der Unterschied, darum hier beide Namen. */}
+            <p className="herkunft wertungen">
+              <span>
+                Spieler{' '}
+                {spiel.spieler ? (
+                  <><b className="zahl">{spiel.spieler.wert}</b><span className="still">/100</span></>
+                ) : (
+                  <span className="still">unbekannt</span>
+                )}
+              </span>
+              <span>
+                Kritiker{' '}
+                {spiel.kritik ? (
+                  <><b className="zahl">{spiel.kritik.wert}</b><span className="still">/100</span></>
+                ) : (
+                  <span className="still">unbekannt</span>
+                )}
+              </span>
+            </p>
             <p className="herkunft">
-              {spiel.kritik ? (
-                <>
-                  <b className="zahl">{spiel.kritik.wert}</b>
-                  <span className="still">/100</span>
-                </>
-              ) : (
-                <span className="still">Wertung unbekannt</span>
-              )}
-              {jahr && <> · <span className="zahl">{jahr}</span></>}
-              {spiel.releaseStatus === 'angekuendigt' && <> · angekündigt</>}
-              {' · '}
+              {jahr && <><span className="zahl">{jahr}</span> · </>}
+              {spiel.releaseStatus === 'angekuendigt' && <>angekündigt · </>}
               {igdbLink(spiel.igdb.slug) ? (
                 <a href={igdbLink(spiel.igdb.slug)!} target="_blank" rel="noreferrer">IGDB</a>
               ) : (

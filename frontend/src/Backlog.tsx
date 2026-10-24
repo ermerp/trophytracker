@@ -127,7 +127,7 @@ export function Backlog() {
                 </Link>
                 <div>
                   <Link to={`/spiel/${k.spielId}`} className="titel">{k.titel}</Link>
-                  <div className="ruhig klein">{k.plattform} · Kritik {k.kritik ?? 'unbekannt'}</div>
+                  <div className="ruhig klein">{k.plattform} · Wertung {k.spieler ?? 'unbekannt'}</div>
                 </div>
                 <div className="knopfzeile">
                   <button type="button" className="klein" disabled={laeuft} onClick={() => uebernehmen(k, { art: 'backlog' })}>ins Backlog</button>

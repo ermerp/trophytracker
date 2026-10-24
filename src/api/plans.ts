@@ -34,12 +34,13 @@ import { liesJson } from "./validierung";
  * gekauft heisst erfuellt. "verworfen" laesst den Wunsch stehen.
  *
  * Sortierung und Filter laufen hier, nicht in SQL (5.2): Favoriten zuerst,
- * dann Kritikerwertung ist der Standard; To-Do steht nach Position.
+ * dann Spielerwertung ist der Standard (seit 20k; `kritik` sortiert nach der
+ * Kritikerwertung, die bis dahin `wertung` hiess); To-Do steht nach Position.
  * Prioritaet und Rang gibt es seit Migration 0013 nicht mehr (Entscheidung
  * des Nutzers vom 15.09.2026).
  */
 
-const SORTIERUNGEN = ["favorit", "wertung", "titel", "angelegt", "release", "position", "preis"] as const;
+const SORTIERUNGEN = ["favorit", "wertung", "kritik", "titel", "angelegt", "release", "position", "preis"] as const;
 type Sortierung = (typeof SORTIERUNGEN)[number];
 
 /** Herkunft, die die Oberflaeche beim Anlegen eines Kaufeintrags nennen darf (Kandidaten, Stufe 15). */
@@ -127,6 +128,7 @@ export function eintragAntwort(z: PlanZeile) {
 		plattform: z.platform,
 		bild: z.cover_url,
 		kritik: z.critic_score,
+		spieler: z.user_score,
 		erscheinungsdatum: z.release_date,
 		releaseStatus: z.release_status,
 		favorit: z.is_favorite === 1,
@@ -197,6 +199,7 @@ export function kaufKandidatAntwort(k: KaufKandidatZeile) {
 		plattform: k.platform,
 		bild: k.cover_url,
 		kritik: k.critic_score,
+		spieler: k.user_score,
 		favorit: k.is_favorite === 1,
 		/** null heisst unbekannt - nie 0 (Darstellungsregel, Abschnitt 13). */
 		besterGebrauchtpreisCents: k.bester_gebrauchtpreis_cents,
@@ -231,6 +234,7 @@ export function kandidatAntwort(k: KandidatZeile) {
 		plattform: k.platform,
 		bild: k.cover_url,
 		kritik: k.critic_score,
+		spieler: k.user_score,
 	};
 }
 
@@ -238,11 +242,13 @@ type Eintrag = ReturnType<typeof eintragAntwort>;
 
 const nachTitel = (a: Eintrag, b: Eintrag) => a.titel.localeCompare(b.titel, "de") || a.id - b.id;
 // Hoechste Wertung zuerst; ohne Wertung ans Ende, dort nach Titel.
-const nachWertung = (a: Eintrag, b: Eintrag) => (b.kritik ?? -1) - (a.kritik ?? -1) || nachTitel(a, b);
+const nachWertung = (a: Eintrag, b: Eintrag) => (b.spieler ?? -1) - (a.spieler ?? -1) || nachTitel(a, b);
+const nachKritik = (a: Eintrag, b: Eintrag) => (b.kritik ?? -1) - (a.kritik ?? -1) || nachTitel(a, b);
 
 const vergleicher: Record<Sortierung, (a: Eintrag, b: Eintrag) => number> = {
 	favorit: (a, b) => Number(b.favorit) - Number(a.favorit) || nachWertung(a, b),
 	wertung: nachWertung,
+	kritik: nachKritik,
 	titel: nachTitel,
 	// Juengste zuerst.
 	angelegt: (a, b) => b.angelegtAm.localeCompare(a.angelegtAm) || b.id - a.id,

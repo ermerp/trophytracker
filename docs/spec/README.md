@@ -32,7 +32,7 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 7.3 | [07-3-ebay-verworfen.md](07-3-ebay-verworfen.md) | geprüft und verworfen: AWIN, eBays Aspekt `Spielname`, Quellen für „nur digital" |
 | 7.4 | [07-4-store-preise.md](07-4-store-preise.md) | PSN Store-Preise: Endpunkt, Produkt-Id, Zuschnitt |
 | 7.4 | [07-4-store-befunde.md](07-4-store-befunde.md) | was ohne Preis dasteht, Nachpflegeliste, Anzeige |
-| 7.5 | [07-5-kritikerwertungen.md](07-5-kritikerwertungen.md) | Kritikerwertungen |
+| 7.5 | [07-5-kritikerwertungen.md](07-5-kritikerwertungen.md) | Kritiker- und Spielerwertungen |
 | 7.6 | [07-6-igdb.md](07-6-igdb.md) | IGDB-Abgleich |
 | 7.7 | [07-7-psn-weitere-daten.md](07-7-psn-weitere-daten.md) | Spielzeit und Kaufliste: Messung, Grenzen, Umfang |
 | 7.7 | [07-7-ps-plus-gegen-kauf.md](07-7-ps-plus-gegen-kauf.md) | gekauft oder PS+: zwei Zustände, Momentaufnahme, Handlauf |

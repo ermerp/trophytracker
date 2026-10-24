@@ -67,6 +67,8 @@ export type ImportKandidatZeile = {
 	game_type: string | null;
 	critic_score: number | null;
 	critic_score_count: number | null;
+	user_score: number | null;
+	user_score_count: number | null;
 	position: number;
 };
 
@@ -211,7 +213,7 @@ export class WishlistImportRepository {
 		const { results: kandidaten } = await this.db
 			.prepare(
 				"SELECT line_id, igdb_id, name, slug, cover_url, release_date, platforms, game_type, " +
-					"critic_score, critic_score_count, position FROM wishlist_import_candidate " +
+					"critic_score, critic_score_count, user_score, user_score_count, position FROM wishlist_import_candidate " +
 					`WHERE line_id IN (${ids.map(() => "?").join(",")}) ORDER BY line_id, position`,
 			)
 			.bind(...ids)
@@ -227,7 +229,8 @@ export class WishlistImportRepository {
 	async ergebnisSetzen(lineId: number, e: Abgleichergebnis, kandidaten: readonly IgdbKandidat[]): Promise<void> {
 		const einfuegen = this.db.prepare(
 			"INSERT OR IGNORE INTO wishlist_import_candidate (line_id, igdb_id, name, slug, cover_url, release_date, " +
-				"platforms, game_type, critic_score, critic_score_count, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				"platforms, game_type, critic_score, critic_score_count, user_score, user_score_count, position) " +
+				"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		);
 		await this.db.batch([
 			this.db.prepare("DELETE FROM wishlist_import_candidate WHERE line_id = ?").bind(lineId),
@@ -243,6 +246,8 @@ export class WishlistImportRepository {
 					k.typ,
 					k.criticScore,
 					k.criticScoreCount,
+					k.userScore,
+					k.userScoreCount,
 					i,
 				),
 			),

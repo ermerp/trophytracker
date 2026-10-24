@@ -28,6 +28,8 @@ export type KandidatZeile = {
 	game_type: string | null;
 	critic_score: number | null;
 	critic_score_count: number | null;
+	user_score: number | null;
+	user_score_count: number | null;
 	position: number;
 };
 
@@ -56,7 +58,8 @@ export type OhneZuordnungZeile = {
  * Die Zustaende eines Spiels sind aus den Zeitstempeln abgeleitet, es gibt
  * keine Statusspalte (Migration 0010). Kritikerwertungen werden nur
  * ueberschrieben, wenn sie von IGDB stammen oder noch fehlen -
- * critic_source ist genau dafuer da (Abschnitt 7.5).
+ * critic_source ist genau dafuer da (Abschnitt 7.5). Die Spielerwertung
+ * (user_score, Stufe 20k) kommt nur von IGDB und wird immer uebernommen.
  */
 export class IgdbRepository {
 	constructor(
@@ -135,6 +138,7 @@ export class IgdbRepository {
 				.prepare(
 					"UPDATE game SET igdb_id = ?, igdb_slug = ?, cover_url = ?, release_date = ?, release_status = ?, " +
 						IgdbRepository.KRITIK_SETZEN +
+						"user_score = ?, user_score_count = ?, " +
 						"igdb_matched_at = datetime('now'), igdb_matched_source = ?, " +
 						"igdb_checked_at = datetime('now'), igdb_synced_at = datetime('now'), igdb_declined_at = NULL, " +
 						`title = CASE WHEN ${IgdbRepository.OHNE_LISTE} THEN ? ELSE title END, ` +
@@ -149,6 +153,8 @@ export class IgdbRepository {
 					m.releaseStatus,
 					m.criticScore,
 					m.criticScoreCount,
+					m.userScore,
+					m.userScoreCount,
 					quelle,
 					titel,
 					titelSchluessel(titel),
@@ -191,6 +197,7 @@ export class IgdbRepository {
 				.prepare(
 					"UPDATE game SET igdb_slug = ?, cover_url = ?, release_date = ?, release_status = ?, " +
 						IgdbRepository.KRITIK_SETZEN +
+						"user_score = ?, user_score_count = ?, " +
 						"igdb_synced_at = datetime('now') WHERE id = ? AND igdb_id = ?",
 				)
 				.bind(
@@ -200,6 +207,8 @@ export class IgdbRepository {
 					m.releaseStatus,
 					m.criticScore,
 					m.criticScoreCount,
+					m.userScore,
+					m.userScoreCount,
 					gameId,
 					m.igdbId,
 				),
@@ -349,8 +358,8 @@ export class IgdbRepository {
 	async kandidatenSetzen(gameId: number, kandidaten: readonly IgdbKandidat[]): Promise<void> {
 		const einfuegen = this.db.prepare(
 			"INSERT OR IGNORE INTO igdb_candidate (game_id, igdb_id, name, slug, cover_url, release_date, " +
-				"platforms, game_type, critic_score, critic_score_count, position, fetched_at) " +
-				"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+				"platforms, game_type, critic_score, critic_score_count, user_score, user_score_count, position, fetched_at) " +
+				"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
 		);
 		await this.db.batch([
 			this.db.prepare("DELETE FROM igdb_candidate WHERE game_id = ?").bind(gameId),
@@ -366,6 +375,8 @@ export class IgdbRepository {
 					k.typ,
 					k.criticScore,
 					k.criticScoreCount,
+					k.userScore,
+					k.userScoreCount,
 					i,
 				),
 			),
@@ -442,7 +453,8 @@ export class IgdbRepository {
 					"critic_score = CASE WHEN critic_source = 'igdb' THEN NULL ELSE critic_score END, " +
 					"critic_score_count = CASE WHEN critic_source = 'igdb' THEN NULL ELSE critic_score_count END, " +
 					"critic_updated_at = CASE WHEN critic_source = 'igdb' THEN NULL ELSE critic_updated_at END, " +
-					"critic_source = CASE WHEN critic_source = 'igdb' THEN NULL ELSE critic_source END " +
+					"critic_source = CASE WHEN critic_source = 'igdb' THEN NULL ELSE critic_source END, " +
+					"user_score = NULL, user_score_count = NULL " +
 					"WHERE id = ? AND igdb_id IS NOT NULL",
 			)
 			.bind(gameId),
@@ -475,7 +487,7 @@ export class IgdbRepository {
 		const { results: kandidaten } = await this.db
 			.prepare(
 				"SELECT game_id, igdb_id, name, slug, cover_url, release_date, platforms, game_type, " +
-					"critic_score, critic_score_count, position FROM igdb_candidate " +
+					"critic_score, critic_score_count, user_score, user_score_count, position FROM igdb_candidate " +
 					`WHERE game_id IN (${ids.map(() => "?").join(",")}) ORDER BY game_id, position`,
 			)
 			.bind(...ids)

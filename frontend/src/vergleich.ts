@@ -11,6 +11,10 @@
  *
  * **Die Richtung meint die Reihenfolge, die man sieht:** `ab` heißt höchster
  * Wert, neuestes Datum oder Favorit zuerst – in jedem Vergleicher gleich.
+ *
+ * **„Wertung" ist seit Stufe 20k die Spielerwertung** (IGDB-Nutzer), auch
+ * unter „Favoriten zuerst"; die Kritikerwertung heißt seitdem `kritik`
+ * (Entscheidung des Nutzers vom 22.10.2026).
  */
 
 export type Richtung = 'auf' | 'ab'
@@ -52,7 +56,8 @@ export function datumZahl(iso: string | null): number | null {
 /** Was jede Liste anbietet. To-Do hat zusätzlich die eigene Reihenfolge. */
 export const SORTIERBAR = {
   favorit: 'Favoriten zuerst, dann Wertung',
-  wertung: 'Kritikerwertung',
+  wertung: 'Spielerwertung',
+  kritik: 'Kritikerwertung',
   preis: 'Gebrauchtpreis',
   titel: 'Titel',
   release: 'Erscheinungsdatum',
@@ -72,6 +77,7 @@ export type PlanSortierfelder = {
   id: number
   titel: string
   kritik: number | null
+  spieler: number | null
   erscheinungsdatum: string | null
   angelegtAm: string
   favorit: boolean
@@ -89,6 +95,7 @@ const nachTitel = (a: PlanSortierfelder, b: PlanSortierfelder) => a.titel.locale
 export const SORTIER_NATUERLICH: Record<Sortierung, Richtung> = {
   favorit: 'ab',
   wertung: 'ab',
+  kritik: 'ab',
   preis: 'auf',
   titel: 'auf',
   release: 'ab',
@@ -106,6 +113,8 @@ export function VERGLEICH<E extends PlanSortierfelder>(sortierung: Sortierung, r
     case 'titel':
       return richtung === 'auf' ? nachTitel : umgekehrt(nachTitel)
     case 'wertung':
+      return nachZahl((e: E) => e.spieler, richtung, nachTitel)
+    case 'kritik':
       return nachZahl((e: E) => e.kritik, richtung, nachTitel)
     case 'preis':
       return nachZahl((e: E) => e.preisCents, richtung, nachTitel)
@@ -122,8 +131,8 @@ export function VERGLEICH<E extends PlanSortierfelder>(sortierung: Sortierung, r
       // Die Favoriten drehen sich mit, die Wertung darunter auch – die
       // Unbewerteten bleiben in beiden Richtungen am Ende ihrer Gruppe.
       const favorit = (a: E, b: E) => Number(b.favorit) - Number(a.favorit)
-      const kritik = nachZahl((e: E) => e.kritik, richtung, nachTitel)
-      return (a, b) => (richtung === 'ab' ? favorit(a, b) : favorit(b, a)) || kritik(a, b)
+      const wertung = nachZahl((e: E) => e.spieler, richtung, nachTitel)
+      return (a, b) => (richtung === 'ab' ? favorit(a, b) : favorit(b, a)) || wertung(a, b)
     }
   }
 }
@@ -135,12 +144,13 @@ export type LueckeSortierfelder = {
   besterGebrauchtpreisCents: number | null
   fortschritt: number
   kritik: number | null
+  spieler: number | null
   erscheinungsdatum: string | null
 }
 
 /**
  * Sortierung der Lückenliste (Stufe 20e, nachgereicht am 02.10.2026;
- * Kritikerwertung und Erscheinungsdatum seit 20e-b).
+ * Kritikerwertung und Erscheinungsdatum seit 20e-b, Spielerwertung seit 20k).
  *
  * Die Ansicht hatte als einzige Liste gar keine – sie kam aus der Datenbank
  * nach Titel und blieb so. Für den Gebrauchtpreis ist das zu wenig: „Was
@@ -154,7 +164,8 @@ export const LUECKEN_SORTIERUNG = {
   titel: 'Titel',
   preis: 'Gebrauchtpreis',
   fortschritt: 'Fortschritt',
-  wertung: 'Kritikerwertung',
+  wertung: 'Spielerwertung',
+  kritik: 'Kritikerwertung',
   release: 'Erscheinungsdatum',
 } as const
 export type LueckenSortierung = keyof typeof LUECKEN_SORTIERUNG
@@ -165,6 +176,7 @@ export const LUECKEN_NATUERLICH: Record<LueckenSortierung, Richtung> = {
   preis: 'auf',
   fortschritt: 'ab',
   wertung: 'ab',
+  kritik: 'ab',
   release: 'ab',
 }
 
@@ -181,9 +193,11 @@ export function lueckenVergleich<L extends LueckeSortierfelder>(sortierung: Luec
     sortierung === 'preis'
       ? (l) => l.besterGebrauchtpreisCents
       : sortierung === 'wertung'
-        ? (l) => l.kritik
-        : sortierung === 'release'
-          ? (l) => datumZahl(l.erscheinungsdatum)
-          : (l) => l.fortschritt
+        ? (l) => l.spieler
+        : sortierung === 'kritik'
+          ? (l) => l.kritik
+          : sortierung === 'release'
+            ? (l) => datumZahl(l.erscheinungsdatum)
+            : (l) => l.fortschritt
   return nachZahl(wert, richtung, nachLueckenTitel)
 }

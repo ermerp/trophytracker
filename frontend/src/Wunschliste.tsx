@@ -12,8 +12,8 @@ import { Zeichen } from './Symbole'
 /**
  * Wunschliste (Use Case 4, ab Stufe 10; Use Case 11 für das Datum).
  *
- * Favoriten zuerst, dann nach Kritikerwertung (5.2); alternativ Wertung,
- * Titel, Erscheinungsdatum, zuletzt angelegt. Neue Wünsche kommen aus der
+ * Favoriten zuerst, dann nach Spielerwertung (5.2, seit 20k); alternativ
+ * Spieler- oder Kritikerwertung, Titel, Erscheinungsdatum, zuletzt angelegt. Neue Wünsche kommen aus der
  * IGDB-Suche; jeder Treffer trägt sein eigenes Plattform-Dropdown, vorbelegt
  * mit seiner neuesten. Ein Eintrag ohne IGDB-Zuordnung entsteht nur über den
  * ausdrücklichen Knopf (8.2).

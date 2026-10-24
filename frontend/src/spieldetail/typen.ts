@@ -93,6 +93,8 @@ export type IgdbZustand = {
 }
 
 export type Kritik = { wert: number; anzahl: number | null; quelle: string | null; standVom: string | null }
+/** Spielerwertung der IGDB-Nutzer (Stufe 20k) – ohne Quelle, sie kommt nur von IGDB. */
+export type Spielerwertung = { wert: number; anzahl: number | null }
 
 /** Offene Absicht am Spiel (releaseId null) oder an einem seiner Releases (Stufe 10). */
 export type Plan = {
@@ -111,6 +113,7 @@ export type Spiel = {
   igdbId: number | null
   igdb: IgdbZustand
   kritik: Kritik | null
+  spieler: Spielerwertung | null
   erscheinungsdatum: string | null
   releaseStatus: ReleaseStatus
   plaene: Plan[]

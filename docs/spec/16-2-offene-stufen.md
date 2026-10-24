@@ -16,8 +16,9 @@ unten ausdrücklich als offen.
 nach dem Muster von 20i (gebaut am 22.10.2026, [7.4](07-4-store-preise.md); der Store-Schritt im Worker geht erst nach einem fehlerfreien Probelauf über `workflow_dispatch` und spätestens um 20:30 UTC desselben Tages vom Netz, sonst eine Nacht später; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) →
 **der Markt auf 20:17 / 22:17** mit Schwelle 30 h für `markt_geprueft` und Stillstand (Nachtrag
 **20i-c**, gebaut am 23.10.2026, erste Abende 23.10.; Entscheidung vom 22.10.2026, eine Änderung je Nacht) →
-**20k – Spielerwertung** erst am 24.10. nach der Nachtauswertung: Sie ändert das Auffrischen, das das
-Wartungsfenster jede Nacht ruft (`src/db/igdb.ts`; geprüft am 23.10.2026) → **Index-Nachtrag** für die
+**20k – Spielerwertung** (gebaut am 22.10.2026, deployt am 24.10. nach der Nachtauswertung, weil sie das
+Auffrischen ändert, das das Wartungsfenster jede Nacht ruft; [5.2](05-1-favorit-und-sortierung.md),
+[7.5](07-5-kritikerwertungen.md); den Altbestand füllt „Auffrischen") → **Index-Nachtrag** für die
 Auswahlen des Lage-Batches, mit dem Bestand der Lesekosten-Messung und dem Ziel, den
 Wartungs-Leerlauf (rund 2 000 Zeilen je Aufruf, 23.10.2026) zu senken – er rückt vor, weil der
 **Vorwärm-Versuch gestrichen** ist: „Ausgang begonnen" läuft schon vor jeder Lage

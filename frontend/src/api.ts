@@ -273,6 +273,8 @@ export type IgdbKandidat = {
   plattformen: string[]
   typ: string | null
   kritik: { wert: number; anzahl: number | null } | null
+  /** Spielerwertung (IGDB-Nutzer, Stufe 20k). */
+  spieler: { wert: number; anzahl: number | null } | null
 }
 
 export type IgdbStatus = {
@@ -356,6 +358,8 @@ export type PlanEintrag = {
   plattform: Plattform | null
   bild: string | null
   kritik: number | null
+  /** Spielerwertung (Stufe 20k); auf der Karte „Wertung". */
+  spieler: number | null
   erscheinungsdatum: string | null
   releaseStatus: ReleaseStatus | null
   favorit: boolean
@@ -453,6 +457,7 @@ export type KaufKandidat = {
   plattform: Plattform | null
   bild: string | null
   kritik: number | null
+  spieler: number | null
   favorit: boolean
   /** null heißt unbekannt – nie 0. */
   besterGebrauchtpreisCents: number | null
@@ -502,6 +507,7 @@ export type BacklogKandidat = {
   plattform: Plattform
   bild: string | null
   kritik: number | null
+  spieler: number | null
 }
 
 /** Wunschlisten-Import (Abschnitt 8.2, Stufe 11). */

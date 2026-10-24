@@ -50,6 +50,8 @@ type Luecke = {
   platin: boolean
   /** Kritikerwertung des Spiels; null heisst unbekannt (seit 20e-b, zum Sortieren). */
   kritik: number | null
+  /** Spielerwertung des Spiels (seit 20k, zum Sortieren). */
+  spieler: number | null
   /** Erscheinungsdatum des Spiels als ISO-Datum; null heisst unbekannt (seit 20e-b). */
   erscheinungsdatum: string | null
   eigenerStatus: PlayStatus | null

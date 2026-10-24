@@ -80,6 +80,13 @@
   color: var(--text);
 }
 
+/* Spieler- und Kritikerwertung (Stufe 20k): auf dem Handy untereinander,
+   ab 48rem in einer Zeile. */
+.wertungen {
+  display: grid;
+  gap: var(--a1);
+}
+
 .pillen {
   display: flex;
   flex-wrap: wrap;
@@ -585,6 +592,11 @@
 
   .spieltitel {
     font-size: 1.9rem;
+  }
+
+  .wertungen {
+    display: flex;
+    gap: var(--a4);
   }
 
   /* Zwei Spalten. 421 der 431 Spiele haben genau ein Release - dann steht
