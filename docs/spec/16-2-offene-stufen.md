@@ -45,8 +45,8 @@ Am 02.11.2026 wird das Budget arbeitender Aufrufe neu bewertet. Fest sind die Ab
   Bestand im täglichen Takt trägt, und „Cron je Minute"
   ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)); was sie für den täglichen Takt heißt, steht
   unten.
-- **Endlos-Scrollen in der Sammlung** (Wunsch des Nutzers vom 24.10.2026) braucht keinen Nachtplatz;
-  wann es kommt, ist offen ([16-2-endlos-scrollen.md](16-2-endlos-scrollen.md)).
+- **Endlos-Scrollen** in Sammlung und Änderungsprotokoll ist gebaut (Stufe 22, 24.10.2026,
+  [16-2-endlos-scrollen.md](16-2-endlos-scrollen.md)), mit ihr `paths-ignore` für Doku-Pushes ([15.2](15-repository-deployment.md)).
 
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 

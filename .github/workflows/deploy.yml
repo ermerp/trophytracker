@@ -3,6 +3,15 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # Reine Doku-Pushes deployen nicht (Stufe 22, Vorgabe des Nutzers vom
+    # 24.10.2026): Kein Test und kein Build liest diese Dateien, und jeder
+    # Deploy liest fuer die Sicherung rund 115 000 Zeilen. Ein Push mit auch
+    # nur einer anderen Datei deployt wie bisher - samt der Doku darin. Zu
+    # einem reinen Doku-Commit gibt es deshalb keinen Lauf.
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "CLAUDE.md"
   pull_request:
 
 permissions:

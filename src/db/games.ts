@@ -704,9 +704,12 @@ aeenliste haengt
 			release: "g.release_date",
 		};
 		const wert = nachWert[filter.sort];
+		// `g.id` zuletzt (Stufe 22): `sort_title` ist nicht eindeutig, und das
+		// Endlos-Scrollen haengt Block an Block - bei gleichen Werten an einer
+		// Blockgrenze darf SQLite sonst zwischen zwei Abfragen anders ordnen.
 		const sortierung = wert
-			? `${wert} IS NULL, ${wert} ${umgekehrt ? "ASC" : "DESC"}, g.sort_title`
-			: `g.sort_title${filter.richtung === "ab" ? " DESC" : ""}`;
+			? `${wert} IS NULL, ${wert} ${umgekehrt ? "ASC" : "DESC"}, g.sort_title, g.id`
+			: `g.sort_title${filter.richtung === "ab" ? " DESC" : ""}, g.id`;
 
 		const [zaehlung, seite] = await this.db.batch([
 			this.db.prepare(`SELECT COUNT(*) AS n ${woher}${sucheBedingung}`).bind(...werte),

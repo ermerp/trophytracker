@@ -26,7 +26,7 @@ erfasste Discs, nächtliche Läufe seit dem 20.09.2026.
 
 | Funktion | Stand | Abschnitt |
 |---|---|---|
-| Deployment | GitHub Action baut und deployt bei Push auf `main`, Migrationen davor | [15.2](docs/spec/15-repository-deployment.md) |
+| Deployment | GitHub Action baut und deployt bei Push auf `main`, Migrationen davor; reine Doku-Pushes (`docs/`, `README.md`, `CLAUDE.md`) deployen nicht | [15.2](docs/spec/15-repository-deployment.md) |
 | Sicherung vor Migration | Dump gegen die Zeilenzahlen der Datenbank, Abbruch bei Abweichung; Datenmigrationen protokollieren ihre Wirkung | [14.2](docs/spec/14-backup-export.md) |
 | Zugriffsschutz | Cloudflare Access vor dem ganzen Worker, ein Access Service Token für Maschinen-Endpunkte | [15.3](docs/spec/15-repository-deployment.md) |
 | Schema | 26 Tabellen, 32 Migrationen, sieben Views; Zugriff nur über `src/db/` | [3](docs/spec/03-sammlung.md), [11](docs/spec/11-sichten.md) |
