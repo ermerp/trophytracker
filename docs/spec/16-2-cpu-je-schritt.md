@@ -29,7 +29,17 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   27 607 Zeilen, je Leerlauf-Aufruf rund 142 (189 weniger, die Store-Auswahl). Wartungs-Leerlauf 3–16,
   Median 5 (n = 33; DFW 5,0, SJC 9,6), vier über 10, alle SJC/LAX – unverändert, rund 2 000 Zeilen je
   Aufruf. Sync 10–20, Spielzeit 26 und 30 ms. `rows_read_24h` 686 129, davon die Nacht rund 115 000,
-  der Rest Deploys und Probelauf am 22.10. Je Standort über die Nächte 20.–22.10. (Leerlauf, Median): EWR 4,8, DFW 5,6, IAD 6,1,
+  der Rest Deploys und Probelauf am 22.10. **Nacht zum 24.10.:** alle 72 `ok`, die Standorte erstmals
+  weltweit verteilt (FRA, AMS, LHR, CDG, VIE, PRG, ARN, LIS, MAD, OTP, HKG, NRT, KIX, SYD, BNE neben den
+  US-Standorten; bis zum 23.10. nur USA). Wartungs-Leerlauf 3–10, **Median 4** (n = 34), keiner über 10;
+  PSN-Leerlauf 3–13, Median 5 (n = 22), drei über 10 (SJC 11/13, LAX 13). **Der bessere
+  Wartungs-Leerlauf kommt vom Standortwechsel, nicht vom Code:** Am Cron hat sich nichts geändert, die
+  Zeilen je Aufruf sind unverändert rund 2 000 (23 928 je Leerlauf-Stunde), und die US-Standorte liegen
+  wie zuvor (DFW 4, SJC 10). **Das Budget für den Leerlauf gilt damit nicht als erreicht** – es hinge an
+  einem Standort, den niemand festlegt (Entscheidung des Nutzers vom 24.10.2026). Sync 8–18, Spielzeit
+  19 (EWR) und 23 ms (LHR), Level 8, Jahre 8, IGDB-Auffrischen 9 (ein Spiel fällig). `rows_read_24h`
+  234 148, `rows_written_24h` 3 507; die Nacht (03–09 UTC) rund 108 500, davon PSN 14 330, der Rest der
+  Deploy von 20i-c (115 804) und die Abendläufe (rund 9 900). Je Standort über die Nächte 20.–22.10. (Leerlauf, Median): EWR 4,8, DFW 5,6, IAD 6,1,
   ORD/ATL 7,2, LAX 7,6, MIA 7,9, SJC 9,8, SEA 10,7 (n = 2) – der langsamste Standort braucht knapp das
   Doppelte des schnellsten. `rows_read_24h` 382 042, davon die Nacht (03–09 UTC) rund 128 000; der Rest
   ist App-Nutzung am Abend des 21.10. (Zähler von Statistik und Einstellungen, Stichprobe der D1-Analytics). Am 18.10. **gab es den PSN-Leerlauf nicht:** In einer Kaufliste-Nacht
@@ -79,7 +89,8 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   für 20 mit echter D1), und **kein** Cron-Aufruf traf eine warme Instanz (0 von 28 im Minutentakt).
   Verworfen damit auch der Wortindex **als eine Zeile** (Berechnetes, das gespeichert würde). Als
   Action in der Nacht zum 20.10.2026: je Portion von sechs Releases Median 2, P90 4, höchstens 15 ms,
-  am 21.10. Median 3, P90 6, höchstens 12, am 22.10. Median 2, P90 4, höchstens 13 ([7.3](07-3-ebay-betrieb.md)).
+  am 21.10. Median 3, P90 6, höchstens 12, am 22.10. Median 2, P90 4, höchstens 13, am ersten Vorabend
+  (23.10.) Median 2, vier von 72 ab 8, höchstens 20 ([7.3](07-3-ebay-betrieb.md)).
 - **Die Lage der Markt-Action** (`GET /api/sync/markt/lage`) – 7 ms (IAD, 20.10.), 19 (SEA, 21.10.),
   18 ms (MSP, 22.10.); **untersucht am 22.10.2026**. Sie ist **ein** D1-Aufruf mit drei Anweisungen und
   liest in der Produktion **1 954 Zeilen** (Auswahl 1 473 für 431 Ziele, alle 479 Spieltitel, Sperrliste
@@ -106,6 +117,12 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   nicht** (zum Vorwärmen oben). Portionen der Store-Action: Median 2–3,5, höchstens 9 ms (die jeweils
   erste je Standort), Concept-Route 2 ms. **Erste Abende, 22.10.2026** (beide leer): „Ausgang begonnen"
   7 ms, Lage 13 (IAD) / 6 ms (DFW), **Ausgang „ende" mit drei D1-Aufrufen 6 / 4 ms** – im Budget.
+  **Erste Abende mit Arbeit, 23.10.2026:** Markt 23:08 statt 20:17 (2 h 51 zu spät), 431 geprüft in
+  72 Portionen, 0 offen, Rückfall 00:47 leer, kein `markt_leer`; Store 23:30 statt 20:47 (2 h 43), 79
+  geprüft in acht Portionen (2–23 ms, Median 5), 0 offen, Rückfall 01:07 leer. **Store-Lage 16 ms (ORD)
+  bei 79 Zeilen**, im leeren Rückfall 7 (SJC); Markt-Lage 4 ms (IAD) bei 1 954, im Rückfall 4 (LAX);
+  Ausgang 4–14 ms. **Beide Lagen werden nur weiter beobachtet**, keine eigene Untersuchung
+  (Entscheidung des Nutzers vom 24.10.2026).
 - **IGDB-Auffrischen** (Frist sieben Tage, 50 Spiele je Aufruf, 10.1 Schritt 12) – **erstmals gemessen
   in der Nacht zum 20.10.2026:** neun Aufrufe von 06:05 bis 06:45, **20–54 ms**, Median 34 (MIA 25–28,
   EWR 28, IAD 39, SJC 20, vier ohne Standort 34–54); acht mit Logzeile, darin 370 angefragt und 369

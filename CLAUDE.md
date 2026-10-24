@@ -212,7 +212,7 @@ Gilt für `/wrapup` vor dessen allgemeinen Schritten. **Nur echte Abweichungen, 
 - **Entscheidungen des Nutzers** → `docs/entscheidungen.md`. **Wo der Nutzer korrigieren musste** → der Vorfall in `docs/lehren.md`.
 - **CLAUDE.md** nur, wenn eine Regel fehlte oder unklar war: die bestehende Regel schärfen, keinen Absatz und kein Beispiel anhängen, kein Datum, keine Zahlen aus dem Vorfall. README nur bei Einrichtung, Betrieb oder Funktionsumfang.
 - **Wo die Session steht und anstehende Beobachtungen** → die Erinnerung „Projektstand" und ihre Zeile in `MEMORY.md`, mit Datum – nur, was in wenigen Tagen erledigt ist, und Erledigtes wird aus der Erinnerung gestrichen; Dauerhaftes gehört nach 16.2.
-- **Erst den Diff zeigen, dann schreiben.** Nach der Freigabe wird ohne zweite Rückfrage committet, gemergt und gepusht (Branch-Regel oben); halbfertiger Code bleibt auf seinem Branch, ein Push auf `main` deployt. Keine Nutzerdaten in die Dokumentation – das Repository ist öffentlich.
+- **Erst den Diff zeigen, dann schreiben** – wenn sich eine Regel, eine Entscheidung oder der Plan ändert. Eine **reine Nachtauswertung** (Messwerte in ihren Abschnitt, eine Changelog-Zeile) wird ohne Diff vorab geschrieben. Nach der Freigabe wird ohne zweite Rückfrage committet, gemergt und gepusht (Branch-Regel oben); halbfertiger Code bleibt auf seinem Branch, ein Push auf `main` deployt. Keine Nutzerdaten in die Dokumentation – das Repository ist öffentlich.
 
 ## Kontext
 
