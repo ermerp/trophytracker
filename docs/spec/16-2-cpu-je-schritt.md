@@ -39,7 +39,17 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   einem Standort, den niemand festlegt (Entscheidung des Nutzers vom 24.10.2026). Sync 8–18, Spielzeit
   19 (EWR) und 23 ms (LHR), Level 8, Jahre 8, IGDB-Auffrischen 9 (ein Spiel fällig). `rows_read_24h`
   234 148, `rows_written_24h` 3 507; die Nacht (03–09 UTC) rund 108 500, davon PSN 14 330, der Rest der
-  Deploy von 20i-c (115 804) und die Abendläufe (rund 9 900). Je Standort über die Nächte 20.–22.10. (Leerlauf, Median): EWR 4,8, DFW 5,6, IAD 6,1,
+  Deploy von 20i-c (115 804) und die Abendläufe (rund 9 900). **Nacht zum 25.10., eine Kaufliste-Nacht:**
+  alle 72 `ok`, wieder weltweit verteilt; Wartungs-Leerlauf 3–10, Median 5 (n = 35), keiner über 10,
+  je Standort wie zuvor (EWR 4, AMS 5, ORD 6–10, SJC 9); PSN-Leerlauf 3–10, Median 4 (n = 7, die
+  Kaufliste belegte 15 Aufrufe). Kaufliste 11–26 ms, Median 19 (n = 15; FRA 12, MXP 11/12, DFW 18–23,
+  SEA 26/26) statt 35–108 vor 18k-b. Sync 8–17, Median 11 (n = 11), Spielzeit 24 / 24 ms (LHR, 200 / 179
+  Titel), Level 12, Jahre 8; kein IGDB-Auffrischen – nach dem Auffrischen von Hand am 24.10. ist
+  nichts fällig. `rows_read_24h` 821 435, `rows_written_24h` 4 042; die Nacht (03–09 UTC) 185 006,
+  davon PSN 17 896, Jahre rund 22 300 und die wöchentliche Sicherung rund 73 000; 626 592 sind Bau
+  und Produktionsprüfung von Stufe 22 am 24.10. (10–14 UTC), 9 837 die Abendläufe. Die Sicherung
+  (`GET /api/export/backup.json`) brauchte **212 ms CPU** (SEA) und lief ohne Abbruch – einmal je
+  Woche, bisher nirgends gemessen; nur notiert. Je Standort über die Nächte 20.–22.10. (Leerlauf, Median): EWR 4,8, DFW 5,6, IAD 6,1,
   ORD/ATL 7,2, LAX 7,6, MIA 7,9, SJC 9,8, SEA 10,7 (n = 2) – der langsamste Standort braucht knapp das
   Doppelte des schnellsten. `rows_read_24h` 382 042, davon die Nacht (03–09 UTC) rund 128 000; der Rest
   ist App-Nutzung am Abend des 21.10. (Zähler von Statistik und Einstellungen, Stichprobe der D1-Analytics). Am 18.10. **gab es den PSN-Leerlauf nicht:** In einer Kaufliste-Nacht
@@ -122,7 +132,11 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   geprüft in acht Portionen (2–23 ms, Median 5), 0 offen, Rückfall 01:07 leer. **Store-Lage 16 ms (ORD)
   bei 79 Zeilen**, im leeren Rückfall 7 (SJC); Markt-Lage 4 ms (IAD) bei 1 954, im Rückfall 4 (LAX);
   Ausgang 4–14 ms. **Beide Lagen werden nur weiter beobachtet**, keine eigene Untersuchung
-  (Entscheidung des Nutzers vom 24.10.2026).
+  (Entscheidung des Nutzers vom 24.10.2026). **Abende des 24.10.:** Markt 22:28 statt 20:17 (2 h 11
+  zu spät), 431 geprüft in 72 Portionen (Median 2,5, P90 5, sieben ab 8, höchstens 19 ms, LAX), 0
+  offen; Store 22:43 statt 20:47 (1 h 56), 79 geprüft in acht Portionen (2–14 ms), 0 offen; beide
+  Rückfälle (00:22 / 00:31) leer, kein `markt_leer`. **Store-Lage 2 ms (MSP) bei 79 Zeilen, im leeren
+  Rückfall 11 (EWR)**; Markt-Lage 7 (LAX), im Rückfall 7 (SEA); Ausgang 3–13 ms.
 - **IGDB-Auffrischen** (Frist sieben Tage, 50 Spiele je Aufruf, 10.1 Schritt 12) – **erstmals gemessen
   in der Nacht zum 20.10.2026:** neun Aufrufe von 06:05 bis 06:45, **20–54 ms**, Median 34 (MIA 25–28,
   EWR 28, IAD 39, SJC 20, vier ohne Standort 34–54); acht mit Logzeile, darin 370 angefragt und 369
