@@ -14,10 +14,13 @@ Beides liegt beim selben Anbieter wie die Datenbank. Gegen einen Bedienfehler hi
 `.github/workflows/backup.yml` läuft sonntags um 03:17 UTC – bewusst nicht zur vollen Stunde, dort staut GitHub die Cron-Jobs – und ist zusätzlich über `workflow_dispatch` von Hand auslösbar. Die Kopie landet im **privaten** Repository `trophytracker-backup`:
 
 1. `wrangler d1 export --remote --output=backup.sql`
-2. `GET /api/export/backup.json` mit dem Service Token `github-backup` holen; enthält die Antwort keine Spiele, bricht der Lauf hier ab – vor jedem Schreiben
-3. Dump prüfen: `scripts/sicherung-pruefen.sh` hält die `INSERT`-Zeilen je Tabelle gegen `COUNT(*)` der Datenbank, `scripts/dump-pruefen.sh` prüft ihn auf Klartext-Zugangsdaten. Beide Skripte benutzt auch der Deploy-Job (15.2), damit es nur eine Prüfung gibt
-4. Beide Dateien und eine kurze `README.md` ins private Repo kopieren und **nur bei Änderung** committen
-5. `POST /api/backup/vermerk` mit Zeitpunkt und Commit – auch bei einem Lauf ohne Änderung
+2. `GET /api/export/backup.json` mit dem Service Token `github-backup` holen und plausibel prüfen (Spiele vorhanden, keine Zugangsdaten). **Scheitert das, läuft der Lauf weiter** (`continue-on-error`) – der Dump ist die Sicherung, die sich einspielen lässt
+3. Dump prüfen: `scripts/sicherung-pruefen.sh` hält die `INSERT`-Zeilen je Tabelle gegen `COUNT(*)` der Datenbank, `scripts/dump-pruefen.sh` prüft ihn auf Klartext-Zugangsdaten. Beide Skripte benutzt auch der Deploy-Job (15.2), damit es nur eine Prüfung gibt. Scheitert eine davon, endet der Lauf **vor** dem Schreiben
+4. `scripts/sicherung-ablegen.sh`: `backup.sql` immer, `backup.json` nur nach gelungenem Schritt 2, dazu eine kurze `README.md` ins private Repo, committet **nur bei Änderung**. Ohne neues JSON heisst der Commit „nur backup.sql", und dort liegt die `backup.json` einer früheren Woche (ihr `exportiertAm` sagt, von wann)
+5. `POST /api/backup/vermerk` mit Zeitpunkt und Commit – auch bei einem Lauf ohne Änderung und auch ohne neues JSON
+6. War Schritt 2 gescheitert, endet der Lauf danach **rot** – sichtbar in GitHub, obwohl der Dump abgelegt ist
+
+**Bis zum 25.10.2026 brach ein gescheiterter JSON-Export den ganzen Lauf ab**, und der schon gezogene Dump derselben Woche ging mit verloren (Vorgabe des Nutzers vom selben Tag; Anlass: `backup.json` brauchte 212 ms CPU, [16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)). `test/sicherung-action.spec.ts` hält Workflow und Skript fest; dass das Skript den Dump ohne JSON ablegt, ist am 25.10.2026 gegen ein Wegwerf-Repository nachgewiesen.
 
 Kostenlos, versioniert, unabhängig vom Cloudflare-Konto. Git liefert die Historie mit, du kannst also auf jeden beliebigen Wochenstand zurück.
 

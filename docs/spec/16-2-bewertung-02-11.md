@@ -15,20 +15,21 @@ um 08:30 gestartet) und wenn sie von Hand gestartet wird. **Der Deploy ruft die 
 per `wrangler d1 export` über die D1-API ([15.2](15-repository-deployment.md)), dort zählt keine Worker-CPU,
 und sein Abbruch hängt nicht an ihr (geprüft am 25.10.2026 in `deploy.yml`).
 
-**Wenn die Laufzeit sie abbricht:** `curl -fsS --retry 3` scheitert, der Lauf endet vor dem Schreiben
-ins private Repository – **auch `backup.sql` desselben Laufs wird dann nicht abgelegt**, obwohl der
-Dump davor gelungen war. Nach acht Tagen warnt das Dashboard rot ([14.2](14-backup-export.md)).
+**Wenn die Laufzeit sie abbricht:** Seit dem 25.10.2026 wird der Dump trotzdem geprüft und abgelegt,
+und der Lauf endet rot ([14.2](14-backup-export.md)); bis dahin ging der Dump derselben Woche mit
+verloren. `backup.json` ist dann die einer früheren Woche.
 
 **Vorzuschlagen bis zum 02.11.:** wie die Route unter die Grenze kommt oder welcher Weg sie ersetzt.
-Denkbar und **noch nicht geprüft**:
+Denkbar und **noch nicht geprüft** sind die ersten beiden:
 
 - **Portioniert:** je Tabelle oder je Seite einer Tabelle ein Aufruf, die Action setzt die Teile zusammen –
   `trophy` ist die größte Tabelle und bräuchte selbst Seiten.
 - **Ohne Worker:** `backup.json` in der Action aus dem schon erzeugten `backup.sql` bauen (in ein
   lokales SQLite einspielen und als JSON ausgeben) – die Route fiele für die Sicherung weg; dann wäre
   zu klären, ob sie für etwas anderes noch gebraucht wird.
-- **Reihenfolge entkoppeln:** `backup.sql` ablegen, auch wenn der JSON-Teil scheitert – das beseitigt
-  den Abbruch nicht, aber den Verlust des Dumps.
+- **Reihenfolge entkoppeln** – **gebaut am 25.10.2026** (Vorgabe des Nutzers, nicht erst nach der
+  Bewertung): beseitigt den Abbruch nicht, aber den Verlust des Dumps. Zu wählen bleibt zwischen den
+  beiden Wegen oben.
 
 #### Die Kaufliste: lohnt eine kleinere Portion?
 
