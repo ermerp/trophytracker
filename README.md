@@ -652,19 +652,23 @@ GitHub die Cron-Jobs aller Repositories. Von Hand startbar über Actions →
 **Was der Lauf tut**
 
 1. `wrangler d1 export --remote` → `backup.sql`
-2. `GET /api/export/backup.json` mit dem Service Token `github-backup`;
-   enthält die Antwort keine Spiele, bricht der Lauf ab – **vor** jedem Schreiben
+2. `GET /api/export/backup.json` mit dem Service Token `github-backup` –
+   **scheitert das, läuft der Lauf weiter**: Der Dump ist die Sicherung, die
+   sich einspielen lässt
 3. `scripts/sicherung-pruefen.sh`: `INSERT`-Zeilen je Tabelle gegen `COUNT(*)`
 4. `scripts/dump-pruefen.sh`: kein NPSSO, kein Refresh- oder Access Token im
-   Klartext
-5. beide Dateien und eine kurze `README.md` ins private Repo, **Commit nur bei
-   Änderung**
+   Klartext – scheitert 3 oder 4, endet der Lauf **vor** jedem Schreiben
+5. `scripts/sicherung-ablegen.sh`: `backup.sql` immer, `backup.json` nur nach
+   gelungenem Schritt 2, dazu eine kurze `README.md` ins private Repo, **Commit
+   nur bei Änderung** (ohne neues JSON heisst er „nur backup.sql")
 6. `POST /api/backup/vermerk` – auch bei einem Lauf ohne Änderung
+7. war Schritt 2 gescheitert, endet der Lauf jetzt **rot**
 
 Der erste manuelle Lauf ist zugleich der Verbindungstest für Repo, PAT und
-Service Token. Ein eigener Testworkflow erübrigt sich: Stimmt eines von beiden
-nicht, scheitert schon Schritt 2 oder der Klon in Schritt 5 – und zwar bevor
-irgendetwas geschrieben wird.
+Service Token. Ein eigener Testworkflow erübrigt sich: Stimmt der PAT nicht,
+scheitert der Klon in Schritt 5, bevor etwas geschrieben wird; stimmt das
+Service Token nicht, scheitert Schritt 2 – der Dump wird dann trotzdem abgelegt,
+der Vermerk in Schritt 6 scheitert am selben Token, und der Lauf endet rot.
 
 **Erster Lauf am 14.09.2026**, 26 Sekunden: `backup.sql` 910.717 Byte mit 1.762
 `INSERT`-Zeilen, `backup.json` 569.884 Byte mit 14 Tabellen, Schemastand

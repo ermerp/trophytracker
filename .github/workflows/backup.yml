@@ -61,7 +61,13 @@ jobs:
       # Laeuft das Token ab, antwortet Access mit 302 auf die Login-Seite,
       # nicht mit 401. Deshalb -f (scheitert bei >= 400) UND die
       # Plausibilitaetspruefung darunter: eine HTML-Loginseite ist kein JSON.
+      #
+      # continue-on-error: Scheitert der JSON-Teil, wird der Dump trotzdem
+      # geprueft und abgelegt - er ist die Sicherung, die sich einspielen
+      # laesst (14.2). Rot endet der Lauf dann im letzten Schritt.
       - name: JSON-Export holen
+        id: json
+        continue-on-error: true
         env:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
@@ -103,83 +109,16 @@ jobs:
 
       # Der Fine-grained PAT reicht ausschliesslich auf das private Repo.
       # Nicht GITHUB_TOKEN: der kommt nicht ueber dieses Repository hinaus.
+      # Der Token steckt in der URL; GitHub maskiert Secrets im Log.
       - name: Ins private Repository schreiben
         id: commit
         env:
           BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+          JSON_OK: ${{ steps.json.outcome == 'success' && 'ja' || 'nein' }}
         run: |
-          set -euo pipefail
-          # Der Token steckt in der URL; GitHub maskiert Secrets im Log.
-          # --depth 1, weil der Verlauf hier jede Woche um einen Dump waechst
-          # und dieser Job ihn nicht braucht.
-          url="https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/${BACKUP_REPO}.git"
-          git clone --depth 1 "$url" ziel || git clone "$url" ziel
-
-          cd ziel
-          # Ein frisch angelegtes Repository hat noch keinen Commit und damit
-          # keinen Branch. symbolic-ref taugt fuer beide Faelle: Es zeigt HEAD
-          # auf main, ob der Branch nun schon existiert oder erst entsteht.
-          git rev-parse --verify HEAD >/dev/null 2>&1 || git symbolic-ref HEAD refs/heads/main
-
-          cp ../export/backup.sql ../export/backup.json .
-          cat > README.md <<'ENDE'
-          # trophytracker-backup
-
-          Woechentliche Sicherung von [trophytracker](https://github.com/ermerp/trophytracker).
-          Geschrieben von `.github/workflows/backup.yml` dort, nicht von Hand.
-
-          | Datei | Inhalt |
-          |---|---|
-          | `backup.sql` | vollstaendiger D1-Dump, zum Wiedereinspielen |
-          | `backup.json` | dieselben Daten als lesbare Zweitform, ohne Rohantworten und Zugangsdaten |
-
-          **Dieses Repository ist privat und muss es bleiben.** Es enthaelt die
-          vollstaendige Spielhistorie. Zugangsdaten stehen nicht darin: NPSSO und
-          Refresh-Token liegen AES-GCM-verschluesselt in D1, der Schluessel als
-          Cloudflare Secret.
-
-          ## Wiederherstellung
-
-          **`backup.sql` laesst sich NICHT unveraendert einspielen.** `d1 export`
-          schreibt die Tabellen in sqlite_master-Reihenfolge; nach dem Neuaufbau
-          von `release` in Migration 0003 steht sie dort hinter den neun
-          Tabellen, die auf sie verweisen. Ein direkter Import scheitert mit
-          `no such table: main.release` (gemessen am 14.09.2026).
-
-          Der Dump muss vorher umgeordnet werden. Das Skript dafuer liegt im
-          Haupt-Repository:
-
-          ```
-          npx wrangler d1 create trophytracker-restore
-          node scripts/wiederherstellung-vorbereiten.mjs backup.sql restore.sql
-          npx wrangler d1 execute trophytracker-restore --remote --file=restore.sql
-          npx wrangler d1 execute trophytracker-restore --remote --command "PRAGMA foreign_key_check"
-          ```
-
-          Der letzte Befehl muss **leer** bleiben: Der Import laeuft mit
-          abgeschalteter Fremdschluesselpruefung, erst er belegt den Bestand.
-
-          Der vollstaendige Ablauf mit Zeilenzahl-Vergleich steht in der README
-          des Haupt-Repositories unter "Wiederherstellung".
-          ENDE
-
-          git config user.name "trophytracker-backup"
-          git config user.email "actions@github.com"
-          git add -A
-
-          if git diff --cached --quiet; then
-            echo "Unverändert - kein Commit"
-            echo "commit=" >> "$GITHUB_OUTPUT"
-          else
-            git commit -q -m "Sicherung $(date -u +%Y-%m-%d)"
-            git push -q origin HEAD:main
-            hash=$(git rev-parse --short HEAD)
-            echo "Commit $hash"
-            echo "commit=$hash" >> "$GITHUB_OUTPUT"
-          fi
-
-          echo "backup.sql: $(wc -c < backup.sql) Byte"
-          echo "backup.json: $(wc -c < backup.json) Byte"
+          scripts/sicherung-ablegen.sh export \
+            "https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/${BACKUP_REPO}.git" \
+            "$JSON_OK"
 
       # Ein Backup, von dem man nicht weiss, ob es laeuft, ist kein Backup
       # (Abschnitt 14.2). Auch ein Lauf ohne Commit wird vermerkt: "geprueft,
@@ -200,3 +139,12 @@ jobs:
             -d "$koerper" \
             "$APP_URL/api/backup/vermerk"
           echo
+
+      # Erst nach dem Vermerk: Der Dump liegt ab und ist geprueft, die
+      # Sicherung gilt. Rot wird der Lauf trotzdem, damit ein gescheiterter
+      # JSON-Export nicht unbemerkt bleibt (Vorgabe des Nutzers vom 25.10.2026).
+      - name: JSON-Teil gescheitert
+        if: steps.json.outcome == 'failure'
+        run: |
+          echo "::error::backup.json gescheitert - backup.sql ist abgelegt, backup.json ist die der Vorwoche"
+          exit 1
