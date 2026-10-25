@@ -5,6 +5,21 @@
 Punkte, die bei der Neubewertung des Budgets arbeitender Aufrufe ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md))
 mit entschieden werden (Vorgabe des Nutzers vom 25.10.2026). **Gebaut wird erst nach der Bewertung.**
 
+#### Welche Nächte zählen
+
+Nachtläufe werden nicht mehr täglich ausgewertet, sondern bei einer Betriebswarnung und zu
+Messterminen (Entscheidung des Nutzers vom 25.10.2026). **Der nächste ist die Nacht zum 01.11.:** Im
+Wartungsfenster werden erstmals alle verknüpften Spiele zum Auffrischen fällig (von Hand aufgefrischt
+am 24.10., Frist sieben Tage), höchstens drei Aufrufe (18n, Logzeile `auffrischen=grenze`); im
+PSN-Fenster läuft die Kaufliste, am selben Sonntag die erste geplante Sicherung mit dem neuen Ablauf
+([14.2](14-backup-export.md)). Für die Bewertung am 02.11. zählen die Nächte 31.10. bis 02.11. – die
+Telemetry hält drei Tage. Abbrüche zählt `workersInvocationsAdaptive` (`status`) auch rückwirkend:
+11.–16.10. 14 bis 42 je Nacht, 17.–25.10. keiner.
+
+**Am Cron bis nach der Auswertung der Nacht zum 01.11. nichts ändern** – sonst ist die Wirkung von 18n
+nicht zuzuordnen (eine Änderung je Nacht). Was den Cron nicht anfasst, läuft parallel, etwa
+„veraltete Ansichten aufräumen“ ([16-2-offene-stufen.md](16-2-offene-stufen.md)).
+
 #### Die Sicherung über `GET /api/export/backup.json`
 
 **Gemessen am 25.10.2026:** 212 ms CPU (SEA, Sonntagslauf) und 266 ms (MSP, erster Lauf von Hand mit
