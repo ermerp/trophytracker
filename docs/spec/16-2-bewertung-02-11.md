@@ -7,8 +7,9 @@ mit entschieden werden (Vorgabe des Nutzers vom 25.10.2026). **Gebaut wird erst 
 
 #### Die Sicherung über `GET /api/export/backup.json`
 
-**Gemessen am 25.10.2026:** 212 ms CPU (SEA) in einem Aufruf, ohne Abbruch – das Zwanzigfache der
-Grenze, die bisher einzige Messung.
+**Gemessen am 25.10.2026:** 212 ms CPU (SEA, Sonntagslauf) und 266 ms (MSP, erster Lauf von Hand mit
+dem neuen Ablauf, `backup.json` 11,65 MB) – je ein Aufruf, beide ohne Abbruch, das Zwanzig- bis
+Siebenundzwanzigfache der Grenze.
 
 **Wann sie läuft:** nur in der wöchentlichen Sicherung (`backup.yml`, sonntags 03:17 UTC, am 25.10.
 um 08:30 gestartet) und wenn sie von Hand gestartet wird. **Der Deploy ruft die Route nicht:** Er sichert

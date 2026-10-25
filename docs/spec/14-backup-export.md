@@ -20,7 +20,7 @@ Beides liegt beim selben Anbieter wie die Datenbank. Gegen einen Bedienfehler hi
 5. `POST /api/backup/vermerk` mit Zeitpunkt und Commit – auch bei einem Lauf ohne Änderung und auch ohne neues JSON
 6. War Schritt 2 gescheitert, endet der Lauf danach **rot** – sichtbar in GitHub, obwohl der Dump abgelegt ist
 
-**Bis zum 25.10.2026 brach ein gescheiterter JSON-Export den ganzen Lauf ab**, und der schon gezogene Dump derselben Woche ging mit verloren (Vorgabe des Nutzers vom selben Tag; Anlass: `backup.json` brauchte 212 ms CPU, [16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)). `test/sicherung-action.spec.ts` hält Workflow und Skript fest; dass das Skript den Dump ohne JSON ablegt, ist am 25.10.2026 gegen ein Wegwerf-Repository nachgewiesen.
+**Bis zum 25.10.2026 brach ein gescheiterter JSON-Export den ganzen Lauf ab**, und der schon gezogene Dump derselben Woche ging mit verloren (Vorgabe des Nutzers vom selben Tag; Anlass: `backup.json` brauchte 212 ms CPU, [16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)). `test/sicherung-action.spec.ts` hält Workflow und Skript fest; dass das Skript den Dump ohne JSON ablegt, ist am 25.10.2026 gegen ein Wegwerf-Repository nachgewiesen. Der erste Lauf mit dem neuen Ablauf (von Hand, 25.10.2026) endete grün mit beiden Dateien; den Weg ohne JSON hat die Produktion noch nicht gesehen.
 
 Kostenlos, versioniert, unabhängig vom Cloudflare-Konto. Git liefert die Historie mit, du kannst also auf jeden beliebigen Wochenstand zurück.
 
