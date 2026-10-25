@@ -326,3 +326,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 24.10.2026 | **Stufe 22 (Endlos-Scrollen) abgenommen** | [16.2](spec/16-2-endlos-scrollen.md) |
 | 24.10.2026 | **Obergrenze fürs IGDB-Auffrischen (18n):** höchstens ⌈verknüpfte Spiele ÷ 200⌉ Aufrufe je Nacht (Puffer 75 %), statt fest zwei; eigene Nacht vor dem 01.11., vor dem Index-Nachtrag | [10.1](spec/10-1-cron-schritte.md), [16.2](spec/16-2-offene-stufen.md) |
 | 24.10.2026 | **`auffrischen_stau` zur Kenntnis (grau) ab 11 Tagen** – nicht 10: Der Abbau eines vollen Staus erreicht knapp 10, mit einer ausgefallenen Nacht knapp 11 | [16.2](spec/16-2-betriebswarnungen.md) |
+| 24.10.2026 | **„Metadaten auffrischen" läuft mit einem Klick durch alle verknüpften Spiele**, mit Fortschritt direkt unter den Knöpfen (Nachtrag 18n-b) – statt zehn Klicks ohne sichtbare Rückmeldung | [7.6](spec/07-6-igdb.md) |

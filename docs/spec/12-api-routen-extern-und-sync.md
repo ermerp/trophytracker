@@ -7,7 +7,7 @@ GET    /api/igdb/search?q=&plattformen=  Eingebaute Suche mit Rückfällen und O
 GET    /api/igdb/status               { zugangsdaten, gesamt, verknuepft, zurPruefung, ungeprueft, abgelehnt, letzteAktualisierung, discBelegt, discOffen }
 GET    /api/igdb/offen                Prüfansicht: Spiele ohne eindeutigen Treffer mit Kandidaten (limit, offset)
 POST   /api/igdb/abgleich             ein Schritt: acht Spiele; { geprueft, verknuepft, vorgeschlagen, ohneTreffer, nochOffen, weiter }
-POST   /api/igdb/auffrischen          ein Schritt: 50 verknüpfte Spiele in einer IGDB-Anfrage; vorweg angekuendigt → erschienen bei verstrichenem Datum, Antwort erschienen (8.4, Stufe 15)
+POST   /api/igdb/auffrischen          ein Schritt eines Durchgangs: {seit?} – ohne seit beginnt er; 50 seit `seit` nicht aufgefrischte Spiele in einer IGDB-Anfrage; Antwort mit seit, nochOffen (18n-b); vorweg angekuendigt → erschienen bei verstrichenem Datum, Antwort erschienen (8.4, Stufe 15)
 POST   /api/igdb/physisch             ein Schritt: Disc-Fassung aus external_games für 50 Spiele; { angefragt, gesetzt, nochOffen, weiter } (7.6, Stufe 14)
 POST   /api/igdb/erneut-suchen        alle Spiele zur Prüfung zurück in den Abgleich; { zurueckgesetzt }
 GET    /api/unmatched?abgelehnte=1    v_ohne_igdb mit zustand; abgelehnte nur mit Parameter (Stufe 11)

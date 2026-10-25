@@ -4,6 +4,9 @@ import { anzeigeTitel, titelSchluessel, type Plattform } from "../domain/titel";
 import { eins, einzeln, ersteZeile, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 
+/** Nicht aufgefrischt seit einem Zeitpunkt (Nachtrag 18n-b) - Auswahl und Rest teilen den Text. */
+const AUFFRISCHEN_VOR = "(igdb_synced_at IS NULL OR igdb_synced_at < ?) ";
+
 /** Exportiert, damit die Lesekosten-Messung die Abfrage aus dem Code nimmt (CLAUDE.md). */
 export const AELTESTER_AUFFRISCH_STEMPEL =
 	"SELECT MIN(igdb_synced_at) AS am FROM game WHERE igdb_id IS NOT NULL";
@@ -297,6 +300,45 @@ export class IgdbRepository {
 			)
 			.bind(schluessel, heute)
 			.run();
+	}
+
+	/**
+	 * Die Uhr der Datenbank (Nachtrag 18n-b): Ein Durchgang "Auffrischen" von
+	 * Hand beginnt hier, und die Stempel schreibt dieselbe Uhr
+	 * (`datetime('now')`). Die Uhr des Workers koennte eine Sekunde abweichen -
+	 * dann gaelten frisch gestempelte Spiele als offen, und der Durchgang
+	 * kaeme nie an sein Ende.
+	 */
+	async datenbankZeit(): Promise<string> {
+		const z = await this.db.prepare("SELECT datetime('now') AS jetzt").first<{ jetzt: string }>();
+		return z!.jetzt;
+	}
+
+	/**
+	 * Die naechsten `n` eines Durchgangs von Hand (Nachtrag 18n-b): nur
+	 * Spiele, die seit `seit` nicht aufgefrischt wurden, die aeltesten zuerst.
+	 * Ohne die Bedingung naehme die letzte Runde Spiele dieses Durchgangs ein
+	 * zweites Mal, und die Zahlen am Ende zaehlten sie doppelt.
+	 */
+	async zumAuffrischenVor(seit: string, n: number): Promise<Array<{ id: number; igdb_id: number }>> {
+		const z = await this.db
+			.prepare(
+				"SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL AND " +
+					AUFFRISCHEN_VOR +
+					"ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT ?",
+			)
+			.bind(seit, n)
+			.all<{ id: number; igdb_id: number }>();
+		return z.results ?? [];
+	}
+
+	/** Der Rest dieses Durchgangs - dieselbe Bedingung (Nachtrag 18n-b). */
+	async auffrischOffen(seit: string): Promise<number> {
+		const z = await this.db
+			.prepare("SELECT COUNT(*) AS n FROM game WHERE igdb_id IS NOT NULL AND " + AUFFRISCHEN_VOR)
+			.bind(seit)
+			.first<{ n: number }>();
+		return z?.n ?? 0;
 	}
 
 	/**

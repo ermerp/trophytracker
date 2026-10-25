@@ -380,6 +380,51 @@ describe("IgdbRepository: Entscheidungen des Nutzers", () => {
 describe("Routen", () => {
 	const json = async (r: Response) => ({ status: r.status, body: (await r.json()) as any });
 
+	describe("Auffrischen als Durchgang (Nachtrag 18n-b)", () => {
+		const post = (a: ReturnType<typeof app>, koerper?: unknown) =>
+			a.request(
+				"/api/igdb/auffrischen",
+				koerper === undefined
+					? { method: "POST" }
+					: { method: "POST", body: JSON.stringify(koerper), headers: { "content-type": "application/json" } },
+				env,
+			);
+		const sechzig = () =>
+			env.DB.batch(
+				Array.from({ length: 60 }, (_, i) =>
+					env.DB.prepare(
+						"INSERT INTO game (id, title, sort_title, igdb_id, igdb_synced_at) VALUES (?, ?, ?, ?, '2026-01-01 00:00:00')",
+					).bind(i + 1, `Spiel ${i + 1}`, `spiel ${i + 1}`, 100 + i),
+				),
+			);
+
+		it("zaehlt den Rest seit dem Beginn, bis alle durch sind", async () => {
+			await sechzig();
+			// IGDB nennt keines: Auch dann wird gestempelt, der Durchgang kommt voran.
+			const a = app(fakeIgdb([[], []]).client);
+
+			const erste = await json(await post(a));
+			expect(erste.status).toBe(200);
+			expect(erste.body).toMatchObject({ angefragt: 50, nochOffen: 10 });
+			expect(erste.body.seit).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+
+			// Nur die zehn uebrigen, keines dieses Durchgangs ein zweites Mal -
+			// sonst zaehlte die Oberflaeche am Ende mehr Spiele, als es gibt.
+			const zweite = await json(await post(a, { seit: erste.body.seit }));
+			expect(zweite.body).toMatchObject({ angefragt: 10, nochOffen: 0, seit: erste.body.seit });
+		});
+
+		it("beginnt ohne `seit` neu, lehnt ein ausdrueckliches null und Unsinn ab", async () => {
+			await sechzig();
+			const a = app(fakeIgdb([[]]).client);
+			// Fehlender Schluessel: neuer Durchgang, wie ohne Koerper.
+			expect((await json(await post(a, {}))).body).toMatchObject({ angefragt: 50, nochOffen: 10 });
+			// Ausdrueckliches null ist kein Zeitpunkt - kein stilles "jetzt".
+			expect((await post(a, { seit: null })).status).toBe(400);
+			expect((await post(a, { seit: "gestern" })).status).toBe(400);
+		});
+	});
+
 	it("antwortet ohne Zugangsdaten mit 503 - und laesst den Rest laufen", async () => {
 		await spiel(1, "Bloodborne", "bloodborne", ["PS4"]);
 		const a = app(fakeIgdb([[]], { zugang: null }).client);
