@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { alsDatum, anfrage, datumMitJahr } from './api'
 import type { BetriebAntwort } from './Offenes'
+import { ortsstunde, ortszeit } from './ortszeit'
 
 /**
  * Einstellungen: NPSSO hinterlegen und Sync auslösen.
@@ -787,11 +788,12 @@ export function Einstellungen() {
 
       <h2>Automatik</h2>
       <p>
-        Der Worker arbeitet in zwei Fenstern, alle fünf Minuten je ein kleiner Schritt. Zwischen 5 und 8 Uhr
-        (03:00–05:59 UTC) alles, was PlayStation anspricht: Trophäen, Spielzeiten und einmal wöchentlich die
-        Kaufliste. Zwischen 8 und 11 Uhr (06:00–08:59 UTC) die Wartung – erschienene Titel freigeben,
-        IGDB-Metadaten und Disc-Fassungen auffrischen, Gebrauchtpreise bei eBay holen, alte PSN-Rohantworten
-        wegräumen.
+        Der Worker arbeitet nachts in zwei Fenstern, alle fünf Minuten je ein kleiner Schritt. Zwischen{' '}
+        {ortsstunde(3)} und {ortsstunde(6)} Uhr (03:00–05:59 UTC) alles, was PlayStation anspricht: Trophäen,
+        Spielzeiten und einmal wöchentlich die Kaufliste. Zwischen {ortsstunde(6)} und {ortsstunde(9)} Uhr
+        (06:00–08:59 UTC) die Wartung – erschienene Titel freigeben, IGDB-Metadaten und Disc-Fassungen
+        auffrischen, alte PSN-Rohantworten wegräumen. Gebraucht- und Store-Preise holen abends zwei GitHub
+        Actions, unten bei ihren Abschnitten.
       </p>
       <p>
         Eine gescheiterte Seite wird bis zu dreimal erneut geholt, bevor der Lauf aufgegeben wird; danach ist
@@ -830,7 +832,7 @@ export function Einstellungen() {
         entscheidest weiter nur du.
       </p>
       <p className="zeile">
-        Die Preise holt jeden Abend um 20:17 UTC eine GitHub Action, alle fälligen Releases in einem Lauf.
+        Die Preise holt jeden Abend um {ortszeit(20, 17)} Uhr (20:17 UTC) eine GitHub Action, alle fälligen Releases in einem Lauf.
         Von Hand starten:{' '}
         <a href="https://github.com/ermerp/trophytracker/actions/workflows/markt.yml" target="_blank" rel="noreferrer noopener">
           Gebrauchtpreise in GitHub Actions
@@ -851,7 +853,7 @@ export function Einstellungen() {
         braucht es nicht.
       </p>
       <p className="zeile">
-        Die Preise holt jeden Abend um 20:47 UTC eine GitHub Action, alle fälligen Releases in einem Lauf.
+        Die Preise holt jeden Abend um {ortszeit(20, 47)} Uhr (20:47 UTC) eine GitHub Action, alle fälligen Releases in einem Lauf.
         Von Hand starten:{' '}
         <a href="https://github.com/ermerp/trophytracker/actions/workflows/store.yml" target="_blank" rel="noreferrer noopener">
           Store-Preise in GitHub Actions
@@ -942,7 +944,7 @@ export function Einstellungen() {
  * einem Cross-Gen-Titel also für beide Fassungen auf einmal.
  *
  * Gespeichert wird und der Preis kommt im selben Aufruf: Ohne das stünde die
- * Zeile bis zum nächsten Morgen stumm da, weil die Tagesfrist greift.
+ * Zeile bis zum nächsten Abendlauf stumm da, weil die Tagesfrist greift.
  */
 function StoreNachpflege({
   eintraege,
