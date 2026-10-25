@@ -64,9 +64,9 @@ sinnvollen Portion gegen dieses Budget:
   je Quelle Protokoll und mehrzeiliger INSERT). Gemessen in `test/lesekosten.spec.ts` an einer Seite
   mit 50 Käufen, die Ausgangszahl im unberührten Stand: **4 / 3 D1-Aufrufe** (erste / jede weitere
   Woche, mit „nur digital?" und dem Aufräumen) statt 103 / 85, **8 / 7 Anweisungen** statt 130 / 112,
-  gelesen 614 / 468 statt 494 / 372 Zeilen, geschrieben unverändert 182 / 0. Die CPU zeigt die
-  nächste Kaufliste-Nacht (um den 25.10.2026) – vorher 35–108 ms je Aufruf; ob die Portion von 50
-  dann ins Budget passt, ist offen.
+  gelesen 614 / 468 statt 494 / 372 Zeilen, geschrieben unverändert 182 / 0. **Kaufliste-Nacht zum
+  25.10.2026:** 11–26 ms je Aufruf, Median 19 (n = 15) statt 35–108 – gut die Hälfte weniger, aber
+  über dem Budget; ob die Portion von 50 kleiner wird, ist offen ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)).
 - **Store → GitHub Action nach dem Muster von 20i: Stufe 20j** (Entscheidungen des Nutzers vom
   20.10.2026; **gebaut und deployt am 22.10.2026**: Teil A 15:40 UTC, Probelauf 16:47 fehlerfrei,
   Teil B – Store aus dem Worker – gegen 16:55; [7.4](07-4-store-preise.md)). Die ersten

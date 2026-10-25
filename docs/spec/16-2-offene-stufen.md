@@ -31,7 +31,7 @@ Nachtplatz und kann an jedem Tag parallel laufen** (geprüft am 23.10.2026): `/t
 `GET /api/trophies` und damit `trophies.liste`, die sonst niemand ruft, auch kein Cron-Schritt. Das gilt
 für diese Ansicht; jede weitere, die dabei wegfallen soll, wird ebenso geprüft → **18m-b** → **neu bewerten: Nachtläufe
 bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster fast leer → **20g**.
-Gebaut sind 18k-b (Kaufliste gebündelt, CPU um den 25.10. messen), 20i (Markt als Action, erste
+Gebaut sind 18k-b (Kaufliste gebündelt, CPU gemessen am 25.10.: Median 19 statt 35–108 ms), 20i (Markt als Action, erste
 volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; erste Nacht 21.10. wie gebaut; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
 Am 02.11.2026 wird das Budget arbeitender Aufrufe neu bewertet. Fest sind die Abhängigkeiten:
 
