@@ -21,7 +21,7 @@ Auffrischen ändert, das das Wartungsfenster jede Nacht ruft; [5.2](05-1-favorit
 [7.5](07-5-kritikerwertungen.md); den Altbestand füllt „Auffrischen") → **18n – Obergrenze fürs
 IGDB-Auffrischen** (Vorgabe des Nutzers vom 24.10.2026, gebaut am 24.10.): höchstens ⌈verknüpfte
 Spiele ÷ 200⌉ Aufrufe je Nacht ([10.1](10-1-cron-schritte.md) Schritt 12) und `auffrischen_stau` zur
-Kenntnis (grau) ab 11 Tagen ([Betriebswarnungen](16-2-betriebswarnungen.md)). Eigene Nacht: Deploy am
+Kenntnis (grau) ab 11 Tagen ([Betriebswarnungen](16-2-betriebswarnungen.md)). Eigene Nacht: deployt am
 25.10. nach der Nachtauswertung, scharf spätestens in der Nacht zum 01.11. → **Index-Nachtrag** für die
 Auswahlen des Lage-Batches, mit dem Bestand der Lesekosten-Messung und dem Ziel, den
 Wartungs-Leerlauf (rund 2 000 Zeilen je Aufruf, 23.10.2026) zu senken – er rückt vor, weil der
