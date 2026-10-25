@@ -10,6 +10,7 @@ import { Geheimnis } from "../src/domain/secret";
 import { erstellePsnClient } from "../src/psn/client";
 import {
 	AUFFRISCH_FRIST_TAGE,
+	auffrischGrenze,
 	bereichFuerAusdruck,
 	besitzLauf,
 	besitzStand,
@@ -20,6 +21,7 @@ import {
 	cronSchritt,
 	HAENGT_NACH_STUNDEN,
 	ROHANTWORTEN_LAEUFE,
+	SCHLUESSEL_AUFFRISCHEN,
 } from "../src/sync/cron";
 import { FEHLVERSUCHE_HOECHSTENS } from "../src/sync/run";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
@@ -194,7 +196,7 @@ beforeEach(async () => {
 	await env.DB.batch([
 		env.DB.prepare("DELETE FROM game_event"),
 		// Der Verlauf lebt in app_setting und ueberdauert sonst den Test.
-		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand')"),
+		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand', 'igdb_auffrischen_nacht')"),
 		// Die Marken liegen seit 18j als eine Zeile je Aufruf im Bereich
 		// `cron_begonnen` bis `cron_begonnen;` (auch die im alten Format).
 		env.DB.prepare("DELETE FROM app_setting WHERE key >= 'cron_begonnen' AND key < 'cron_begonnen;'"),
@@ -453,6 +455,78 @@ describe("cronSchritt", () => {
 		// Beide frisch: nichts faellig, auch die Disc-Fassungen sind gestempelt.
 		expect((await cronSchritt(repos(), psnStumm(), client)).getan).toBe("nichts");
 		expect(AUFFRISCH_FRIST_TAGE).toBe(7);
+	});
+
+	describe("Obergrenze je Nacht (Stufe 18n)", () => {
+		const nacht = async () =>
+			JSON.parse(
+				(await env.DB.prepare("SELECT value FROM app_setting WHERE key = ?").bind(SCHLUESSEL_AUFFRISCHEN).first<{ value: string }>())
+					?.value ?? "null",
+			);
+		const nachtSetzen = (wert: object) =>
+			env.DB.prepare("INSERT OR REPLACE INTO app_setting (key, value) VALUES (?, ?)")
+				.bind(SCHLUESSEL_AUFFRISCHEN, JSON.stringify(wert))
+				.run();
+
+		it("rechnet einen Aufruf je angefangene 200 verknuepfte Spiele", () => {
+			// 480 Spiele brauchen 69 je Nacht; erlaubt sind 150.
+			expect([200, 201, 480, 700, 701, 1000].map(auffrischGrenze)).toEqual([1, 2, 3, 4, 4, 5]);
+		});
+
+		it("zaehlt den Aufruf und die verknuepften Spiele des Tages", async () => {
+			await spielMitIgdb(1, 11, "2020-01-01 00:00:00");
+			await spielMitIgdb(2, 12, "2020-01-01 00:00:00");
+			await nachtSetzen({ datum: "2020-01-01", aufrufe: 9, spiele: 9 });
+
+			const e = await cronSchritt(repos(), psnStumm(), fakeIgdb([[spielRoh({ id: 11 }), spielRoh({ id: 12 })]]).client);
+			expect(e.getan).toBe("igdb_auffrischen");
+			// Ein Zaehler von gestern zaehlt nicht weiter, er beginnt neu.
+			expect(await nacht()).toEqual({ datum: HEUTE, aufrufe: 1, spiele: 2 });
+		});
+
+		it("ruht, wenn die Grenze der Nacht erreicht ist, und sagt es", async () => {
+			await spielMitIgdb(1, 11, "2020-01-01 00:00:00");
+			await nachtSetzen({ datum: HEUTE, aufrufe: 1, spiele: 1 });
+			const { client, aufrufe } = fakeIgdb([[spielRoh({ id: 11 })]]);
+
+			const e = await cronSchritt(repos(), psnStumm(), client);
+			expect(e.getan).not.toBe("igdb_auffrischen");
+			expect(e.auffrischenGekappt).toEqual({ aufrufe: 1, grenze: 1 });
+			expect(cronLogzeile(e)).toContain("auffrischen=grenze aufrufe=1/1");
+			// Kein Abruf, auch kein Token: Die Grenze greift vor jeder Arbeit.
+			expect(aufrufe).toHaveLength(0);
+
+			// Am naechsten Tag laeuft der Schritt wieder.
+			const morgen = await cronSchritt(repos(), psnStumm(), client, { heute: MORGEN });
+			expect(morgen.getan).toBe("igdb_auffrischen");
+			expect(morgen.auffrischenGekappt).toBeUndefined();
+		});
+
+		it("zaehlt vor der Arbeit - ein Aufruf, den die Laufzeit abbricht, ist schon gezaehlt", async () => {
+			// Ein Abbruch durch die Laufzeit erreicht kein catch und kein Danach.
+			// Nachgestellt mit einem IGDB-Abruf, der nie antwortet: Der Aufruf
+			// steht mitten in der Arbeit, und der Zaehler muss schon stehen -
+			// sonst liefe genau dieser teure Aufruf die ganze Nacht erneut.
+			await spielMitIgdb(1, 11, null);
+			const { client } = fakeIgdb([]);
+			const haengt: typeof client = { ...client, nachIds: () => new Promise(() => {}) };
+			void cronSchritt(repos(), psnStumm(), haengt);
+			await new Promise((r) => setTimeout(r, 200));
+			expect(await nacht()).toEqual({ datum: HEUTE, aufrufe: 1, spiele: 1 });
+		});
+
+		it("zaehlt auch einen gescheiterten Aufruf - ein IGDB-Ausfall verbraucht die Grenze", async () => {
+			// Ein Fehler stempelt nichts; ohne Grenze waehlte jeder Aufruf
+			// der Nacht dieselben Spiele und scheiterte erneut.
+			await spielMitIgdb(1, 11, null);
+			const kaputt = fakeIgdb([new Response("weg", { status: 500 }), new Response("weg", { status: 500 })]).client;
+
+			expect((await cronSchritt(repos(), psnStumm(), kaputt)).auffrischen).toMatchObject({ status: "fehler" });
+			expect(await nacht()).toEqual({ datum: HEUTE, aufrufe: 1, spiele: 1 });
+			const zweiter = await cronSchritt(repos(), psnStumm(), kaputt);
+			expect(zweiter.getan).not.toBe("igdb_auffrischen");
+			expect(zweiter.auffrischenGekappt).toEqual({ aufrufe: 1, grenze: 1 });
+		});
 	});
 
 	it("stempelt Spiele, die IGDB nicht zurueckgibt - sonst dreht sich der Schritt im Kreis", async () => {

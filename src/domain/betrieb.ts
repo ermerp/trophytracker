@@ -76,6 +76,7 @@ export const BETRIEB_ARTEN = [
 	"kaufliste",
 	"markt_leer",
 	"store_leer",
+	"auffrischen_stau",
 	"fenster_offen",
 ] as const;
 export type BetriebArt = (typeof BETRIEB_ARTEN)[number];
@@ -113,6 +114,8 @@ export type BetriebFakten = {
 	sicherungAm: string | null;
 	/** `fehlerAm` der Kaufliste (YYYY-MM-DD), oder null. */
 	kauflisteFehlerAm: string | null;
+	/** Aeltester Auffrischstempel der verknuepften Spiele (UTC wie D1), oder null (Stufe 18n). */
+	auffrischenAeltester: string | null;
 };
 
 /** Ohne vermerkten Ausgang laenger als das, und der Bereich gilt als still (Entscheidung vom 18.10.2026). */
@@ -137,6 +140,16 @@ export const ACTION_STILL_NACH_STUNDEN = 30;
  * die Summe fest.
  */
 export const STORE_ZIEL_ALT_NACH_STUNDEN = 42;
+/**
+ * Ab diesem Alter des aeltesten Auffrischstempels haengt das IGDB-Auffrischen
+ * hinterher (Stufe 18n, Entscheidung des Nutzers vom 24.10.2026). Im
+ * Normalbetrieb ist er 7-8 Tage alt; ein voller Stau ist mit der Grenze
+ * (`auffrischGrenze`, src/sync/cron.ts) nach vier Naechten abgebaut, der
+ * aelteste dann knapp unter 10 Tagen, mit einer ausgefallenen Nacht dazu
+ * knapp unter 11. Erst zwei Ausfaelle oder eine kaputte Grenze reichen
+ * darueber. Simuliert am 24.10.2026, ein Test haelt die Summe fest.
+ */
+export const AUFFRISCHEN_STAU_NACH_TAGEN = 11;
 /** Ab wann ein Bereich als still gilt - die beiden Actions mit ihrer eigenen Schwelle. */
 const STILL_NACH: Record<"psn" | "wartung" | "markt" | "store", number> = {
 	psn: STILL_NACH_STUNDEN,
@@ -531,6 +544,21 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 			text: "Die Kaufliste ist beim letzten Abruf gescheitert; der nächste Lauf versucht es erneut.",
 			ziel: "einstellungen",
 			zielText: "Einstellungen",
+		});
+	}
+
+	// Das IGDB-Auffrischen haengt hinterher (Stufe 18n). Der Stempel kommt aus
+	// einer eigenen Abfrage, nicht aus der Auswahl des Schritts - ist die
+	// kaputt und findet nichts, schlaegt die Warnung trotzdem an.
+	const auffrischAm = f.auffrischenAeltester ? zeitAus(f.auffrischenAeltester) : null;
+	const auffrischTage = auffrischAm ? (f.jetzt.getTime() - auffrischAm.getTime()) / TAG_MS : 0;
+	if (auffrischAm && auffrischTage > AUFFRISCHEN_STAU_NACH_TAGEN) {
+		raus.push({
+			art: "auffrischen_stau",
+			stufe: "kenntnis",
+			text: `Das IGDB-Auffrischen hängt hinterher: Ein Spiel wurde seit ${Math.floor(auffrischTage)} Tagen nicht aufgefrischt, zuletzt am ${datum(auffrischAm)}`,
+			ziel: "einstellungen",
+			zielText: "Verlauf",
 		});
 	}
 

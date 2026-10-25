@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	ACTION_STILL_NACH_STUNDEN,
+	AUFFRISCHEN_STAU_NACH_TAGEN,
 	FENSTERREGEL_SCHARF,
 	STORE_ZIEL_ALT_NACH_STUNDEN,
 	fensterOffen,
@@ -11,6 +12,8 @@ import {
 	type ZugangFakt,
 } from "../src/domain/betrieb";
 import { STORE_FRIST_STUNDEN } from "../src/db/store";
+import { AUFFRISCHEN_JE_AUFRUF } from "../src/sync/igdb";
+import { AUFFRISCH_FRIST_TAGE, auffrischGrenze } from "../src/sync/cron";
 
 /**
  * Die Regeln der Betriebswarnungen (Stufe 18m, 16.2) - rein, ohne D1. Die
@@ -47,6 +50,8 @@ function ruhig(ueber: Partial<BetriebFakten> = {}): BetriebFakten {
 		syncLaeufe: [{ status: "erfolg", gestartetAm: "2026-10-18 03:00:41", meldung: null }],
 		sicherungAm: "2026-10-18T08:07:24Z",
 		kauflisteFehlerAm: null,
+		// Im Normalbetrieb 7-8 Tage alt (Stufe 18n).
+		auffrischenAeltester: "2026-10-11 06:15:00",
 		...ueber,
 	};
 }
@@ -128,7 +133,7 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 				wartung: { am: "2026-11-20 08:56", getan: "nichts", meldung: false },
 				markt: { am: "2026-11-20 02:26", getan: "markt", meldung: false },
 				store: { am: "2026-11-19 20:52", getan: "store", meldung: false },
-			}, sicherungAm: "2026-11-20T08:00:00Z", syncLaeufe: [] }));
+			}, sicherungAm: "2026-11-20T08:00:00Z", syncLaeufe: [], auffrischenAeltester: "2026-11-14 06:15:00" }));
 			expect(spaet.map((w) => `${w.art}:${w.stufe}`)).toEqual(["zugang_endet:kenntnis"]);
 			expect(spaet[0].text).toBe("Der PlayStation-Zugang läuft laut Sony am 28.11. ab (in 8 Tagen).");
 		});
@@ -415,6 +420,35 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 		it("ist rot, solange sie noch nie gelaufen ist", () => {
 			const { store: _s, store_begonnen: _b, store_geprueft: _g, ...ohne } = ruhig().stand;
 			expect(urteile(ruhig({ stand: ohne })).map((x) => x.text)).toEqual(["Die Store-Preis-Action hat noch keinen Lauf vermerkt."]);
+		});
+	});
+
+	describe("IGDB-Auffrischen (Stufe 18n)", () => {
+		it("meldet einen Stempel ueber 11 Tagen zur Kenntnis, nicht darunter", () => {
+			// JETZT ist der 18.10. 09:38 UTC.
+			expect(arten(ruhig({ auffrischenAeltester: "2026-10-07 10:38:00" }))).toEqual([]);
+			const w = urteile(ruhig({ auffrischenAeltester: "2026-10-07 08:38:00" }));
+			expect(w.map((x) => `${x.art}:${x.stufe}`)).toEqual(["auffrischen_stau:kenntnis"]);
+			expect(w[0].text).toBe(
+				"Das IGDB-Auffrischen hängt hinterher: Ein Spiel wurde seit 11 Tagen nicht aufgefrischt, zuletzt am 07.10.",
+			);
+		});
+
+		it("schweigt ohne verknuepfte Spiele", () => {
+			expect(arten(ruhig({ auffrischenAeltester: null }))).toEqual([]);
+		});
+
+		it("schweigt beim Abbau eines vollen Staus, auch mit einer ausgefallenen Nacht", () => {
+			// Alle Stempel vom selben Tag (Auffrischen von Hand): Der letzte
+			// kommt in der Nacht `FRIST + Naechte - 1` dran, mit einem Ausfall
+			// eine Nacht spaeter - und muss dann noch unter der Schwelle liegen.
+			// Bei jeder Bestandsgroesse, sonst waechst die Grenze nicht richtig mit.
+			for (let spiele = 1; spiele <= 3000; spiele++) {
+				const jeNacht = auffrischGrenze(spiele) * AUFFRISCHEN_JE_AUFRUF;
+				const naechte = Math.ceil(spiele / jeNacht);
+				expect(naechte, `${spiele} Spiele`).toBeLessThanOrEqual(4);
+				expect(AUFFRISCH_FRIST_TAGE + naechte - 1 + 1).toBeLessThanOrEqual(AUFFRISCHEN_STAU_NACH_TAGEN);
+			}
 		});
 	});
 

@@ -324,3 +324,5 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 24.10.2026 | **`g.id` als letzter Sortierschlüssel der Sammlung**, mit Test | [16.2](spec/16-2-endlos-scrollen.md) |
 | 24.10.2026 | **Endlos-Scrollen heute bauen und deployen, `paths-ignore` für `docs/**`, `README.md`, `CLAUDE.md` gleich mit** (Stufe 22) | [16.2](spec/16-2-endlos-scrollen.md), [15.2](spec/15-repository-deployment.md) |
 | 24.10.2026 | **Stufe 22 (Endlos-Scrollen) abgenommen** | [16.2](spec/16-2-endlos-scrollen.md) |
+| 24.10.2026 | **Obergrenze fürs IGDB-Auffrischen (18n):** höchstens ⌈verknüpfte Spiele ÷ 200⌉ Aufrufe je Nacht (Puffer 75 %), statt fest zwei; eigene Nacht vor dem 01.11., vor dem Index-Nachtrag | [10.1](spec/10-1-cron-schritte.md), [16.2](spec/16-2-offene-stufen.md) |
+| 24.10.2026 | **`auffrischen_stau` zur Kenntnis (grau) ab 11 Tagen** – nicht 10: Der Abbau eines vollen Staus erreicht knapp 10, mit einer ausgefallenen Nacht knapp 11 | [16.2](spec/16-2-betriebswarnungen.md) |

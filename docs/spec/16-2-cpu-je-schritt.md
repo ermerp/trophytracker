@@ -142,5 +142,7 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   EWR 28, IAD 39, SJC 20, vier ohne Standort 34–54); acht mit Logzeile, darin 370 angefragt und 369
   aktualisiert. Am 21.10. ein Aufruf, 47 Spiele, 28 ms (EWR).
   Einmal je Woche, aber jeder Aufruf über dem Budget; Ursache nicht untersucht. Bleibt im Worker
-  (16.2) – ob das so bleibt, ist offen.
+  (16.2) – ob das so bleibt, ist offen. **Seit 18n** höchstens ⌈Spiele ÷ 200⌉ Aufrufe je Nacht
+  ([10.1](10-1-cron-schritte.md) Schritt 12): Das begrenzt, wie viele Aufrufe über dem Budget in einer
+  Nacht laufen, nicht ihre Kosten.
 
