@@ -37,7 +37,7 @@ gilt weiter Median um 5, P99 unter 10. Grundlage, gemessen in den Nächten 18. u
 Leerlauf allein liegt im Median bei 5,8 ms (n = 41), dieselbe Arbeit kostet je Standort das Doppelte
 bis 2,5-Fache – P99 unter 10 ließe praktisch keine Arbeit zu. Bewusst eine Wette auf die Duldung
 „gelegentlicher" Überschreitungen; **neu bewertet am 02.11.2026** mit den Abbruchdaten der zwei
-Wochen dazwischen ([10-1-cron-cpu.md](10-1-cron-cpu.md)).
+Wochen dazwischen ([10-1-cron-cpu.md](10-1-cron-cpu.md)); was dabei mit entschieden wird – Sicherung, Kaufliste –: [16-2-bewertung-02-11.md](16-2-bewertung-02-11.md).
 
 **Die Wege je Schritt** (Entscheidungen des Nutzers vom 19.10.2026), gerechnet mit der kleinsten
 sinnvollen Portion gegen dieses Budget:
@@ -66,7 +66,7 @@ sinnvollen Portion gegen dieses Budget:
   Woche, mit „nur digital?" und dem Aufräumen) statt 103 / 85, **8 / 7 Anweisungen** statt 130 / 112,
   gelesen 614 / 468 statt 494 / 372 Zeilen, geschrieben unverändert 182 / 0. **Kaufliste-Nacht zum
   25.10.2026:** 11–26 ms je Aufruf, Median 19 (n = 15) statt 35–108 – gut die Hälfte weniger, aber
-  über dem Budget; ob die Portion von 50 kleiner wird, ist offen ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)).
+  über dem Budget; ob die Portion von 50 kleiner wird, ist offen ([16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)).
 - **Store → GitHub Action nach dem Muster von 20i: Stufe 20j** (Entscheidungen des Nutzers vom
   20.10.2026; **gebaut und deployt am 22.10.2026**: Teil A 15:40 UTC, Probelauf 16:47 fehlerfrei,
   Teil B – Store aus dem Worker – gegen 16:55; [7.4](07-4-store-preise.md)). Die ersten
