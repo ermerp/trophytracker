@@ -45,7 +45,7 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   Kaufliste belegte 15 Aufrufe). Kaufliste 11–26 ms, Median 19 (n = 15; FRA 12, MXP 11/12, DFW 18–23,
   SEA 26/26) statt 35–108 vor 18k-b. Sync 8–17, Median 11 (n = 11), Spielzeit 24 / 24 ms (LHR, 200 / 179
   Titel), Level 12, Jahre 8; kein IGDB-Auffrischen – nach dem Auffrischen von Hand am 24.10. ist
-  nichts fällig. `rows_read_24h` 821 435, `rows_written_24h` 4 042; die Nacht (03–09 UTC) 185 006,
+  nichts fällig. Die Nächte ab dem 26.10. stehen in [16-2-naechte.md](16-2-naechte.md). `rows_read_24h` 821 435, `rows_written_24h` 4 042; die Nacht (03–09 UTC) 185 006,
   davon PSN 17 896, Jahre rund 22 300 und die wöchentliche Sicherung rund 73 000; 626 592 sind Bau
   und Produktionsprüfung von Stufe 22 am 24.10. (10–14 UTC), 9 837 die Abendläufe. Die Sicherung
   (`GET /api/export/backup.json`) brauchte **212 ms CPU** (SEA) und lief ohne Abbruch – einmal je

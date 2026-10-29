@@ -13,7 +13,7 @@ Wartungsfenster werden erstmals alle verknüpften Spiele zum Auffrischen fällig
 am 24.10., Frist sieben Tage), höchstens drei Aufrufe (18n, Logzeile `auffrischen=grenze`); im
 PSN-Fenster läuft die Kaufliste, am selben Sonntag die erste geplante Sicherung mit dem neuen Ablauf
 ([14.2](14-backup-export.md)). Für die Bewertung am 02.11. zählen die Nächte 31.10. bis 02.11. – die
-Telemetry hält drei Tage. Abbrüche zählt `workersInvocationsAdaptive` (`status`) auch rückwirkend:
+Telemetry hält rund sieben Tage (gemessen am 29.10.2026, [10.1](10-1-cron-cpu.md)). Abbrüche zählt `workersInvocationsAdaptive` (`status`) auch rückwirkend:
 11.–16.10. 14 bis 42 je Nacht, 17.–25.10. keiner.
 
 **Am Cron bis nach der Auswertung der Nacht zum 01.11. nichts ändern** – sonst ist die Wirkung von 18n
