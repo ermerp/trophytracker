@@ -16,7 +16,6 @@ import { reviewRoutes } from "./api/review";
 import { scanRoutes } from "./api/scan";
 import { jahreRoutes, statsRoutes } from "./api/stats";
 import { storeRoutes } from "./api/store";
-import { trophyRoutes } from "./api/trophies";
 import { gameRoutes, zuordnungRoutes } from "./api/zuordnung";
 import { createRepositories } from "./db";
 import type { CronLage } from "./db/cron-lage";
@@ -72,7 +71,6 @@ export function createApp(
 
 	app.route("/api/igdb", igdbRoutes);
 	app.route("/api/unmatched", unmatchedRoutes);
-	app.route("/api/trophies", trophyRoutes);
 	app.route("/api/feed", feedRoutes);
 	app.route("/api/releases", releaseTrophaeenRoutes);
 	app.route("/api/releases", releasePreiseRoutes);

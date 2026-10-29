@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
 	NormalisierungsError,
 	normalisiereSeite,
-	platinStand,
 } from "../src/domain/normalize";
 import { SONDERFAELLE, fakeSeite, fakeTitel } from "./trophy-fixtures";
 
@@ -94,20 +93,5 @@ describe("normalisiereSeite", () => {
 
 	it("kommt mit einer leeren Seite zurecht", () => {
 		expect(normalisiereSeite(fakeSeite([]))).toEqual({ titel: [], verworfen: 0 });
-	});
-});
-
-describe("platinStand", () => {
-	it("meldet 'nicht_verfuegbar', wenn es gar keine Platin-Trophaee gibt", () => {
-		// Der Fall, vor dem Abschnitt 4.1 warnt: 93 von 431 echten Titeln.
-		expect(platinStand(0, 0)).toBe("nicht_verfuegbar");
-	});
-
-	it("meldet 'erspielt'", () => {
-		expect(platinStand(1, 1)).toBe("erspielt");
-	});
-
-	it("meldet 'offen'", () => {
-		expect(platinStand(1, 0)).toBe("offen");
 	});
 });

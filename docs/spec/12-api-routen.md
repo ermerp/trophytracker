@@ -28,8 +28,6 @@ PUT    /api/releases/:id/play-status  Use Case 2: Body { status, begonnenAm?, be
 PATCH  /api/releases/:id/play-status  Body { status } – nur der Status, Datum/Bewertung/Notiz bleiben; koppelt und stempelt wie PUT
 GET    /api/deviations                v_abweichungen, mit spielId/releaseId für den Link ins Spieldetail
 
-GET    /api/trophies
-GET    /api/trophies/unmatched
 GET    /api/games/uebersicht           Alle Zuordnungen als Tabelle, filter- und durchsuchbar
 POST   /api/games/release/:id/abtrennen  Release in ein neues Spiel herauslösen
 POST   /api/games/schluessel-neu-berechnen  sort_title aller Spiele aus dem Titel neu ableiten
