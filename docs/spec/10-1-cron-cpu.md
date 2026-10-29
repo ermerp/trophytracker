@@ -80,7 +80,11 @@ Aufruf** liefert seit dem 19.10.2026 die Telemetry-API der Observability-Logs
 (`/accounts/{id}/workers/observability/telemetry/query`, Token wie Wrangler): je Aufruf ein Ereignis
 mit `cpuTimeMs` (ganze ms), `wallTimeMs` und `outcome`, dazu die Logzeile `cron: …` über dieselbe
 `requestId`. Aufbewahrt werden **drei Tage**, und auch dort fehlen Ereignisse (zwei von vier
-Portionen im ersten Lauf von 20i). Verbunden über die Minute ergibt beides Schritt, Menge, Standort
+Portionen im ersten Lauf von 20i). Ab dem 01.12.2026 rechnet Cloudflare Observability nach Volumen:
+im Free-Plan 0,5 GB am Tag und sieben Tage Aufbewahrung; ist die Tagesgrenze erreicht, kommen bis
+zum Zurücksetzen keine Ereignisse mehr an – eine Lücke, die nicht vom Worker kommt. Gemessen am
+28.10.2026: 162 Ereignisse, 177 KB. Ob die Telemetry-API dann sieben Tage zurückreicht, wird nach
+dem 01.12. geprüft. Verbunden über die Minute ergibt beides Schritt, Menge, Standort
 und CPU je Aufruf; was fehlt, deckt `cron_verlauf`. Ob sich der Standort festlegen lässt, wird nach 18j bis 18l recherchiert. Was daraus
 für jeden Schritt folgt und was zu entscheiden ist: [16.2](16-2-cpu-und-betrieb.md).
 Der Bezahlplan ist ausgeschlossen (Entscheidung des Nutzers vom 16.10.2026).
