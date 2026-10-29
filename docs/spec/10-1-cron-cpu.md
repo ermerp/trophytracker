@@ -85,7 +85,12 @@ Ereignisse (zwei von vier Portionen im ersten Lauf von 20i). Ab dem 01.12.2026 r
 Observability nach Volumen: im Free-Plan 0,5 GB am Tag und sieben Tage Aufbewahrung; ist die
 Tagesgrenze erreicht, kommen bis zum Zurücksetzen keine Ereignisse mehr an – eine Lücke, die nicht
 vom Worker kommt. Gemessen am 28.10.2026: 162 Ereignisse, 177 KB. Verbunden über die Minute ergibt beides Schritt, Menge, Standort
-und CPU je Aufruf; was fehlt, deckt `cron_verlauf`. Ob sich der Standort festlegen lässt, wird nach 18j bis 18l recherchiert. Was daraus
+und CPU je Aufruf; was fehlt, deckt `cron_verlauf`. **Festlegen lässt sich der Standort nicht** (recherchiert am 29.10.2026 in der Dokumentation von
+Cloudflare): Cron Trigger laufen auf gerade wenig ausgelasteten Rechnern, und Placement (`smart`,
+`region`, `host`) wirkt nur auf `fetch`, nicht auf den Scheduled-Einstieg. Einschränken lässt ihn nur
+**Green Compute** (Einstellung des Kontos): Cron Trigger dann nur in Rechenzentren, die als rein
+erneuerbar betrieben gelten, auch über Zertifikate. Welche das sind und ob der Free-Plan es anbietet,
+nennt die Dokumentation nicht – ob es die langsamen Standorte trifft, wäre zu messen (offen, 16.2). Was daraus
 für jeden Schritt folgt und was zu entscheiden ist: [16.2](16-2-cpu-und-betrieb.md).
 Der Bezahlplan ist ausgeschlossen (Entscheidung des Nutzers vom 16.10.2026).
 

@@ -16,8 +16,8 @@ Der Bezahlplan ist ausgeschlossen (Entscheidung des Nutzers vom 16.10.2026).
 **Und wo der Aufruf läuft:** Die Nacht zum 17.10.2026 zeigte, dass das CPU-Niveau mit dem Standort
 des Crons wandert – vom 10. bis 16.10. lief jeder Aufruf in Singapur, davor in Newark, am 17.10.
 verstreut über die USA ([10-1-cron-cpu.md](10-1-cron-cpu.md)). **Nächte werden deshalb nur je Standort verglichen.**
-Ob sich der Standort festlegen lässt, wird erst **nach 18j bis 18l** recherchiert (Entscheidung des
-Nutzers vom 17.10.2026).
+Festlegen lässt er sich nicht (recherchiert am 29.10.2026, [10.1](10-1-cron-cpu.md)). **Offen:** Green
+Compute als Versuch, frühestens nach der Auswertung vom 01.11., in eigener Nacht, je Standort gemessen.
 
 **Was daraus je Schritt folgt** – Leerlauf, Spielzeit, Sync, Store und Gebrauchtpreise mit den
 gemessenen Einzelkosten und den Nachtmessungen bis 19.10.2026 – steht in
