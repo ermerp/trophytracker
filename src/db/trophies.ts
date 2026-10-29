@@ -1,18 +1,6 @@
 import type { TrophyTitel } from "../domain/normalize";
 import { EREIGNIS_SPALTEN, type EventRepository } from "./events";
 
-export type TrophySortierung = "zuletzt" | "fortschritt" | "titel";
-
-export type TrophyZeile = TrophyTitel & {
-	release_id: number | null;
-	synced_at: string;
-};
-
-export type TrophyListe = {
-	zeilen: TrophyZeile[];
-	gesamt: number;
-};
-
 /**
  * Zugriff auf trophy_progress.
  *
@@ -136,43 +124,5 @@ export class TrophiesRepository {
 			.prepare("SELECT COUNT(*) AS n FROM trophy_progress")
 			.first<{ n: number }>();
 		return zeile?.n ?? 0;
-	}
-
-	async liste(optionen: {
-		limit: number;
-		offset: number;
-		sortierung: TrophySortierung;
-		nurPlatin: boolean;
-	}): Promise<TrophyListe> {
-		// Feste Zuordnung statt Zeichenkette aus der Anfrage - kein Weg fuer
-		// eingeschleustes SQL in die ORDER-BY-Klausel.
-		const ordnung: Record<TrophySortierung, string> = {
-			zuletzt: "last_played_at DESC NULLS LAST, title_name ASC",
-			fortschritt: "progress_pct DESC, title_name ASC",
-			titel: "title_name COLLATE NOCASE ASC",
-		};
-
-		const bedingung = optionen.nurPlatin
-			? "WHERE defined_platinum > 0 AND earned_platinum > 0"
-			: "";
-
-		const gesamtZeile = await this.db
-			.prepare(`SELECT COUNT(*) AS n FROM trophy_progress ${bedingung}`)
-			.first<{ n: number }>();
-
-		const { results } = await this.db
-			.prepare(
-				`SELECT np_communication_id, np_service_name, title_name, platform, icon_url,
-				        defined_bronze, defined_silver, defined_gold, defined_platinum,
-				        earned_bronze, earned_silver, earned_gold, earned_platinum,
-				        progress_pct, last_played_at, synced_at, release_id
-				 FROM trophy_progress ${bedingung}
-				 ORDER BY ${ordnung[optionen.sortierung]}
-				 LIMIT ? OFFSET ?`,
-			)
-			.bind(optionen.limit, optionen.offset)
-			.all<TrophyZeile>();
-
-		return { zeilen: results, gesamt: gesamtZeile?.n ?? 0 };
 	}
 }

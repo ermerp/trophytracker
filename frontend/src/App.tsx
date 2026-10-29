@@ -22,7 +22,6 @@ import { SammlungPruefen } from './SammlungPruefen'
 import { Sicherung } from './Sicherung'
 import { Todo } from './Todo'
 import { Spieldetail } from './spieldetail/Spieldetail'
-import { Trophaeen } from './Trophaeen'
 import { Wunschliste } from './Wunschliste'
 import { WunschlisteImport } from './WunschlisteImport'
 import { Zuordnung } from './Zuordnung'
@@ -82,7 +81,6 @@ function Werkzeuge() {
         <li><Link to="/erscheint-bald">Erscheint bald</Link> – vorgemerkte Titel, die noch nicht erschienen sind</li>
         <li><Link to="/aenderungen">Änderungen</Link> – wer wann was geschrieben hat, nach Quelle</li>
         <li><Link to="/pruefen">Sammlung prüfen</Link> – alle Zuordnungen als Tabelle</li>
-        <li><Link to="/trophaeen">Trophäen</Link> – die Rohliste von Sony</li>
       </ul>
     </section>
   )
@@ -131,7 +129,6 @@ function App() {
           <Route path="/ohne-zuordnung" element={<OhneZuordnung />} />
           <Route path="/pruefen" element={<SammlungPruefen />} />
           <Route path="/aenderungen" element={<Aenderungen />} />
-          <Route path="/trophaeen" element={<Trophaeen />} />
           <Route path="*" element={<Navigate to="/start" replace />} />
         </Routes>
       </main>

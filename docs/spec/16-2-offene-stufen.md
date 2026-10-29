@@ -27,13 +27,7 @@ Auswahlen des Lage-Batches, mit dem Bestand der Lesekosten-Messung und dem Ziel,
 Wartungs-Leerlauf (rund 2 000 Zeilen je Aufruf, 23.10.2026) zu senken – er rückt vor, weil der
 **Vorwärm-Versuch gestrichen** ist: „Ausgang begonnen" läuft schon vor jeder Lage
 ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md), Entscheidung vom 23.10.2026); ein Markt-Lage-Schritt
-gegen die Zeilen entfällt vorerst → **veraltete Ansichten aufräumen** (Vorgabe des Nutzers vom
-21.10.2026): `/trophaeen`, die Rohliste von Sony aus Stufe 3, steht nur noch unter „Werkzeuge" und
-zeigt nichts, was Sammlung und Spieldetail nicht besser zeigen – entfernen, und dabei alle Ansichten
-darauf prüfen, ob es weitere solche gibt (13.1 nennt sie nicht alle). **Sie braucht keinen eigenen
-Nachtplatz und kann an jedem Tag parallel laufen** (geprüft am 23.10.2026): `/trophaeen` liest nur
-`GET /api/trophies` und damit `trophies.liste`, die sonst niemand ruft, auch kein Cron-Schritt. Das gilt
-für diese Ansicht; jede weitere, die dabei wegfallen soll, wird ebenso geprüft → **18m-b** → **neu bewerten: Nachtläufe
+gegen die Zeilen entfällt vorerst → **18m-b** → **neu bewerten: Nachtläufe
 bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster fast leer → **20g**.
 Gebaut sind 18k-b (Kaufliste gebündelt, CPU gemessen am 25.10.: Median 19 statt 35–108 ms), 20i (Markt als Action, erste
 volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; erste Nacht 21.10. wie gebaut; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
@@ -53,6 +47,11 @@ Am 02.11.2026 wird das Budget arbeitender Aufrufe neu bewertet. Fest sind die Ab
   unten.
 - **Endlos-Scrollen** in Sammlung und Änderungsprotokoll ist gebaut (Stufe 22, 24.10.2026,
   [16-2-endlos-scrollen.md](16-2-endlos-scrollen.md)), mit ihr `paths-ignore` für Doku-Pushes ([15.2](15-repository-deployment.md)).
+- **Veraltete Ansichten aufgeräumt** (Stufe 23, 29.10.2026): nur `/trophaeen` samt `GET /api/trophies`
+  entfernt – Sammlung und Spieldetail zeigen dasselbe besser. Die Durchsicht aller 22 Routen fand keine
+  weitere: `/pruefen` ist die einzige Stelle für „Release abtrennen" und „Sortierschlüssel neu berechnen"
+  ([13.1](13-1-ansichten-listen-und-werkzeuge.md)), die übrigen Werkzeuge verlinken Offenes, Listen oder
+  Feed, „Abweichungen" zeigt sonst niemand, „Anzeige" ist bewusst dauerhaft.
 
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 

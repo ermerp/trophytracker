@@ -116,17 +116,3 @@ export function normalisiereSeite(raw: string): NormalisierungsErgebnis {
 
 	return { titel, verworfen };
 }
-
-/**
- * Platin-Kennzeichen, dreiwertig.
- *
- * Die Pruefung auf defined_platinum > 0 ist zwingend (Abschnitt 4.1): 93 von
- * 431 Titeln der echten Sammlung definieren gar keine Platin-Trophaee. Als
- * Boolean modelliert wuerden sie dauerhaft als "Platin offen" erscheinen.
- */
-export type PlatinStand = "erspielt" | "offen" | "nicht_verfuegbar";
-
-export function platinStand(defined_platinum: number, earned_platinum: number): PlatinStand {
-	if (defined_platinum === 0) return "nicht_verfuegbar";
-	return earned_platinum > 0 ? "erspielt" : "offen";
-}
