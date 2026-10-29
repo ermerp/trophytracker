@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 136 | 29.10.2026 | **Nachtrag: Nächte zum 26.–29.10., auf Wunsch nachträglich.** Alle 288 Cron-Aufrufe `ok`, kein Abbruch, Sync jede Nacht `erfolg`, Zugang lebt; Wartungs-Leerlauf Median 5–6, PSN-Leerlauf 4–6, 10 von 227 über 10 ms (NRT, HKG, ORD am langsamsten) – Budget weiter verfehlt; Spielzeit einmal 64 ms (SJC, nicht erklärt); Abendläufe grün, aber bis 3 h 42 verspätet; `rows_read_24h` 121 456; Telemetry hält rund sieben statt drei Tage (10.1). Neue Datei `16-2-naechte.md` (16.2) |
 | 135 | 29.10.2026 | **Nachtrag: Observability nach Volumen.** Ab 01.12.2026 im Free-Plan 0,5 GB Ingestion am Tag und sieben Tage Aufbewahrung; Grenze erreicht heißt Lücke in der Telemetry, nicht im Worker; gemessen am 28.10.: 162 Ereignisse, 177 KB; Aufbewahrung der Telemetry-API nach dem 01.12. prüfen (10.1) |
 | 134 | 25.10.2026 | **Nachtrag: Abschluss der Sitzung.** Auswertung nach Anlass statt täglich, nächster Messtermin Nacht zum 01.11., Cron bis dahin unverändert; Abbrüche je Nacht seit 11.10. gezählt; Regel zu Uhrzeiten in CLAUDE.md (16.2) |
 | 133 | 25.10.2026 | **Nachtrag: erster Lauf der neuen Sicherung.** Von Hand gestartet, grün, beide Dateien abgelegt (25 899 INSERT-Zeilen geprüft, `backup.json` 11,65 MB), der rote Schlussschritt übersprungen; `backup.json` 266 ms CPU (MSP) – zweite Messung neben 212 (14.2, 16.2) |
