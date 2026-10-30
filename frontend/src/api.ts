@@ -98,8 +98,8 @@ export const datum = (wert: string | null) => {
   return Number.isNaN(d.getTime()) ? 'unbekannt' : d.toLocaleDateString('de-DE')
 }
 
-export const euro = (cents: number | null) =>
-  cents === null ? 'unbekannt' : (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
+import { euro } from './geld'
+export { euro }
 
 /**
  * Der Gebrauchtpreis als Satz (Stufe 20).
@@ -277,22 +277,8 @@ export type IgdbKandidat = {
   spieler: { wert: number; anzahl: number | null } | null
 }
 
-/** Eine Meldung des Preisalarms hinter der Glocke (Stufe 20g, `GET /api/preisalarme`). */
-export type Preisalarm = {
-  id: number
-  releaseId: number
-  gameId: number
-  titel: string
-  plattform: string
-  kanal: 'gebraucht' | 'store'
-  /** `tief`: Allzeittief seiner Reihe; `grenze`: unter der Grenze am Release. */
-  art: 'tief' | 'grenze'
-  reihe: 'haendler' | 'markt' | 'store'
-  preisCents: number
-  /** Das bisherige Tief (`tief`) oder die Grenze (`grenze`). */
-  vorherCents: number
-  aktualisiertAm: string
-}
+/** Eine Meldung des Preisalarms (Stufe 20g) - steht in `preisalarm.ts`, das ohne diese Datei auskommt. */
+export type { Preisalarm } from './preisalarm'
 
 export type IgdbStatus = {
   zugangsdaten: boolean

@@ -1,9 +1,27 @@
-import { euro, type Preisalarm } from './api'
-
 /**
- * Der Satz unter einer Meldung des Preisalarms (Stufe 20g): Reihe, Preis und
- * Grund. Eine eigene Datei ohne React, damit ein Test sie erreicht.
+ * Preisalarm im Frontend (Stufe 20g): der Typ einer Meldung, der Satz darunter
+ * und die Euro-Eingabe der Grenze. Eine eigene Datei ohne React und ohne
+ * `api.ts`, damit ein Test sie erreicht, ohne die ganze API mitzuprüfen.
  */
+import { euro } from './geld'
+
+/** Eine Meldung hinter der Glocke (`GET /api/preisalarme`). */
+export type Preisalarm = {
+  id: number
+  releaseId: number
+  gameId: number
+  titel: string
+  plattform: string
+  kanal: 'gebraucht' | 'store'
+  /** `tief`: Allzeittief seiner Reihe; `grenze`: unter der Grenze am Release. */
+  art: 'tief' | 'grenze'
+  reihe: 'haendler' | 'markt' | 'store'
+  preisCents: number
+  /** Das bisherige Tief (`tief`) oder die Grenze (`grenze`). */
+  vorherCents: number
+  aktualisiertAm: string
+}
+
 
 const REIHE: Record<Preisalarm['reihe'], string> = { haendler: 'Händler', markt: 'Markt', store: 'Store' }
 
