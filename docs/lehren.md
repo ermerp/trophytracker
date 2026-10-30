@@ -832,3 +832,15 @@ ich hatte eine Anleitung dafür gegeben, ohne ihn selbst auszuprobieren. Behoben
 ein Durchgang mit Fortschritt direkt unter den Knöpfen.
 → Wer dem Nutzer einen Handgriff aufträgt, sieht vorher an, was danach auf dem Bildschirm
 steht – bei 360 px (CLAUDE.md, „Oberfläche wird angesehen").
+
+---
+
+## Der Pfad, den der Nutzer nicht erreicht
+
+**30.10.2026 (Stufe 20g) – „ich finde die bilder nicht".** Ich nannte für die
+Bildschirmfotos den Scratchpad-Pfad unter `/tmp/claude-1000/…` – vollständig, wie verlangt,
+aber in WSL. Der Nutzer arbeitet unter Windows und erreicht `/tmp` nicht; `explorer.exe`
+zum Öffnen des Prototyps lieferte Exit 1, ob er aufging, war nicht festzustellen. Behoben
+durch eine Kopie nach `C:\Users\phili\Downloads\trophytracker-20g-bilder`.
+→ Die Stelle, die dem Nutzer genannt wird, muss eine sein, die er erreicht (CLAUDE.md,
+„Was berichtet … wird").

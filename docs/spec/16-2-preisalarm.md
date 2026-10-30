@@ -113,3 +113,5 @@ gerade gilt.
   dessen vorgelegt, was auslösen würde (CLAUDE.md, automatischer Schreibpfad).
 - **CPU der Portionsrouten** nach dem Deploy an der Telemetry messen; ob die Action mit 87 Portionen
   grün bleibt.
+- **Die Logzeile der Markt- und Store-Action nennt die Preisalarme noch nicht** – die Routen liefern
+  `preisalarme` mit, `scripts/markt-action.ts` und `store-action.ts` geben es nicht aus.
