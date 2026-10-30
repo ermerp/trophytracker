@@ -28,13 +28,18 @@ Wartungs-Leerlauf (rund 2 000 Zeilen je Aufruf, 23.10.2026) zu senken – er rü
 **Vorwärm-Versuch gestrichen** ist: „Ausgang begonnen" läuft schon vor jeder Lage
 ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md), Entscheidung vom 23.10.2026); ein Markt-Lage-Schritt
 gegen die Zeilen entfällt vorerst → **18m-b** → **neu bewerten: Nachtläufe
-bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster fast leer → **20g**.
+bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster fast leer.
+
+**20g vorgezogen** (Entscheidung des Nutzers vom 30.10.2026): 20g kommt **vor** Index-Nachtrag, 18m-b
+und die Neubewertung. Keiner davon ist Bedingung für 20g, und 20g rechnet in den Abendläufen
+(Preisschritte als Action), nicht in den Nachtfenstern. Gebaut wird bis zum 02.11., deployt frühestens
+nach der Bewertung vom 02.11. – bis dahin bleibt der Worker unverändert.
 Gebaut sind 18k-b (Kaufliste gebündelt, CPU gemessen am 25.10.: Median 19 statt 35–108 ms), 20i (Markt als Action, erste
 volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; erste Nacht 21.10. wie gebaut; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
 Am 02.11.2026 wird das Budget arbeitender Aufrufe neu bewertet. Fest sind die Abhängigkeiten:
 
 - **20g kommt nach 20i**; der Allzeittief-Auslöser bliebe bis zum 03.11.2026 ohnehin still
-  (Mindesthistorie, unten). **Wann 20g kommt, ist offen.**
+  (Mindesthistorie, unten). Deploy frühestens am 02.11.2026 nach der Bewertung.
 - **18n kommt vor die Nacht zum 01.11.** und vor den Index-Nachtrag: Der bringt die Auffrisch-Auswahl
   auf den Teilindex aus 18n und misst den Zähler im Lage-Batch mit.
 - **Der Index-Nachtrag kommt vor die Entscheidung „Cron je Minute"** ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
