@@ -2,13 +2,13 @@
 
 ## 16. Umsetzungsreihenfolge – die offenen Teile von Stufe 20
 
-Drei Teile standen offen, zwei davon (20h und 20f) sind abgenommen. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
+Drei Teile standen offen: 20h und 20f sind abgenommen, 20g ist gebaut. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
 Messung von sechs vollständigen Tagen im täglichen Takt; was trotzdem offen bleibt, steht
 unten ausdrücklich als offen.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 09.10.2026): **20h**, dann **20f**, dann
 **20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
-20h und 20f sind am 11.10.2026 abgenommen. Für 20g ist alles entschieden außer der relativen Regel, die ab dem 03.11.2026 messbar wird.
+20h und 20f sind am 11.10.2026 abgenommen, 20g ist am 30.10.2026 gebaut; offen bleibt dort nur die relative Regel, messbar ab dem 03.11.2026.
 
 **Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026).
 
@@ -33,7 +33,8 @@ bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster
 **20g vorgezogen** (Entscheidung des Nutzers vom 30.10.2026): 20g kommt **vor** Index-Nachtrag, 18m-b
 und die Neubewertung. Keiner davon ist Bedingung für 20g, und 20g rechnet in den Abendläufen
 (Preisschritte als Action), nicht in den Nachtfenstern. Gebaut wird bis zum 02.11., deployt frühestens
-nach der Bewertung vom 02.11. – bis dahin bleibt der Worker unverändert.
+nach der Bewertung vom 02.11. – bis dahin bleibt der Worker unverändert. Gebaut am 30.10.2026
+([16-2-preisalarm.md](16-2-preisalarm.md)).
 Gebaut sind 18k-b (Kaufliste gebündelt, CPU gemessen am 25.10.: Median 19 statt 35–108 ms), 20i (Markt als Action, erste
 volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; erste Nacht 21.10. wie gebaut; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
 Am 02.11.2026 wird das Budget arbeitender Aufrufe neu bewertet. Fest sind die Abhängigkeiten:
@@ -101,75 +102,10 @@ zur zweiten Frage, welcher Wert je Woche überlebt (Minimum, Median, letzter), i
 entschieden. Kommt sie, gehört sie in ein **drittes Cron-Fenster** – drei der fünf erlaubten
 Einträge sind frei.
 
-#### 20g – Preisalarm
+#### 20g – Preisalarm (**gebaut am 30.10.2026**, Deploy nach der Bewertung vom 02.11.)
 
-Die Glocke in der Kopfzeile meldet einen Preis, der zur Absicht passt.
-
-**Ein eigener Ton, nicht Gold** (Vorgabe des Nutzers vom 18.10.2026, am Prototyp von 18m): Gold liegt
-zu nah am Warn-Gelb, und ein Preisalarm ist eine gute Nachricht, keine wartende Arbeit. Im Prototyp
-von 20g wird ein Grün aus den Tokens (`--st-am_spielen`) neben Rot, Grau und Gelb der Glocke geprüft;
-die Gruppe in der Tafel steht zwischen Warnungen und Posten ([16.2](16-2-betriebswarnungen.md), 18m).
-
-**Der Kanal folgt der Absicht** (Entscheidung des Nutzers vom 09.10.2026) – für Alarm *und*
-Anzeige: Disc-Fassung `ja` → Gebrauchtpreis, `nein` oder „physisch nicht gewünscht"
-([5.3](05-3-luecke-verwerfen.md)) → Store-Preis, `unbekannt` → beide anzeigen. **Welcher Zweig
-bei `unbekannt` alarmiert, entscheidet sich zur LESEZEIT** (Entscheidung des Nutzers vom
-11.10.2026): Sobald eine Gebrauchtreihe besteht oder die Disc-Fassung auf `ja` steht, gilt der
-Gebrauchtzweig; sonst der Store-Zweig. Damit alarmiert ein Eintrag auf dem einzigen Kanal, den
-er hat, statt auf keinem – und er wechselt von selbst mit, wenn eBay später doch etwas findet.
-Keine gespeicherte Zuordnung, die veralten könnte („Berechnetes nicht speichern"). Reichweite am 09.10.2026 über die 60 Releases mit offener Kauf- oder
-Wunschabsicht: **48 mit `ja`** (alle mit Gebrauchtreihe), **12 mit `unbekannt`**, **0 mit
-`nein`** und 0 mit verworfenem Lücken-Kauf. Der Store-Zweig ist damit heute leer und füllt
-sich in der finalen Stufe 1, wo 113 der 157 offenen Releases den Befund „eBay kennt kein
-Angebot" tragen; gebaut wird er trotzdem mit, sonst erbt ihn später niemand.
-
-**Zwei Auslöser, beide entschieden:**
-
-1. **Absolut** – eine Schwelle je offener Absicht. Das Feld bleibt **leer**, nie vorbelegt
-   (Abschnitt 3): 29 der 41 Reihen auf der Wunschliste stehen schon unter 15 €, eine globale
-   Vorbelegung löste sofort 29 Meldungen aus. Braucht 20f nicht und hat keine Falschmeldungen.
-2. **Allzeittief**, mit vier Bedingungen zugleich: der Kanal passt zur Absicht; der Punkt ist
-   das Tief **seiner** Reihe (Händler und Markt werden nie verrechnet, Abschnitt 6);
-   **Mindesthistorie 30 Tage seit dem ersten Punkt der Reihe und mindestens 3 Punkte**; und
-   **Mindesttiefe 10 %** unter dem bisherigen Tief. Die Mindesthistorie zählt in **Tagen,
-   nicht in Punkten** – eine Reihe mit wenigen Punkten ist ein *stabiler* Preis und damit die
-   bessere Grundlage. Praktische Folge: Der Alarm wird gebaut, bleibt aber **bis zum
-   03.11.2026 still** (erste Punkte mit Kanal am 04.10., Store am 03.10.).
-
-**Warum eine Mindesttiefe sein muss:** Ohne sie feuert allein die Händlerreihe rund 20-mal je
-Nacht – ihre neuen Tiefs liegen im Median **3,7 %** unter dem bisherigen, zwei Drittel
-flacher als 5 % ([7.3](07-3-ebay-reihen.md)). Mit 10 % bleiben auf den offenen Absichten **2,5
-Meldungen je Nacht statt 5,8**, und 12 der 15 kommen aus der Marktreihe.
-
-**Gerechnet wird im Preisschritt selbst**, nicht als eigener Cron-Schritt: Er ist der einzige
-Zeitpunkt, an dem sich etwas ändern kann, er kennt den neuen Punkt schon, und „die
-Nebenwirkung gehört an den Schritt, nicht an seinen Auslöser" (CLAUDE.md). Das Wartungsfenster
-trägt keinen 16. Schritt ([10.1](10-1-cron.md)).
-
-**Wie eine Meldung lebt** (Entscheidung des Nutzers vom 11.10.2026):
-
-- **Quittiert wird durch Antippen.** Ohne Quittung stünde dasselbe Tief jede Nacht erneut da.
-- **Keine Sperrfrist, sondern höchstens eine offene Meldung je Reihe.** Ein tieferes Tief
-  **aktualisiert** die offene Meldung, statt eine zweite anzulegen – ein Preis, der in drei
-  Nächten dreimal fällt, meldet einmal mit dem tiefsten Stand. Das ist die Antwort auf
-  dieselbe Frage, die eine Sperrfrist lösen sollte, ohne eine Frist zu erfinden, die niemand
-  gemessen hat.
-- **Die absolute Schwelle meldet beim Unterschreiten** und wird erst wieder scharf, wenn der
-  Preis über die Schwelle zurückgeht. Sonst meldete ein Eintrag, der dauerhaft darunter
-  liegt, jede Nacht.
-- **Stammt ein gemeldetes Tief aus einem später verworfenen Angebot (20h), entfällt die
-  Meldung** – mit `price_snapshot.ebay_item_id` ist der Punkt eindeutig. **Der danach tiefste
-  Punkt löst keine neue aus:** Er stand schon da, als der Nutzer das Angebot verwarf, und eine
-  Korrektur soll nichts Neues melden.
-
-**Offen, ausdrücklich:**
-
-- **Die relative Regel** („20 % unter dem 30-Tage-Median") ist **nicht entschieden** und
-  bleibt ein möglicher Nachtrag. Messbar wird sie ab dem **03.11.2026**. Dann steht auch die
-  Frage, die sie technisch trägt: Der Median über `price_snapshot` ist **nicht** der Median
-  des Preises – geschrieben wird nur bei Änderung, also wiegen Tage mit Bewegung schwerer.
-  Richtig gerechnet braucht es eine Treppenfunktion (letzten Wert fortschreiben) oder eine
-  bewusst in Kauf genommene Verzerrung.
+Steht in [16-2-preisalarm.md](16-2-preisalarm.md): Kanal, Auslöser, Schreibweg, Oberfläche und was
+offen bleibt.
 
 #### Offen, bevor der grosse Wunschlisten-Import kommt
 

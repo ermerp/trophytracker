@@ -65,6 +65,7 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 16 | [16-umsetzung.md](16-umsetzung.md) | Übersicht Umsetzungsreihenfolge |
 | 16 | [16-1-abgeschlossene-stufen.md](16-1-abgeschlossene-stufen.md) | eine Zeile je abgeschlossener Stufe |
 | 16 | [16-2-offene-stufen.md](16-2-offene-stufen.md) | die offenen Teile von Stufe 20: 20h, 20f, 20g |
+| 16 | [16-2-preisalarm.md](16-2-preisalarm.md) | 20g Preisalarm: Kanal, Auslöser, Schreibweg, Glocke, Grenze |
 | 16 | [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) | CPU-Grenze: Budget, Wege je Schritt, Cron je Minute, Fristen, Index-Nachtrag |
 | 16 | [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md) | CPU-Grenze: was je Schritt folgt, mit den Nachtmessungen |
 | 16 | [16-2-naechte.md](16-2-naechte.md) | Nachtmessungen ab dem 26.10.2026 |

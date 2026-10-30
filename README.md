@@ -14,8 +14,8 @@ Die vollständige Spezifikation steht in [`docs/spec/`](docs/spec/README.md).
 
 ## Stand
 
-**Alle Funktionsstufen sind durch; Stufe 21 ist am 08.10.2026 abgenommen.** Offen
-ist nur noch ein Nachtrag zu den Preisen (20g Preisalarm) und die fünf finalen
+**Alle Funktionsstufen sind durch; Stufe 21 ist am 08.10.2026 abgenommen.** Der
+Preisalarm (20g) ist seit dem 30.10.2026 dabei. Offen sind die fünf finalen
 Stufen: Sammlung finalisieren, Oberfläche und Bedienbarkeit, Refactoring,
 Wiederherstellungsprobe, Außendarstellung. Die Einzelheiten stehen in
 [Abschnitt 16](docs/spec/16-umsetzung.md), die Fassungsgeschichte in
@@ -57,6 +57,7 @@ erfasste Discs, nächtliche Läufe seit dem 20.09.2026.
 | Spielzeit und digitaler Besitz | Aus PSN ergänzt, nie importiert; `kauf` schlägt `plus`, PS+ ist eine Momentaufnahme | [7.7](docs/spec/07-7-psn-weitere-daten.md), [PS+](docs/spec/07-7-ps-plus-gegen-kauf.md) |
 | Einzeltrophäen | 18 355 Trophäen mit Seltenheit, Stufe und Fortschrittszähler; Liste je Release, Level und Jahre im Dashboard | [7.7](docs/spec/07-7-einzeltrophaeen.md) |
 | Dashboard | Kennzahlen je Plattform, Trophäen je Stufe, Feed aus zwei Quellen; Betriebswarnungen rot, „zur Kenntnis" und Zählendes an der Glocke | [13](docs/spec/13-1-ansichten.md) |
+| Preisalarm | Die Glocke meldet ein Allzeittief oder einen Preis unter der eigenen Grenze, je Release mit offener Absicht; Kanal nach Disc-Fassung, quittiert über den Haken | [16.2](docs/spec/16-2-preisalarm.md) |
 | Spiel anlegen | Aus der Sammlung oder beim Scannen, mit IGDB-Suche oder ohne IGDB-Eintrag | [9.2](docs/spec/09-barcode.md) |
 | Scannen | Kamera (Handy, Webcam), EAN-13/UPC-A/EAN-8, zwei Lesungen zur Bestätigung (UPC-A drei); „Überspringen" speichert nichts | [9](docs/spec/09-barcode.md) |
 | EAN-Auflösung | `ean_mapping` → `market_offer` → **eBay live** → upcitemdb als Rückfall, alles im Moment des Scannens | [9.2](docs/spec/09-barcode.md) |

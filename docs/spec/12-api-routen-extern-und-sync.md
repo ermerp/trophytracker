@@ -32,6 +32,8 @@ GET    /api/export/:liste.csv         sammlung|wunsch|todo|backlog|kauf|luecken|
 GET    /api/export/backup.json        Vollsicherung: die 19 Fachtabellen, ohne Rohantworten und Zugangsdaten (14.2)
 GET    /api/backup/status             { letzterErfolgAm, letzterCommit, tageSeit }
 GET    /api/betrieb/warnungen         { warnungen[]: art, stufe (rot|kenntnis), text, ziel?, zielText?; zugangsende } – ein D1-Aufruf (Stufe 18m, 16.2)
+GET    /api/preisalarme               { alarme[]: id, releaseId, gameId, titel, plattform, kanal, art (tief|grenze), reihe, preisCents, vorherCents, aktualisiertAm } – offene Meldungen mit offener Absicht (Stufe 20g, 16.2)
+POST   /api/preisalarme/:id/quittieren  der Haken an der Meldung; 404, wenn sie nicht mehr offen ist (20g)
 POST   /api/backup/vermerk            Body: { zeitpunkt (ISO), commit? } – die Backup-Action meldet ihren Lauf
 
 GET    /api/upcoming                  { anzahl, eintraege[] } aus v_erscheint_bald: planId, art, spielId, releaseId, titel, bild, plattform, erscheinungsdatum, favorit (Stufe 15)
@@ -89,7 +91,8 @@ POST   /api/sync/store/ergebnisse     Body: { ergebnisse: [{ releaseId, preis } 
                                       nurKatalog }] }, 1 bis STORE_JE_POST (10); ein Lese- und ein
                                       Schreib-Batch. Produkt-Id, Preis und Befund streng geprueft (400),
                                       unbekannte Id uebergangen und gezaehlt. { geprueft, mitPreis,
-                                      imAngebot, imPlusKatalog, zugeordnet, ohneTreffer, unbekannt }
+                                      imAngebot, imPlusKatalog, zugeordnet, ohneTreffer, unbekannt,
+                                      preisalarme } – seit 20g mit den Meldungen im selben Schreib-Batch
 POST   /api/sync/store/ausgang        Body: { art: 'begonnen' } oder { art: 'ende', sechs Zahlen, fehler? }
                                       – Beginn unter `store_begonnen`, Ausgang unter `store` mit
                                       Verlaufszeile; `store_geprueft`, wenn geprueft > 0 oder ohne Meldung

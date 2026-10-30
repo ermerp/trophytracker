@@ -24,9 +24,9 @@ Die Action fragt eBay und gleicht ab, in Node ohne CPU-Grenze (`marktLauf`,
 D1-Aufruf) und schreibt je Portion über `POST /api/sync/markt/ergebnisse` (Weg A, Entscheidung des
 Nutzers vom 19.10.2026). Die Route liest Titel, Plattform und **Disc-Fassung selbst** und bildet den
 Anbieter aus dem Verkäufer nach; vom Körper nimmt sie nur die Angebote, streng geprüft
-(`angebotWahlAus`). **`MARKT_JE_POST = 6`**: höchstens sieben Anweisungen je Release, also 43 mit der
-Abfrage – unter den 50 je Aufruf, die D1 dokumentiert. Startwert, nach dem ersten Lauf an der
-gemessenen CPU je POST angepasst. Beginn und Ausgang vermerkt `POST /api/sync/markt/ausgang` (Bereich
+(`angebotWahlAus`). **`MARKT_JE_POST = 5`** (seit 20g, vorher 6): höchstens acht Anweisungen je
+Release – seit 20g mit der Meldung des Preisalarms –, also 44 mit dem Lese-Batch von vier – unter den
+50 je Aufruf, die D1 dokumentiert ([16-2-preisalarm.md](16-2-preisalarm.md)). Beginn und Ausgang vermerkt `POST /api/sync/markt/ausgang` (Bereich
 `markt` und `markt_begonnen` in `cron_stand`, [10-1-cron-verlauf.md](10-1-cron-verlauf.md)); die
 Meldung ist ein Code, kein Fremdtext. Das Log der Action ist öffentlich und enthält nur Zahlen.
 
