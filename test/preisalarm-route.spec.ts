@@ -160,6 +160,16 @@ describe("Preisalarm und das Verwerfen (20h)", () => {
 		expect(await alarme()).toMatchObject([{ entfallen: 0, preis_cents: 800 }]);
 	});
 
+	it("ein verworfenes Angebot zaehlt beim bisherigen Tief nicht mit, wie im Diagramm", async () => {
+		await release(1);
+		await punkte(1, "markt", [[40, 1000], [30, 600, "nurdisc"], [20, 1000]]);
+		await env.DB.prepare(
+			"INSERT INTO market_offer_verworfen (release_id, ebay_item_id, titel, preis_cents, verworfen_am) VALUES (1, 'nurdisc', 'Nur Disc', 600, datetime('now'))",
+		).run();
+		await sende("/api/sync/markt/ergebnisse", { ergebnisse: [ergebnis(1, 850)] });
+		expect(await alarme()).toMatchObject([{ preis_cents: 850, vorher_cents: 1000 }]);
+	});
+
 	it("die Ruecknahme stellt nicht her, wenn inzwischen eine andere Meldung offen ist", async () => {
 		await release(1);
 		await punkte(1, "markt", [[60, 1000], [50, 1000]]);
