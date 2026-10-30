@@ -3,6 +3,7 @@ import { meldungFuer } from "../psn/store";
 import { OHNE_WEBSTORE, PRODUKT_ID, STORE_BEFUNDE, storeAdresse, type StoreErgebnis } from "../domain/store";
 import { storeConceptIds } from "../domain/igdb";
 import { STORE_LAGE_HOECHSTENS, type Rueckbefund, type StoreRueckmeldung } from "../db/store";
+import { alarmPruefen } from "../domain/preisalarm";
 import { einesPruefen, storeActionZeile, STORE_JE_POST, type StoreActionErgebnis } from "../sync/store";
 import { liesJson } from "./validierung";
 import type { AppEnv } from "../types";
@@ -133,9 +134,19 @@ export const storeRoutes = new Hono<AppEnv>()
 		if (kaputt >= 0) return c.json({ fehler: `Eintrag ${kaputt + 1} ist kein gültiges Ergebnis.` }, 400);
 		const rueckmeldungen = gelesen as StoreRueckmeldung[];
 
-		const vorhanden = await c.var.repos.store.vorhandene([...new Set(rueckmeldungen.map((r) => r.releaseId))]);
+		const { vorhanden, alarmLage } = await c.var.repos.store.vorhandeneMitAlarm([
+			...new Set(rueckmeldungen.map((r) => r.releaseId)),
+		]);
 		const schreiben = rueckmeldungen.filter((r) => vorhanden.has(r.releaseId));
-		const geschrieben = await c.var.repos.store.rueckmeldungenSchreiben(schreiben);
+		// Preisalarm (Stufe 20g): im selben Schreib-Batch wie die Preise.
+		const jetzt = new Date();
+		const alarme = schreiben.flatMap((r) => {
+			const lage = alarmLage.get(r.releaseId);
+			if (!lage || !("preis" in r)) return [];
+			const a = alarmPruefen(lage, "store", [{ reihe: "store", preisCents: r.preis.preisCents, ebayItemId: null }], jetzt);
+			return a ? [a] : [];
+		});
+		const geschrieben = await c.var.repos.store.rueckmeldungenSchreiben(schreiben, alarme);
 		const preise = schreiben.flatMap((r) => ("preis" in r ? [r.preis] : []));
 		return c.json({
 			geprueft: schreiben.length,
@@ -145,6 +156,7 @@ export const storeRoutes = new Hono<AppEnv>()
 			zugeordnet: geschrieben.filter((g) => g.neuZugeordnet).length,
 			ohneTreffer: schreiben.length - preise.length,
 			unbekannt: rueckmeldungen.length - schreiben.length,
+			preisalarme: alarme.length,
 		});
 	})
 

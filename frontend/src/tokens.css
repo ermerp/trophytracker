@@ -33,6 +33,13 @@
 	--gefahr: #e0685a;
 	/* Der Grund des roten Blocks auf dem Dashboard (Stufe 18m) - wie --gold-flaeche. */
 	--gefahr-flaeche: rgba(224, 104, 90, 0.1);
+	/*
+	 * Preisalarm (Stufe 20g): eine GUTE Nachricht, keine wartende Arbeit -
+	 * deshalb weder Gold (zu nah am Warn-Gelb) noch das Gruen von "am Spielen"
+	 * und PS Vita, das neben einem Vita-Kennzeichen doppeldeutig waere. Ein
+	 * eigenes Tuerkis (Entscheidung des Nutzers vom 30.10.2026, am Prototyp).
+	 */
+	--preisalarm: #39b5a4;
 
 	/*
 	 * Ein Ton fuer alles, was FEHLT: keine Disc, kein Download, offenes Platin

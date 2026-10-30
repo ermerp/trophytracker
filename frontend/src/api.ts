@@ -277,6 +277,23 @@ export type IgdbKandidat = {
   spieler: { wert: number; anzahl: number | null } | null
 }
 
+/** Eine Meldung des Preisalarms hinter der Glocke (Stufe 20g, `GET /api/preisalarme`). */
+export type Preisalarm = {
+  id: number
+  releaseId: number
+  gameId: number
+  titel: string
+  plattform: string
+  kanal: 'gebraucht' | 'store'
+  /** `tief`: Allzeittief seiner Reihe; `grenze`: unter der Grenze am Release. */
+  art: 'tief' | 'grenze'
+  reihe: 'haendler' | 'markt' | 'store'
+  preisCents: number
+  /** Das bisherige Tief (`tief`) oder die Grenze (`grenze`). */
+  vorherCents: number
+  aktualisiertAm: string
+}
+
 export type IgdbStatus = {
   zugangsdaten: boolean
   gesamt: number

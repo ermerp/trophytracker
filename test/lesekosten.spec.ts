@@ -1686,6 +1686,125 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	 * Reihe (Abschnitt 6). Die Verdichtung aendert daran nichts - sie
 	 * verkleinert die ANTWORT, nicht die gelesenen Zeilen.
 	 */
+	it("misst den Preisalarm: Portionen mit Lage, Glocke und Spieldetail (Stufe 20g)", async () => {
+		// Der Stand in einem Jahr, grosszuegig: 60 offene Wuensche (heute 60)
+		// mit je drei Reihen zu 120 Punkten, dazu 200 quittierte Meldungen und
+		// fuenf offene. Die Schreibrouten laufen je Portion - bei 431 Faelligen
+		// rund 87-mal je Abend; die Glocke bei jedem Oeffnen des Dashboards.
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("DELETE FROM price_snapshot"),
+			env.DB.prepare("DELETE FROM preis_alarm"),
+		]);
+		const wunsch = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin, status) VALUES ('wunsch', ?, 'manuell', 'offen')");
+		const punkt = env.DB.prepare(
+			"INSERT INTO price_snapshot (release_id, channel, kanal, source, price_cents, ebay_item_id, captured_at) " +
+				"VALUES (?, ?, ?, 'ebay', ?, ?, datetime('now', '-' || ? || ' days'))",
+		);
+		const alarm = env.DB.prepare(
+			"INSERT INTO preis_alarm (release_id, kanal, art, reihe, preis_cents, vorher_cents, erstellt_am, aktualisiert_am, quittiert_am) " +
+				"VALUES (?, 'gebraucht', 'tief', 'markt', 900, 1000, datetime('now'), datetime('now'), ?)",
+		);
+		const anweisungen: D1PreparedStatement[] = [];
+		for (let r = 1; r <= 60; r++) {
+			anweisungen.push(wunsch.bind(r));
+			for (let t = 0; t < 120; t++) {
+				anweisungen.push(punkt.bind(r, "gebraucht", "haendler", 3_000 - t, `22${r}${t}`, t * 3));
+				anweisungen.push(punkt.bind(r, "gebraucht", "markt", 3_000 - t, `11${r}${t}`, t * 3));
+				anweisungen.push(punkt.bind(r, "psn_store", null, 6_000 - t, null, t * 3));
+			}
+		}
+		for (let i = 0; i < 200; i++) anweisungen.push(alarm.bind((i % 60) + 1, "2026-01-01 00:00:00"));
+		for (let r = 1; r <= 5; r++) anweisungen.push(alarm.bind(r, null));
+		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
+		await env.DB.prepare("UPDATE release SET physical_release_status = 'ja' WHERE id <= 30").run();
+		await env.DB.prepare("UPDATE release SET physical_release_status = 'nein' WHERE id > 30 AND id <= 60").run();
+
+		const app = createApp(
+			() => erstellePsnClient(fakeFetch([]).fetch),
+			() => fakeIgdb([[]], { zugang: null }).client,
+		);
+		const route = async (pfad: string, koerper?: unknown) => {
+			const zaehler = zaehlendeDb(env.DB);
+			const antwort = await app.request(
+				pfad,
+				koerper === undefined
+					? undefined
+					: { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(koerper) },
+				{ ...env, DB: zaehler.db },
+			);
+			return { antwort: (await antwort.json()) as Record<string, unknown>, aufrufe: zaehler.aufrufe(), anweisungen: zaehler.anweisungen(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
+		};
+		const preis = (cents: number, item: string) => ({
+			anbieter: "x",
+			angebot: { titel: "Spiel PS4", preisCents: cents, zustand: "Gut", verkaeufer: null, url: "https://www.ebay.de/itm/1", itemId: item },
+		});
+		const markt = (ids: number[], cents: number) =>
+			route("/api/sync/markt/ergebnisse", {
+				ergebnisse: ids.map((id) => ({
+					releaseId: id,
+					rohangebote: 3,
+					angebote: {
+						haendler: { preis: preis(cents, `33${id}`), beleg: preis(cents, `33${id}`) },
+						markt: { preis: preis(cents, `44${id}`), beleg: preis(cents, `44${id}`) },
+					},
+				})),
+			});
+		// Mit Absicht und Geschichte, jede meldet (Allzeittief): der teuerste Fall.
+		const mitAlarm = await markt([6, 7, 8, 9, 10], 1_000);
+		// Ohne Absicht: der haeufige Fall, 371 von 431 - die Lage darf nichts kosten.
+		const ohneAbsicht = await markt([101, 102, 103, 104, 105], 1_000);
+		const store = await route("/api/sync/store/ergebnisse", {
+			ergebnisse: [31, 32, 33, 34, 35, 36, 37, 38, 39, 40].map((id) => ({
+				releaseId: id,
+				preis: { produktId: "EP9000-CUSA13323_00-GHOSTSHIP0000000", produktName: "Spiel", preisCents: 1999, grundpreisCents: 1999, waehrung: "EUR", istSale: false, imPlusKatalog: false },
+			})),
+		});
+		const glocke = await route("/api/preisalarme");
+		const detail = await route("/api/games/6");
+		const ohne = (r: Awaited<ReturnType<typeof route>>) => ({ ...r, antwort: undefined });
+		console.info({
+			preisalarmMarkt: ohne(mitAlarm),
+			preisalarmMarktOhneAbsicht: ohne(ohneAbsicht),
+			preisalarmStore: ohne(store),
+			preisalarmGlocke: ohne(glocke),
+			preisalarmDetail: ohne(detail),
+		});
+
+		expect(mitAlarm.antwort).toMatchObject({ geprueft: 5, preisalarme: 5 });
+		expect(mitAlarm.aufrufe).toBe(2);
+		expect(mitAlarm.anweisungen).toBeLessThanOrEqual(50);
+		expect(store.antwort).toMatchObject({ geprueft: 10, preisalarme: 10 });
+		expect(store.aufrufe).toBe(2);
+		expect(store.anweisungen).toBeLessThanOrEqual(50);
+		// Fuenf schon offene, fuenf aus dem Markt, zehn aus dem Store.
+		expect((glocke.antwort.alarme as unknown[]).length).toBe(20);
+		// Gemessen am 30.10.2026 in diesem Bestand: 1 400 (Markt, fuenf
+		// Releases zu je 240 Gebrauchtpunkten - die Lage liest die Punkte der
+		// Reihen, und die wachsen mit jedem Preiswechsel), 130 ohne Absicht,
+		// 1 500 Store, 100 Glocke, 42 Spieldetail. Heute (30.10.) haben die
+		// Reihen der offenen Absichten im Mittel 13 Punkte, nicht 120.
+		expect(mitAlarm.gelesen).toBeLessThan(2_000);
+		// Dieselbe Grenze wie die Portion aus Stufe 20i: Ohne offene Absicht
+		// kostet die Lage praktisch nichts.
+		expect(ohneAbsicht.gelesen).toBeLessThan(500);
+		expect(store.gelesen).toBeLessThan(2_000);
+		expect(glocke.gelesen).toBeLessThan(300);
+		expect(detail.gelesen).toBeLessThan(100);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM plan_entry"),
+			env.DB.prepare("DELETE FROM price_snapshot"),
+			env.DB.prepare("DELETE FROM preis_alarm"),
+			env.DB.prepare("DELETE FROM market_offer"),
+			env.DB.prepare("DELETE FROM game_event"),
+			env.DB.prepare(
+				"UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, markt_geprueft_am = NULL, markt_rohangebote = NULL, " +
+					"store_geprueft_am = NULL, psn_product_id = NULL, store_price_cents = NULL, store_base_price_cents = NULL, store_befund = NULL, store_produkt_name = NULL",
+			),
+		]);
+	});
+
 	it("misst den Preisverlauf eines Release (Stufe 20f)", async () => {
 		await env.DB.prepare("DELETE FROM price_snapshot").run();
 		await env.DB.prepare("DELETE FROM market_offer_verworfen").run();

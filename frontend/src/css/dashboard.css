@@ -36,6 +36,12 @@
   color: var(--gefahr);
 }
 
+/* Preisalarm (Stufe 20g): eine gute Nachricht in eigenem Ton, nicht Gold
+   und nicht das Gruen von "am Spielen" (Entscheidung vom 30.10.2026). */
+.ikone.preisalarm {
+  color: var(--preisalarm);
+}
+
 /* Zur Kenntnis (Stufe 18m): still, kein eigener Farbton – nichts steht still
    (Entscheidung des Nutzers vom 18.10.2026). */
 .ikone.kenntnis {
@@ -69,6 +75,10 @@
   background: var(--text-leise);
 }
 
+.punktzahl.preisalarm {
+  background: var(--preisalarm);
+}
+
 /* „Da ist noch mehr" – ohne eine zweite Zahl aufzumachen. Der Rand in der
    Grundfarbe trennt ihn von der roten Glocke darunter. */
 .nebenpunkt {
@@ -84,6 +94,10 @@
 
 .nebenpunkt.kenntnis {
   background: var(--text-leise);
+}
+
+.nebenpunkt.preisalarm {
+  background: var(--preisalarm);
 }
 
 /* --- Warnungen und Tafel ------------------------------------------------ */
@@ -167,6 +181,10 @@
   color: var(--text-leise);
 }
 
+.tafelname.preisalarm {
+  color: var(--preisalarm);
+}
+
 /* Die Tafel der Glocke endet über der Leiste und scrollt in sich: Mit Rot,
    Hinweisen und Posten lief sie bei 360 px unten aus dem Bild (gesehen im
    Bild vom 18.10.2026). Nur diese Tafel – `.tafel` tragen auch die Menüs. */
@@ -174,6 +192,27 @@
   max-height: calc(100dvh - var(--kopf-hoehe) - var(--leiste-hoehe) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--a4));
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* Die Preisalarme (Stufe 20g): eine Linie im eigenen Ton, rechts der Haken.
+   Der Knopf behaelt seine 44 px zum Treffen; die negativen Raender holen ihn
+   an die Kante der Tafel, statt die Zeile breiter zu machen. */
+.tafel .preisalarmliste li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--a2);
+  padding-left: var(--a2);
+  border-left: 2px solid var(--preisalarm);
+}
+
+.preisalarmtext {
+  flex-grow: 1;
+  min-width: 0;
+  padding-top: var(--a1);
+}
+
+.preisalarmliste .ikone {
+  margin: calc(-1 * var(--a2)) calc(-1 * var(--a3)) calc(-1 * var(--a2)) 0;
 }
 
 /* Die Hinweise zur Kenntnis: eine feine Linie statt einer Farbe. */

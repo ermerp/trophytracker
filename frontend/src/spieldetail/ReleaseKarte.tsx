@@ -17,6 +17,7 @@ import { Preis } from '../Preis'
 import { StorePreis } from '../StorePreis'
 import { Trophaeenliste } from '../Trophaeenliste'
 import { Zeichen } from '../Symbole'
+import { PreisGrenze } from './PreisGrenze'
 import { Preisverlauf } from './Preisverlauf'
 import { spielzeitText } from '../spielzeit'
 import { BesitzKnopf } from './BesitzKnopf'
@@ -254,6 +255,10 @@ export function ReleaseKarte({
           )}
         </p>
       )}
+
+      {/* Die Grenze des Preisalarms (Stufe 20g) unter den Preisen, an denen
+          sie misst – nur bei offenem Wunsch oder Kauf. */}
+      <PreisGrenze release={r} laeuft={laeuft} tue={tue} />
 
       {/* Der Verlauf beider Kanäle, zugeklappt (Stufe 20f). Er steht direkt
           unter den Preisen, zu denen er gehört, und lädt erst beim Öffnen:

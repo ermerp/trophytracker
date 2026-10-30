@@ -58,7 +58,7 @@ s("PRAGMA foreign_keys = OFF;");
 const kennung = (i, art) => `${{ m: 11, h: 12, x: 13, y: 14 }[art]}${String(1_000_000_000 + i).slice(0, 10)}`;
 for (const tabelle of [
 	"game_event", "plan_entry", "play_status", "physical_copy", "digital_entitlement",
-	"review_queue", "trophy_progress", "psn_played_title", "ean_mapping", "price_snapshot",
+	"review_queue", "trophy_progress", "psn_played_title", "ean_mapping", "preis_alarm", "price_snapshot",
 	"market_offer_verworfen", "market_offer", "release", "game", "psn_raw_response", "psn_sync_run", "app_setting",
 ]) {
 	s(`DELETE FROM ${tabelle};`);

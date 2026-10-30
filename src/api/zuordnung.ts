@@ -1,3 +1,4 @@
+import { alarmKanal } from "../domain/preisalarm";
 import { Hono } from "hono";
 import { ereignisAntwort, seitenParameter } from "./events";
 import {
@@ -502,6 +503,24 @@ export const gameRoutes = new Hono<AppEnv>()
 								produktId: r.psn_product_id,
 								conceptId: detail.spiel.store_concept_id,
 							},
+				/**
+				 * Preisalarm (Stufe 20g): nur bei offener Absicht - die Grenze
+				 * wirkt sonst nicht und steht deshalb auch nicht da. `kanal` ist
+				 * der Kanal, der gerade alarmiert, zur Lesezeit bestimmt;
+				 * `aktuellCents` der Preis, an dem die Grenze misst (null:
+				 * unbekannt).
+				 */
+				preisalarm:
+					r.absicht_offen !== 1
+						? null
+						: (() => {
+								const kanal = alarmKanal(r.physical_release_status, r.kauf_verworfen === 1, r.hat_gebraucht === 1);
+								return {
+									grenzeCents: r.preis_grenze_cents,
+									kanal,
+									aktuellCents: kanal === "gebraucht" ? r.gebraucht_tiefst_cents : r.store_price_cents,
+								};
+							})(),
 				trophaeen:
 					r.np_communication_id === null
 						? null

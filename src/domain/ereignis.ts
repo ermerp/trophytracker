@@ -117,7 +117,12 @@ const RELEASE_FELD: Record<string, string> = {
 	physical_release_status: "Disc-Fassung",
 	physical_release_region: "Region der Disc-Fassung",
 	psn_product_id: "PSN-Produkt-Id",
+	preis_grenze_cents: "Preisalarm unter",
 };
+
+/** Cent als Euro, wie in der Oberflaeche ("12,50 €"); leer bleibt leer. */
+const euroText = (cents: string | null): string | null =>
+	cents === null || cents === "" ? null : `${(Number(cents) / 100).toFixed(2).replace(".", ",")} €`;
 
 const BEWERTUNG_FELD: Record<string, string> = {
 	rating: "Bewertung",
@@ -201,6 +206,11 @@ export function beschreibeEreignis(e: Ereignis): string {
 		case "release_geloescht":
 			return mitDetail("Release gelöscht", e.detail);
 		case "release_geaendert":
+			// Die Grenze des Preisalarms (Stufe 20g) steht in Cent und wird als
+			// Euro gelesen - gespeichert bleibt die Zahl.
+			if (e.field === "preis_grenze_cents") {
+				return `${RELEASE_FELD.preis_grenze_cents}: ${wert(euroText(e.old_value))} → ${wert(euroText(e.new_value))}`;
+			}
 			return `${wert(e.field, RELEASE_FELD)}: ${uebergang(e)}`;
 		case "disc_fassung_belegt":
 			return mitDetail("Disc-Fassung belegt: unbekannt → ja", e.detail);

@@ -53,6 +53,11 @@ export const EXPORT_TABELLEN = [
 	// Angebote wieder die guenstigsten.
 	"market_offer_verworfen",
 	"price_snapshot",
+	// Die Meldungen des Preisalarms (Migration 0037). Exportiert, weil das
+	// Quittieren eine Handlung des Nutzers ist: Ohne sie stuenden nach einer
+	// Wiederherstellung alle quittierten Meldungen wieder offen da - und eine
+	// neue entstuende erst mit dem naechsten Tief.
+	"preis_alarm",
 	"app_setting",
 	"psn_sync_run",
 	"game_event",

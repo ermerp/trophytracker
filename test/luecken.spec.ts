@@ -163,11 +163,11 @@ describe("PATCH /api/releases/:id", () => {
 
 		expect(await json(await patch(`/api/releases/${id}`, { discFassung: "nein" }))).toEqual({
 			status: 200,
-			body: { id, discFassung: "nein", discQuelle: "manuell", psnProductId: null },
+			body: { id, discFassung: "nein", discQuelle: "manuell", psnProductId: null, preisGrenzeCents: null },
 		});
 		expect(await json(await patch(`/api/releases/${id}`, { discFassung: "unbekannt", psnProductId: " EP9000-CUSA00900_00 " }))).toEqual({
 			status: 200,
-			body: { id, discFassung: "unbekannt", discQuelle: null, psnProductId: "EP9000-CUSA00900_00" },
+			body: { id, discFassung: "unbekannt", discQuelle: null, psnProductId: "EP9000-CUSA00900_00", preisGrenzeCents: null },
 		});
 		expect(await releases(1)).toEqual([{ platform: "PS4", status: "unbekannt", quelle: null, geprueft: 1 }]);
 

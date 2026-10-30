@@ -2,6 +2,8 @@ import { OHNE_WEBSTORE, type StoreBefund, type StoreErgebnis } from "../domain/s
 import type { Plattform } from "../domain/titel";
 import { eins, einzeln, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
+import type { AlarmLage, AlarmSchreiben } from "../domain/preisalarm";
+import type { PreisalarmRepository } from "./preisalarm";
 
 /**
  * PSN Store-Preise (Abschnitt 7.4, Stufe 21).
@@ -108,6 +110,7 @@ export class StoreRepository {
 	constructor(
 		private readonly db: D1Database,
 		private readonly events: EventRepository,
+		private readonly preisalarm: PreisalarmRepository,
 	) {}
 
 	/**
@@ -196,12 +199,26 @@ export class StoreRepository {
 	 * Hoechstens STORE_JE_POST Ids, weit unter 100 Binds.
 	 */
 	async vorhandene(releaseIds: readonly number[]): Promise<Set<number>> {
-		if (releaseIds.length === 0) return new Set();
-		const { results } = await this.db
-			.prepare(`SELECT id FROM release WHERE id IN (${releaseIds.map(() => "?").join(", ")})`)
-			.bind(...releaseIds)
-			.all<{ id: number }>();
-		return new Set(results.map((z) => z.id));
+		return (await this.vorhandeneMitAlarm(releaseIds)).vorhanden;
+	}
+
+	/**
+	 * Dasselbe mit der Lage des Preisalarms (Stufe 20g) - der Lese-Batch der
+	 * Portionsroute, vier Anweisungen in EINEM Aufruf.
+	 */
+	async vorhandeneMitAlarm(
+		releaseIds: readonly number[],
+	): Promise<{ vorhanden: Set<number>; alarmLage: Map<number, AlarmLage> }> {
+		if (releaseIds.length === 0) return { vorhanden: new Set(), alarmLage: new Map() };
+		const lage = this.preisalarm.lageAnweisungen(releaseIds, "store");
+		const [ids, ...rest] = await this.db.batch([
+			this.db.prepare(`SELECT id FROM release WHERE id IN (${releaseIds.map(() => "?").join(", ")})`).bind(...releaseIds),
+			...lage.anweisungen,
+		]);
+		return {
+			vorhanden: new Set(((ids?.results ?? []) as Array<{ id: number }>).map((z) => z.id)),
+			alarmLage: lage.lesen(rest),
+		};
 	}
 
 	/**
@@ -213,13 +230,20 @@ export class StoreRepository {
 	 * Scheitert eine Anweisung, scheitert der Batch ganz: Kein Release der
 	 * Portion bekommt Preis oder Stempel, alle bleiben faellig, und der
 	 * naechste Lauf fragt sie neu. Stillstehen kann nur diese Portion.
+	 *
+	 * Die Meldungen des Preisalarms (Stufe 20g) stehen am ENDE, hoechstens
+	 * eine je Release, nach den Preisen, auf denen sie beruhen - mit ihnen
+	 * hoechstens 4 Anweisungen je Release, 40 bei STORE_JE_POST = 10.
 	 */
-	async rueckmeldungenSchreiben(liste: readonly StoreRueckmeldung[]): Promise<Array<{ neuZugeordnet: boolean }>> {
+	async rueckmeldungenSchreiben(
+		liste: readonly StoreRueckmeldung[],
+		alarme: readonly AlarmSchreiben[] = [],
+	): Promise<Array<{ neuZugeordnet: boolean }>> {
 		const teile = liste.map((r) =>
 			"preis" in r ? this.preisAnweisungen(r.releaseId, r.preis) : [this.befundAnweisung(r.releaseId, r.befund, r.nurKatalog)],
 		);
 		if (teile.length === 0) return [];
-		const ergebnisse = await this.db.batch(teile.flat());
+		const ergebnisse = await this.db.batch([...teile.flat(), ...alarme.map((a) => this.preisalarm.schreibAnweisung(a))]);
 		let pos = 0;
 		return teile.map((t, i) => {
 			const erstes = ergebnisse[pos];
