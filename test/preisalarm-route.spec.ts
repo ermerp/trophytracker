@@ -128,6 +128,20 @@ describe("Preisalarm in der Markt-Route", () => {
 	});
 });
 
+describe("Hoechstens eine offene Meldung je Release und Kanal", () => {
+	it("eine zweite neue Meldung laeuft ins Leere, statt den Batch scheitern zu lassen", async () => {
+		await release(1);
+		const r = repos();
+		const neu = { releaseId: 1, kanal: "gebraucht" as const, art: "tief" as const, reihe: "markt" as const, preisCents: 800, vorherCents: 1000, ebayItemId: null, ersetzt: null };
+		await env.DB.batch([r.preisalarm.schreibAnweisung(neu), r.preisalarm.schreibAnweisung({ ...neu, preisCents: 700 })]);
+		expect(await alarme()).toMatchObject([{ preis_cents: 800 }]);
+		// Nach dem Quittieren darf eine neue entstehen.
+		await env.DB.prepare("UPDATE preis_alarm SET quittiert_am = datetime('now')").run();
+		await env.DB.batch([r.preisalarm.schreibAnweisung({ ...neu, preisCents: 600 })]);
+		expect(await alarme()).toMatchObject([{ preis_cents: 800, quittiert: 1 }, { preis_cents: 600, quittiert: 0 }]);
+	});
+});
+
 describe("Preisalarm und das Verwerfen (20h)", () => {
 	it("ein verworfenes Angebot laesst seine Meldung entfallen, die Ruecknahme stellt sie wieder her", async () => {
 		await release(1);

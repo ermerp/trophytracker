@@ -413,6 +413,28 @@ for (let i = 1; i <= ANZAHL; i += 3) {
 	s(`UPDATE game SET store_concept_id = '${200000 + i}', store_concept_am = datetime('now') WHERE id = ${i};`);
 }
 
+// Preisalarm (Stufe 20g): drei offene Meldungen - Allzeittief aus dem Markt,
+// Unterschreiten einer Grenze beim Haendler, Allzeittief im Store - und eine
+// quittierte, damit die Glocke alle Arten zeigt. Dazu Grenzen an zwei
+// Releases mit offenem Wunsch, eine davon ueber dem aktuellen Preis.
+s(
+	"INSERT INTO preis_alarm (release_id, kanal, art, reihe, preis_cents, vorher_cents, ebay_item_id, erstellt_am, aktualisiert_am, quittiert_am) " +
+		"SELECT release_id, CASE n WHEN 3 THEN 'store' ELSE 'gebraucht' END, CASE n WHEN 2 THEN 'grenze' ELSE 'tief' END, " +
+		"CASE n WHEN 2 THEN 'haendler' WHEN 3 THEN 'store' ELSE 'markt' END, " +
+		"CASE n WHEN 1 THEN 795 WHEN 2 THEN 916 WHEN 3 THEN 1499 ELSE 600 END, " +
+		"CASE n WHEN 1 THEN 900 WHEN 2 THEN 1000 WHEN 3 THEN 2999 ELSE 800 END, NULL, " +
+		"datetime('now', '-' || n || ' days'), datetime('now', '-' || n || ' days'), CASE n WHEN 4 THEN datetime('now') END " +
+		"FROM (SELECT release_id, ROW_NUMBER() OVER (ORDER BY release_id) AS n FROM plan_entry " +
+		"WHERE kind = 'wunsch' AND status = 'offen' AND release_id IS NOT NULL) WHERE n <= 4;",
+);
+for (const [grenze, versatz] of [[1000, 0], [99999, 1]]) {
+	s(
+		`UPDATE release SET preis_grenze_cents = ${grenze}, preis_grenze_am = datetime('now', '-3 days') WHERE id = ` +
+			"(SELECT release_id FROM plan_entry WHERE kind = 'wunsch' AND status = 'offen' AND release_id IS NOT NULL " +
+			`ORDER BY release_id LIMIT 1 OFFSET ${versatz});`,
+	);
+}
+
 s(
 	"INSERT INTO psn_sync_run (started_at, finished_at, status, titles_seen, started_by) VALUES " +
 		`(datetime('now', '-6 hours'), datetime('now', '-5 hours'), 'erfolg', ${ANZAHL}, 'cron');`,

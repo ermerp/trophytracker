@@ -617,9 +617,12 @@
   margin: var(--a2) 0;
 }
 
+/* Dieselbe Groesse und Farbe wie die Preiszeilen darueber (`.still`): Das
+   Feld gehoert zu ihnen, es ist keine eigene Ueberschrift. */
 .preisgrenze label {
   margin-bottom: var(--a1);
-  color: var(--text-leise);
+  color: var(--text-still);
+  font-size: 0.85rem;
 }
 
 .preisgrenze input {
