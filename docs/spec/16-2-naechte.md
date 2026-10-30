@@ -5,8 +5,9 @@
 Fortsetzung der Nachtmessungen aus [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md), die sonst über
 15 KB läge. Seit dem 25.10.2026 wird nur bei Betriebswarnung und zu Messterminen ausgewertet
 ([16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)); die Nächte 26.–29.10. sind auf Wunsch des
-Nutzers nachträglich ausgewertet (am 29.10.2026), ohne Anlass. Am Code hat sich seit dem Deploy vom
-25.10. nichts geändert (nur `docs/`).
+Nutzers nachträglich ausgewertet (am 29.10.2026), ohne Anlass, ebenso die Nacht zum 30.10. (am 30.10.2026).
+Am Code hat sich vom Deploy des 25.10. bis zu dem von Stufe 23 (29.10., 21:00 UTC) nichts geändert;
+Stufe 23 fasst keinen Cron-Schritt an.
 
 #### Nächte zum 26., 27., 28. und 29.10.2026
 
@@ -44,3 +45,32 @@ Wartung 94 132 bis 96 067 (am 26.10. 147 264 – App-Nutzung am Morgen, 28 Aufru
 0 offen, der zweite ohne Arbeit. **GitHub startet sie später als bisher:** 2 h 10 bis 3 h 42 nach
 dem Plan (20:17 / 22:17 / 20:47 / 22:47 UTC), am 24.10. 2 h 20 bis 2 h 51; der späteste begann
 am 29.10. um 01:56. Folgen hat das bisher keine, die Schwelle für `markt_geprueft` liegt bei 30 h.
+
+#### Nacht zum 30.10.2026
+
+Erste Nacht mit dem Code von Stufe 23. **Alle 72 Cron-Aufrufe `success`**, kein `exceededResources`
+(03–09 UTC), keine Marke `cron_begonnen` liegengeblieben; in der Telemetry 72 Logzeilen, aber nur 71
+Ereignisse mit CPU-Zeit (06:30 fehlt). Sync `erfolg` (431 Titel, 03:00–03:50, 9–24 ms, n = 11), Zugang
+lebt (`letzter_erfolg_am` 30.10. 03:50, Sony nennt 28.11.). Spielzeit 16 / 26 ms (200 / 179 Titel), Level 9,
+Jahre 9 ms (16 Jahre, 5 gelöscht); keine Kaufliste, kein Auffrischen, keine Disc-Prüfung. 26 Standorte.
+
+| | 30.10. |
+|---|---|
+| Wartungs-Leerlauf, Median (n) | **7** (34) |
+| PSN-Leerlauf, Median (n) | 5 (22) |
+| Leerlauf über 10 ms | 5 – LAX 12, 12; SJC 11 (PSN); AMS 13, 11 (Wartung) |
+
+**Der Wartungs-Leerlauf liegt einen Punkt über den vier Nächten davor** (5–6). AMS lief sieben Mal
+(Median 8, zuvor 7), SJC zweimal mit 8 und 10 (zuvor 6). Wieder ist das **nur notiert**: Eine Nacht
+reicht nicht, um es dem Standort oder dem Deploy zuzuschreiben.
+
+**Gelesene Zeilen:** PSN-Fenster 14 960, Wartung 94 132 (06–09 UTC); die Abendläufe 9 853 (23, 00 und 02 UTC).
+`rows_read_24h` am 30.10. **268 462**, `rows_written_24h` 3 481. Mehr als die Hälfte davon fällt in
+die Stunde 21 UTC am 29.10. (136 092 Zeilen, nichts geschrieben): Deploy von Stufe 23 und Prüfung der
+Produktion. In der Stichprobe von `d1QueriesAdaptiveGroups` sind es Statistik-Abfragen (Plattformübersicht
+12-mal, 40 140 Zeilen). Ohne diese Stunde bleiben 132 370, etwas mehr als am 29.10. (121 456).
+
+**Abendläufe des 29.10.:** Alle vier grün. Markt 23:56 UTC (431 geprüft in 72 Portionen, 503 s, 0 offen),
+Store 00:22 (79 geprüft, 76 Anfragen, 0 offen), die beiden zweiten Läufe um 02:00 und 02:09 ohne Arbeit.
+Verspätung gegen den Plan 3 h 22 bis 3 h 43; das ist dieselbe Größenordnung wie die 3 h 42 vom 29.10.
+
