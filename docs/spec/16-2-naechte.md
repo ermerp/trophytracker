@@ -5,7 +5,7 @@
 Fortsetzung der Nachtmessungen aus [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md), die sonst über
 15 KB läge. Seit dem 25.10.2026 wird nur bei Betriebswarnung und zu Messterminen ausgewertet
 ([16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)); die Nächte 26.–29.10. sind auf Wunsch des
-Nutzers nachträglich ausgewertet (am 29.10.2026), ohne Anlass, ebenso die Nacht zum 30.10. (am 30.10.2026).
+Nutzers nachträglich ausgewertet (am 29.10.2026), ohne Anlass, ebenso die Nächte zum 30.10. und 31.10. (jeweils am selben Tag).
 Am Code hat sich vom Deploy des 25.10. bis zu dem von Stufe 23 (29.10., 21:00 UTC) nichts geändert;
 Stufe 23 fasst keinen Cron-Schritt an.
 
@@ -74,3 +74,30 @@ Produktion. In der Stichprobe von `d1QueriesAdaptiveGroups` sind es Statistik-Ab
 Store 00:22 (79 geprüft, 76 Anfragen, 0 offen), die beiden zweiten Läufe um 02:00 und 02:09 ohne Arbeit.
 Verspätung gegen den Plan 3 h 22 bis 3 h 43; das ist dieselbe Größenordnung wie die 3 h 42 vom 29.10.
 
+#### Nacht zum 31.10.2026
+
+Zweite Nacht mit dem Code von Stufe 23. **Alle 72 Cron-Aufrufe `ok`** in der Telemetry, jeder mit CPU-Zeit
+und Logzeile; `workersInvocationsAdaptive` (03–09 UTC) kennt nur 70, alle `success` – 06:00 und 06:15 fehlen
+dort, ihr Standort ist deshalb unbekannt. Kein `exceededResources`. Sync `erfolg` (431 Titel, 03:00–03:50,
+9–27 ms, Median 14, n = 11), Zugang lebt (`letzter_erfolg_am` 31.10. 03:50, Sony nennt 28.11.). Spielzeit
+27 / 17 ms (200 / 179 Titel), Level 17, Jahre 8 ms (16 Jahre, 5 gelöscht); keine Kaufliste, keine
+Disc-Prüfung. **Kein Auffrischen, wie erwartet:** Alle 478 verknüpften Spiele sind am 24.10. um 10:45 UTC
+aufgefrischt, fällig werden sie erst nach dem Wartungsfenster des 31.10. – die erste Nacht mit der
+Obergrenze aus 18n bleibt die zum 01.11. 25 Standorte.
+
+| | 31.10. |
+|---|---|
+| Wartungs-Leerlauf, Median (n) | 5 (35), höchstens 10 |
+| PSN-Leerlauf, Median (n) | 5 (22) |
+| Leerlauf über 10 ms | 1 – IAD 11 (PSN) |
+
+**Der Wartungs-Leerlauf ist zurück bei 5** – der Wert 7 der Nacht davor wiederholt sich nicht. AMS lief nur
+einmal (6). Ob es der Standortmix war, bleibt offen; einer Erklärung bedarf es nicht mehr.
+
+**Gelesene Zeilen:** PSN-Fenster 15 059, Wartung 94 132 (06–09 UTC, auf die Zeile wie am 30.10.); die
+Abendläufe 9 953 (23, 00 und 01 UTC). `rows_read_24h` am 31.10. gegen 12:30 UTC **173 541**,
+`rows_written_24h` 3 536.
+
+**Abendläufe des 30.10.:** Alle vier grün. Markt 23:45 UTC (431 geprüft in 72 Portionen, 485 s, 0 offen),
+Store 00:04 (79 geprüft, 76 Anfragen, 0 offen), die beiden zweiten Läufe um 01:38 und 01:50 ohne Arbeit.
+Verspätung gegen den Plan 3 h 03 bis 3 h 28 – etwas weniger als am 29.10.
