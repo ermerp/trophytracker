@@ -101,3 +101,47 @@ Abendläufe 9 953 (23, 00 und 01 UTC). `rows_read_24h` am 31.10. gegen 12:30 UTC
 **Abendläufe des 30.10.:** Alle vier grün. Markt 23:45 UTC (431 geprüft in 72 Portionen, 485 s, 0 offen),
 Store 00:04 (79 geprüft, 76 Anfragen, 0 offen), die beiden zweiten Läufe um 01:38 und 01:50 ohne Arbeit.
 Verspätung gegen den Plan 3 h 03 bis 3 h 28 – etwas weniger als am 29.10.
+
+#### Nacht zum 01.11.2026 – Messtermin
+
+Der Messtermin aus [16-2-bewertung-02-11.md](16-2-bewertung-02-11.md): erste Nacht mit der Obergrenze fürs
+Auffrischen (18n) und Kaufliste-Nacht. **Alle 72 Cron-Aufrufe `ok`** in der Telemetry, jeder mit CPU-Zeit und
+Logzeile; `workersInvocationsAdaptive` (03–09 UTC) kennt 71, alle `success` – 03:00 fehlt dort. Kein
+`exceededResources`, keine Marke `cron_begonnen` liegengeblieben, keine App-Nutzung im Fenster. Sync `erfolg`
+(431 Titel, 03:00–03:50, 10–24 ms, Median 13, n = 11), Zugang lebt (`letzter_erfolg_am` 01.11. 03:50, Sony
+nennt 28.11.). Spielzeit 21 (BNE) / **46 ms (SJC)** bei 200 / 179 Titeln, Level 8, Jahre 5. 21 Standorte.
+
+**Die Obergrenze greift wie gebaut:** drei Aufrufe zu je 50 Spielen (06:05 AMS 32 ms, 06:11 ICN 28,
+06:15 IAD 36; 150 angefragt, 150 aktualisiert), danach 32 Aufrufe mit `auffrischen=grenze aufrufe=3/3`.
+Stand in `igdb_auffrischen_nacht`: 3 Aufrufe, 478 Spiele. 328 bleiben fällig – wie simuliert folgen
+3 und 1 Aufrufe in den Nächten zum 02. und 03.11. (der letzte mit 28 Spielen), dann Ruhe bis zum
+nächsten Stau. **Jeder Auffrisch-Aufruf liegt über dem Budget** (28–36, wie am 20.10. mit 20–54); die
+Grenze begrenzt ihre Zahl, nicht ihre Kosten (16-2-cpu-je-schritt.md).
+
+**Kaufliste:** 15 Aufrufe, 14 × 50 und 1 × 34 = 734 Einträge, keine Änderung (`kauf=0 plus=0 entfallen=0`),
+**10–19 ms, Median 13** (am 25.10.: 11–26, Median 19). Weiter über dem Budget (Median ≤ 8), aber kein Aufruf
+über 20; ob es am Standortmix liegt, ist nicht geprüft. PSN-Fenster belegt: Sync 11, Spielzeit 2, Kaufliste 15,
+Level 1 – 29 von 36, wie am 25.10.
+
+| | 01.11. |
+|---|---|
+| Wartungs-Leerlauf, Median (n) | 5,5 (32), höchstens 11 |
+| PSN-Leerlauf, Median (n) | 4 (7) |
+| Leerlauf über 10 ms | 1 – ORD 11 (Wartung) |
+| Auffrischen, ms (n = 3) | 28–36, Median 32 |
+| Kaufliste, ms (n = 15) | 10–19, Median 13 |
+
+**Spielzeit zum zweiten Mal über 40 ms, beide Male SJC** (29.10.: 64, 01.11.: 46) bei derselben Arbeit.
+Zwei Werte am selben Standort sind ein Hinweis, keine Erklärung – nur notiert.
+
+**Gelesene Zeilen:** PSN-Fenster 18 624 (sonst 14 564–15 059, der Rest ist die Kaufliste), Wartung 108 274
+(sonst 94 132): Die Stunde 06 liest 52 546 statt 27 864 – rund 24 700 für die drei Auffrisch-Aufrufe,
+etwa 8 200 je Aufruf. Abendläufe 9 883 (23 und 01 UTC). `rows_read_24h` am 01.11. gegen 10:20 UTC
+**151 250**, `rows_written_24h` 3 852.
+
+**Abendläufe des 31.10.:** Alle vier grün. Markt 23:23 UTC (431 geprüft in 72 Portionen, 488 s, 0 offen),
+Store 23:45 (79 geprüft, 76 Anfragen, 0 offen), die beiden zweiten Läufe um 01:15 und 01:28 ohne Arbeit.
+Verspätung gegen den Plan 2 h 41 bis 3 h 06.
+
+**Sonntagssicherung:** Bis 10:21 UTC von GitHub **nicht gestartet** (geplant 03:17; die vier Sonntage davor
+starteten zwischen 08:06 und 10:05). Ihre CPU-Zeit steht damit noch aus.

@@ -62,4 +62,6 @@ Denkbar und **noch nicht geprüft** sind die ersten beiden:
   Seiten am selben Standort 18–23. Das ist ein einzelner Wert (n = 1) – er deutet auf feste Kosten je
   Aufruf, nicht auf Kosten je Kauf.
 
+**Zweite Messung in der Nacht zum 01.11.2026:** 10–19 ms, Median 13, an anderen Standorten ([16-2-naechte.md](16-2-naechte.md)).
+
 **Offen:** ob die Kaufliste wie Markt und Store in eine Action gehört, statt kleiner zu werden.
