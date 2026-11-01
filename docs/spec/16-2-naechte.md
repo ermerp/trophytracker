@@ -6,6 +6,7 @@ Fortsetzung der Nachtmessungen aus [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.
 15 KB läge. Seit dem 25.10.2026 wird nur bei Betriebswarnung und zu Messterminen ausgewertet
 ([16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)); die Nächte 26.–29.10. sind auf Wunsch des
 Nutzers nachträglich ausgewertet (am 29.10.2026), ohne Anlass, ebenso die Nächte zum 30.10. und 31.10. (jeweils am selben Tag).
+Ab dem 01.11.2026 rechnet `node scripts/nacht.mjs <datum>` die Kennzahlen der Tabellen – Aufrufe, Ausgang, Standorte, CPU je Schritt, gelesene Zeilen je Fenster – aus Telemetry und GraphQL (Entscheidung des Nutzers vom 01.11.2026: Skripte, die nur Betriebszahlen lesen, gehören ins Repository); geprüft gegen die Nächte zum 31.10. und 01.11., auf die Zahl genau bis auf die Standorte des 01.11. (von Hand 21 gezählt, richtig 30, korrigiert). Sicherung, Abendläufe und Zugang sieht es nicht.
 Am Code hat sich vom Deploy des 25.10. bis zu dem von Stufe 23 (29.10., 21:00 UTC) nichts geändert;
 Stufe 23 fasst keinen Cron-Schritt an.
 
@@ -109,7 +110,7 @@ Auffrischen (18n) und Kaufliste-Nacht. **Alle 72 Cron-Aufrufe `ok`** in der Tele
 Logzeile; `workersInvocationsAdaptive` (03–09 UTC) kennt 71, alle `success` – 03:00 fehlt dort. Kein
 `exceededResources`, keine Marke `cron_begonnen` liegengeblieben, keine App-Nutzung im Fenster. Sync `erfolg`
 (431 Titel, 03:00–03:50, 10–24 ms, Median 13, n = 11), Zugang lebt (`letzter_erfolg_am` 01.11. 03:50, Sony
-nennt 28.11.). Spielzeit 21 (BNE) / **46 ms (SJC)** bei 200 / 179 Titeln, Level 8, Jahre 5. 21 Standorte.
+nennt 28.11.). Spielzeit 21 (BNE) / **46 ms (SJC)** bei 200 / 179 Titeln, Level 8, Jahre 5. 30 Standorte.
 
 **Die Obergrenze greift wie gebaut:** drei Aufrufe zu je 50 Spielen (06:05 AMS 32 ms, 06:11 ICN 28,
 06:15 IAD 36; 150 angefragt, 150 aktualisiert), danach 32 Aufrufe mit `auffrischen=grenze aufrufe=3/3`.
