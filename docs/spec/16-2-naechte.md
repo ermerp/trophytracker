@@ -144,5 +144,6 @@ etwa 8 200 je Aufruf. Abendläufe 9 883 (23 und 01 UTC). `rows_read_24h` am 01.1
 Store 23:45 (79 geprüft, 76 Anfragen, 0 offen), die beiden zweiten Läufe um 01:15 und 01:28 ohne Arbeit.
 Verspätung gegen den Plan 2 h 41 bis 3 h 06.
 
-**Sonntagssicherung:** Bis 10:21 UTC von GitHub **nicht gestartet** (geplant 03:17; die vier Sonntage davor
-starteten zwischen 08:06 und 10:05). Ihre CPU-Zeit steht damit noch aus.
+**Sonntagssicherung:** grün, von GitHub erst um **10:34 UTC** gestartet (geplant 03:17, 7 h 17 zu spät; die vier
+Sonntage davor zwischen 08:06 und 10:05). `GET /api/export/backup.json` **321 ms CPU** (MSP, 1,9 s Wandzeit), ohne
+Abbruch – am 25.10. 212 (SEA) und 266 ms (MSP), also das Zweiunddreißigfache der Grenze, weiter geduldet.
