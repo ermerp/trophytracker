@@ -23,6 +23,7 @@ npm run build                                     # Frontend nach frontend/dist
 npm test                                          # Vitest
 npm run typecheck                                 # tsc --noEmit fuer src/ und test/ (Frontend: in npm run build)
 MESSWERTE=1 npm test                              # dazu die Lesekosten-Messwerte (sonst still)
+node scripts/nacht.mjs 2026-11-01 [--liste]       # Nachtauswertung der Cron-Fenster (Token in der Umgebung)
 ```
 
 Migrationen **niemals** von Hand gegen `--remote` anwenden. Das macht ausschließlich der Deploy-Job.
@@ -149,7 +150,7 @@ D1 zählt **gelesene Zeilen** (Scans, nicht Ergebniszeilen); der Free Tier erlau
 ### Keine echten PSN-Daten als Testdaten
 
 - Die Rohantworten in der Produktionsdatenbank enthalten die vollständige Spielhistorie des Nutzers, und dieses Repository ist öffentlich. Testdaten werden nachgebaut (`test/trophy-fixtures.ts`, `scripts/testdaten.mjs`), nie kopiert.
-- Dasselbe gilt für die Wunschlisten in `wunschlisten/` (per `.gitignore` ausgeschlossen) und für Messskripte gegen echte Daten: Sie bleiben im Scratchpad, ins Repository kommen nur Zahlen.
+- Dasselbe gilt für die Wunschlisten in `wunschlisten/` (per `.gitignore` ausgeschlossen) und für Messskripte, die **Nutzerdaten** lesen: Sie bleiben im Scratchpad, ins Repository kommen nur Zahlen. Ein Skript, das nur **Betriebszahlen** liest (CPU-Zeit, Standort, Zeilenzähler, Logzeilen ohne Inhalt), gehört dagegen ins Repository (`scripts/nacht.mjs`).
 
 ### Datenbankzugriff kapseln
 
