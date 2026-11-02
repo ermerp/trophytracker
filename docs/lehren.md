@@ -832,3 +832,15 @@ ich hatte eine Anleitung dafür gegeben, ohne ihn selbst auszuprobieren. Behoben
 ein Durchgang mit Fortschritt direkt unter den Knöpfen.
 → Wer dem Nutzer einen Handgriff aufträgt, sieht vorher an, was danach auf dem Bildschirm
 steht – bei 360 px (CLAUDE.md, „Oberfläche wird angesehen").
+
+---
+
+## Die Vorgabe, die nur verlinkt war
+
+**02.11.2026 – „ab wann kann man auswerten?" beantwortete ich mit 09:00 UTC.** Dass die
+Nachtläufe seit der Vorgabe vom 17.10.2026 bis 05:00 UTC fertig sein sollen, erwähnte ich
+nicht; der Nutzer fragte „wollten wir das nicht anpassen?". Der Punkt steht in
+`16-2-betriebswarnungen.md` – beim Session-Start gelesen werden `16-2-offene-stufen.md` und
+`16-2-cpu-und-betrieb.md`, und die verlinken ihn nur mit einer Überschrift.
+→ Beim Session-Start gehören auch die offenen Punkte dazu, auf die die beiden Dateien nur
+verweisen (CLAUDE.md, „Session-Start").
