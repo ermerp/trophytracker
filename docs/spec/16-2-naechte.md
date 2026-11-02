@@ -114,9 +114,9 @@ nennt 28.11.). Spielzeit 21 (BNE) / **46 ms (SJC)** bei 200 / 179 Titeln, Level 
 
 **Die Obergrenze greift wie gebaut:** drei Aufrufe zu je 50 Spielen (06:05 AMS 32 ms, 06:11 ICN 28,
 06:15 IAD 36; 150 angefragt, 150 aktualisiert), danach 32 Aufrufe mit `auffrischen=grenze aufrufe=3/3`.
-Stand in `igdb_auffrischen_nacht`: 3 Aufrufe, 478 Spiele. 328 bleiben fällig – wie simuliert folgen
-3 und 1 Aufrufe in den Nächten zum 02. und 03.11. (der letzte mit 28 Spielen), dann Ruhe bis zum
-nächsten Stau. **Jeder Auffrisch-Aufruf liegt über dem Budget** (28–36, wie am 20.10. mit 20–54); die
+Stand in `igdb_auffrischen_nacht`: 3 Aufrufe, 478 Spiele. 328 bleiben fällig – es folgen 3, 3 und 1
+Aufrufe in den Nächten zum 02., 03. und 04.11. (der letzte mit 28 Spielen; hier stand bis zum 02.11.
+„3 und 1 in den Nächten zum 02. und 03.11.", nachgezählt am 02.11.), dann Ruhe bis zum nächsten Stau. **Jeder Auffrisch-Aufruf liegt über dem Budget** (28–36, wie am 20.10. mit 20–54); die
 Grenze begrenzt ihre Zahl, nicht ihre Kosten (16-2-cpu-je-schritt.md).
 
 **Kaufliste:** 15 Aufrufe, 14 × 50 und 1 × 34 = 734 Einträge, keine Änderung (`kauf=0 plus=0 entfallen=0`),
@@ -147,3 +147,34 @@ Verspätung gegen den Plan 2 h 41 bis 3 h 06.
 **Sonntagssicherung:** grün, von GitHub erst um **10:34 UTC** gestartet (geplant 03:17, 7 h 17 zu spät; die vier
 Sonntage davor zwischen 08:06 und 10:05). `GET /api/export/backup.json` **321 ms CPU** (MSP, 1,9 s Wandzeit), ohne
 Abbruch – am 25.10. 212 (SEA) und 266 ms (MSP), also das Zweiunddreißigfache der Grenze, weiter geduldet.
+
+#### Nacht zum 02.11.2026
+
+Letzte Nacht für die Bewertung am 02.11. ([16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)), ausgewertet mit
+`node scripts/nacht.mjs`. **Alle 72 Cron-Aufrufe `ok`** in der Telemetry; `workersInvocationsAdaptive` kennt 71,
+alle `success` – 03:45 fehlt dort. Kein `exceededResources`, keine Marke `cron_begonnen` liegengeblieben. Sync
+`erfolg` (431 Titel, 03:00–03:50, 9–28 ms, Median 12, n = 11), Zugang lebt (`letzter_erfolg_am` 02.11. 03:50,
+Sony nennt 28.11.). Spielzeit 19 (LIS) / 22 ms (ORD) bei 200 / 179 Titeln, Level 9, Jahre 7; keine Kaufliste.
+21 Standorte.
+
+**Zweite Nacht mit der Obergrenze:** wieder drei Aufrufe zu je 50 Spielen (06:05 DFW 32 ms, 06:10 **ORD 60**,
+06:15 ORD 44; 150 angefragt, 150 aktualisiert), danach 33 mit `auffrischen=grenze aufrufe=3/3`. Fällig bleiben
+**178** (gezählt mit der Bedingung von `zumAuffrischenBaustein`): 178 Spiele mit Stempel 24.10., je 150 vom
+01. und 02.11. Damit folgen 3 Aufrufe zum 03.11. und 1 zum 04.11., und weil die Stempel in Blöcken liegen,
+wiederholt sich rechnerisch der Rhythmus 3/3/3/1 ab dem 08.11. jede Woche. **60 ms ist der höchste Auffrisch-Aufruf seit
+dem 20.10.** (damals 20–54), bei derselben Arbeit, aber ohne Abbruch.
+
+| | 02.11. |
+|---|---|
+| Wartungs-Leerlauf, Median (n) | 5 (32), höchstens 12 |
+| PSN-Leerlauf, Median (n) | 5 (22) |
+| Leerlauf über 10 ms | 2 – SJC 12, ORD 11 (beide Wartung) |
+| Auffrischen, ms (n = 3) | 32–60, Median 44 |
+
+**Gelesene Zeilen:** PSN-Fenster 15 293, Wartung 102 877 – die Stunde 06 liest 50 749, wie am 01.11. rund
+24 000 mehr für die drei Auffrisch-Aufrufe. Abendläufe 9 761 (23 und 01 UTC). `rows_read_24h` am 02.11. gegen
+10:50 UTC **141 343**, `rows_written_24h` 3 741.
+
+**Abendläufe des 01.11.:** Alle vier grün. Markt 23:34 UTC (431 geprüft in 72 Portionen, 467 s, 0 offen),
+Store 23:54 (79 geprüft, 76 Anfragen, 0 offen), die beiden zweiten Läufe um 01:34 und 01:50 ohne Arbeit.
+Verspätung gegen den Plan 3 h 03 bis 3 h 17.
