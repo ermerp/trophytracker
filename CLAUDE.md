@@ -199,7 +199,7 @@ Kein `env.DB.prepare()` direkt in Route-Handlern – alle Zugriffe laufen über 
 
 Gilt für `/catchup` vor dessen allgemeinen Schritten. **Es gibt kein `plan.md` und kein `findings.md`** – nicht suchen, nicht anlegen.
 
-- **Stand und nächste Schritte** stehen in `docs/spec/16-2-offene-stufen.md` und `16-2-cpu-und-betrieb.md` – daraus nur der Abschnitt der nächsten Stufe und die offenen Punkte, nicht beide Dateien ganz. Sitzungsstand, der in wenigen Tagen erledigt ist (anstehende Beobachtungen), steht in der Erinnerung „Projektstand" (über `MEMORY.md` verlinkt).
+- **Stand und nächste Schritte** stehen in `docs/spec/16-2-offene-stufen.md` und `16-2-cpu-und-betrieb.md` – daraus nur der Abschnitt der nächsten Stufe und die offenen Punkte, **auch die, auf die dort nur verlinkt wird**, nicht beide Dateien ganz. Sitzungsstand, der in wenigen Tagen erledigt ist (anstehende Beobachtungen), steht in der Erinnerung „Projektstand" (über `MEMORY.md` verlinkt).
 - Dazu die **ersten fünf Tabellenzeilen** von `docs/changelog.md` (neueste zuerst – nicht `tail`) und `git log --oneline -10`.
 - **Nicht** gelesen werden die übrige Spezifikation, `lehren.md` und `entscheidungen.md`.
 - Zu `git log`/`git status` gehört der Branch: Wer nicht auf `main` steht oder einen ungemergten `stufe-*`-Branch findet, hat eine halbe Stufe vor sich und sagt das.

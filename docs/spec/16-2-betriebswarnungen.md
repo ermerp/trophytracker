@@ -72,9 +72,16 @@ zusammenfallen. Zwei Prüffragen:
    der Spielzeit-Stand, Level- und Jahre-Stand, die Tagesfristen. Ginge ein Fenster über Mitternacht
    UTC, oder bleibt nur 00:00–05:00 UTC? Über Mitternacht verteilte sich die PSN-Kette auf zwei
    „heute".
-2. **Reicht die Kapazität – 60 statt 72 Aufrufe, Kaufliste-Nächte eingerechnet –, sobald 18j bis 20i
-   gebaut sind?** Heute braucht eine Kaufliste-Nacht 64 bis 73. Kleinere Portionen (18l: ein Release
-   je Aufruf) heißen mehr Aufrufe, nicht weniger; die Frage hängt mit „Cron je Minute" zusammen.
-   **Gemessen am 18.10.2026:** Eine Kaufliste-Nacht belegt das PSN-Fenster **voll** (36 von 36, der
-   Store fertig im letzten Aufruf), und der Lage-Batch liest je Wartungsaufruf rund 2 590 Zeilen –
-   mit Cron je Minute rund 466 000 je Nacht (oben).
+2. **Reicht die Kapazität – 60 statt 72 Aufrufe, Kaufliste-Nächte eingerechnet?** **Gemessen in den
+   Nächten 31.10.–02.11.2026: ja, ohne Cron je Minute.** Seit Markt und Store als Action laufen, hat das
+   PSN-Fenster 14 Aufrufe mit Arbeit (Sync 11, Spielzeit 2, Level 1), in einer Kaufliste-Nacht 29, die
+   Wartung 1 bis 4 (Jahre, bis zu drei Auffrisch-Aufrufe) – zusammen höchstens rund 33 von 60. Am
+   18.10.2026 belegte eine Kaufliste-Nacht das PSN-Fenster noch voll (36 von 36); der Lage-Batch liest
+   je Wartungsaufruf rund 2 590 Zeilen – mit Cron je Minute rund 466 000 je Nacht (oben). **Noch nicht
+   gemessen:** die Aufteilung (zwei Stunden geben 24 Aufrufe, die Kaufliste-Nacht braucht 29), der
+   schlimmste Fall der Wartung (Auffrischen und Disc-Prüfung zugleich) und die Überschneidung mit den
+   Abendläufen, die mit rund drei Stunden Verspätung bis gegen 02:00 UTC laufen.
+
+**Offen, vom Nutzer zu entscheiden:** ob der Index-Nachtrag davor kommen muss – laut 16.2 ist er nur
+Bedingung für „Cron je Minute". Bis zur Umstellung endet die Wartung um 08:55 UTC; eine vollständige
+Nachtauswertung geht erst ab 09:00 UTC.
