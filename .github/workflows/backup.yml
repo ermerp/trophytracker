@@ -53,31 +53,24 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 export trophytracker --remote --output=export/backup.sql
 
-      # Der Worker steht hinter Cloudflare Access (Abschnitt 15.3). Eine
-      # Action kann keinen Browser-Login durchlaufen, deshalb das Service
-      # Token 'github-backup' - derselbe Mechanismus wie fuer Personen, nur
-      # ohne Browser. Kein zweites Geheimnis im Worker.
+      # Aus dem Dump gebaut, nicht ueber den Worker (Nachtrag vom 02.11.2026):
+      # GET /api/export/backup.json kostete 212 bis 321 ms CPU gegen die
+      # 10-ms-Grenze. Dasselbe Format - dieselbe Tabellenliste, geprueft gegen
+      # die Route (14.2). Die Route bleibt fuer den Download von Hand.
       #
-      # Laeuft das Token ab, antwortet Access mit 302 auf die Login-Seite,
-      # nicht mit 401. Deshalb -f (scheitert bei >= 400) UND die
-      # Plausibilitaetspruefung darunter: eine HTML-Loginseite ist kein JSON.
+      # Die Warnung zum Modultyp betrifft nur das Laden der Tabellenliste aus
+      # src/db/export-tabellen.ts und waere im Log bloss Rauschen.
       #
       # continue-on-error: Scheitert der JSON-Teil, wird der Dump trotzdem
       # geprueft und abgelegt - er ist die Sicherung, die sich einspielen
       # laesst (14.2). Rot endet der Lauf dann im letzten Schritt.
-      - name: JSON-Export holen
+      - name: JSON aus dem Dump bauen
         id: json
         continue-on-error: true
-        env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          curl -fsS --retry 3 --retry-delay 5 \
-            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-            -o export/backup.json \
-            "$APP_URL/api/export/backup.json"
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
+            scripts/json-aus-dump.mjs export/backup.sql export/backup.json
 
           jq -e '.tabellen.game | length > 0' export/backup.json > /dev/null \
             || { echo "::error::backup.json enthält keine Spiele - Abbruch vor dem Commit"; exit 1; }

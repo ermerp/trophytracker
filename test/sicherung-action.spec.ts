@@ -29,10 +29,21 @@ const schritt = (n: string) => {
  * am 25.10.2026 gegen ein Wegwerf-Repository nachgewiesen.
  */
 describe("Sicherung: Dump auch ohne JSON", () => {
-	it("laesst den Lauf weiterlaufen, wenn der JSON-Export scheitert", () => {
-		const json = schritt("JSON-Export holen");
+	it("laesst den Lauf weiterlaufen, wenn der JSON-Teil scheitert", () => {
+		const json = schritt("JSON aus dem Dump bauen");
 		expect(json).toMatch(/^ {8}id: json$/m);
 		expect(json).toMatch(/^ {8}continue-on-error: true$/m);
+	});
+
+	it("baut backup.json aus dem Dump, nicht ueber den Worker (Nachtrag vom 02.11.2026)", () => {
+		// Die Route kostete 212 bis 321 ms CPU gegen die 10-ms-Grenze (14.2).
+		const json = schritt("JSON aus dem Dump bauen");
+		expect(json).toMatch(/scripts\/json-aus-dump\.mjs export\/backup\.sql export\/backup\.json/);
+		expect(workflow).not.toMatch(/\/api\/export\/backup\.json/);
+		// Der Dump muss vorher da sein.
+		const namen = schritte.map(name);
+		expect(namen.indexOf("SQL-Dump erzeugen")).toBeGreaterThanOrEqual(0);
+		expect(namen.indexOf("SQL-Dump erzeugen")).toBeLessThan(namen.indexOf("JSON aus dem Dump bauen"));
 	});
 
 	it("prueft, legt ab und vermerkt ohne Bedingung", () => {
