@@ -9,7 +9,8 @@ import { Geheimnis } from "../src/domain/secret";
 import { createApp, createScheduled } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
 import { zaehlendeDb } from "./d1-zaehler";
-import { fakeIgdb } from "./igdb-fake";
+import { fakeIgdb, spielRoh } from "./igdb-fake";
+import { AUFFRISCHEN_JE_AUFRUF, igdbAuffrischSchritt } from "../src/sync/igdb";
 import { fakeFetch, jsonAntwort } from "./psn-fake";
 import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt } from "../src/sync/besitz";
 import { MARKT_JE_POST } from "../src/sync/markt";
@@ -433,6 +434,35 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(wieder.gelesen).toBeLessThan(1_500);
 
 		await env.DB.prepare("DELETE FROM digital_entitlement").run();
+	});
+
+	it("misst einen Auffrisch-Aufruf als Schritt (Nachtrag 18n-c)", async () => {
+		// Eine volle Portion wie nachts: 50 verknuepfte Spiele, IGDB liefert 49
+		// (eines wird nur gestempelt), eines wechselt angekuendigt -> erschienen.
+		// Bis 18n-c schrieb der Schritt je Spiel einen eigenen Batch - 50
+		// D1-Aufrufe nacheinander, ueber 100 Anweisungen je Aufruf (16.2).
+		const ids = Array.from({ length: AUFFRISCHEN_JE_AUFRUF }, (_, k) => k + 1);
+		await env.DB.batch([
+			env.DB.prepare(`UPDATE game SET igdb_id = 5000 + id, igdb_synced_at = NULL WHERE id <= ${AUFFRISCHEN_JE_AUFRUF}`),
+			env.DB.prepare("UPDATE game SET release_status = 'angekuendigt' WHERE id = 1"),
+		]);
+		const { client } = fakeIgdb([ids.slice(0, -1).map((i) => spielRoh({ id: 5000 + i, name: `Spiel ${i}` }))]);
+		const zaehler = zaehlendeDb(env.DB);
+		const e = await igdbAuffrischSchritt(createRepositories(zaehler.db, env.NPSSO_KEY), client);
+		const messung = { aufrufe: zaehler.aufrufe(), anweisungen: zaehler.anweisungen(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
+		console.info({ auffrischAufruf: messung });
+
+		expect(e).toEqual({ status: "erfolg", angefragt: 50, aktualisiert: 49, ohneAntwort: 1 });
+		// Ein Lese- und ein Schreibaufruf, gleich wie viele Spiele.
+		expect(messung.aufrufe).toBe(2);
+		expect(messung.anweisungen).toBeLessThanOrEqual(5);
+		// Je Spiel Index-Lookups, kein Scan ueber game.
+		expect(messung.gelesen).toBeLessThan(1_000);
+
+		await env.DB.batch([
+			env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_slug = NULL, cover_url = NULL, release_date = NULL, release_status = 'unbekannt', critic_score = NULL, critic_score_count = NULL, critic_source = NULL, critic_updated_at = NULL, user_score = NULL, user_score_count = NULL, igdb_synced_at = NULL"),
+			env.DB.prepare("DELETE FROM game_event WHERE source = 'igdb' AND kind = 'erschienen'"),
+		]);
 	});
 
 	it("misst die Routen der Markt-Action als Route (Stufe 20i)", async () => {
