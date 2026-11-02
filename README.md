@@ -477,8 +477,10 @@ curl -sS -o /dev/null -w '%{http_code}\n' "$BASIS/api/health"
 
 ### Maschinen-Endpunkte
 
-`GET /api/export/backup.json` und `POST /api/backup/vermerk` werden von GitHub
-Actions aufgerufen und können keinen Browser-Login durchlaufen.
+`POST /api/backup/vermerk` wird von der Sicherungs-Action aufgerufen, die
+keinen Browser-Login durchlaufen kann; `GET /api/export/backup.json` liegt
+hinter demselben Schutz (seit dem 02.11.2026 nur noch für den Download von
+Hand, die Action baut die Datei aus dem Dump).
 
 **Entschieden in Stufe 8: Access Service Token.** Der Alternativweg – diese
 Pfade von Access ausnehmen und mit einem eigenen Bearer-Token absichern – ist
@@ -652,8 +654,8 @@ GitHub die Cron-Jobs aller Repositories. Von Hand startbar über Actions →
 **Was der Lauf tut**
 
 1. `wrangler d1 export --remote` → `backup.sql`
-2. `GET /api/export/backup.json` mit dem Service Token `github-backup` –
-   **scheitert das, läuft der Lauf weiter**: Der Dump ist die Sicherung, die
+2. `scripts/json-aus-dump.mjs` baut `backup.json` aus dem Dump, ohne den
+   Worker – **scheitert das, läuft der Lauf weiter**: Der Dump ist die Sicherung, die
    sich einspielen lässt
 3. `scripts/sicherung-pruefen.sh`: `INSERT`-Zeilen je Tabelle gegen `COUNT(*)`
 4. `scripts/dump-pruefen.sh`: kein NPSSO, kein Refresh- oder Access Token im
