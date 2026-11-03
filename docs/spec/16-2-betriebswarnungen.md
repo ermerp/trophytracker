@@ -80,7 +80,9 @@ zusammenfallen. Zwei Prüffragen:
    je Wartungsaufruf rund 2 590 Zeilen – mit Cron je Minute rund 466 000 je Nacht (oben). **Noch nicht
    gemessen:** die Aufteilung (zwei Stunden geben 24 Aufrufe, die Kaufliste-Nacht braucht 29), der
    schlimmste Fall der Wartung (Auffrischen und Disc-Prüfung zugleich) und die Überschneidung mit den
-   Abendläufen, die mit rund drei Stunden Verspätung bis gegen 02:00 UTC laufen.
+   Abendläufen: bis zum 01.11. rund drei Stunden verspätet, bis gegen 02:00 UTC; am 02.11. **4 h 55 bis
+   6 h 00**, die zweiten Läufe um 03:29 und 03:42 UTC erstmals im PSN-Fenster ([16-2-naechte.md](16-2-naechte.md)).
+   Sie rufen Routen des Workers, keinen Cron-Schritt – was das für das Fenster heißt, ist offen.
 
 **Offen, vom Nutzer zu entscheiden:** ob der Index-Nachtrag davor kommen muss – laut 16.2 ist er nur
 Bedingung für „Cron je Minute". Bis zur Umstellung endet die Wartung um 08:55 UTC; eine vollständige
