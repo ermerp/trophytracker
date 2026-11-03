@@ -844,6 +844,7 @@ zum Öffnen des Prototyps lieferte Exit 1, ob er aufging, war nicht festzustelle
 durch eine Kopie nach `C:\Users\phili\Downloads\trophytracker-20g-bilder`.
 → Die Stelle, die dem Nutzer genannt wird, muss eine sein, die er erreicht (CLAUDE.md,
 „Was berichtet … wird").
+---
 
 ## Die Vorgabe, die nur verlinkt war
 
@@ -854,3 +855,14 @@ nicht; der Nutzer fragte „wollten wir das nicht anpassen?". Der Punkt steht in
 `16-2-cpu-und-betrieb.md`, und die verlinken ihn nur mit einer Überschrift.
 → Beim Session-Start gehören auch die offenen Punkte dazu, auf die die beiden Dateien nur
 verweisen (CLAUDE.md, „Session-Start").
+
+---
+
+## Die Zahl auf der Grenze
+
+**03.11.2026 (Nachtauswertung) – „waren sie alle unter 10 ms? das ist die Grenze oder?"** Ich
+berichtete das Auffrischen nach 18n-c als „8–10 ms statt 28–60". Zwei der drei Aufrufe lagen bei
+genau 10 ms, also an der Grenze, nicht darunter – und `cpuTimeMs` der Telemetry ist ganzzahlig,
+eine 10 kann also auch 10,9 sein. Die Spanne klang nach Einhaltung, weil die Verbesserung groß war.
+→ Ein Messwert wird gegen die Grenze berichtet, nicht gegen den Vorher-Wert; was auf ihr liegt,
+heißt „an der Grenze" (CLAUDE.md, „Was die Laufzeit duldet, ist keine Einhaltung").
