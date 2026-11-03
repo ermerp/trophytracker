@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createRepositories } from "../src/db";
 import { createApp } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
-import { eindeutigerTreffer } from "../src/domain/igdb";
+import { eindeutigerTreffer, type IgdbMetadaten } from "../src/domain/igdb";
 import { igdbAbgleichSchritt, igdbAuffrischSchritt, kandidatenSuchen } from "../src/sync/igdb";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
 import { fakeFetch } from "./psn-fake";
@@ -355,7 +355,7 @@ describe("IgdbRepository: Entscheidungen des Nutzers", () => {
 
 		// Was der Nutzer danach umbenennt, bleibt beim Auffrischen.
 		await r.games.umbenennen(1, "BG3");
-		await r.igdb.auffrischen(1, meta("Baldur's Gate 3"));
+		await r.igdb.auffrischenAlle([{ gameId: 1, m: meta("Baldur's Gate 3") }], []);
 		expect(await zeile(1)).toMatchObject({ title: "BG3" });
 	});
 
@@ -374,6 +374,86 @@ describe("IgdbRepository: Entscheidungen des Nutzers", () => {
 		expect((await zeile(1))?.igdb_checked_at).toBeNull();
 		expect((await zeile(2))?.igdb_checked_at).not.toBeNull();
 		expect((await zeile(3))?.igdb_checked_at).not.toBeNull();
+	});
+});
+
+describe("Auffrischen als Portion (Nachtrag 18n-c)", () => {
+	const meta = (igdbId: number, ueber: Partial<IgdbMetadaten> = {}): IgdbMetadaten => ({
+		igdbId,
+		name: "egal",
+		igdbSlug: `slug-${igdbId}`,
+		coverUrl: `https://x.invalid/${igdbId}.jpg`,
+		releaseDate: "2026-03-01",
+		releaseStatus: "erschienen",
+		criticScore: 80.5,
+		criticScoreCount: 7,
+		userScore: 70,
+		userScoreCount: 100,
+		...ueber,
+	});
+	const ereignisse = async () =>
+		(await env.DB.prepare("SELECT game_id, kind, field, old_value, new_value, detail FROM game_event ORDER BY id").all()).results;
+
+	beforeEach(async () => {
+		await env.DB.prepare("DELETE FROM game_event").run();
+		for (const id of [1, 2, 3, 4, 5]) await spiel(id, `Spiel ${id}`, `spiel ${id}`, ["PS4"]);
+		await env.DB.batch([
+			env.DB.prepare("UPDATE game SET igdb_id = 100 + id, igdb_synced_at = '2026-01-01 00:00:00'"),
+			env.DB.prepare("UPDATE game SET release_status = 'angekuendigt' WHERE id IN (1, 2)"),
+			env.DB.prepare("UPDATE game SET critic_score = 77, critic_source = 'manuell' WHERE id = 3"),
+		]);
+	});
+
+	it("schreibt alle Spiele einer Portion und protokolliert nur den Wechsel angekuendigt → erschienen", async () => {
+		const n = await repos().igdb.auffrischenAlle(
+			[
+				{ gameId: 1, m: meta(101) },
+				{ gameId: 2, m: meta(102, { releaseStatus: "angekuendigt", releaseDate: null }) },
+				{ gameId: 4, m: meta(104) },
+			],
+			[],
+		);
+		expect(n).toBe(3);
+		expect(await ereignisse()).toEqual([
+			{ game_id: 1, kind: "erschienen", field: "release_status", old_value: "angekuendigt", new_value: "erschienen", detail: "2026-03-01" },
+		]);
+		expect(await zeile(1)).toMatchObject({ release_status: "erschienen", release_date: "2026-03-01", igdb_slug: "slug-101", critic_score: 80.5, critic_source: "igdb", user_score: 70 });
+		expect(await zeile(2)).toMatchObject({ release_status: "angekuendigt", release_date: null });
+		// Typen bleiben, was IGDB liefert: Kommazahl als REAL, Anzahl als INTEGER.
+		const typen = await env.DB.prepare("SELECT typeof(critic_score) AS w, typeof(critic_score_count) AS n FROM game WHERE id = 4").first();
+		expect(typen).toEqual({ w: "real", n: "integer" });
+	});
+
+	it("laesst ein Spiel unberuehrt, dessen Verknuepfung inzwischen eine andere ist", async () => {
+		const n = await repos().igdb.auffrischenAlle([{ gameId: 1, m: meta(999) }], []);
+		expect(n).toBe(0);
+		expect(await ereignisse()).toEqual([]);
+		expect(await zeile(1)).toMatchObject({ igdb_id: 101, release_status: "angekuendigt", cover_url: null, igdb_synced_at: "2026-01-01 00:00:00" });
+	});
+
+	it("laesst die manuelle Kritikerwertung stehen und schreibt ein ausdrueckliches null als NULL", async () => {
+		await env.DB.prepare("UPDATE game SET critic_score = 60, critic_source = 'igdb', cover_url = 'alt' WHERE id = 4").run();
+		await repos().igdb.auffrischenAlle(
+			[
+				{ gameId: 3, m: meta(103) },
+				{ gameId: 4, m: meta(104, { criticScore: null, criticScoreCount: null, coverUrl: null }) },
+			],
+			[],
+		);
+		expect(await zeile(3)).toMatchObject({ critic_score: 77, critic_source: "manuell", user_score: 70 });
+		// IGDB nennt keine Wertung mehr: unbekannt, nicht der alte Wert.
+		expect(await zeile(4)).toMatchObject({ critic_score: null, critic_score_count: null, critic_source: "igdb", cover_url: null });
+	});
+
+	it("stempelt Spiele ohne Antwort, ohne ihre Metadaten anzufassen, und zaehlt sie nicht mit", async () => {
+		const n = await repos().igdb.auffrischenAlle([{ gameId: 1, m: meta(101) }], [2, 5]);
+		expect(n).toBe(1);
+		for (const id of [2, 5]) {
+			const z = await zeile(id);
+			expect(z?.igdb_synced_at).not.toBe("2026-01-01 00:00:00");
+			expect(z).toMatchObject({ cover_url: null, igdb_slug: null });
+		}
+		expect((await zeile(3))?.igdb_synced_at).toBe("2026-01-01 00:00:00");
 	});
 });
 

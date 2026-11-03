@@ -141,8 +141,13 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   in der Nacht zum 20.10.2026:** neun Aufrufe von 06:05 bis 06:45, **20–54 ms**, Median 34 (MIA 25–28,
   EWR 28, IAD 39, SJC 20, vier ohne Standort 34–54); acht mit Logzeile, darin 370 angefragt und 369
   aktualisiert. Am 21.10. ein Aufruf, 47 Spiele, 28 ms (EWR).
-  Einmal je Woche, aber jeder Aufruf über dem Budget; Ursache nicht untersucht. Bleibt im Worker
-  (16.2) – ob das so bleibt, ist offen. **Seit 18n** höchstens ⌈Spiele ÷ 200⌉ Aufrufe je Nacht
-  ([10.1](10-1-cron-schritte.md) Schritt 12): Das begrenzt, wie viele Aufrufe über dem Budget in einer
-  Nacht laufen, nicht ihre Kosten.
+  **Seit 18n** höchstens ⌈Spiele ÷ 200⌉ Aufrufe je Nacht ([10.1](10-1-cron-schritte.md) Schritt 12),
+  am 01. und 02.11. je drei zu 50: 28–36 und 32–60 ms. **Die Ursache, gefunden am 02.11.2026:** ein
+  Batch je Spiel, also **51 D1-Aufrufe mit 100 Anweisungen** je Aufruf (doppelt so viele wie die
+  dokumentierten 50); mit einem Spiel kostete der Aufruf 9 ms. **Nachtrag 18n-c** schreibt die Portion
+  in einem Batch: **2 Aufrufe, 4 Anweisungen**, gelesen 450 statt 250 Zeilen, geschrieben 104 wie zuvor
+  (`test/lesekosten.spec.ts`). Eine kleinere Portion hätte die Kosten nur linear gesenkt (bei 25 rund
+  20 ms, hochgerechnet) und doppelt so viele Aufrufe gebraucht. **Gemessen in der ersten Nacht damit
+  (03.11.2026):** 8–10 ms, 3–6 über dem Leerlauf des Standorts – das Verarbeiten der IGDB-Antwort kostet
+  wenige Millisekunden ([16-2-naechte.md](16-2-naechte.md)).
 

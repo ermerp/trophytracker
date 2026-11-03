@@ -32,15 +32,14 @@ bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster
 
 **20g vorgezogen** (Entscheidung des Nutzers vom 30.10.2026): 20g kommt **vor** Index-Nachtrag, 18m-b
 und die Neubewertung. Keiner davon ist Bedingung für 20g, und 20g rechnet in den Abendläufen
-(Preisschritte als Action), nicht in den Nachtfenstern. Gebaut wird bis zum 02.11., deployt frühestens
-nach der Bewertung vom 02.11. – bis dahin bleibt der Worker unverändert. Gebaut am 30.10.2026
-([16-2-preisalarm.md](16-2-preisalarm.md)).
+(Preisschritte als Action), nicht in den Nachtfenstern. Gebaut am 30.10.2026, deployt am 03.11.2026
+nach der Nachtauswertung ([16-2-preisalarm.md](16-2-preisalarm.md)).
 Gebaut sind 18k-b (Kaufliste gebündelt, CPU gemessen am 25.10.: Median 19 statt 35–108 ms), 20i (Markt als Action, erste
 volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; erste Nacht 21.10. wie gebaut; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
 Am 02.11.2026 wird das Budget arbeitender Aufrufe neu bewertet. Fest sind die Abhängigkeiten:
 
 - **20g kommt nach 20i**; der Allzeittief-Auslöser bliebe bis zum 03.11.2026 ohnehin still
-  (Mindesthistorie, unten). Deploy frühestens am 02.11.2026 nach der Bewertung.
+  (Mindesthistorie, unten). Deployt am 03.11.2026.
 - **18n kommt vor die Nacht zum 01.11.** und vor den Index-Nachtrag: Der bringt die Auffrisch-Auswahl
   auf den Teilindex aus 18n und misst den Zähler im Lage-Batch mit.
 - **Der Index-Nachtrag kommt vor die Entscheidung „Cron je Minute"** ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
@@ -102,7 +101,7 @@ zur zweiten Frage, welcher Wert je Woche überlebt (Minimum, Median, letzter), i
 entschieden. Kommt sie, gehört sie in ein **drittes Cron-Fenster** – drei der fünf erlaubten
 Einträge sind frei.
 
-#### 20g – Preisalarm (**gebaut am 30.10.2026**, Deploy nach der Bewertung vom 02.11.)
+#### 20g – Preisalarm (**gebaut am 30.10.2026, deployt am 03.11.2026**)
 
 Steht in [16-2-preisalarm.md](16-2-preisalarm.md): Kanal, Auslöser, Schreibweg, Oberfläche und was
 offen bleibt.

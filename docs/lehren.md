@@ -844,3 +844,13 @@ zum Öffnen des Prototyps lieferte Exit 1, ob er aufging, war nicht festzustelle
 durch eine Kopie nach `C:\Users\phili\Downloads\trophytracker-20g-bilder`.
 → Die Stelle, die dem Nutzer genannt wird, muss eine sein, die er erreicht (CLAUDE.md,
 „Was berichtet … wird").
+
+## Die Vorgabe, die nur verlinkt war
+
+**02.11.2026 – „ab wann kann man auswerten?" beantwortete ich mit 09:00 UTC.** Dass die
+Nachtläufe seit der Vorgabe vom 17.10.2026 bis 05:00 UTC fertig sein sollen, erwähnte ich
+nicht; der Nutzer fragte „wollten wir das nicht anpassen?". Der Punkt steht in
+`16-2-betriebswarnungen.md` – beim Session-Start gelesen werden `16-2-offene-stufen.md` und
+`16-2-cpu-und-betrieb.md`, und die verlinken ihn nur mit einer Überschrift.
+→ Beim Session-Start gehören auch die offenen Punkte dazu, auf die die beiden Dateien nur
+verweisen (CLAUDE.md, „Session-Start").

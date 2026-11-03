@@ -9,6 +9,7 @@ import {
 	physischePlattformenListe,
 	suchbegriff,
 	type IgdbKandidat,
+	type IgdbMetadaten,
 } from "../domain/igdb";
 import { anzeigeTitel, plattformenAus, titelSchluessel } from "../domain/titel";
 import {
@@ -206,22 +207,17 @@ export async function igdbAuffrischSchritt(
 		const treffer = normalisiereTrefferliste(await igdb.nachIds(spiele.map((s) => s.igdb_id)));
 		const nachId = new Map<number, IgdbKandidat>(treffer.map((k) => [k.igdbId, k]));
 		const heute = heuteIso();
-		let aktualisiert = 0;
+		const eintraege: Array<{ gameId: number; m: IgdbMetadaten }> = [];
 		const ohneAntwort: number[] = [];
 		for (const spiel of spiele) {
 			const k = nachId.get(spiel.igdb_id);
 			// Was IGDB nicht zurueckgibt, wird trotzdem gestempelt - sonst waehlt
 			// der naechste Aufruf dieselben Spiele wieder und kommt nie voran.
-			if (!k) {
-				ohneAntwort.push(spiel.id);
-				continue;
-			}
-			if (await repos.igdb.auffrischen(spiel.id, metadatenAus(k, heute))) aktualisiert++;
+			if (k) eintraege.push({ gameId: spiel.id, m: metadatenAus(k, heute) });
+			else ohneAntwort.push(spiel.id);
 		}
-		// In Stuecken: D1 erlaubt 100 gebundene Werte je Statement.
-		for (let i = 0; i < ohneAntwort.length; i += 50) {
-			await repos.igdb.auffrischStempeln(ohneAntwort.slice(i, i + 50));
-		}
+		// Ein Schreibaufruf fuer die ganze Portion (Nachtrag 18n-c).
+		const aktualisiert = await repos.igdb.auffrischenAlle(eintraege, ohneAntwort);
 		return { status: "erfolg", angefragt: spiele.length, aktualisiert, ohneAntwort: ohneAntwort.length };
 	} catch (fehler) {
 		return { status: "fehler", angefragt: spiele.length, aktualisiert: 0, meldung: meldungFuer(fehler) };

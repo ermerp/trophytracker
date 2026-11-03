@@ -144,7 +144,7 @@ export class IgdbRepository {
 			this.db
 				.prepare(
 					"UPDATE game SET igdb_id = ?, igdb_slug = ?, cover_url = ?, release_date = ?, release_status = ?, " +
-						IgdbRepository.KRITIK_SETZEN +
+						IgdbRepository.kritikSetzen("?", "?") +
 						"user_score = ?, user_score_count = ?, " +
 						"igdb_matched_at = datetime('now'), igdb_matched_source = ?, " +
 						"igdb_checked_at = datetime('now'), igdb_synced_at = datetime('now'), igdb_declined_at = NULL, " +
@@ -178,66 +178,97 @@ export class IgdbRepository {
 
 	/**
 	 * Kritikerwertung nur schreiben, wenn sie fehlt oder von IGDB stammt.
-	 * Zwei Bindings: score, count.
+	 * Wert und Anzahl als SQL-Ausdruck: `?` beim Verknuepfen, die Spalte der
+	 * Portion beim Auffrischen - dieselbe Regel an beiden Stellen.
 	 */
-	private static readonly KRITIK_SETZEN =
-		"critic_score = CASE WHEN critic_source IS NULL OR critic_source = 'igdb' THEN ? ELSE critic_score END, " +
-		"critic_score_count = CASE WHEN critic_source IS NULL OR critic_source = 'igdb' THEN ? ELSE critic_score_count END, " +
-		"critic_source = CASE WHEN critic_source IS NULL OR critic_source = 'igdb' THEN 'igdb' ELSE critic_source END, " +
-		"critic_updated_at = CASE WHEN critic_source IS NULL OR critic_source = 'igdb' THEN datetime('now') ELSE critic_updated_at END, ";
-
-	/** Metadaten eines verknuepften Spiels erneut uebernehmen. */
-	async auffrischen(gameId: number, m: IgdbMetadaten): Promise<boolean> {
-		const [, ergebnis] = await this.db.batch([
-			// Protokoll (8.5) nur fuer den Statuswechsel angekuendigt → erschienen;
-			// Cover, Wertung und Datum wechseln bei jedem Auffrischen und sind kein Ereignis.
-			this.events.insertSelect(
-				"SELECT 'igdb', id, NULL, title, 'erschienen', 'release_status', release_status, ?, ? FROM game " +
-					"WHERE id = ? AND igdb_id = ? AND release_status = 'angekuendigt' AND ? = 'erschienen'",
-				m.releaseStatus,
-				m.releaseDate,
-				gameId,
-				m.igdbId,
-				m.releaseStatus,
-			),
-			this.db
-				.prepare(
-					"UPDATE game SET igdb_slug = ?, cover_url = ?, release_date = ?, release_status = ?, " +
-						IgdbRepository.KRITIK_SETZEN +
-						"user_score = ?, user_score_count = ?, " +
-						"igdb_synced_at = datetime('now') WHERE id = ? AND igdb_id = ?",
-				)
-				.bind(
-					m.igdbSlug,
-					m.coverUrl,
-					m.releaseDate,
-					m.releaseStatus,
-					m.criticScore,
-					m.criticScoreCount,
-					m.userScore,
-					m.userScoreCount,
-					gameId,
-					m.igdbId,
-				),
-		]);
-		return (ergebnis.meta.changes ?? 0) > 0;
+	private static kritikSetzen(wert: string, anzahl: string): string {
+		return (
+			`critic_score = CASE WHEN critic_source IS NULL OR critic_source = 'igdb' THEN ${wert} ELSE critic_score END, ` +
+			`critic_score_count = CASE WHEN critic_source IS NULL OR critic_source = 'igdb' THEN ${anzahl} ELSE critic_score_count END, ` +
+			"critic_source = CASE WHEN critic_source IS NULL OR critic_source = 'igdb' THEN 'igdb' ELSE critic_source END, " +
+			"critic_updated_at = CASE WHEN critic_source IS NULL OR critic_source = 'igdb' THEN datetime('now') ELSE critic_updated_at END, "
+		);
 	}
 
 	/**
-	 * Spiele als "geprueft" stempeln, ohne ihre Metadaten anzufassen.
-	 *
-	 * Fuer die, die IGDB auf Anfrage nicht zurueckgibt: Ohne Stempel waehlt
-	 * der naechste Aufruf dieselben Spiele erneut, und der naechtliche
-	 * Auffrisch-Schritt dreht sich im Kreis (Verdacht vom 21.09.2026).
-	 * Dieselbe Regel wie bei der Disc-Pruefung: Eine leere Antwort ist ein
-	 * Ergebnis, kein Grund zur Wiederholung. Kein Ereignis - nichts geaendert.
+	 * Eine Portion des Auffrischens als Tabelle aus EINEM gebundenen Wert
+	 * (Nachtrag 18n-c): D1 erlaubt 100 gebundene Werte je Statement, eine
+	 * Portion von 50 Spielen braeuchte 500. `json_each` packt sie in SQL aus,
+	 * der Abgleich mit `game` laeuft ueber den Primaerschluessel. Die neuen
+	 * Werte heissen `neu_*`: Gleichnamige Spalten waeren im UPDATE neben
+	 * `game` mehrdeutig (etwa `critic_score` im ELSE von `kritikSetzen`).
 	 */
-	async auffrischStempeln(ids: readonly number[]): Promise<number> {
-		if (ids.length === 0) return 0;
-		const ergebnis = await this.db
-			.prepare(`UPDATE game SET igdb_synced_at = datetime('now') WHERE id IN (${ids.map(() => "?").join(",")})`)
-			.bind(...ids)
-			.run();
+	private static readonly PORTION =
+		"(SELECT value ->> 'gameId' AS game_id, value ->> 'igdbId' AS igdb_id, value ->> 'igdbSlug' AS neu_slug, " +
+		"value ->> 'coverUrl' AS neu_cover, value ->> 'releaseDate' AS neu_datum, value ->> 'releaseStatus' AS neu_status, " +
+		"value ->> 'criticScore' AS neu_kritik, value ->> 'criticScoreCount' AS neu_kritik_anzahl, " +
+		"value ->> 'userScore' AS neu_spieler, value ->> 'userScoreCount' AS neu_spieler_anzahl FROM json_each(?)) AS m";
+
+	/**
+	 * Metadaten verknuepfter Spiele erneut uebernehmen - eine ganze Portion
+	 * in einem Batch (Nachtrag 18n-c). Bis dahin ein Batch je Spiel: 50
+	 * D1-Aufrufe nacheinander, und die kosten die CPU, nicht das Rechnen (10.1).
+	 *
+	 * `ohneAntwort` sind Spiele, die IGDB auf Anfrage nicht zurueckgab. Sie
+	 * werden nur gestempelt: Ohne Stempel waehlt der naechste Aufruf dieselben
+	 * Spiele erneut, und der naechtliche Schritt dreht sich im Kreis (Verdacht
+	 * vom 21.09.2026). Eine leere Antwort ist ein Ergebnis, kein Grund zur
+	 * Wiederholung - kein Ereignis, nichts geaendert.
+	 *
+	 * Reihenfolge im Batch: Ereignis, Metadaten, Stempel. Das Ereignis steht
+	 * VOR dem UPDATE, sonst laese es schon den neuen Status (8.5). Scheitert
+	 * eine Anweisung, scheitert der Batch als Ganzes: Kein Spiel der Portion
+	 * ist aufgefrischt oder gestempelt, der naechste Aufruf waehlt dieselben
+	 * wieder. Ein dauerhaft scheiternder Datensatz haelt damit die ganze
+	 * Portion an, nicht nur sich - sichtbar an `status: fehler` in der
+	 * Logzeile und nach elf Tagen an `auffrischen_stau` (18n).
+	 *
+	 * Zurueck: Zahl der aufgefrischten Spiele, aus dem UPDATE allein - nie als
+	 * Summe ueber den Batch, sonst zaehlten Protokoll und Stempel mit.
+	 */
+	async auffrischenAlle(
+		eintraege: ReadonlyArray<{ gameId: number; m: IgdbMetadaten }>,
+		ohneAntwort: readonly number[],
+	): Promise<number> {
+		const portion = JSON.stringify(
+			eintraege.map(({ gameId, m }) => ({
+				gameId,
+				igdbId: m.igdbId,
+				igdbSlug: m.igdbSlug,
+				coverUrl: m.coverUrl,
+				releaseDate: m.releaseDate,
+				releaseStatus: m.releaseStatus,
+				criticScore: m.criticScore,
+				criticScoreCount: m.criticScoreCount,
+				userScore: m.userScore,
+				userScoreCount: m.userScoreCount,
+			})),
+		);
+		const [, ergebnis] = await this.db.batch([
+			// Protokoll (8.5) nur fuer den Statuswechsel angekuendigt → erschienen;
+			// Cover, Wertung und Datum wechseln bei jedem Auffrischen und sind kein Ereignis.
+			// Dieselbe Bedingung wie das UPDATE darunter (id UND igdb_id).
+			this.events.insertSelect(
+				"SELECT 'igdb', game.id, NULL, game.title, 'erschienen', 'release_status', game.release_status, " +
+					`m.neu_status, m.neu_datum FROM game JOIN ${IgdbRepository.PORTION} ` +
+					"ON game.id = m.game_id AND game.igdb_id = m.igdb_id " +
+					"WHERE game.release_status = 'angekuendigt' AND m.neu_status = 'erschienen'",
+				portion,
+			),
+			this.db
+				.prepare(
+					"UPDATE game SET igdb_slug = m.neu_slug, cover_url = m.neu_cover, release_date = m.neu_datum, " +
+						"release_status = m.neu_status, " +
+						IgdbRepository.kritikSetzen("m.neu_kritik", "m.neu_kritik_anzahl") +
+						"user_score = m.neu_spieler, user_score_count = m.neu_spieler_anzahl, " +
+						`igdb_synced_at = datetime('now') FROM ${IgdbRepository.PORTION} ` +
+						"WHERE game.id = m.game_id AND game.igdb_id = m.igdb_id",
+				)
+				.bind(portion),
+			this.db
+				.prepare("UPDATE game SET igdb_synced_at = datetime('now') WHERE id IN (SELECT value FROM json_each(?))")
+				.bind(JSON.stringify(ohneAntwort)),
+		]);
 		return ergebnis.meta.changes ?? 0;
 	}
 

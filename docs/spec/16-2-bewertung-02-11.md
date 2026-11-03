@@ -35,17 +35,12 @@ und sein Abbruch hängt nicht an ihr (geprüft am 25.10.2026 in `deploy.yml`).
 und der Lauf endet rot ([14.2](14-backup-export.md)); bis dahin ging der Dump derselben Woche mit
 verloren. `backup.json` ist dann die einer früheren Woche.
 
-**Vorzuschlagen bis zum 02.11.:** wie die Route unter die Grenze kommt oder welcher Weg sie ersetzt.
-Denkbar und **noch nicht geprüft** sind die ersten beiden:
-
-- **Portioniert:** je Tabelle oder je Seite einer Tabelle ein Aufruf, die Action setzt die Teile zusammen –
-  `trophy` ist die größte Tabelle und bräuchte selbst Seiten.
-- **Ohne Worker:** `backup.json` in der Action aus dem schon erzeugten `backup.sql` bauen (in ein
-  lokales SQLite einspielen und als JSON ausgeben) – die Route fiele für die Sicherung weg; dann wäre
-  zu klären, ob sie für etwas anderes noch gebraucht wird.
-- **Reihenfolge entkoppeln** – **gebaut am 25.10.2026** (Vorgabe des Nutzers, nicht erst nach der
-  Bewertung): beseitigt den Abbruch nicht, aber den Verlust des Dumps. Zu wählen bleibt zwischen den
-  beiden Wegen oben.
+**Entschieden am 02.11.2026: ohne Worker.** `backup.json` entsteht in der Action aus dem schon
+erzeugten `backup.sql` (`scripts/json-aus-dump.mjs`, [14.2](14-backup-export.md)); die Route bleibt
+nur für den Download von Hand. Geprüft vorher: dieselbe Datei wie die Route, mit erfundenen Daten und
+mit dem Bestand der Produktion. **Verworfen:** die portionierte Route – sie hätte `trophy` in Seiten
+teilen und die Teile in der Action zusammensetzen müssen, für eine Datei, die der Dump schon enthält.
+Die Entkopplung vom 25.10.2026 bleibt: Scheitert der JSON-Teil, wird der Dump trotzdem abgelegt.
 
 #### Die Kaufliste: lohnt eine kleinere Portion?
 
@@ -62,4 +57,15 @@ Denkbar und **noch nicht geprüft** sind die ersten beiden:
   Seiten am selben Standort 18–23. Das ist ein einzelner Wert (n = 1) – er deutet auf feste Kosten je
   Aufruf, nicht auf Kosten je Kauf.
 
-**Offen:** ob die Kaufliste wie Markt und Store in eine Action gehört, statt kleiner zu werden.
+**Zweite Messung in der Nacht zum 01.11.2026:** 10–19 ms, Median 13, an anderen Standorten ([16-2-naechte.md](16-2-naechte.md)).
+
+**Entschieden am 02.11.2026: Die Portion bleibt bei 50.** Ein Aufruf macht eine feste Zahl von
+D1-Aufrufen (Seite holen, Kandidaten in einer Abfrage, Berechtigungen erkennen; eine Schleife nur über
+neue Käufe), eine kleinere Portion senkte die Kosten kaum und bräuchte mehr Aufrufe. **Weiter offen:** ob
+die Kaufliste wie Markt und Store in eine Action gehört.
+
+#### Das Budget arbeitender Aufrufe
+
+**Offen, bewertet mit der Nacht zum 03.11.2026** (Entscheidung des Nutzers vom 02.11.2026): Der größte
+Ausreißer war das Auffrischen, und das ändert Nachtrag 18n-c ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)).
+Verglichen wird je Standort mit den Nächten zum 01. und 02.11.

@@ -3,8 +3,9 @@
 ## 16. Umsetzungsreihenfolge – 20g Preisalarm
 
 **Gebaut am 30.10.2026** auf `stufe-20g-preisalarm`, vorgezogen vor Index-Nachtrag, 18m-b und die
-Neubewertung (Entscheidung des Nutzers vom 30.10.2026). **Deployt wird frühestens nach der
-Bewertung am 02.11.2026**, bis dahin bleibt der Worker unverändert ([16-2-offene-stufen.md](16-2-offene-stufen.md)).
+Neubewertung (Entscheidung des Nutzers vom 30.10.2026). **Deployt am 03.11.2026** nach der
+Nachtauswertung ([16-2-offene-stufen.md](16-2-offene-stufen.md)); der erste Abendlauf, der Meldungen schreiben
+kann, ist der des 03.11.
 
 Die Glocke in der Kopfzeile meldet einen Preis, der zu einer offenen Absicht passt.
 
@@ -51,8 +52,17 @@ neuen Tiefs liegen im Median 3,7 % unter dem bisherigen, zwei Drittel flacher al
 Markt, 7 vom Händler, 0 aus dem Store.
 
 **Wann es scharf wird:** Die ersten Punkte mit Kanal stammen vom 03.10. (Store) und 04.10.
-(Gebraucht). Am 03.11.2026 haben **12 der 85** Reihen im passenden Kanal 30 Tage Geschichte und drei
-Punkte; 80 erreichen die 30 Tage bis Mitte November, alle bis zum 23.11. (Stand 30.10.).
+(Gebraucht). **Gemessen am 03.11.2026** für den ersten Abendlauf damit: **18 der 85** Reihen im passenden
+Kanal sind scharf (am 30.10. waren 12 gerechnet), die übrigen 67 werden es bis zum 23.11. – 8 davon fehlt
+noch der dritte Punkt. Ein Release mit offener Absicht hat keine Reihe im eigenen Kanal.
+
+**Die Liste vor dem ersten Lauf** (CLAUDE.md, automatischer Schreibpfad), dem Nutzer am 03.11.2026
+vorgelegt: Gerechnet mit `alarmPruefen` und der Bedingung von `lageAnweisungen`, lesend gegen die
+Produktion. Grenzen gibt es vor dem Deploy keine, also keine Grenz-Meldung. Von den 18 scharfen Reihen
+liegt **keine unter ihrer Schwelle**; vier stehen auf ihrem Tief und meldeten bei weiteren 10 %. Die 30
+Abendläufe bis zum 02.11. nachgespielt: keine Meldung (Mindesthistorie). Gegenprobe ohne die 30-Tage-Hürde:
+24 Meldungen vom 06. bis 31.10., höchstens 4 an einem Abend – das Nachspielen trifft also. Die Liste selbst
+sind Nutzerdaten und steht nicht hier.
 
 #### Wo gerechnet wird
 
@@ -109,8 +119,6 @@ gerade gilt.
   möglicher Nachtrag, messbar ab dem 03.11.2026. Der Median über `price_snapshot` ist **nicht** der
   Median des Preises – geschrieben wird nur bei Änderung, Tage mit Bewegung wiegen schwerer. Richtig
   gerechnet braucht es eine Treppenfunktion oder eine bewusst in Kauf genommene Verzerrung.
-- **Vor dem ersten Lauf, der Meldungen schreibt** (ab dem 03.11.), wird die vollständige Liste
-  dessen vorgelegt, was auslösen würde (CLAUDE.md, automatischer Schreibpfad).
 - **CPU der Portionsrouten** nach dem Deploy an der Telemetry messen; ob die Action mit 87 Portionen
   grün bleibt.
 - **Die Logzeile der Markt- und Store-Action nennt die Preisalarme noch nicht** – die Routen liefern
