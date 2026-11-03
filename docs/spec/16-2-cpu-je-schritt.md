@@ -147,7 +147,7 @@ Ausgelagert aus [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md), weil die Dat
   dokumentierten 50); mit einem Spiel kostete der Aufruf 9 ms. **Nachtrag 18n-c** schreibt die Portion
   in einem Batch: **2 Aufrufe, 4 Anweisungen**, gelesen 450 statt 250 Zeilen, geschrieben 104 wie zuvor
   (`test/lesekosten.spec.ts`). Eine kleinere Portion hätte die Kosten nur linear gesenkt (bei 25 rund
-  20 ms, hochgerechnet) und doppelt so viele Aufrufe gebraucht. **Offen:** was das Verarbeiten der
-  IGDB-Antwort für 50 Spiele kostet – erste Nacht mit 18n-c zum 03.11. (drei Aufrufe zu 50, dieselbe
-  Arbeit wie am 01. und 02.11.).
+  20 ms, hochgerechnet) und doppelt so viele Aufrufe gebraucht. **Gemessen in der ersten Nacht damit
+  (03.11.2026):** 8–10 ms, 3–6 über dem Leerlauf des Standorts – das Verarbeiten der IGDB-Antwort kostet
+  wenige Millisekunden ([16-2-naechte.md](16-2-naechte.md)).
 

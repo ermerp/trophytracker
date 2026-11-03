@@ -178,3 +178,36 @@ dem 20.10.** (damals 20–54), bei derselben Arbeit, aber ohne Abbruch.
 **Abendläufe des 01.11.:** Alle vier grün. Markt 23:34 UTC (431 geprüft in 72 Portionen, 467 s, 0 offen),
 Store 23:54 (79 geprüft, 76 Anfragen, 0 offen), die beiden zweiten Läufe um 01:34 und 01:50 ohne Arbeit.
 Verspätung gegen den Plan 3 h 03 bis 3 h 17.
+
+#### Nacht zum 03.11.2026 – erste mit 18n-c
+
+Messtermin fürs Budget ([16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)), mit `node scripts/nacht.mjs`.
+**Alle 72 Cron-Aufrufe `ok`**, `workersInvocationsAdaptive` 78 `success` (06:45 ohne Standort), kein
+`exceededResources`, keine Marke liegengeblieben. Sync `erfolg` (11–19 ms, Median 15), Zugang lebt
+(`letzter_erfolg_am` 03.11. 03:50). Spielzeit 20 / 25, Level 17, Jahre 12; keine Kaufliste. 24 Standorte.
+
+**Auffrischen mit 18n-c: 8–10 ms statt 28–60.** Drei Aufrufe zu 50 (LHR 8, SEA 10, EWR 10; 149 aktualisiert,
+1 ohne Antwort), danach 33 an der Grenze. Fällig bleiben **28** (Bedingung von `zumAuffrischenBaustein`) – ein
+Aufruf zum 04.11. Je Standort nicht direkt vergleichbar (01./02.11.: AMS, ICN, IAD, DFW, ORD); gegen den
+Leerlauf desselben Standorts kostet ein Aufruf jetzt 3–6 ms mehr, vorher 23–54. **Das Verarbeiten der
+IGDB-Antwort für 50 Spiele kostet wenige Millisekunden** ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)).
+
+| | 03.11. |
+|---|---|
+| Wartungs- / PSN-Leerlauf, Median (n) | 6 (32) / 6 (22), höchstens 17 / 18 |
+| Leerlauf über 10 ms | **11** – SJC 16, 17; LAX 12, 15, 11, 13, 11; ORD 18, 11; SEA 11; HKG 16 |
+| Auffrischen, ms (n = 3) | 8–10, Median 10 |
+
+**Leerlauf über 10 ms: 11** statt 1–2 in den Nächten davor, an den langsamsten Standorten vom 26.–29.10.;
+18n-c ändert den Leerlauf nicht – **nur notiert**.
+
+**Gelesene Zeilen:** PSN 17 229 (die Stunde 03 enthält zwei Abendläufe), Wartung 98 079 – je Auffrisch-Aufruf
+weiter rund 7 000–8 000 mehr als im Leerlauf, obwohl `test/lesekosten.spec.ts` für den Schreibschritt 450
+nennt; **woher sie kommen, ist nicht geklärt**. Stunde 21 UTC am 02.11.: 73 722, App-Nutzung (Dashboard,
+vor allem Statistik). `rows_read_24h` am 03.11. 15:50 UTC **196 885** (ohne Stunde 21 rund 123 000),
+`rows_written_24h` 3 715.
+
+**Abendläufe des 02.11.:** Alle vier grün. Markt 02:17 UTC (431 in 72 Portionen, 491 s), Store 02:38 (78
+geprüft, 1 offen), zweite Läufe 03:29 und 03:42 (Store holt den einen nach). **Verspätung 4 h 55 bis 6 h 00**
+(bisher bis 3 h 43); die zweiten Läufe lagen erstmals im PSN-Fenster – die ungemessene Überschneidung für
+„Nachtläufe bis 05:00" ([16-2-betriebswarnungen.md](16-2-betriebswarnungen.md)).
