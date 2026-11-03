@@ -24,12 +24,14 @@ import { vorbereiten, type SammlungsSpiel, type VorbereitetesSpiel } from "../do
  *
  * Gezaehlt wird nicht die Arbeit, sondern die Anweisungen: D1 dokumentiert 50
  * Abfragen je Aufruf des Workers, jede Anweisung eines Batches zaehlt. Je
- * Release sind es hoechstens sieben (`MarktRepository.ergebnisseSchreiben`),
- * dazu die eine Abfrage nach den Releases: 6 x 7 + 1 = 43. Startwert, nach dem
- * ersten Lauf an der gemessenen CPU je POST angepasst (Entscheidung des
- * Nutzers vom 19.10.2026); nach oben begrenzt durch die 50.
+ * Release sind es hoechstens acht (`MarktRepository.ergebnisseSchreiben`,
+ * seit 20g mit der Meldung des Preisalarms), dazu der Lese-Batch mit vier
+ * Anweisungen: 5 x 8 + 4 = 44. Bis 20g waren es sechs (6 x 7 + 1 = 43); mit
+ * der achten Anweisung waeren sechs genau 52 gewesen. Nach oben begrenzt
+ * durch die 50 (Entscheidung des Nutzers vom 19.10.2026: an der CPU je POST
+ * angepasst).
  */
-export const MARKT_JE_POST = 6;
+export const MARKT_JE_POST = 5;
 
 export type MarktErgebnis = {
 	status: "erfolg" | "fehler";

@@ -190,6 +190,13 @@ export type SpielDetail = {
 		preis_item_id: string | null;
 		/** Wie viele Angebote fuer dieses Release verworfen sind (Stufe 20h). */
 		preis_verworfen: number;
+		/** Preisalarm (Stufe 20g): die Grenze und was den Kanal zur Lesezeit bestimmt. */
+		preis_grenze_cents: number | null;
+		absicht_offen: number;
+		kauf_verworfen: number;
+		hat_gebraucht: number;
+		/** Der tiefste aktuelle Gebrauchtpreis aus beiden Reihen - der, an dem die Grenze misst. */
+		gebraucht_tiefst_cents: number | null;
 		np_communication_id: string | null;
 		title_name: string | null;
 		icon_url: string | null;
@@ -213,6 +220,14 @@ export type SpielDetail = {
  * `game` mit je einem `release` pro Trophaeenliste - so beschreibt es
  * Abschnitt 3 am Beispiel GTA V.
  */
+/** Die Felder, die `releaseAendern` setzt und zurueckgibt. */
+export type ReleaseFelder = {
+	physical_release_status: DiscFassung;
+	physical_source: string | null;
+	psn_product_id: string | null;
+	preis_grenze_cents: number | null;
+};
+
 export class GamesRepository {
 	constructor(
 		private readonly db: D1Database,
@@ -782,7 +797,15 @@ aeenliste haengt
 					"COALESCE(mh.ebay_item_id, mm.ebay_item_id) AS preis_item_id, " +
 					// Korrelierter COUNT ueber den Primaerschluessel der
 					// Sperrliste (Stufe 20h) - kein neuer Join.
-					"(SELECT COUNT(*) FROM market_offer_verworfen v WHERE v.release_id = r.id) AS preis_verworfen " +
+					"(SELECT COUNT(*) FROM market_offer_verworfen v WHERE v.release_id = r.id) AS preis_verworfen, " +
+					// Preisalarm (Stufe 20g): je ein Lookup ueber idx_plan_release
+					// und idx_price_release, kein Join.
+					"r.preis_grenze_cents, " +
+					"EXISTS (SELECT 1 FROM plan_entry pe WHERE pe.release_id = r.id AND pe.kind IN ('wunsch','kauf') AND pe.status = 'offen') AS absicht_offen, " +
+					"EXISTS (SELECT 1 FROM plan_entry k WHERE k.release_id = r.id AND k.kind = 'kauf' AND k.status = 'verworfen') AS kauf_verworfen, " +
+					"EXISTS (SELECT 1 FROM price_snapshot s WHERE s.release_id = r.id AND s.channel = 'gebraucht' AND s.kanal IS NOT NULL) AS hat_gebraucht, " +
+					"CASE WHEN mh.price_cents IS NULL THEN mm.price_cents WHEN mm.price_cents IS NULL THEN mh.price_cents " +
+					"ELSE MIN(mh.price_cents, mm.price_cents) END AS gebraucht_tiefst_cents " +
 					"FROM release r LEFT JOIN trophy_progress t ON t.release_id = r.id " +
 					"LEFT JOIN market_offer mh ON mh.release_id = r.id AND mh.kanal = 'haendler' AND mh.in_stock = 1 " +
 					"LEFT JOIN market_offer mm ON mm.release_id = r.id AND mm.kanal = 'markt' AND mm.in_stock = 1 " +
@@ -1006,7 +1029,8 @@ aeenliste haengt
 	}
 
 	/**
-	 * Release von Hand aendern (Stufe 14): Disc-Fassung und PSN-Produkt-Id.
+	 * Release von Hand aendern (Stufe 14): Disc-Fassung und PSN-Produkt-Id,
+	 * seit Stufe 20g die Grenze des Preisalarms.
 	 *
 	 * `ja` und `nein` sind das Urteil des Nutzers und tragen Quelle
 	 * 'manuell' - kein automatischer Prozess (IGDB, spaeter Feed) ueberschreibt
@@ -1016,13 +1040,15 @@ aeenliste haengt
 	 */
 	async releaseAendern(
 		id: number,
-		felder: { discFassung?: DiscFassung; psnProductId?: string | null },
-	): Promise<{ physical_release_status: DiscFassung; physical_source: string | null; psn_product_id: string | null } | null> {
+		felder: { discFassung?: DiscFassung; psnProductId?: string | null; preisGrenzeCents?: number | null },
+	): Promise<ReleaseFelder | null> {
 		const lesen = () =>
 			this.db
-				.prepare("SELECT physical_release_status, physical_source, psn_product_id FROM release WHERE id = ?")
+				.prepare(
+					"SELECT physical_release_status, physical_source, psn_product_id, preis_grenze_cents FROM release WHERE id = ?",
+				)
 				.bind(id)
-				.first<{ physical_release_status: DiscFassung; physical_source: string | null; psn_product_id: string | null }>();
+				.first<ReleaseFelder>();
 		const vorher = await lesen();
 		if (!vorher) return null;
 
@@ -1064,6 +1090,23 @@ aeenliste haengt
 					}),
 				);
 			}
+		}
+		// Preisalarm (Stufe 20g): Nur eine GEAENDERTE Grenze setzt den
+		// Zeitpunkt neu - an ihm haengt, ob sie wieder scharf ist. Dieselbe
+		// Grenze noch einmal zu speichern laesst alles, wie es ist.
+		if (felder.preisGrenzeCents !== undefined && felder.preisGrenzeCents !== vorher.preis_grenze_cents) {
+			setzungen.push("preis_grenze_cents = ?", "preis_grenze_am = CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END");
+			werte.push(felder.preisGrenzeCents, felder.preisGrenzeCents);
+			ereignisse.push(
+				this.events.statement({
+					source: "nutzer",
+					kind: "release_geaendert",
+					releaseId: id,
+					field: "preis_grenze_cents",
+					alt: vorher.preis_grenze_cents === null ? null : String(vorher.preis_grenze_cents),
+					neu: felder.preisGrenzeCents === null ? null : String(felder.preisGrenzeCents),
+				}),
+			);
 		}
 		if (setzungen.length > 0) {
 			await this.db.batch([

@@ -609,3 +609,31 @@
   }
 }
 
+/* --- Preisalarm (Stufe 20g) ---------------------------------------------- */
+
+/* Ein Formularfeld, deshalb nativ: Betrag eintippen, Enter oder weg. Schmal,
+   weil hoechstens vier Ziffern und Cent hineinpassen muessen. */
+.preisgrenze {
+  margin: var(--a2) 0;
+}
+
+/* Dieselbe Groesse und Farbe wie die Preiszeilen darueber (`.still`): Das
+   Feld gehoert zu ihnen, es ist keine eigene Ueberschrift. */
+.preisgrenze label {
+  margin-bottom: var(--a1);
+  color: var(--text-still);
+  font-size: 0.85rem;
+}
+
+.preisgrenze input {
+  display: inline-block;
+  width: 6rem;
+  margin: 0;
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.preisgrenze p {
+  margin: 0;
+}
+

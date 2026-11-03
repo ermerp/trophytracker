@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { AppEnv } from "../types";
+import { alarmPruefen } from "../domain/preisalarm";
 import { einesPruefen, MARKT_JE_POST, marktZeile, type MarktErgebnis } from "../sync/markt";
 import { liesJson } from "./validierung";
 import { meldungFuer } from "../ebay/client";
@@ -83,20 +84,32 @@ export const marktRoutes = new Hono<AppEnv>()
 		if (kaputt >= 0) return c.json({ fehler: `Eintrag ${kaputt + 1} ist kein gültiges Ergebnis.` }, 400);
 		const ergebnisse = gelesen as NonNullable<(typeof gelesen)[number]>[];
 
-		const ziele = new Map(
-			(await c.var.repos.markt.einige([...new Set(ergebnisse.map((e) => e.releaseId))])).map((z) => [z.releaseId, z]),
-		);
+		const gelesenAusDb = await c.var.repos.markt.einigeMitAlarm([...new Set(ergebnisse.map((e) => e.releaseId))]);
+		const ziele = new Map(gelesenAusDb.ziele.map((z) => [z.releaseId, z]));
 		const schreiben = ergebnisse.flatMap((e) => {
 			const ziel = ziele.get(e.releaseId);
 			return ziel ? [{ ziel, angebote: e.angebote, rohangebote: e.rohangebote }] : [];
 		});
-		const geschrieben = await c.var.repos.markt.ergebnisseSchreiben(schreiben);
+		// Preisalarm (Stufe 20g): im selben Schreib-Batch wie die Preise.
+		const jetzt = new Date();
+		const alarme = schreiben.flatMap((s) => {
+			const lage = gelesenAusDb.alarmLage.get(s.ziel.releaseId);
+			if (!lage) return [];
+			const neu = (["haendler", "markt"] as const).flatMap((reihe) => {
+				const preis = s.angebote[reihe]?.preis;
+				return preis ? [{ reihe, preisCents: preis.angebot.preisCents, ebayItemId: preis.angebot.itemId }] : [];
+			});
+			const a = alarmPruefen(lage, "gebraucht", neu, jetzt);
+			return a ? [a] : [];
+		});
+		const geschrieben = await c.var.repos.markt.ergebnisseSchreiben(schreiben, alarme);
 		return c.json({
 			geprueft: geschrieben.length,
 			mitPreis: geschrieben.filter((g) => g.preis !== null).length,
 			discBelegt: geschrieben.filter((g) => g.discBelegt).length,
 			ohneAngebot: schreiben.filter((s) => s.rohangebote === 0).length,
 			unbekannt: ergebnisse.length - schreiben.length,
+			preisalarme: alarme.length,
 		});
 	})
 

@@ -27,7 +27,8 @@ export function bewertungAntwort(z: PlayStatusZeile) {
 export const releaseRoutes = new Hono<AppEnv>()
 	/**
 	 * Stufe 14: Disc-Fassung von Hand (ja / nein / unbekannt, Quelle
-	 * 'manuell') und PSN-Produkt-Id. Nur die genannten Felder aendern sich.
+	 * 'manuell') und PSN-Produkt-Id; seit 20g die Grenze des Preisalarms in
+	 * Cent. Nur die genannten Felder aendern sich.
 	 */
 	.patch("/:id", async (c) => {
 		const id = Number(c.req.param("id"));
@@ -36,7 +37,7 @@ export const releaseRoutes = new Hono<AppEnv>()
 		const k = await liesJson(c);
 		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
 
-		const felder: { discFassung?: DiscFassung; psnProductId?: string | null } = {};
+		const felder: { discFassung?: DiscFassung; psnProductId?: string | null; preisGrenzeCents?: number | null } = {};
 		if (k.discFassung !== undefined) {
 			if (typeof k.discFassung !== "string" || !(DISC_FILTER as readonly string[]).includes(k.discFassung)) {
 				return c.json({ fehler: `discFassung muss eines von ${DISC_FILTER.join(", ")} sein.` }, 400);
@@ -48,13 +49,27 @@ export const releaseRoutes = new Hono<AppEnv>()
 			else if (typeof k.psnProductId === "string") felder.psnProductId = k.psnProductId.trim() || null;
 			else return c.json({ fehler: "psnProductId muss Text sein." }, 400);
 		}
-		if (felder.discFassung === undefined && felder.psnProductId === undefined) {
-			return c.json({ fehler: "Nichts zu ändern: discFassung oder psnProductId angeben." }, 400);
+		// Preisalarm (Stufe 20g): Ein fehlender Schluessel laesst die Grenze,
+		// wie sie ist; ein ausdrueckliches null leert sie (CLAUDE.md, Abschnitt 3).
+		if (k.preisGrenzeCents !== undefined) {
+			const g: unknown = k.preisGrenzeCents;
+			if (g === null) felder.preisGrenzeCents = null;
+			else if (typeof g === "number" && Number.isInteger(g) && g > 0 && g <= 1_000_000) felder.preisGrenzeCents = g;
+			else return c.json({ fehler: "preisGrenzeCents muss eine ganze Zahl von 1 bis 1000000 oder null sein." }, 400);
+		}
+		if (felder.discFassung === undefined && felder.psnProductId === undefined && felder.preisGrenzeCents === undefined) {
+			return c.json({ fehler: "Nichts zu ändern: discFassung, psnProductId oder preisGrenzeCents angeben." }, 400);
 		}
 
 		const r = await c.var.repos.games.releaseAendern(id, felder);
 		if (!r) return c.json({ fehler: "Release nicht gefunden." }, 404);
-		return c.json({ id, discFassung: r.physical_release_status, discQuelle: r.physical_source, psnProductId: r.psn_product_id });
+		return c.json({
+			id,
+			discFassung: r.physical_release_status,
+			discQuelle: r.physical_source,
+			psnProductId: r.psn_product_id,
+			preisGrenzeCents: r.preis_grenze_cents,
+		});
 	})
 
 	/**

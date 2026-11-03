@@ -75,6 +75,12 @@ export type Release = {
     produktId: string | null
     conceptId: string | null
   } | null
+  /**
+   * Preisalarm (Stufe 20g); null heißt: keine offene Absicht, also keine
+   * Grenze. `kanal` ist der Kanal, der gerade alarmiert, `aktuellCents` der
+   * Preis, an dem die Grenze misst (null: unbekannt).
+   */
+  preisalarm: { grenzeCents: number | null; kanal: 'gebraucht' | 'store'; aktuellCents: number | null } | null
   trophaeen: Trophaeen | null
   bewertung: Bewertung | null
   exemplare: Exemplar[]

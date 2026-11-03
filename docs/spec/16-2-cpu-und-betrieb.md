@@ -46,7 +46,7 @@ sinnvollen Portion gegen dieses Budget:
   und 431 Aufrufe passten in keinen Takt. **Weg A** (Entscheidung des Nutzers vom 19.10.2026): Die
   Action schreibt über Routen des Workers in Portionen, nicht direkt über die D1-Schnittstelle – die
   Regeln zu `src/db/` und zum Protokoll bleiben, kein kontoweites Token mit Schreibrecht in GitHub.
-  Lauf seit 20i-c um 20:17 UTC mit Rückfall um 22:17 (vorher 02:17 / 08:17), Portion `MARKT_JE_POST = 6` (43 Anweisungen),
+  Lauf seit 20i-c um 20:17 UTC mit Rückfall um 22:17 (vorher 02:17 / 08:17), Portion `MARKT_JE_POST = 5` (44 Anweisungen, seit 20g; vorher 6 mit 43),
   Einzelheiten in [7.3](07-3-ebay-betrieb.md). **Erster Lauf am 19.10.2026, 11:41 UTC** per `workflow_dispatch`, alle
   Aufrufe in IAD: 20 Releases in 4 Portionen, 15 mit Preis, nichts übersprungen; CPU je Aufruf Beginn
   5 ms, Lage 6 ms, Portionen **16 / 4 / ~4 / ~4 ms** (zwei aus der Minutensumme der Analytics

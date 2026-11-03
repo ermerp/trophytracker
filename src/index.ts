@@ -3,6 +3,7 @@ import { deviationRoutes } from "./api/deviations";
 import { eventRoutes } from "./api/events";
 import { feedRoutes, releasePreiseRoutes, releaseTrophaeenRoutes } from "./api/feed";
 import { backupRoutes, exportRoutes } from "./api/export";
+import { preisalarmRoutes } from "./api/preisalarm";
 import { betriebRoutes } from "./api/betrieb";
 import { digitalEntitlementRoutes, physicalCopyRoutes } from "./api/ownership";
 import { igdbRoutes, unmatchedRoutes } from "./api/igdb";
@@ -94,6 +95,7 @@ export function createApp(
 	app.route("/api/export", exportRoutes);
 	app.route("/api/backup", backupRoutes);
 	app.route("/api/betrieb", betriebRoutes);
+	app.route("/api/preisalarme", preisalarmRoutes);
 	app.route("/api/physical-copies", physicalCopyRoutes);
 	app.route("/api/digital-entitlements", digitalEntitlementRoutes);
 	app.route("/api", psnRoutes);

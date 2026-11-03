@@ -14,7 +14,7 @@ PATCH  /api/games/:id
 DELETE /api/games/:id                 Trophäenlisten zurück in die Zuordnung
 
 POST   /api/releases                  Body: { spielId, plattform } – 409, wenn die Plattform belegt ist
-PATCH  /api/releases/:id              Body: Teilmenge von { discFassung: ja|nein|unbekannt, psnProductId } – ja/nein mit Quelle 'manuell', unbekannt nimmt die Quelle zurück (Stufe 14)
+PATCH  /api/releases/:id              Body: Teilmenge von { discFassung: ja|nein|unbekannt, psnProductId, preisGrenzeCents } – ja/nein mit Quelle 'manuell', unbekannt nimmt die Quelle zurück (Stufe 14); preisGrenzeCents 1–1 000 000 oder null (leert), ein fehlender Schlüssel lässt sie stehen (20g)
 DELETE /api/releases/:id              Trophäenliste zurück in die Zuordnung; leeres Spiel wird mit gelöscht
 
 GET    /api/physical-copies

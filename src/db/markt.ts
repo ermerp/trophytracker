@@ -2,6 +2,8 @@ import type { AngebotUrteil, AngebotWahl, MarktKanal } from "../domain/markt";
 import type { Plattform } from "../domain/titel";
 import { eins, einzeln, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
+import type { AlarmLage, AlarmSchreiben } from "../domain/preisalarm";
+import type { PreisalarmRepository } from "./preisalarm";
 
 /**
  * Gebrauchtpreise und Disc-Nachweis aus eBay (Abschnitt 7.3, Stufe 20).
@@ -110,6 +112,7 @@ export class MarktRepository {
 	constructor(
 		private readonly db: D1Database,
 		private readonly events: EventRepository,
+		private readonly preisalarm: PreisalarmRepository,
 	) {}
 
 	/**
@@ -187,15 +190,30 @@ export class MarktRepository {
 	 */
 	async einige(releaseIds: readonly number[]): Promise<ZuPruefen[]> {
 		if (releaseIds.length === 0) return [];
-		const { results } = await this.db
+		const { results } = await this.einigeAnweisung(releaseIds).all<ZuPruefen>();
+		return results;
+	}
+
+	private einigeAnweisung(releaseIds: readonly number[]): D1PreparedStatement {
+		return this.db
 			.prepare(
 				"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
 					"r.physical_release_status AS discFassung " +
 					`FROM release r JOIN game g ON g.id = r.game_id WHERE r.id IN (${releaseIds.map(() => "?").join(", ")})`,
 			)
-			.bind(...releaseIds)
-			.all<ZuPruefen>();
-		return results;
+			.bind(...releaseIds);
+	}
+
+	/**
+	 * Der Lese-Batch der Portionsroute (Stufe 20i, seit 20g mit der Lage des
+	 * Preisalarms): die Releases und, fuer die mit offener Absicht, was der
+	 * Alarm vor dem Schreiben wissen muss. Vier Anweisungen in EINEM Aufruf.
+	 */
+	async einigeMitAlarm(releaseIds: readonly number[]): Promise<{ ziele: ZuPruefen[]; alarmLage: Map<number, AlarmLage> }> {
+		if (releaseIds.length === 0) return { ziele: [], alarmLage: new Map() };
+		const lage = this.preisalarm.lageAnweisungen(releaseIds, "gebraucht");
+		const [ziele, ...rest] = await this.db.batch([this.einigeAnweisung(releaseIds), ...lage.anweisungen]);
+		return { ziele: (ziele?.results ?? []) as ZuPruefen[], alarmLage: lage.lesen(rest) };
 	}
 
 	/**
@@ -207,13 +225,24 @@ export class MarktRepository {
 	 * Scheitert eine Anweisung, scheitert der Batch ganz: Kein Release der
 	 * Portion bekommt Angebot oder Stempel, alle bleiben faellig, und der
 	 * naechste Lauf fragt sie neu. Stillstehen kann nur diese Portion.
+	 *
+	 * Die Meldungen des Preisalarms (Stufe 20g) stehen am ENDE, hoechstens
+	 * eine je Release - nach den Preisen, auf denen sie beruhen. Sie sind so
+	 * gebaut, dass sie nicht scheitern (`INSERT OR IGNORE`, UPDATE mit
+	 * Bedingung); taeten sie es doch, gilt dasselbe wie oben: Die Portion
+	 * bleibt faellig und wird am naechsten Abend neu gefragt. Mit ihnen
+	 * hoechstens 8 Anweisungen je Release, deshalb MARKT_JE_POST = 5.
 	 */
 	async ergebnisseSchreiben(
 		liste: ReadonlyArray<{ ziel: ZuPruefen; angebote: AngebotJeKanal; rohangebote: number }>,
+		alarme: readonly AlarmSchreiben[] = [],
 	): Promise<Array<{ discBelegt: boolean; preis: AngezeigtesAngebot | null }>> {
 		const teile = liste.map((e) => this.ergebnisAnweisungen(e.ziel, e.angebote, e.rohangebote));
 		if (teile.length === 0) return [];
-		const ergebnisse = await this.db.batch(teile.flatMap((t) => t.anweisungen));
+		const ergebnisse = await this.db.batch([
+			...teile.flatMap((t) => t.anweisungen),
+			...alarme.map((a) => this.preisalarm.schreibAnweisung(a)),
+		]);
 		let pos = 0;
 		return teile.map((t) => {
 			const eigene = ergebnisse.slice(pos, pos + t.anweisungen.length);
@@ -499,6 +528,8 @@ export class MarktRepository {
 						"VALUES (?, ?, ?, ?, datetime('now'))",
 				)
 				.bind(releaseId, itemId, titel, preisCents),
+			// Eine Meldung aus diesem Angebot entfaellt (Stufe 20g).
+			this.preisalarm.entfallenAnweisung(releaseId, itemId),
 		]);
 	}
 
@@ -524,6 +555,9 @@ export class MarktRepository {
 			this.db
 				.prepare("DELETE FROM market_offer_verworfen WHERE release_id = ? AND ebay_item_id = ?")
 				.bind(releaseId, itemId),
+			// ... und die Meldung, die das Verwerfen entfallen liess, kommt
+			// zurueck (Stufe 20g) - Rueckgaengig stellt den Stand ganz her.
+			this.preisalarm.wiederherstellenAnweisung(releaseId, itemId),
 		]);
 		return (ergebnisse[1]?.meta.changes ?? 0) > 0;
 	}

@@ -4,10 +4,11 @@ import { describe, it, expect } from "vitest";
 // 16 Tabellen aus Migration 0001, dazu igdb_candidate aus Migration 0010,
 // die drei Import-Tabellen aus Migration 0012, game_event aus 0019,
 // psn_played_title aus 0023, psn_zugang aus 0026, die beiden
-// Trophaeentabellen aus 0027 und market_offer_verworfen aus 0033.
+// Trophaeentabellen aus 0027, market_offer_verworfen aus 0033 und
+// preis_alarm aus 0037.
 const TABELLEN = [
 	"app_setting", "digital_entitlement", "ean_mapping", "game", "game_event", "igdb_candidate",
-	"market_offer", "market_offer_verworfen", "physical_copy", "plan_entry", "play_status", "price_snapshot",
+	"market_offer", "market_offer_verworfen", "physical_copy", "plan_entry", "play_status", "preis_alarm", "price_snapshot",
 	"psn_credentials", "psn_played_title", "psn_raw_response", "psn_sync_run", "psn_zugang", "release", "review_queue",
 	"trophy", "trophy_group", "trophy_progress", "unresolved_scan", "wishlist_import", "wishlist_import_candidate",
 	"wishlist_import_line",
@@ -29,7 +30,7 @@ async function namen(typ: "table" | "view"): Promise<string[]> {
 }
 
 describe("Migration 0001", () => {
-	it("legt genau die 26 Tabellen aus der Spezifikation an", async () => {
+	it("legt genau die 27 Tabellen aus der Spezifikation an", async () => {
 		expect(await namen("table")).toEqual(TABELLEN);
 	});
 

@@ -13,6 +13,7 @@ import { OwnershipRepository } from "./ownership";
 import { PlanRepository } from "./plan";
 import { PlayStatusRepository } from "./play-status";
 import { PreiseRepository } from "./preise";
+import { PreisalarmRepository } from "./preisalarm";
 import { ReviewRepository } from "./review";
 import { ScanRepository } from "./scan";
 import { StatsRepository } from "./stats";
@@ -41,8 +42,10 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 	const trophaeen = new TrophaeenRepository(db);
 	const games = new GamesRepository(db, events);
 	const igdb = new IgdbRepository(db, events);
-	const markt = new MarktRepository(db, events);
-	const store = new StoreRepository(db, events);
+	// Der Preisalarm (Stufe 20g) haengt in den Batches von Markt und Store.
+	const preisalarm = new PreisalarmRepository(db);
+	const markt = new MarktRepository(db, events, preisalarm);
+	const store = new StoreRepository(db, events, preisalarm);
 	return {
 		credentials,
 		sync,
@@ -68,6 +71,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		scan: new ScanRepository(db),
 		stats: new StatsRepository(db),
 		preise: new PreiseRepository(db),
+		preisalarm,
 		export: new ExportRepository(db),
 		wishlistImport: new WishlistImportRepository(db),
 	};

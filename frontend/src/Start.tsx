@@ -26,7 +26,8 @@ import { Glocke, Tafel, useOffenePosten, Warnblock } from './Offenes'
  * Glocke, obwohl dort Platz für einen Dauerblock wäre.
  */
 export function Start() {
-	const { rot, kenntnis, posten } = useOffenePosten()
+	const offen = useOffenePosten()
+	const { rot, kenntnis, posten, preise } = offen
 	const [tafel, setTafel] = useState(false)
 
 	// Die Tafel schwebt über der Seite; Escape schliesst sie, wie jedes andere
@@ -48,6 +49,7 @@ export function Start() {
 				zusatz={
 					<Glocke
 						rot={rot.length}
+						preise={preise.length}
 						kenntnis={kenntnis.length}
 						posten={posten.length}
 						offen={tafel}
@@ -56,7 +58,7 @@ export function Start() {
 				}
 			/>
 			<div className="seite dashboard">
-				{tafel && <Tafel rot={rot} kenntnis={kenntnis} posten={posten} />}
+				{tafel && <Tafel {...offen} />}
 				<Warnblock rot={rot} />
 				<div className="dspalten">
 					<div className="dlinks">
