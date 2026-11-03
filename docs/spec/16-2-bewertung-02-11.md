@@ -66,6 +66,24 @@ die Kaufliste wie Markt und Store in eine Action gehört.
 
 #### Das Budget arbeitender Aufrufe
 
-**Offen, bewertet mit der Nacht zum 03.11.2026** (Entscheidung des Nutzers vom 02.11.2026): Der größte
-Ausreißer war das Auffrischen, und das ändert Nachtrag 18n-c ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)).
-Verglichen wird je Standort mit den Nächten zum 01. und 02.11.
+**Bewertet am 03.11.2026** mit den Nächten 31.10. bis 03.11. ([16-2-naechte.md](16-2-naechte.md)):
+**Die Hypothese bleibt Ziel, und es wird gezielt daran gearbeitet** – nach 20g (Entscheidung des Nutzers
+vom 03.11.2026). Gelockert wird sie nicht: Dass seit dem 17.10. kein Aufruf abbrach, ist Duldung, keine
+Einhaltung (CLAUDE.md); eine andere Begründung für eine höhere Obergrenze gibt es nicht.
+
+| | 31.10. | 01.11. | 02.11. | 03.11. |
+|---|---|---|---|---|
+| arbeitende Aufrufe | 15 | 33 | 18 | 18 |
+| davon über 10 / über 15 ms | 13 / 8 | 28 / 14 | 13 / 9 | 15 / 8 |
+| Leerlauf über 10 ms | 1 | 1 | 2 | 11 |
+
+Der Median arbeitender Aufrufe liegt bei rund 13–15 ms; kein arbeitender Schritt hält das Budget außer
+Jahre und Level an guten Standorten. Abbrüche (`exceededResources`, alle Aufrufe je Tag): 10.–16.10. 12
+bis 42 je Tag, seit dem 17.10. keiner – auch nicht bei Spielzeit mit 64 ms und der Sicherung über den
+Worker mit 321 ms.
+
+**Wie gearbeitet wird:** nach dem Muster von 18n-c – erst je Schritt die D1-Aufrufe zählen, dann
+bündeln. Reihenfolge nach Häufigkeit mal Überschreitung: **Sync** (11 Aufrufe jede Nacht, Median 12–15),
+dann Spielzeit (2, 20–34), dann Kaufliste (15 einmal je Woche, Median 13). **Das Auffrischen bleibt, wie
+es ist** (Entscheidung vom 03.11.2026): 8–10 ms nach 18n-c; erst bei einem Abbruch oder einem Wert über
+15 ms wird es wieder angesehen.
