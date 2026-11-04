@@ -2,7 +2,7 @@ import { quelleAusMatch, type EreignisQuelle } from "../domain/ereignis";
 import type { TrophyEintrag } from "../domain/gruppen";
 import type { PlayStatus } from "../domain/play-status";
 import { SUCHE_SQL, suchbar, titelSchluessel, type Plattform } from "../domain/titel";
-import { eins, einzeln, geaendert, zeilen, type Baustein } from "./baustein";
+import { eins, einzeln, ersteZeile, geaendert, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 
 export type ZuOrdnenderRelease = {
@@ -352,6 +352,17 @@ export class GamesRepository {
 			.bind(schluessel)
 			.all<{ id: number; platform: string }>();
 		return results;
+	}
+
+	/**
+	 * Die hoechste Release-Id (Stufe 18o): Ist sie groesser als beim letzten
+	 * Spielzeit-Volllauf, kam etwas dazu. Eine Zeile ueber den Primaerschluessel.
+	 */
+	neuestesReleaseBaustein(): Baustein<number> {
+		return eins(
+			this.db.prepare("SELECT MAX(id) AS id FROM release"),
+			(e) => ersteZeile<{ id: number | null }>(e)?.id ?? 0,
+		);
 	}
 
 	/**

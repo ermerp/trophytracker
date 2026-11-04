@@ -589,13 +589,17 @@ export class SyncRepository {
 	}
 
 	async fortschrittSetzenWert(schluessel: string, wert: string): Promise<void> {
-		await this.db
+		await this.fortschrittAnweisung(schluessel, wert).run();
+	}
+
+	/** Dasselbe als Anweisung fuer den Batch eines Schritts (Stufe 18o). */
+	fortschrittAnweisung(schluessel: string, wert: string): D1PreparedStatement {
+		return this.db
 			.prepare(
 				"INSERT INTO app_setting (key, value) VALUES (?, ?) " +
 					"ON CONFLICT(key) DO UPDATE SET value = excluded.value",
 			)
-			.bind(schluessel, wert)
-			.run();
+			.bind(schluessel, wert);
 	}
 
 	/**

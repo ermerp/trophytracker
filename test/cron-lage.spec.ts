@@ -70,7 +70,7 @@ beforeEach(async () => {
 	await env.DB.batch([
 		env.DB.prepare("DELETE FROM game_event"),
 		env.DB.prepare(
-			"DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand')",
+			"DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_spielzeit_runde', 'psn_besitz_stand')",
 		),
 		env.DB.prepare("DELETE FROM app_setting WHERE key >= 'cron_begonnen' AND key < 'cron_begonnen;'"),
 		env.DB.prepare("DELETE FROM psn_raw_response"),
@@ -240,7 +240,7 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 	const lage = (psn: Partial<NonNullable<CronLage["psn"]>> = {}, einstellungen: Record<string, string> = {}): CronLage => ({
 		verlauf: [],
 		einstellungen: new Map(Object.entries(einstellungen)),
-		psn: { abgebrochen: 0, laufend: null, heutige: [lauf], zugang, naechsteListe: null, ...psn },
+		psn: { abgebrochen: 0, laufend: null, heutige: [lauf], zugang, naechsteListe: null, neuestesRelease: 0, ...psn },
 	});
 	const k = { heute: HEUTE, igdbKonfiguriert: true };
 	const fertig = {
@@ -270,6 +270,24 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 		};
 		expect(entscheide(w, k)).toEqual(["jahre", "igdb_auffrischen", "igdb_physisch"]);
 		expect(entscheide(w, { ...k, igdbKonfiguriert: false })).toEqual(["jahre"]);
+	});
+});
+
+describe("die hoechste Release-Id im Lage-Batch (Stufe 18o)", () => {
+	it("liest sie im PSN-Bereich, und nur dort", async () => {
+		await env.DB.batch([
+			env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (7001, 'Erfunden', 'erfunden')"),
+			env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (70011, 7001, 'PS4')"),
+		]);
+		const lesen = (bereich: "psn" | "wartung") => lageLesen(repos(), bereich, HEUTE);
+		const psn = await lesen("psn");
+		const wartung = await lesen("wartung");
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM release WHERE id = 70011"),
+			env.DB.prepare("DELETE FROM game WHERE id = 7001"),
+		]);
+		expect(psn.psn?.neuestesRelease).toBeGreaterThanOrEqual(70011);
+		expect(wartung.psn).toBeUndefined();
 	});
 });
 

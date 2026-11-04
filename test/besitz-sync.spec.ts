@@ -57,6 +57,37 @@ beforeEach(async () => {
 });
 
 describe("spielzeitSchritt", () => {
+	it("schreibt Seite und Stand zusammen oder gar nicht (Stufe 18o)", async () => {
+		await env.DB.prepare("DELETE FROM psn_played_title").run();
+		const psn = psnMit([{ titleId: "CUSA1", name: "Erfunden", category: "ps4_game", playDuration: "PT1H" }], 1, [], 0);
+		const e = await spielzeitSchritt(repos(), psn, TOKEN, 0, {
+			abschluss: () => [env.DB.prepare("INSERT INTO gibt_es_nicht VALUES (1)")],
+		});
+		expect(e.status).toBe("fehler");
+		const z = await env.DB.prepare("SELECT COUNT(*) AS n FROM psn_played_title").first<{ n: number }>();
+		expect(z?.n).toBe(0);
+	});
+
+	it("zaehlt in `geschrieben` nur die Seite, nicht den Stand (8.5)", async () => {
+		await env.DB.prepare("DELETE FROM psn_played_title").run();
+		const psn = psnMit([{ titleId: "CUSA1", name: "Erfunden", category: "ps4_game", playDuration: "PT1H" }], 1, [], 0);
+		const e = await spielzeitSchritt(repos(), psn, TOKEN, 0, {
+			abschluss: () => [repos().sync.fortschrittAnweisung("psn_test_zaehlt_nicht", "1")],
+		});
+		await env.DB.prepare("DELETE FROM app_setting WHERE key = 'psn_test_zaehlt_nicht'").run();
+		expect(e).toMatchObject({ status: "erfolg", geschrieben: 1 });
+	});
+
+	it("schreibt den Stand auch, wenn die Seite nichts Gueltiges hat", async () => {
+		const psn = psnMit([{ titleId: "CUSA2", name: "App", category: "unknown" }], 1, [], 0);
+		await spielzeitSchritt(repos(), psn, TOKEN, 0, {
+			abschluss: () => [repos().sync.fortschrittAnweisung("psn_test_leer", "1")],
+		});
+		const z = await env.DB.prepare("SELECT value FROM app_setting WHERE key = 'psn_test_leer'").first<{ value: string }>();
+		await env.DB.prepare("DELETE FROM app_setting WHERE key = 'psn_test_leer'").run();
+		expect(z?.value).toBe("1");
+	});
+
 	it("ordnet einen eindeutigen Treffer zu und rechnet die Dauer um", async () => {
 		await spiel(1, "Bloodborne", ["PS4"]);
 		const psn = psnMit(

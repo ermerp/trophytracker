@@ -156,9 +156,12 @@ export class CredentialsRepository {
 	 * bedeutet "der Trophaeenstand ist von da".
 	 */
 	async fehlerStatusLoeschen(): Promise<void> {
-		await this.db
-			.prepare("UPDATE psn_credentials SET status = 'ok' WHERE id = 1 AND status = 'fehler'")
-			.run();
+		await this.fehlerStatusLoeschenAnweisung().run();
+	}
+
+	/** Dasselbe als Anweisung fuer den Batch eines Schritts (Stufe 18o). */
+	fehlerStatusLoeschenAnweisung(): D1PreparedStatement {
+		return this.db.prepare("UPDATE psn_credentials SET status = 'ok' WHERE id = 1 AND status = 'fehler'");
 	}
 
 	/**

@@ -196,7 +196,7 @@ beforeEach(async () => {
 	await env.DB.batch([
 		env.DB.prepare("DELETE FROM game_event"),
 		// Der Verlauf lebt in app_setting und ueberdauert sonst den Test.
-		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand', 'igdb_auffrischen_nacht')"),
+		env.DB.prepare("DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_spielzeit_runde', 'psn_besitz_stand', 'igdb_auffrischen_nacht')"),
 		// Die Marken liegen seit 18j als eine Zeile je Aufruf im Bereich
 		// `cron_begonnen` bis `cron_begonnen;` (auch die im alten Format).
 		env.DB.prepare("DELETE FROM app_setting WHERE key >= 'cron_begonnen' AND key < 'cron_begonnen;'"),
@@ -1041,12 +1041,12 @@ describe("cronSchritt", () => {
 
 			const erste = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
 			expect(erste).toMatchObject({ getan: "spielzeit", spielzeit: { status: "erfolg", geholt: 200 } });
-			expect(await stand()).toBe(`${heute}:200`);
+			expect(await stand()).toBe(`${heute}:200:0:frist`);
 
 			const gescheitert = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
 			expect(gescheitert.spielzeit).toMatchObject({ status: "fehler", versuche: 1 });
 			// Der Offset bleibt stehen: Der naechste Aufruf holt dieselbe Seite.
-			expect(await stand()).toBe(`${heute}:200:1`);
+			expect(await stand()).toBe(`${heute}:200:1:frist`);
 
 			const nachgeholt = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
 			expect(nachgeholt.spielzeit).toMatchObject({ status: "erfolg", geholt: 179 });
@@ -1080,6 +1080,171 @@ describe("cronSchritt", () => {
 
 			const e = await cronSchritt(repos(), psn, igdbOhne(), { heute, bereich: "psn" });
 			expect(e.getan).not.toBe("spielzeit");
+		});
+
+		describe("Spitze und Volllauf (Stufe 18o)", () => {
+			const heute = "2026-10-20";
+			const gestern = "2026-10-19";
+
+			/** 379 Titel, absteigend nach "zuletzt gespielt"; `abfolge` ersetzt die Daten. */
+			function psnListe(optionen: { abfolge?: (i: number) => string; fehler?: number } = {}) {
+				const abfrufe: Array<{ offset: number; limit: number }> = [];
+				let fehler = optionen.fehler ?? 0;
+				const { fetch, aufrufe } = fakeFetch([
+					[/oauth\/authorize/, () => redirectAntwort("v3.abc")],
+					[/oauth\/token/, () => jsonAntwort(TOKEN_ANTWORT)],
+					[
+						/gamelist\/v2/,
+						() => {
+							const url = new URL(aufrufe[aufrufe.length - 1].url);
+							const offset = Number(url.searchParams.get("offset") ?? 0);
+							const limit = Number(url.searchParams.get("limit") ?? 0);
+							abfrufe.push({ offset, limit });
+							if (fehler-- > 0) return jsonAntwort({ error: "gesperrt" }, 403);
+							const n = Math.max(0, Math.min(limit, 379 - offset));
+							return jsonAntwort({
+								totalItemCount: 379,
+								titles: Array.from({ length: n }, (_, k) => ({
+									titleId: `CUSA${offset + k}`,
+									name: `Erfundenes Spiel ${offset + k}`,
+									category: "ps4_game",
+									playDuration: "PT1H30M",
+									lastPlayedDateTime:
+										optionen.abfolge?.(offset + k) ?? new Date(Date.parse("2020-01-01T10:00:00Z") - (offset + k) * 86_400_000).toISOString(),
+								})),
+							});
+						},
+					],
+				]);
+				return { psn: erstellePsnClient(fetch), abfrufe };
+			}
+
+			const runde = (r: { vollAm?: string; release?: number; spitzeAm?: string } = {}) =>
+				repos().sync.fortschrittSetzenWert(
+					"psn_spielzeit_runde",
+					JSON.stringify({ vollAm: gestern, release: 999_999, spitzeAm: gestern, ...r }),
+				);
+			const gespeicherteRunde = async () => {
+				const z = await env.DB.prepare("SELECT value FROM app_setting WHERE key = 'psn_spielzeit_runde'").first<{ value: string }>();
+				return z ? JSON.parse(z.value) : null;
+			};
+			const schritt = (psn: ReturnType<typeof psnListe>["psn"], tag = heute) =>
+				cronSchritt(repos(), psn, igdbOhne(), { heute: tag, bereich: "psn" });
+
+			beforeEach(async () => {
+				await env.DB.prepare("DELETE FROM psn_played_title").run();
+				await syncSchonErledigt(heute);
+			});
+
+			it("holt in der ersten Nacht alles und merkt sich die Runde", async () => {
+				const { psn, abfrufe } = psnListe();
+				const eins = await schritt(psn);
+				expect(eins.spielzeit).toMatchObject({ lauf: "frist", geholt: 200 });
+				const zwei = await schritt(psn);
+				expect(zwei.spielzeit).toMatchObject({ lauf: "frist", geholt: 179 });
+				expect(abfrufe).toEqual([{ offset: 0, limit: 200 }, { offset: 200, limit: 200 }]);
+				expect(await gespeicherteRunde()).toMatchObject({ vollAm: heute, spitzeAm: heute });
+			});
+
+			it("holt danach nur die Spitze: eine Seite, ein Aufruf", async () => {
+				await runde();
+				const { psn, abfrufe } = psnListe();
+				const e = await schritt(psn);
+				expect(e.spielzeit).toMatchObject({ lauf: "spitze", geholt: 25, geschrieben: 25, weiter: false });
+				expect(abfrufe).toEqual([{ offset: 0, limit: 25 }]);
+				expect(await stand()).toBe(`${heute}:-1`);
+				// Der Volllauf bleibt, wann er war; nur die Spitze rueckt vor.
+				expect(await gespeicherteRunde()).toEqual({ vollAm: gestern, release: 999_999, spitzeAm: heute });
+				expect((await schritt(psn)).getan).not.toBe("spielzeit");
+			});
+
+			it("laeuft voll, wenn ein neues Release dazukam", async () => {
+				await runde({ release: -1 });
+				const { psn, abfrufe } = psnListe();
+				expect((await schritt(psn)).spielzeit?.lauf).toBe("neu");
+				expect(abfrufe[0].limit).toBe(200);
+				expect((await schritt(psn)).spielzeit?.lauf).toBe("neu");
+				expect(await gespeicherteRunde()).toMatchObject({ vollAm: heute, release: 0 });
+			});
+
+			it("laeuft voll, wenn der letzte Volllauf 30 Tage her ist", async () => {
+				await runde({ vollAm: "2026-09-20" });
+				expect((await schritt(psnListe().psn)).spielzeit?.lauf).toBe("frist");
+			});
+
+			it("beginnt den Volllauf, wenn die Spitze unsortiert kommt", async () => {
+				await runde();
+				const { psn, abfrufe } = psnListe({ abfolge: (i) => `2020-01-${String((i % 28) + 1).padStart(2, "0")}T10:00:00.000Z` });
+				const e = await schritt(psn);
+				expect(e.spielzeit).toMatchObject({ lauf: "spitze", ungeordnet: true, geschrieben: 25 });
+				expect(await stand()).toBe(`${heute}:0:0:sortierung`);
+				// Die Runde bleibt: Fertig ist die Nacht noch nicht.
+				expect(await gespeicherteRunde()).toMatchObject({ spitzeAm: gestern });
+
+				expect((await schritt(psn)).spielzeit).toMatchObject({ lauf: "sortierung", geholt: 200 });
+				expect(abfrufe[1]).toEqual({ offset: 0, limit: 200 });
+				expect((await schritt(psn)).spielzeit).toMatchObject({ lauf: "sortierung", geholt: 179 });
+				expect(await gespeicherteRunde()).toMatchObject({ vollAm: heute, spitzeAm: heute });
+			});
+
+			it("blaettert weiter, solange auch der letzte Titel neu ist", async () => {
+				await runde();
+				// 30 Titel seit gestern, minutenweise fallend, alles danach alt.
+				const neu = psnListe({
+					abfolge: (i) => (i < 30 ? new Date(Date.parse("2026-10-19T23:00:00Z") - i * 60_000).toISOString() : "2020-01-01T10:00:00.000Z"),
+				});
+				const e = await schritt(neu.psn);
+				expect(e.spielzeit).toMatchObject({ lauf: "spitze", geholt: 25, weiter: true });
+				expect(await stand()).toBe(`${heute}:25:0:spitze`);
+				const f = await schritt(neu.psn);
+				expect(f.spielzeit).toMatchObject({ lauf: "spitze", geholt: 25, weiter: false });
+				expect(neu.abfrufe).toEqual([{ offset: 0, limit: 25 }, { offset: 25, limit: 25 }]);
+				expect(await stand()).toBe(`${heute}:-1`);
+			});
+
+			it("reicht nach einer verpassten Nacht entsprechend weiter zurueck", async () => {
+				await runde({ spitzeAm: "2026-10-10" });
+				const { psn } = psnListe({
+					abfolge: (i) => new Date(Date.parse("2026-10-15T12:00:00Z") - i * 60_000).toISOString(),
+				});
+				expect((await schritt(psn)).spielzeit?.weiter).toBe(true);
+			});
+
+			it("bleibt nach einem Fehler bei der Spitze und laesst die Runde stehen", async () => {
+				await runde();
+				const { psn, abfrufe } = psnListe({ fehler: 1 });
+				expect((await schritt(psn)).spielzeit).toMatchObject({ status: "fehler", lauf: "spitze", versuche: 1 });
+				expect(await stand()).toBe(`${heute}:0:1:spitze`);
+				expect(await gespeicherteRunde()).toMatchObject({ spitzeAm: gestern });
+
+				expect((await schritt(psn)).spielzeit).toMatchObject({ status: "erfolg", lauf: "spitze" });
+				expect(abfrufe.map((a) => a.limit)).toEqual([25, 25]);
+			});
+
+			it("laesst einen gescheiterten Volllauf faellig", async () => {
+				await runde({ release: -1 });
+				const { psn } = psnListe({ fehler: 99 });
+				for (let i = 0; i < FEHLVERSUCHE_HOECHSTENS; i++) await schritt(psn);
+				expect(await stand()).toBe(`${heute}:-1`);
+				expect(await gespeicherteRunde()).toMatchObject({ release: -1 });
+				await syncSchonErledigt("2026-10-21");
+				expect((await schritt(psnListe().psn, "2026-10-21")).spielzeit?.lauf).toBe("neu");
+			});
+
+			it("raeumt ein altes fehler am Zugang im selben Batch weg", async () => {
+				await runde();
+				await repos().credentials.statusSetzen("fehler");
+				await schritt(psnListe().psn);
+				expect((await repos().credentials.anzeige()).status).toBe("ok");
+			});
+
+			it("nennt den Lauf in der Verlaufszeile", async () => {
+				await runde();
+				const e = await schritt(psnListe().psn);
+				expect(cronLogzeile(e)).toContain("lauf=spitze");
+				const f = { ...e, spielzeit: { ...e.spielzeit!, ungeordnet: true } };
+				expect(cronLogzeile(f)).toContain("sortierung=abweichend");
+			});
 		});
 	});
 

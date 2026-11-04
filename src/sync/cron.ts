@@ -12,7 +12,7 @@ import {
 	type AuffrischErgebnis,
 	type PhysischErgebnis,
 } from "./igdb";
-import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis } from "./besitz";
+import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis, type SpielzeitLauf } from "./besitz";
 import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
 import {
 	eineListe,
@@ -161,8 +161,8 @@ export function auffrischenGekappt(stand: string | null, heute: string): { aufru
 /**
  * Wie oft die beiden PSN-Zusatzabrufe laufen (7.7, Stufe 18c).
  *
- * Spielzeit taeglich: Sie aendert sich, sobald gespielt wird, und kostet nur
- * zwei Aufrufe. Besitz woechentlich: Der PS+-Katalog wechselt monatlich, und
+ * Spielzeit taeglich: Sie aendert sich, sobald gespielt wird - geholt wird
+ * seit Stufe 18o nur die Spitze, ein Aufruf. Besitz woechentlich: Der PS+-Katalog wechselt monatlich, und
  * die ganze Kaufliste sind rund 15 Aufrufe - ein eigener Monatsplan waere
  * mehr Verwaltung als Gewinn und traefe den Wechsel trotzdem nur zufaellig
  * (Entscheidung des Nutzers vom 22.09.2026).
@@ -180,6 +180,8 @@ export const ROHANTWORTEN_LAEUFE = 3;
 
 /** Schluessel des Blaetterungs-Fortschritts in app_setting. */
 const SCHLUESSEL_SPIELZEIT = "psn_spielzeit_stand";
+/** Was ueber die Naechte hinweg bleibt (Stufe 18o) - `SpielzeitRunde` als JSON. */
+const SCHLUESSEL_SPIELZEIT_RUNDE = "psn_spielzeit_runde";
 export const SCHLUESSEL_BESITZ = "psn_besitz_stand";
 
 export type CronErgebnis = {
@@ -230,6 +232,7 @@ export type CronKandidat =
 /** Die Schluessel aus app_setting, die die Entscheidung braucht. */
 export const CRON_STAENDE = [
 	SCHLUESSEL_SPIELZEIT,
+	SCHLUESSEL_SPIELZEIT_RUNDE,
 	SCHLUESSEL_BESITZ,
 	SCHLUESSEL_LEVEL,
 	SCHLUESSEL_JAHRE,
@@ -351,7 +354,11 @@ export async function cronSchritt(
 			case "level": {
 				try {
 					if (kandidat === "spielzeit") {
-						const spielzeit = await spielzeitLauf(repos, psn, heute, stand(SCHLUESSEL_SPIELZEIT));
+						const spielzeit = await spielzeitLauf(repos, psn, heute, {
+							stand: stand(SCHLUESSEL_SPIELZEIT),
+							runde: spielzeitRundeAus(stand(SCHLUESSEL_SPIELZEIT_RUNDE)),
+							neuestesRelease: lage.psn?.neuestesRelease ?? 0,
+						});
 						if (spielzeit) return { ...basis, getan: "spielzeit", spielzeit };
 					} else if (kandidat === "besitz") {
 						const besitz = await besitzLauf(repos, psn, heute, {
@@ -424,13 +431,64 @@ export async function cronSchritt(
 	return { ...basis, getan: "nichts" };
 }
 
-/** Der Spielzeit-Stand "datum:offset[:versuche]", gelesen. */
-function spielzeitStand(stand: string | null, heute: string): { offset: number; bisher: number; faellig: boolean } {
-	const [tag, offsetRoh, versucheRoh] = (stand ?? "").split(":");
+/**
+ * Ohne einen dieser Gruende laeuft seit Stufe 18o nur die Spitze. Die Frist ist
+ * das Netz fuer das, was keine Pruefung sieht: eine Korrektur durch Sony, ein
+ * umbenanntes Spiel.
+ */
+export const VOLLLAUF_FRIST_TAGE = 30;
+
+/** Was eine Nacht der naechsten hinterlaesst (Stufe 18o). */
+export type SpielzeitRunde = {
+	/** Tag des letzten vollstaendigen Volllaufs. */
+	vollAm: string;
+	/** Die hoechste Release-Id zu dem Zeitpunkt. */
+	release: number;
+	/** Letzte Nacht, die fertig wurde - bis dahin reicht die Spitze zurueck. */
+	spitzeAm: string;
+};
+
+export function spielzeitRundeAus(wert: string | null): SpielzeitRunde | null {
+	if (!wert) return null;
+	try {
+		const r = JSON.parse(wert) as Partial<SpielzeitRunde>;
+		return typeof r.vollAm === "string" && typeof r.release === "number" && typeof r.spitzeAm === "string"
+			? { vollAm: r.vollAm, release: r.release, spitzeAm: r.spitzeAm }
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Braucht diese Nacht einen Volllauf? `null` heisst: nur die Spitze.
+ *
+ * "neu": Nur ein neues Release kann einem Titel ohne Zuordnung noch ein Ziel
+ * geben - seit Ende September kam keins dazu. "frist": auch ohne Runde, also
+ * in der ersten Nacht. Der dritte Anlass, "sortierung", entsteht erst beim
+ * Holen (`spielzeitSchritt`).
+ */
+export function spielzeitAnlass(
+	runde: SpielzeitRunde | null,
+	neuestesRelease: number,
+	heute: string,
+): "neu" | "frist" | null {
+	if (!runde || tageSeit(runde.vollAm, heute) >= VOLLLAUF_FRIST_TAGE) return "frist";
+	return neuestesRelease > runde.release ? "neu" : null;
+}
+
+/** Der Spielzeit-Stand "datum:offset[:versuche[:lauf]]", gelesen. */
+function spielzeitStand(
+	stand: string | null,
+	heute: string,
+): { offset: number; bisher: number; faellig: boolean; lauf: SpielzeitLauf | null } {
+	const [tag, offsetRoh, versucheRoh, laufRoh] = (stand ?? "").split(":");
 	const vonHeute = tag === heute;
 	const offset = vonHeute ? Number(offsetRoh) : 0;
 	const bisher = vonHeute ? Number(versucheRoh ?? 0) || 0 : 0;
-	return { offset, bisher, faellig: !(vonHeute && offset < 0) };
+	// Mitten im Lauf ohne Angabe: ein Stand von vor 18o, also ein Volllauf.
+	const lauf = !vonHeute ? null : ((laufRoh as SpielzeitLauf | undefined) ?? (offset > 0 ? "frist" : null));
+	return { offset, bisher, faellig: !(vonHeute && offset < 0), lauf };
 }
 
 const spielzeitFaellig = (stand: string | null, heute: string) => spielzeitStand(stand, heute).faellig;
@@ -438,11 +496,17 @@ const spielzeitFaellig = (stand: string | null, heute: string) => spielzeitStand
 /**
  * Eine Seite Spielzeit, wenn heute noch nicht alles geholt wurde.
  *
- * Der Stand steht als "datum:offset[:versuche]" in app_setting: Ein neuer Tag
- * beginnt bei 0, ein abgeschlossener Tag traegt offset -1 und laesst den
- * Schritt ruhen. Damit macht jeder Aufruf genau eine Seite - dieselbe
+ * Der Stand steht als "datum:offset[:versuche[:lauf]]" in app_setting: Ein
+ * neuer Tag beginnt bei 0, ein abgeschlossener Tag traegt offset -1 und laesst
+ * den Schritt ruhen. Damit macht jeder Aufruf genau eine Seite - dieselbe
  * Blaetterung wie beim Trophaeen-Sync (Abschnitt 2). Das dritte Feld fehlt in
- * alten Werten und zaehlt dann als 0.
+ * alten Werten und zaehlt dann als 0. Das vierte haelt fest, ob die Nacht
+ * Spitze oder Volllauf ist: Entschieden wird beim ersten Aufruf des Tages.
+ *
+ * **Seit Stufe 18o holt eine Nacht nur die Spitze** (`spielzeitAnlass`). Kommt
+ * sie unsortiert, wird die Seite trotzdem geschrieben, und der naechste Aufruf
+ * derselben Nacht beginnt den Volllauf: Mit falscher Reihenfolge ist die Spitze
+ * nicht mehr die Liste der gespielten Titel.
  *
  * **Ein Abrufsfehler beendet den Tag nicht mehr (Stufe 18f).** Bis hierher
  * schrieb jeder Fehler `-1`, und der Tag war erledigt. In der Nacht zum
@@ -462,31 +526,54 @@ async function spielzeitLauf(
 	repos: Repositories,
 	psn: PsnClient,
 	heute: string,
-	stand: string | null,
+	lage: { stand: string | null; runde: SpielzeitRunde | null; neuestesRelease: number },
 ): Promise<SpielzeitErgebnis | null> {
-	const { offset, bisher, faellig } = spielzeitStand(stand, heute);
+	const { offset, bisher, faellig, lauf: gemerkt } = spielzeitStand(lage.stand, heute);
 	if (!faellig) return null;
+	const { runde, neuestesRelease } = lage;
+	const lauf: SpielzeitLauf = gemerkt ?? spielzeitAnlass(runde, neuestesRelease, heute) ?? "spitze";
+	const voll = lauf !== "spitze";
 
 	const { accessToken } = await sitzungBesorgen(repos, psn);
-	const ergebnis = await spielzeitSchritt(repos, psn, accessToken, offset);
-	if (ergebnis.status === "erfolg") await zugangGeglueckt(repos);
+	// Ein Tag Spielraum: Bis zum Abend der letzten fertigen Nacht kann Sony
+	// noch nachgezogen haben. Die Runde fehlt nur ohne Vorgeschichte, und dann
+	// ist `spielzeitAnlass` schon "frist" - das `heute` ist nur der Typ.
+	const spitzeBis = voll ? undefined : `${tagDavor(runde?.spitzeAm ?? heute)}T00:00:00Z`;
+	const ergebnis = await spielzeitSchritt(repos, psn, accessToken, offset, {
+		spitzeBis,
+		abschluss: ({ geholt, weiter, ungeordnet }) => {
+			const stand = (wert: string) => repos.sync.fortschrittAnweisung(SCHLUESSEL_SPIELZEIT, wert);
+			const raeumen = repos.credentials.fehlerStatusLoeschenAnweisung();
+			// Fortschritt setzt den Zaehler zurueck: Gezaehlt werden Versuche an
+			// derselben Stelle, nicht ueber die Nacht verteilte.
+			if (ungeordnet) return [stand(`${heute}:0:0:sortierung`), raeumen];
+			if (weiter) return [stand(`${heute}:${offset + geholt}:0:${lauf}`), raeumen];
+			// Nur eine fertige Nacht schreibt die Runde: Ein gescheiterter
+			// Volllauf ist beim naechsten Mal weiter faellig (`fehlerAm`-Regel,
+			// 10.1), und die Spitze reicht dann entsprechend weiter zurueck.
+			const neu: SpielzeitRunde = {
+				vollAm: voll || !runde ? heute : runde.vollAm,
+				release: voll || !runde ? neuestesRelease : runde.release,
+				spitzeAm: heute,
+			};
+			return [
+				stand(`${heute}:-1`),
+				repos.sync.fortschrittAnweisung(SCHLUESSEL_SPIELZEIT_RUNDE, JSON.stringify(neu)),
+				raeumen,
+			];
+		},
+	});
 	if (ergebnis.status === "fehler") {
 		const versuche = bisher + 1;
 		// Unter der Grenze bleibt der Offset stehen - der naechste Aufruf holt
 		// dieselbe Seite. Erst danach ruht der Tag.
 		await repos.sync.fortschrittSetzenWert(
 			SCHLUESSEL_SPIELZEIT,
-			versuche < FEHLVERSUCHE_HOECHSTENS ? `${heute}:${offset}:${versuche}` : `${heute}:-1`,
+			versuche < FEHLVERSUCHE_HOECHSTENS ? `${heute}:${offset}:${versuche}:${lauf}` : `${heute}:-1`,
 		);
-		return { ...ergebnis, versuche };
+		return { ...ergebnis, lauf, versuche };
 	}
-	// Fortschritt setzt den Zaehler zurueck: Gezaehlt werden Versuche an
-	// derselben Stelle, nicht ueber die Nacht verteilte.
-	await repos.sync.fortschrittSetzenWert(
-		SCHLUESSEL_SPIELZEIT,
-		ergebnis.weiter ? `${heute}:${offset + ergebnis.geholt}` : `${heute}:-1`,
-	);
-	return ergebnis;
+	return { ...ergebnis, lauf };
 }
 
 /** Der Stand der Kaufliste in app_setting (Stufe 18c, `fehlerAm` seit 18e). */
@@ -586,6 +673,11 @@ async function zugangGeglueckt(repos: Repositories): Promise<void> {
 	await repos.credentials.fehlerStatusLoeschen();
 }
 
+/** Der Tag vor einem ISO-Datum (YYYY-MM-DD). */
+function tagDavor(tag: string): string {
+	return new Date(Date.parse(`${tag}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+}
+
 /** Ganze Tage zwischen zwei ISO-Datumsangaben (YYYY-MM-DD). */
 function tageSeit(vorher: string, heute: string): number {
 	const a = Date.parse(`${vorher}T00:00:00Z`);
@@ -678,6 +770,9 @@ export function cronLogzeile(e: CronErgebnis): string {
 			`geschrieben=${e.spielzeit.geschrieben}`,
 			`zugeordnet=${e.spielzeit.zugeordnet}`,
 		);
+		// Sagt, warum es heute nur eine Seite war oder doch der ganze Bestand.
+		if (e.spielzeit.lauf) teile.push(`lauf=${e.spielzeit.lauf}`);
+		if (e.spielzeit.ungeordnet) teile.push("sortierung=abweichend");
 		// Wie beim Sync (18e): Die Zahl trennt "dreimal dieselbe Seite" von
 		// "drei Seiten geholt".
 		if (e.spielzeit.versuche) teile.push(`versuch=${e.spielzeit.versuche}/${FEHLVERSUCHE_HOECHSTENS}`);

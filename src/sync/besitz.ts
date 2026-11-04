@@ -1,6 +1,6 @@
 import type { Repositories } from "../db";
 import type { GespielterTitel } from "../db/besitz";
-import { dauerInSekunden, plattformAusKategorie } from "../domain/psn-besitz";
+import { absteigendNachLetztemSpiel, dauerInSekunden, plattformAusKategorie, spitzeReichtWeiter } from "../domain/psn-besitz";
 import { titelSchluessel } from "../domain/titel";
 import { PsnAbrufError, PsnAuthError, type PsnClient } from "../psn/client";
 
@@ -19,7 +19,28 @@ import { PsnAbrufError, PsnAuthError, type PsnClient } from "../psn/client";
  */
 
 export const GESPIELTE_JE_SEITE = 200;
+/**
+ * Die naechtliche Spitze (Stufe 18o, 7.7): Sony sortiert nach "zuletzt
+ * gespielt", und in sieben Tagen wurde ein Titel gespielt, nicht 303. Fest
+ * die ersten 25 statt nur der neuen, damit auch ein Titel vom Vortag noch
+ * einmal geschrieben wird, dessen Spielzeit Sony erst spaeter nachzog.
+ */
+export const SPITZE_JE_SEITE = 25;
 export const KAEUFE_JE_SEITE = 50;
+
+/** "spitze" oder der Anlass des Volllaufs (Stufe 18o). */
+export type SpielzeitLauf = "spitze" | "neu" | "frist" | "sortierung";
+
+/** Wie `spielzeitSchritt` eine Seite holt; ohne Angabe wie der Volllauf. */
+export type SpielzeitOptionen = {
+	/** Nur die Spitze holen, zurueck bis zu diesem Zeitpunkt. */
+	spitzeBis?: string;
+	/**
+	 * Was in den Schreib-Batch der Seite gehoert (Stand, Fehlerstatus) - das
+	 * haengt am Ergebnis, deshalb erst hier bekannt.
+	 */
+	abschluss?: (e: { geholt: number; weiter: boolean; ungeordnet: boolean }) => D1PreparedStatement[];
+};
 
 export type SpielzeitErgebnis = {
 	status: "erfolg" | "fehler";
@@ -31,6 +52,10 @@ export type SpielzeitErgebnis = {
 	zugeordnet: number;
 	weiter: boolean;
 	meldung?: string;
+	/** Spitze oder Volllauf mit Anlass (Stufe 18o) - setzt `spielzeitLauf`. */
+	lauf?: SpielzeitLauf;
+	/** Die Spitze kam nicht nach "zuletzt gespielt" sortiert (Stufe 18o). */
+	ungeordnet?: boolean;
 	/**
 	 * Fehlversuche an DERSELBEN Seite, wenn dieser Aufruf einen hatte
 	 * (Stufe 18f). Wie beim Sync seit 18e: Die Zahl gehoert in die
@@ -58,9 +83,12 @@ export async function spielzeitSchritt(
 	psn: PsnClient,
 	accessToken: Parameters<PsnClient["holeGespielteSeite"]>[0],
 	offset: number,
+	optionen: SpielzeitOptionen = {},
 ): Promise<SpielzeitErgebnis> {
 	try {
-		const { gesamt, titel } = await psn.holeGespielteSeite(accessToken, offset, GESPIELTE_JE_SEITE);
+		const { spitzeBis } = optionen;
+		const limit = spitzeBis === undefined ? GESPIELTE_JE_SEITE : SPITZE_JE_SEITE;
+		const { gesamt, titel } = await psn.holeGespielteSeite(accessToken, offset, limit);
 
 		// Streaming-Apps und Unbestimmtes fallen hier heraus, bevor
 		// irgendetwas gespeichert wird.
@@ -94,15 +122,28 @@ export async function spielzeitSchritt(
 			};
 		});
 
-		// Die ganze Seite in einem Batch (Stufe 18k).
-		const geschrieben = await repos.besitz.spielzeitSchreiben(gefiltert);
+		// Geprueft wird, was gespeichert wird (PS4/PS5): Dafuer ist die
+		// Reihenfolge gemessen, fuer die Streaming-Apps nicht.
+		const ungeordnet = spitzeBis !== undefined && !absteigendNachLetztemSpiel(gueltig.map((g) => g.t));
+		const weiter =
+			offset + titel.length < gesamt &&
+			titel.length > 0 &&
+			!ungeordnet &&
+			(spitzeBis === undefined || spitzeReichtWeiter(titel, spitzeBis));
+
+		// Die ganze Seite in einem Batch (Stufe 18k), samt Stand (18o).
+		const geschrieben = await repos.besitz.spielzeitSchreiben(
+			gefiltert,
+			optionen.abschluss?.({ geholt: titel.length, weiter, ungeordnet }),
+		);
 
 		return {
 			status: "erfolg",
 			geholt: titel.length,
 			geschrieben,
 			zugeordnet,
-			weiter: offset + titel.length < gesamt && titel.length > 0,
+			weiter,
+			...(ungeordnet ? { ungeordnet } : {}),
 		};
 	} catch (fehler) {
 		return { status: "fehler", geholt: 0, geschrieben: 0, zugeordnet: 0, weiter: false, meldung: meldungFuer(fehler) };

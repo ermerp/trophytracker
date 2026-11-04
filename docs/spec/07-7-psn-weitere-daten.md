@@ -95,5 +95,17 @@ dasselbe gilt für das echte „letztes Platin", das erst mit dem Zeitpunkt je T
 
 ### Was daraus folgt
 
+#### Spielzeit: die Spitze statt des ganzen Bestands (Stufe 18o)
+
+**Gebaut am 04.11.2026.** Bis dahin holte jede Nacht alle Titel in zwei Aufrufen, und jeder lag über dem Budget (14 von 14 über 15 ms in den Nächten 29.10.–04.11., Median 22, höchstens 64) – für **303** gespeicherte Titel, von denen am 04.11. **1** in den letzten 7 und **3** in den letzten 30 Tagen gespielt waren. Rund 12 der 22 ms sind die Seite selbst (gegen Level mit Median 10; hergeleitet, nicht je Aufruf gemessen).
+
+- **Sonys Liste kommt nach „zuletzt gespielt" absteigend.** Gemessen am 04.11.2026: Seite 1 reicht bis 09.03.2020, Seite 2 beginnt am 02.03.2020, und in der Einfügereihenfolge stehen auf 303 Zeilen nur 2 Umkehrungen. Das ist gemessen, nicht zugesagt.
+- **Jede Nacht die ersten 25 Titel** (`SPITZE_JE_SEITE`), ein Aufruf. Weitergeblättert wird nur, wenn auch der älteste Titel der Seite nach dem Vortag der letzten fertigen Nacht gespielt wurde – nach einer verpassten Nacht reicht die Spitze also weiter zurück. Fest 25 statt nur der neuen: Auch ein Titel vom Vortag wird so noch einmal geschrieben, falls Sony nachzieht.
+- **Der Volllauf hat drei Anlässe** (`spielzeitAnlass`, `lauf=` in der Verlaufszeile): `neu`, wenn die höchste Release-Id seit dem letzten Volllauf gestiegen ist – nur ein neues Release gibt einem der 66 Titel ohne Zuordnung ein Ziel, das letzte kam laut Protokoll Ende September; `sortierung`, wenn die Spitze nicht absteigend kommt (`sortierung=abweichend`; gleich im nächsten Aufruf derselben Nacht); `frist`, wenn der letzte Volllauf 30 Tage her ist (`VOLLLAUF_FRIST_TAGE`), auch in der ersten Nacht. Die Frist ist das Netz für das, was keine Prüfung sieht: eine Korrektur durch Sony, ein umbenanntes Spiel.
+- **Stand und Fehlerstatus stehen im Schreib-Batch der Seite**, dahinter. Scheitert der Batch, ist weder die Seite noch der Stand geschrieben, und der nächste Aufruf versucht dieselbe Seite; still steht nur die Spielzeit, nach drei Versuchen für diese Nacht. Nur eine fertige Nacht schreibt `psn_spielzeit_runde` – ein gescheiterter Volllauf bleibt fällig.
+- **D1-Aufrufe je Spielzeit-Aufruf: 6 statt 8.** Der Token bleibt ein eigener Schreibvorgang vor der Arbeit, weil er rotiert. Gelesen / geschrieben in `test/lesekosten.spec.ts`: 133 / 77 Zeilen für die Spitze gegen 1 100–1 300 / 400–600 je voller Seite.
+- **Was das kostet:** Ein nicht frisch gespielter Titel bekommt seine Zuordnung zu einem neuen Release erst im Volllauf der nächsten Nacht, eine Umbenennung bis zu 30 Tage später.
+- **Am Tag der Kaufliste gibt es keine Sonderregel:** Ihre 29 Aufrufe enthalten schon die zwei der Spielzeit.
+
 - Die Spielzeit gehört als Feld an das Release beziehungsweise die Trophäenliste, nicht an das Spiel: Sie kommt je Titel-Id von Sony. Anzeige im Spieldetail und als Sortierkriterium der Listen (5.2); Titel ohne Spielzeit stehen dabei am Ende (entschieden und gebaut in Stufe 18c).
 - Der digitale Besitz aus PSN ist **Fremddatum** und braucht eine Herkunftsspalte an `digital_entitlement`, wie `physical_source` bei der Disc-Fassung (Abschnitt 3): Was der Nutzer selbst erfasst hat, darf ein automatischer Lauf nie überschreiben.
