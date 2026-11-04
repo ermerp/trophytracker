@@ -1,6 +1,6 @@
-← [Inhaltsverzeichnis](README.md) · [16.2 CPU-Grenze](16-2-cpu-und-betrieb.md) · [Messungen je Schritt](16-2-cpu-je-schritt.md)
+← [Inhaltsverzeichnis](README.md) · [16.2 CPU-Grenze](16-2-cpu-und-betrieb.md) · [Messungen je Schritt](16-2-cpu-je-schritt.md) · [ab 04.11.](16-2-naechte-2.md)
 
-## 16. Nachtmessungen ab dem 26.10.2026
+## 16. Nachtmessungen vom 26.10. bis 03.11.2026
 
 Fortsetzung der Nachtmessungen aus [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md), die sonst über
 15 KB läge. Seit dem 25.10.2026 wird nur bei Betriebswarnung und zu Messterminen ausgewertet
@@ -136,7 +136,7 @@ Level 1 – 29 von 36, wie am 25.10.
 Zwei Werte am selben Standort sind ein Hinweis, keine Erklärung – nur notiert.
 
 **Gelesene Zeilen:** PSN-Fenster 18 624 (sonst 14 564–15 059, der Rest ist die Kaufliste), Wartung 108 274
-(sonst 94 132): Die Stunde 06 liest 52 546 statt 27 864 – rund 24 700 für die drei Auffrisch-Aufrufe,
+(sonst 94 132): Die Stunde 06 liest 52 546 statt 27 864 – rund 24 700 mehr, vor allem Jahre ([16-2-naechte-2.md](16-2-naechte-2.md)),
 etwa 8 200 je Aufruf. Abendläufe 9 883 (23 und 01 UTC). `rows_read_24h` am 01.11. gegen 10:20 UTC
 **151 250**, `rows_written_24h` 3 852.
 
@@ -172,7 +172,7 @@ dem 20.10.** (damals 20–54), bei derselben Arbeit, aber ohne Abbruch.
 | Auffrischen, ms (n = 3) | 32–60, Median 44 |
 
 **Gelesene Zeilen:** PSN-Fenster 15 293, Wartung 102 877 – die Stunde 06 liest 50 749, wie am 01.11. rund
-24 000 mehr für die drei Auffrisch-Aufrufe. Abendläufe 9 761 (23 und 01 UTC). `rows_read_24h` am 02.11. gegen
+24 000 mehr, vor allem Jahre ([16-2-naechte-2.md](16-2-naechte-2.md)). Abendläufe 9 761 (23 und 01 UTC). `rows_read_24h` am 02.11. gegen
 10:50 UTC **141 343**, `rows_written_24h` 3 741.
 
 **Abendläufe des 01.11.:** Alle vier grün. Markt 23:34 UTC (431 geprüft in 72 Portionen, 467 s, 0 offen),
@@ -201,9 +201,8 @@ IGDB-Antwort für 50 Spiele kostet wenige Millisekunden** ([16-2-cpu-je-schritt.
 **Leerlauf über 10 ms: 11** statt 1–2 in den Nächten davor, an den langsamsten Standorten vom 26.–29.10.;
 18n-c ändert den Leerlauf nicht – **nur notiert**.
 
-**Gelesene Zeilen:** PSN 17 229 (die Stunde 03 enthält zwei Abendläufe), Wartung 98 079 – je Auffrisch-Aufruf
-weiter rund 7 000–8 000 mehr als im Leerlauf, obwohl `test/lesekosten.spec.ts` für den Schreibschritt 450
-nennt; **woher sie kommen, ist nicht geklärt**. Stunde 21 UTC am 02.11.: 73 722, App-Nutzung (Dashboard,
+**Gelesene Zeilen:** PSN 17 229 (die Stunde 03 enthält zwei Abendläufe), Wartung 98 079 – die Mehrzeilen der
+Stunde 06 sind vor allem Jahre, ein Auffrisch-Aufruf liest rund 700–1 000 mehr ([16-2-naechte-2.md](16-2-naechte-2.md), korrigiert am 04.11.). Stunde 21 UTC am 02.11.: 73 722, App-Nutzung (Dashboard,
 vor allem Statistik). `rows_read_24h` am 03.11. 15:50 UTC **196 885** (ohne Stunde 21 rund 123 000),
 `rows_written_24h` 3 715.
 

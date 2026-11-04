@@ -68,7 +68,8 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 16 | [16-2-preisalarm.md](16-2-preisalarm.md) | 20g Preisalarm: Kanal, Auslöser, Schreibweg, Glocke, Grenze |
 | 16 | [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) | CPU-Grenze: Budget, Wege je Schritt, Cron je Minute, Fristen, Index-Nachtrag |
 | 16 | [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md) | CPU-Grenze: was je Schritt folgt, mit den Nachtmessungen |
-| 16 | [16-2-naechte.md](16-2-naechte.md) | Nachtmessungen ab dem 26.10.2026 |
+| 16 | [16-2-naechte.md](16-2-naechte.md) | Nachtmessungen vom 26.10. bis 03.11.2026 |
+| 16 | [16-2-naechte-2.md](16-2-naechte-2.md) | Nachtmessungen ab dem 04.11.2026 |
 | 16 | [16-2-bewertung-02-11.md](16-2-bewertung-02-11.md) | Vorlagen für die Budget-Bewertung am 02.11.: Sicherung (`backup.json`), Kaufliste-Portion |
 | 16 | [16-2-betriebswarnungen.md](16-2-betriebswarnungen.md) | Betriebswarnungen (18m, 18m-b), Nachtläufe bis 05:00 UTC |
 | 16 | [16-2-endlos-scrollen.md](16-2-endlos-scrollen.md) | Endlos-Scrollen in der Sammlung und im Änderungsprotokoll (Stufe 22) |
