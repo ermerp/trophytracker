@@ -273,6 +273,24 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 	});
 });
 
+describe("die hoechste Release-Id im Lage-Batch (Stufe 18o)", () => {
+	it("liest sie im PSN-Bereich, und nur dort", async () => {
+		await env.DB.batch([
+			env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (7001, 'Erfunden', 'erfunden')"),
+			env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (70011, 7001, 'PS4')"),
+		]);
+		const lesen = (bereich: "psn" | "wartung") => lageLesen(repos(), bereich, HEUTE);
+		const psn = await lesen("psn");
+		const wartung = await lesen("wartung");
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM release WHERE id = 70011"),
+			env.DB.prepare("DELETE FROM game WHERE id = 7001"),
+		]);
+		expect(psn.psn?.neuestesRelease).toBeGreaterThanOrEqual(70011);
+		expect(wartung.psn).toBeUndefined();
+	});
+});
+
 describe("Knopf und Cron sehen dieselbe Auswahl (Stufe 18j, Vorgabe des Nutzers)", () => {
 	it("IGDB und Einzeltrophaeen: der Lage-Batch liefert, was die Repository-Methode liefert", async () => {
 		await env.DB.batch([

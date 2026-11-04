@@ -120,5 +120,7 @@ gerade gilt.
   möglicher Nachtrag, messbar ab dem 03.11.2026. Der Median über `price_snapshot` ist **nicht** der
   Median des Preises – geschrieben wird nur bei Änderung, Tage mit Bewegung wiegen schwerer. Richtig
   gerechnet braucht es eine Treppenfunktion oder eine bewusst in Kauf genommene Verzerrung.
+- **Ein Rückgängig für den Haken fehlt.** Eine quittierte Meldung ist fort; der Nutzer will das
+  zurücknehmen können, aber nicht jetzt (04.11.2026). Vorgemerkt, nicht geplant.
 - **Die Logzeile der Markt- und Store-Action nennt die Preisalarme noch nicht** – die Routen liefern
   `preisalarme` mit, `scripts/markt-action.ts` und `store-action.ts` geben es nicht aus.

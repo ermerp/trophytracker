@@ -36,7 +36,7 @@ und die Neubewertung. Keiner davon ist Bedingung für 20g, und 20g rechnet in de
 nach der Nachtauswertung ([16-2-preisalarm.md](16-2-preisalarm.md)).
 Gebaut sind 18k-b (Kaufliste gebündelt, CPU gemessen am 25.10.: Median 19 statt 35–108 ms), 20i (Markt als Action, erste
 volle Nacht 20.10.) und 20i-b (Frist 12 Stunden, Rückfall, Warnung; erste Nacht 21.10. wie gebaut; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
-Das Budget arbeitender Aufrufe ist am 03.11.2026 bewertet: Ziel bleibt, gearbeitet wird nach 20g, zuerst am Sync ([16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)). Fest sind die Abhängigkeiten:
+Das Budget arbeitender Aufrufe ist am 03.11.2026 bewertet: Ziel bleibt, gearbeitet wird nach 20g, vom teuersten Aufruf abwärts, zuerst die Spielzeit (18o), dann der Sync ([16-2-bewertung-02-11.md](16-2-bewertung-02-11.md)). **Wohin Index-Nachtrag und 18m-b dabei rücken, ist offen.** Fest sind die Abhängigkeiten:
 
 - **20g kommt nach 20i**; der Allzeittief-Auslöser bliebe bis zum 03.11.2026 ohnehin still
   (Mindesthistorie, unten). Deployt am 03.11.2026.
