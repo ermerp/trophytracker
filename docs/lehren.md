@@ -866,3 +866,21 @@ genau 10 ms, also an der Grenze, nicht darunter – und `cpuTimeMs` der Telemetr
 eine 10 kann also auch 10,9 sein. Die Spanne klang nach Einhaltung, weil die Verbesserung groß war.
 → Ein Messwert wird gegen die Grenze berichtet, nicht gegen den Vorher-Wert; was auf ihr liegt,
 heißt „an der Grenze" (CLAUDE.md, „Was die Laufzeit duldet, ist keine Einhaltung").
+
+---
+
+## Die Differenz ohne Gegenprobe
+
+**04.11.2026 (Nachtauswertung).** In den Nächten 01.–03.11. schrieb ich die Mehrzeilen der Stunde 06
+dem Auffrischen zu, rund 7 000–8 000 je Aufruf, und nannte sie ungeklärt. Die Nacht zum 31.10. hatte
+kein Auffrischen und las trotzdem 22 348 Zeilen mehr: Es war der Schritt Jahre. Ein Auffrisch-Aufruf
+liest rund 700–1 000 mehr. Die Vergleichsnacht lag die ganze Zeit in der Telemetry.
+→ Eine Differenz wird erst einem Schritt zugeschrieben, wenn eine Nacht ohne ihn sie widerlegen
+könnte und es nicht tut.
+
+**Am selben Tag – „sollten wir uns nicht von oben nach unten runter arbeiten?"** Die Reihenfolge
+„Häufigkeit mal Überschreitung" setzte den Sync nach vorn; die Spielzeit lag mit 14 von 14 Aufrufen
+über 15 ms davor, und erst die Nachfrage brachte die Rechnung je Aufruf. Danach ergab die Frage „warum
+so teuer?" den eigentlichen Hebel: 303 Zeilen je Nacht für einen gespielten Titel je Woche.
+→ Ein Budget je Aufruf wird am teuersten Aufruf abgearbeitet, und vor dem Bündeln steht die Frage, ob
+die Arbeit überhaupt nötig ist.
