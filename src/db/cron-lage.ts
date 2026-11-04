@@ -57,6 +57,8 @@ export type CronLage = {
 		heutige: SyncLauf[];
 		zugang: CredentialAnzeige;
 		naechsteListe: ZuFuellen | null;
+		/** Die hoechste Release-Id: Gab es Neues seit dem Volllauf? (Stufe 18o) */
+		neuestesRelease: number;
 	};
 	wartung?: {
 		erschienen: number;
@@ -114,6 +116,7 @@ export class CronLageRepository {
 					heutige: merke(this.q.sync.laeufeSeitBaustein(o.heute)),
 					zugang: merke(this.q.credentials.anzeigeBaustein()),
 					liste: merke(this.q.trophaeen.naechsteZumFuellenBaustein(1)),
+					neuestesRelease: merke(this.q.games.neuestesReleaseBaustein()),
 				}
 			: null;
 		const w = wartung
@@ -149,6 +152,7 @@ export class CronLageRepository {
 							heutige: wert<SyncLauf[]>(p.heutige),
 							zugang: wert<CredentialAnzeige>(p.zugang),
 							naechsteListe: wert<ZuFuellen[]>(p.liste)[0] ?? null,
+							neuestesRelease: wert<number>(p.neuestesRelease),
 						},
 					}
 				: {}),

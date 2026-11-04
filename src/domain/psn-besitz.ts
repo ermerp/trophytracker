@@ -68,3 +68,37 @@ export function spielzeitText(sekunden: number | null): string {
 	if (stunden < 10) return `${stunden.toFixed(1).replace(".", ",")} h`;
 	return `${Math.round(stunden)} h`;
 }
+
+/**
+ * Stimmt Sonys Reihenfolge noch? (Stufe 18o, 7.7)
+ *
+ * Die naechtliche Spitze verlaesst sich darauf, dass die Liste absteigend nach
+ * "zuletzt gespielt" kommt - das ist gemessen, nicht zugesagt, und die
+ * Anbindung ist inoffiziell. Titel ohne Datum zaehlen nicht mit: Es gibt sie
+ * (einen von 303 am 04.11.2026), und sie sagen nichts ueber die Reihenfolge.
+ */
+export function absteigendNachLetztemSpiel(titel: ReadonlyArray<{ lastPlayedDateTime?: string }>): boolean {
+	let vorher = Number.POSITIVE_INFINITY;
+	for (const t of titel) {
+		const zeit = t.lastPlayedDateTime ? Date.parse(t.lastPlayedDateTime) : Number.NaN;
+		if (Number.isNaN(zeit)) continue;
+		if (zeit > vorher) return false;
+		vorher = zeit;
+	}
+	return true;
+}
+
+/**
+ * Reicht die Spitze ueber diese Seite hinaus? (Stufe 18o)
+ *
+ * Ja, solange auch der aelteste Titel der Seite noch auf oder nach `bis`
+ * gespielt wurde - dann kann dahinter Neues liegen. Eine Seite ohne Datum
+ * reicht nicht weiter: Dort gibt es nichts, woran man das festmachen koennte.
+ */
+export function spitzeReichtWeiter(titel: ReadonlyArray<{ lastPlayedDateTime?: string }>, bis: string): boolean {
+	const zeiten = titel.flatMap((t) => {
+		const zeit = t.lastPlayedDateTime ? Date.parse(t.lastPlayedDateTime) : Number.NaN;
+		return Number.isNaN(zeit) ? [] : [zeit];
+	});
+	return zeiten.length > 0 && Math.min(...zeiten) >= Date.parse(bis);
+}

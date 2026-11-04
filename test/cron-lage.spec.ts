@@ -70,7 +70,7 @@ beforeEach(async () => {
 	await env.DB.batch([
 		env.DB.prepare("DELETE FROM game_event"),
 		env.DB.prepare(
-			"DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand')",
+			"DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_spielzeit_runde', 'psn_besitz_stand')",
 		),
 		env.DB.prepare("DELETE FROM app_setting WHERE key >= 'cron_begonnen' AND key < 'cron_begonnen;'"),
 		env.DB.prepare("DELETE FROM psn_raw_response"),
@@ -240,7 +240,7 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 	const lage = (psn: Partial<NonNullable<CronLage["psn"]>> = {}, einstellungen: Record<string, string> = {}): CronLage => ({
 		verlauf: [],
 		einstellungen: new Map(Object.entries(einstellungen)),
-		psn: { abgebrochen: 0, laufend: null, heutige: [lauf], zugang, naechsteListe: null, ...psn },
+		psn: { abgebrochen: 0, laufend: null, heutige: [lauf], zugang, naechsteListe: null, neuestesRelease: 0, ...psn },
 	});
 	const k = { heute: HEUTE, igdbKonfiguriert: true };
 	const fertig = {

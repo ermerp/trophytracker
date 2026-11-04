@@ -12,7 +12,7 @@ import { zaehlendeDb } from "./d1-zaehler";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
 import { AUFFRISCHEN_JE_AUFRUF, igdbAuffrischSchritt } from "../src/sync/igdb";
 import { fakeFetch, jsonAntwort } from "./psn-fake";
-import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt } from "../src/sync/besitz";
+import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt, SPITZE_JE_SEITE } from "../src/sync/besitz";
 import { MARKT_JE_POST } from "../src/sync/markt";
 import { STORE_JE_POST } from "../src/sync/store";
 
@@ -374,6 +374,34 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(wieder.gelesen).toBeLessThan(1_500);
 
 		await env.DB.prepare("DELETE FROM psn_played_title").run();
+	});
+
+	it("misst die naechtliche Spitze als Schritt (Stufe 18o)", async () => {
+		const titel = Array.from({ length: SPITZE_JE_SEITE }, (_, k) => ({
+			titleId: `CUSA${String(k + 1).padStart(5, "0")}_00`,
+			name: `Spiel ${String(k + 1).padStart(4, "0")}`,
+			category: "ps4_game",
+			playDuration: "PT3H",
+			playCount: 1,
+			lastPlayedDateTime: new Date(Date.parse("2026-11-03T22:00:00Z") - k * 86_400_000).toISOString(),
+		}));
+		const psn = erstellePsnClient(
+			fakeFetch([[/gamelist\/v2/, () => jsonAntwort({ totalItemCount: 379, titles: titel })]]).fetch,
+		);
+		const zaehler = zaehlendeDb(env.DB);
+		const repos = createRepositories(zaehler.db, env.NPSSO_KEY);
+		const e = await spielzeitSchritt(repos, psn, new Geheimnis("access-token-test"), 0, {
+			spitzeBis: "2026-11-02T00:00:00Z",
+			abschluss: () => [repos.sync.fortschrittAnweisung("psn_spielzeit_stand", "2026-11-04:-1"), repos.credentials.fehlerStatusLoeschenAnweisung()],
+		});
+		await env.DB.prepare("DELETE FROM app_setting WHERE key = 'psn_spielzeit_stand'").run();
+		console.info({ spielzeitSpitze: { aufrufe: zaehler.aufrufe(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() } });
+
+		expect(e).toMatchObject({ status: "erfolg", geholt: SPITZE_JE_SEITE, geschrieben: SPITZE_JE_SEITE, weiter: false });
+		// Ein Lese- und ein Schreib-Batch, der Stand steckt im zweiten.
+		expect(zaehler.aufrufe()).toBe(2);
+		expect(zaehler.gelesen()).toBeLessThan(200);
+		expect(zaehler.geschrieben()).toBeLessThan(120);
 	});
 
 	it("misst eine ganze Kaufliste-Seite als Schritt (Stufe 18k-b)", async () => {
@@ -1698,7 +1726,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("DELETE FROM psn_raw_response"),
 			env.DB.prepare("DELETE FROM psn_sync_run"),
 			env.DB.prepare(
-				"DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_besitz_stand')",
+				"DELETE FROM app_setting WHERE key IN ('cron_verlauf', 'cron_stand', 'trophaeen_jahre', 'trophaeen_level', 'psn_spielzeit_stand', 'psn_spielzeit_runde', 'psn_besitz_stand')",
 			),
 			env.DB.prepare("DELETE FROM app_setting WHERE key >= 'cron_begonnen' AND key < 'cron_begonnen;'"),
 			env.DB.prepare("DELETE FROM psn_credentials"),
