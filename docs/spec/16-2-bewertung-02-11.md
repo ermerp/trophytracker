@@ -86,4 +86,4 @@ Worker mit 321 ms.
 bündeln. Reihenfolge nach Häufigkeit mal Überschreitung: **Sync** (11 Aufrufe jede Nacht, Median 12–15),
 dann Spielzeit (2, 20–34), dann Kaufliste (15 einmal je Woche, Median 13). **Das Auffrischen bleibt, wie
 es ist** (Entscheidung vom 03.11.2026): 8–10 ms nach 18n-c; erst bei einem Abbruch oder einem Wert über
-15 ms wird es wieder angesehen.
+15 ms wird es wieder angesehen. **Am 04.11. stand ein Aufruf bei 22 ms** (LAX, 28 Spiele, n = 1, [16-2-naechte-2.md](16-2-naechte-2.md)).

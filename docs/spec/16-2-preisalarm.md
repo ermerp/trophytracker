@@ -5,7 +5,8 @@
 **Gebaut am 30.10.2026** auf `stufe-20g-preisalarm`, vorgezogen vor Index-Nachtrag, 18m-b und die
 Neubewertung (Entscheidung des Nutzers vom 30.10.2026). **Deployt am 03.11.2026** nach der
 Nachtauswertung ([16-2-offene-stufen.md](16-2-offene-stufen.md)); der erste Abendlauf, der Meldungen schreiben
-kann, ist der des 03.11.
+kann, ist der des 03.11.: alle Läufe grün, 87 Portionen, Median 3 ms, höchstens 18, eine Meldung
+([16-2-naechte-2.md](16-2-naechte-2.md)).
 
 Die Glocke in der Kopfzeile meldet einen Preis, der zu einer offenen Absicht passt.
 
@@ -119,7 +120,5 @@ gerade gilt.
   möglicher Nachtrag, messbar ab dem 03.11.2026. Der Median über `price_snapshot` ist **nicht** der
   Median des Preises – geschrieben wird nur bei Änderung, Tage mit Bewegung wiegen schwerer. Richtig
   gerechnet braucht es eine Treppenfunktion oder eine bewusst in Kauf genommene Verzerrung.
-- **CPU der Portionsrouten** nach dem Deploy an der Telemetry messen; ob die Action mit 87 Portionen
-  grün bleibt.
 - **Die Logzeile der Markt- und Store-Action nennt die Preisalarme noch nicht** – die Routen liefern
   `preisalarme` mit, `scripts/markt-action.ts` und `store-action.ts` geben es nicht aus.
