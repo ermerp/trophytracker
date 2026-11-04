@@ -2,7 +2,7 @@
 
 ## 16. Umsetzungsreihenfolge – die offenen Teile von Stufe 20
 
-Drei Teile standen offen: 20h und 20f sind abgenommen, 20g ist gebaut. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
+Drei Teile standen offen: 20h und 20f sind abgenommen, 20g ist deployt. Ihre Entscheidungen sind am **09.10.2026** getroffen, auf der
 Messung von sechs vollständigen Tagen im täglichen Takt; was trotzdem offen bleibt, steht
 unten ausdrücklich als offen.
 
@@ -107,6 +107,10 @@ Steht in [16-2-preisalarm.md](16-2-preisalarm.md): Kanal, Auslöser, Schreibweg,
 offen bleibt.
 
 #### Offen, bevor der grosse Wunschlisten-Import kommt
+
+**Die Zahlen dieses Abschnitts stammen von vor 20i:** Der Markt läuft seit dem 20.10.2026 als
+Action und belegt keine Wartungsaufrufe mehr; am 04.11. waren es 431 Releases in 87 Portionen und
+529 s. Die Decke ist für den neuen Weg nicht gemessen. Vor dem Import neu zu messen.
 
 **Die Fensterkapazität entscheidet, ob der tägliche Takt überlebt** – und damit, ob 20f
 weiter Punkte bekommt und 20g weiter melden kann. Gemessen am 09.10.2026: Der
