@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 154 | 04.11.2026 | **Nachtrag: Auffrischen abwarten.** Die 22 ms vom 04.11. ändern vorerst nichts, entschieden wird nach dem nächsten Stau ab dem 08.11. (16.2) |
 | 153 | 04.11.2026 | **Stufe 18o: Spielzeit von der Spitze.** Nachts die 25 zuletzt gespielten Titel statt aller 303; Volllauf nur bei neuem Release, abweichender Sortierung oder nach 30 Tagen; Stand und Fehlerstatus im Schreib-Batch der Seite (6 statt 8 D1-Aufrufe); Reihenfolge der Optimierung jetzt vom teuersten Aufruf abwärts; Rückgängig für den Preisalarm-Haken vorgemerkt (7.7, 10.1, 16.2) |
 | 152 | 04.11.2026 | **Nachtrag: Nacht zum 04.11., erster Abendlauf mit 20g.** Alle 72 Cron-Aufrufe `ok`, Sync `erfolg`, Zugang lebt; alle vier Abendläufe grün, Verspätung 3 h 56 bis 4 h 19; Markt 87 Portionen (Route Median 3, höchstens 18 ms), 1 Preisalarm; Auffrischen 22 ms (LAX, 28 Spiele, n = 1), über der Marke von 15 ms; korrigiert: Die Mehrzeilen der Stunde 06 sind vor allem Jahre, ein Auffrisch-Aufruf liest rund 700–1 000 statt 7 000–8 000 mehr; `rows_read_24h` 262 793; neue Datei `16-2-naechte-2.md` (16.2) |
 | 151 | 03.11.2026 | **Nachtrag: Abschluss der Sitzung.** Verspätung der Abendläufe vom 02.11. (bis 6 h, erstmals im PSN-Fenster) bei der Kapazitätsfrage für „Nachtläufe bis 05:00" eingetragen; Lehre zum Messwert auf der Grenze; Trenner in `lehren.md` nach dem 20g-Merge repariert (16.2) |
