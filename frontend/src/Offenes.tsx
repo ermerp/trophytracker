@@ -39,16 +39,16 @@ export type OffeneDaten = {
 	rot: Posten[]
 	kenntnis: Posten[]
 	posten: Posten[]
+	/** Die offenen Meldungen – nur sie zählen an der Glocke. */
 	preise: Preisalarm[]
-	/** Quittieren über den Haken (Stufe 20g); die Zeile verschwindet sofort. */
+	/** Wie geladen: Eine quittierte Zeile behält ihren Platz, bis die Seite neu lädt. */
+	alarmzeilen: Preisalarm[]
+	/** Quittieren über den Haken (Stufe 20g); die Zeile wird kleiner, bleibt aber stehen. */
 	quittieren: (id: number) => void
-	/** Eben Quittiertes, solange die Seite steht – je Zeile ein „Rückgängig". */
-	gesehen: Gesehen[]
+	/** Eben Quittiertes je Id, mit dem Grund, falls die Rücknahme scheiterte. */
+	gesehen: Map<number, string | null>
 	zuruecknehmen: (id: number) => void
 }
-
-/** Eine eben quittierte Meldung; `fehler` sagt, warum sie nicht zurückkam. */
-export type Gesehen = { alarm: Preisalarm; fehler?: string }
 
 /** Eine Betriebswarnung, wie der Server sie urteilt (src/domain/betrieb.ts). */
 export type Betriebswarnung = {
@@ -101,8 +101,8 @@ export function useOffenePosten(): OffeneDaten {
 	const [kandidaten, setKandidaten] = useState(0)
 	const [storeOffen, setStoreOffen] = useState(0)
 	const [betrieb, setBetrieb] = useState<Betriebswarnung[]>([])
-	const [preise, setPreise] = useState<Preisalarm[]>([])
-	const [gesehen, setGesehen] = useState<Gesehen[]>([])
+	const [alarmzeilen, setAlarmzeilen] = useState<Preisalarm[]>([])
+	const [gesehen, setGesehen] = useState<Map<number, string | null>>(new Map())
 
 	useEffect(() => {
 		// Fehler bleiben hier still: Ein Posten, der sich nicht laden lässt,
@@ -117,7 +117,7 @@ export function useOffenePosten(): OffeneDaten {
 			.catch(() => {})
 		anfrage<IgdbStatus>('/api/igdb/status').then(setIgdb).catch(() => {})
 		anfrage<{ alarme: Preisalarm[] }>('/api/preisalarme')
-			.then((a) => setPreise(a.alarme))
+			.then((a) => setAlarmzeilen(a.alarme))
 			.catch(() => {})
 		anfrage<{ eintraege: unknown[] }>('/api/sync/store/offen')
 			.then((a) => setStoreOffen(a.eintraege.length))
@@ -253,29 +253,30 @@ export function useOffenePosten(): OffeneDaten {
 		})
 	}
 
-	// Die Zeile geht sofort weg; scheitert die Anfrage, kommt sie mit dem
+	// Die Zeile wechselt sofort; scheitert die Anfrage, kommt sie mit dem
 	// nächsten Laden zurück - es geht nichts verloren, was der Server hält.
 	const quittieren = (id: number) => {
-		const alarm = preise.find((a) => a.id === id)
-		if (alarm) setGesehen((g) => [{ alarm }, ...g])
-		setPreise((p) => p.filter((a) => a.id !== id))
+		setGesehen((g) => new Map(g).set(id, null))
 		anfrage(`/api/preisalarme/${id}/quittieren`, { methode: 'POST' }).catch(() => {})
 	}
 
 	const zuruecknehmen = (id: number) => {
 		anfrage(`/api/preisalarme/${id}/zuruecknehmen`, { methode: 'POST' })
-			.then(() => {
-				const eintrag = gesehen.find((g) => g.alarm.id === id)
-				if (eintrag) setPreise((p) => [eintrag.alarm, ...p])
-				setGesehen((g) => g.filter((e) => e.alarm.id !== id))
-			})
+			.then(() =>
+				setGesehen((g) => {
+					const neu = new Map(g)
+					neu.delete(id)
+					return neu
+				}),
+			)
 			.catch((f: unknown) => {
 				const fehler = f instanceof Error ? f.message : 'Rückgängig fehlgeschlagen.'
-				setGesehen((g) => g.map((e) => (e.alarm.id === id ? { ...e, fehler } : e)))
+				setGesehen((g) => new Map(g).set(id, fehler))
 			})
 	}
 
-	return { rot, kenntnis, posten, preise, quittieren, gesehen, zuruecknehmen }
+	const preise = alarmzeilen.filter((a) => !gesehen.has(a.id))
+	return { rot, kenntnis, posten, preise, alarmzeilen, quittieren, gesehen, zuruecknehmen }
 }
 
 /**
@@ -369,7 +370,7 @@ export function Warnblock({ rot }: { rot: Posten[] }) {
  * ist. Der Preisalarm aus 20g steht als eigene Gruppe zwischen Warnungen und
  * Posten, in seinem eigenen Ton (16.2).
  */
-export function Tafel({ rot, kenntnis, posten, preise, quittieren, gesehen, zuruecknehmen }: OffeneDaten) {
+export function Tafel({ rot, kenntnis, posten, alarmzeilen, quittieren, gesehen, zuruecknehmen }: OffeneDaten) {
 	return (
 		<div className="tafel glockentafel" role="region" aria-label="Offene Posten">
 			{rot.length > 0 && (
@@ -382,41 +383,47 @@ export function Tafel({ rot, kenntnis, posten, preise, quittieren, gesehen, zuru
 					</ul>
 				</>
 			)}
-			{preise.length + gesehen.length > 0 && (
+			{alarmzeilen.length > 0 && (
 				<>
 					<div className="tafelname preisalarm">Preise</div>
 					{/* Der Titel führt ins Spieldetail, ohne zu quittieren; quittiert
-					    wird nur über den Haken (Entscheidung vom 30.10.2026). */}
+					    wird nur über den Haken (Entscheidung vom 30.10.2026). Eine
+					    quittierte Zeile bleibt an ihrem Platz, kleiner und weiter als
+					    Link (06.11.2026). */}
 					<ul className="preisalarmliste">
-						{preise.map((a) => (
-							<li key={a.id}>
-								<div className="preisalarmtext">
-									<Link to={`/spiel/${a.gameId}`}>{a.titel}</Link> <PlattformChip plattform={a.plattform} />
-									<div className="ruhig klein">{preisalarmText(a)}</div>
-								</div>
-								<button
-									type="button"
-									className="ikone"
-									aria-label={`Preisalarm zu ${a.titel} gesehen`}
-									title="Gesehen"
-									onClick={() => quittieren(a.id)}
-								>
-									<Zeichen name="haken" />
-								</button>
-							</li>
-						))}
-						{gesehen.map(({ alarm, fehler }) => (
-							<li key={`gesehen-${alarm.id}`}>
-								<div className="preisalarmtext ruhig klein" role="status">
-									„{alarm.titel}" gesehen.{' '}
-									{fehler ?? (
-										<button type="button" className="klein" onClick={() => zuruecknehmen(alarm.id)}>
+						{alarmzeilen.map((a) =>
+							gesehen.has(a.id) ? (
+								<li key={a.id}>
+									<div className="preisalarmtext klein">
+										<Link to={`/spiel/${a.gameId}`}>{a.titel}</Link>{' '}
+										<span className="ruhig" role="status">
+											{gesehen.get(a.id) ?? 'gesehen'}
+										</span>
+									</div>
+									{!gesehen.get(a.id) && (
+										<button type="button" className="klein" onClick={() => zuruecknehmen(a.id)}>
 											Rückgängig
 										</button>
 									)}
-								</div>
-							</li>
-						))}
+								</li>
+							) : (
+								<li key={a.id}>
+									<div className="preisalarmtext">
+										<Link to={`/spiel/${a.gameId}`}>{a.titel}</Link> <PlattformChip plattform={a.plattform} />
+										<div className="ruhig klein">{preisalarmText(a)}</div>
+									</div>
+									<button
+										type="button"
+										className="ikone"
+										aria-label={`Preisalarm zu ${a.titel} gesehen`}
+										title="Gesehen"
+										onClick={() => quittieren(a.id)}
+									>
+										<Zeichen name="haken" />
+									</button>
+								</li>
+							),
+						)}
 					</ul>
 				</>
 			)}
