@@ -78,8 +78,10 @@ export class PreisalarmRepository {
 				.bind(...ids),
 			this.db
 				.prepare(
-					"SELECT id, release_id, kanal, art, preis_cents, vorher_cents FROM preis_alarm " +
-						`WHERE release_id IN (${p}) AND quittiert_am IS NULL AND entfallen_am IS NULL`,
+					"SELECT a.id, a.release_id, a.kanal, a.art, a.preis_cents, a.vorher_cents, a.ebay_item_id, " +
+						"a.quittiert_am IS NOT NULL AS quittiert, a.entfallen_am IS NOT NULL AS entfallen, " +
+						"EXISTS (SELECT 1 FROM market_offer_verworfen v WHERE v.release_id = a.release_id AND v.ebay_item_id = a.ebay_item_id) AS verworfen " +
+						`FROM preis_alarm a WHERE a.release_id IN (${p}) ORDER BY a.id`,
 				)
 				.bind(...ids),
 			this.db
@@ -124,9 +126,19 @@ export class PreisalarmRepository {
 					art: AlarmArt;
 					preis_cents: number;
 					vorher_cents: number;
+					ebay_item_id: string | null;
+					quittiert: number;
+					entfallen: number;
+					verworfen: number;
 				}>) {
 					const l = lage.get(z.release_id);
-					if (l) l.offen[z.kanal] = { id: z.id, art: z.art, preisCents: z.preis_cents, vorherCents: z.vorher_cents };
+					if (!l) continue;
+					// Nach Id geordnet: Die juengste Meldung des Kanals gewinnt. Ist
+					// sie quittiert oder verworfen, kommt der alte Preis nicht wieder.
+					const meldung = { id: z.id, art: z.art, preisCents: z.preis_cents, vorherCents: z.vorher_cents };
+					const zurueck = z.entfallen === 1 && z.quittiert === 0 && z.verworfen === 0;
+					(l.entfallen ??= {})[z.kanal] = zurueck ? meldung : undefined;
+					if (z.entfallen === 0 && z.quittiert === 0) l.offen[z.kanal] = { ...meldung, ebayItemId: z.ebay_item_id };
 				}
 				for (const z of (punkte?.results ?? []) as Array<{
 					release_id: number;

@@ -105,18 +105,43 @@ describe("alarmPruefen - eine offene Meldung folgt dem Preis (06.11.2026)", () =
 	// Die Lage NACH der Meldung: Der gemeldete Preis steht schon in der Reihe.
 	const tief = {
 		punkte: { markt: reihe([40, 1000], [20, 1000], [1, 800]) },
-		offen: { gebraucht: { id: 3, art: "tief" as const, preisCents: 800, vorherCents: 1000 } },
+		offen: { gebraucht: { id: 3, art: "tief" as const, preisCents: 800, vorherCents: 1000, ebayItemId: "neu" } },
 	};
 	const grenze = {
 		grenzeCents: 1500,
 		grenzeAm: "2026-10-01 10:00:00",
 		letzteGrenzeAm: "2026-10-30 10:00:00",
 		punkte: { markt: reihe([40, 2000], [1, 1200]) },
-		offen: { gebraucht: { id: 4, art: "grenze" as const, preisCents: 1200, vorherCents: 1500 } },
+		offen: { gebraucht: { id: 4, art: "grenze" as const, preisCents: 1200, vorherCents: 1500, ebayItemId: "neu" } },
 	};
 
 	it("ein gleicher Preis aendert nichts", () => {
 		expect(alarmPruefen(lage(tief), "gebraucht", markt(800), JETZT)).toBeNull();
+	});
+
+	it("gleicher Preis, anderes Angebot: Die Meldung bleibt und zeigt auf das Angebot, das noch da ist", () => {
+		expect(alarmPruefen(lage(tief), "gebraucht", [{ reihe: "markt", preisCents: 800, ebayItemId: "b" }], JETZT)).toMatchObject({
+			art: "tief",
+			preisCents: 800,
+			vorherCents: 1000,
+			ebayItemId: "b",
+			ersetzt: 3,
+		});
+	});
+
+	it("kommt der entfallene Preis wieder, meldet er neu - auch ohne eigenen Ausloeser", () => {
+		const wieder = { punkte: tief.punkte, entfallen: { gebraucht: { id: 3, art: "tief" as const, preisCents: 800, vorherCents: 1000 } } };
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(800), JETZT)).toMatchObject({ art: "tief", preisCents: 800, vorherCents: 1000, ersetzt: null });
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(790), JETZT)).toMatchObject({ preisCents: 790, ersetzt: null });
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(801), JETZT)).toBeNull();
+	});
+
+	it("eine entfallene Grenz-Meldung kommt wieder, sobald der Preis unter der Grenze liegt", () => {
+		const { offen: _, ...ohne } = grenze;
+		const wieder = { ...ohne, entfallen: { gebraucht: { id: 4, art: "grenze" as const, preisCents: 1200, vorherCents: 1500 } } };
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(1400), JETZT)).toMatchObject({ art: "grenze", preisCents: 1400, vorherCents: 1500, ersetzt: null });
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(1500), JETZT)).toBeNull();
+		expect(alarmPruefen(lage({ ...wieder, grenzeCents: null }), "gebraucht", markt(1400), JETZT)).toBeNull();
 	});
 
 	it("ein tieferer Preis ersetzt sie auch dann, wenn er selbst nicht ausgeloest haette", () => {

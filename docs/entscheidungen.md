@@ -352,4 +352,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 04.11.2026 | **Der Haken am Preisalarm soll zurücknehmbar werden, aber nicht jetzt** | [16.2](spec/16-2-preisalarm.md) |
 | 04.11.2026 | **Die 22 ms beim IGDB-Auffrischen ändern vorerst nichts**: Entschieden wird nach dem nächsten Stau ab dem 08.11., an mehreren Aufrufen und Standorten | [16.2](spec/16-2-bewertung-02-11.md) |
 | 06.11.2026 | **Am Cron wird frühestens nach der Auswertung der Nacht zum 08.11. etwas geändert**, und der Sync-Plan wartet bis dahin | [16.2](spec/16-2-naechte-2.md) |
-| 06.11.2026 | **Ein Preisalarm entfällt automatisch, wenn der Preis weg ist** („wenn weg, dann weg") | [16.2](spec/16-2-preisalarm.md) |
+| 06.11.2026 | **Ein Preisalarm entfällt automatisch, wenn der Preis weg ist** („wenn weg, dann weg"), eine Grenz-Meldung erst über der Grenze; **kommt der Preis wieder, meldet er neu**. Die relative Regel wird im Dezember neu gemessen | [16.2](spec/16-2-preisalarm.md) |

@@ -23,7 +23,9 @@
  * dem Preis des Kanals: Jeder tiefere ersetzt sie, und ist der gemeldete Preis
  * weg, entfaellt sie (Entscheidung vom 06.11.2026, "wenn weg, dann weg") -
  * ausser bei einer Grenz-Meldung, solange der Preis weiter unter der Grenze
- * liegt: Dann stimmt sie noch und zeigt den neuen Preis.
+ * liegt: Dann stimmt sie noch und zeigt den neuen Preis. Kommt der Preis nach
+ * dem Entfallen wieder, meldet er neu (Entscheidung vom 06.11.2026) - das
+ * Allzeittief saehe ihn sonst nie: Sein Punkt steht schon in der Reihe.
  */
 
 export type AlarmKanal = "gebraucht" | "store";
@@ -51,6 +53,9 @@ export function alarmKanal(disc: string, kaufVerworfen: boolean, hatGebrauchtrei
 /** Ein Punkt einer Reihe, wie er VOR dem Schreiben des neuen Preises besteht. */
 export type Punkt = { preisCents: number; am: string };
 
+/** Eine Meldung, wie sie in der Lage steht. */
+export type OffeneMeldung = { id: number; art: AlarmArt; preisCents: number; vorherCents: number; ebayItemId: string | null };
+
 /** Was ueber ein Release vor dem Schreiben bekannt ist. */
 export type AlarmLage = {
 	releaseId: number;
@@ -62,7 +67,12 @@ export type AlarmLage = {
 	/** Bisherige Punkte je Reihe, verworfene Angebote schon herausgenommen. */
 	punkte: Partial<Record<AlarmReihe, Punkt[]>>;
 	/** Die offene Meldung dieses Kanals, falls es eine gibt. */
-	offen: Partial<Record<AlarmKanal, { id: number; art: AlarmArt; preisCents: number; vorherCents: number }>>;
+	offen: Partial<Record<AlarmKanal, OffeneMeldung>>;
+	/**
+	 * Die juengste Meldung je Kanal, wenn sie entfallen ist, weil ihr Preis weg
+	 * war - nicht quittiert und nicht verworfen. Kommt der Preis wieder, gilt sie.
+	 */
+	entfallen?: Partial<Record<AlarmKanal, Omit<OffeneMeldung, "ebayItemId">>>;
 	/** Wann zuletzt eine Grenz-Meldung entstand (gleich welcher Zustand), oder null. */
 	letzteGrenzeAm: string | null;
 };
@@ -168,11 +178,7 @@ export function alarmPruefen(
 					b.preisCents < a.preisCents || (b.preisCents === a.preisCents && b.art === "tief" && a.art !== "tief") ? b : a,
 				);
 
-	if (!offen) return wahl ? { ...wahl, releaseId: lage.releaseId, kanal, ersetzt: null } : null;
-
-	// Hoechstens eine offene Meldung, und sie folgt dem Preis.
-	if (aktuell.preisCents === offen.preisCents) return null;
-	const folgen = (art: AlarmArt, vorherCents: number): AlarmSchreiben => ({
+	const aufAktuell = (art: AlarmArt, vorherCents: number, ersetzt: number | null): AlarmSchreiben => ({
 		art,
 		reihe: aktuell.reihe,
 		preisCents: aktuell.preisCents,
@@ -180,8 +186,25 @@ export function alarmPruefen(
 		ebayItemId: aktuell.ebayItemId,
 		releaseId: lage.releaseId,
 		kanal,
-		ersetzt: offen.id,
+		ersetzt,
 	});
+
+	if (!offen) {
+		if (wahl) return { ...wahl, releaseId: lage.releaseId, kanal, ersetzt: null };
+		// Der entfallene Preis ist wieder da.
+		const alt = lage.entfallen?.[kanal];
+		if (!alt) return null;
+		const wieder = alt.art === "grenze" ? grenze !== null && aktuell.preisCents < grenze : aktuell.preisCents <= alt.preisCents;
+		return wieder ? aufAktuell(alt.art, alt.art === "grenze" ? grenze! : alt.vorherCents, null) : null;
+	}
+
+	// Hoechstens eine offene Meldung, und sie folgt dem Preis.
+	const folgen = (art: AlarmArt, vorherCents: number) => aufAktuell(art, vorherCents, offen.id);
+	if (aktuell.preisCents === offen.preisCents) {
+		// Gleicher Preis, anderes Angebot: Das Verwerfen (20h) trifft die Meldung
+		// ueber die Angebots-Id, sie muss also die des Angebots sein, das noch da ist.
+		return aktuell.ebayItemId === offen.ebayItemId ? null : folgen(offen.art, offen.vorherCents);
+	}
 	if (aktuell.preisCents < offen.preisCents) {
 		// Ob der neue Preis selbst ausgeloest haette, spielt keine Rolle: Auch
 		// fuenf Prozent tiefer ist der bessere Preis.

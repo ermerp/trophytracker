@@ -99,10 +99,16 @@ tiefsten Preis des Kanals** (Entscheidung vom 06.11.2026, „wenn weg, dann weg"
 - **Ausnahme Grenze:** Liegt der Preis noch unter der Grenze, bleibt die Grenz-Meldung und zeigt den
   neuen Preis. Sie stimmt weiter, und entfiele sie, käme keine neue: Die Grenze wird erst über ihr
   wieder scharf.
-- **Das Entfallen kennt keine Karenz:** Ein Angebot, das eBay an einem Abend nicht liefert, nimmt die
-  Meldung mit, und ein Rückgängig gibt es dafür nicht. Kehrt es zurück, meldet ein Allzeittief nicht
-  neu – sein Punkt steht schon in der Reihe. Die Meldungen von vor dem 06.11. folgen ab dem ersten
-  Abendlauf danach; dafür gibt es nichts zurückzunehmen.
+- **Gleicher Preis, anderes Angebot:** Die Meldung bleibt und bekommt die Angebots-Id, denn das
+  Verwerfen (20h) trifft sie darüber.
+- **Kommt der Preis wieder, meldet er neu** (Entscheidung vom 06.11.2026): Das Entfallen hat keine
+  Karenz, ein Angebot, das eBay einen Abend nicht liefert, nimmt die Meldung mit. Sieht ein späterer
+  Lauf denselben oder einen tieferen Preis – eine Grenz-Meldung: wieder unter der Grenze –, entsteht
+  eine neue mit Art und Vergleichswert der alten; der Auslöser allein sähe das nie, der Punkt steht
+  schon in der Reihe. **Nicht** nach einem Haken und **nicht** nach dem Verwerfen: Maßgeblich ist die
+  jüngste Meldung des Kanals, ist sie quittiert oder ihr Angebot gesperrt, gibt es kein Wiederkommen; ein anderes Angebot zum selben Preis ist nach dem Verwerfen trotzdem ein neues Tief, weil das verworfene nicht zur Reihe zählt. Ein Angebot,
+  das jeden zweiten Abend fehlt, meldet deshalb jedes Mal neu; die Meldungen von vor dem 06.11. folgen
+  ab dem ersten Abendlauf danach.
 
 - **Quittiert wird über den Haken** (Entscheidung vom 30.10.2026). Der Titel führt ins Spieldetail,
   ohne zu quittieren.

@@ -894,7 +894,6 @@ Code prüfte das erst, nachdem der neue Preis selbst ausgelöst hätte: mindeste
 eine Grenz-Meldung gar nicht mehr, solange der Preis unter der Grenze blieb. Der Test fiel von 850 auf 700
 und traf genau den Fall, der ohnehin auslöst. Aufgefallen ist es nicht in einer Prüfung, sondern an der
 Frage des Nutzers, was die Glocke bei einem günstigeren Angebot zeigt; dieselbe Frage ergab, dass eine
-Meldung nach dem Verkauf des Angebots stehen blieb: Am 06.11. zeigte eine 6,50 €, gefunden wurden seit dem
-05.11. 6,99 €.
+Meldung nach dem Verkauf des Angebots mit dem alten Preis stehen blieb.
 → Ein Test zu einer Regel nimmt den Fall, in dem **nur** diese Regel greift, nicht einen, den eine andere
 schon erledigt.
