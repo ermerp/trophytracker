@@ -113,8 +113,8 @@ tiefsten Preis des Kanals** (Entscheidung vom 06.11.2026, „wenn weg, dann weg"
 - **Quittiert wird über den Haken** (Entscheidung vom 30.10.2026). Der Titel führt ins Spieldetail,
   ohne zu quittieren.
 - **Der Haken lässt sich zurücknehmen** (`POST /api/preisalarme/:id/zuruecknehmen`, gebaut am
-  06.11.2026) – an zwei Stellen. In der Tafel steht „… gesehen. Rückgängig", solange die Startseite
-  steht. **Im Spieldetail** steht unter dem Grenzfeld „Preisalarm … € gesehen · Rückgängig", **15 Tage**
+  06.11.2026) – an zwei Stellen. In der Tafel behält die Zeile ihren Platz, kleiner, der Titel bleibt
+  Link, dazu „gesehen" und „Rückgängig", solange die Startseite steht. **Im Spieldetail** steht unter dem Grenzfeld „Preisalarm … € gesehen · Rückgängig", **15 Tage**
   nach dem Haken (`GESEHEN_TAGE`), aus der Datenbank, also auch nach dem Neuladen; nur bei offener
   Absicht und nur, solange zu Release und Kanal keine neuere Meldung folgte. Die 15 Tage sind die
   Länge eines Store-Sales: 31 von 31 abgeschlossenen am 06.11.2026 lagen bei 14 oder 15 Tagen, alle
