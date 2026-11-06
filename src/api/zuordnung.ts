@@ -437,6 +437,7 @@ export const gameRoutes = new Hono<AppEnv>()
 		// Offene Absichten (Stufe 10): am Spiel oder an einem seiner Releases.
 		const plaene = await c.var.repos.plan.offeneFuerSpiel(id);
 
+		const gesehen = await c.var.repos.preisalarm.gesehen(detail.releases.map((r) => r.id));
 		return c.json({
 			id: detail.spiel.id,
 			titel: detail.spiel.title,
@@ -519,6 +520,8 @@ export const gameRoutes = new Hono<AppEnv>()
 									grenzeCents: r.preis_grenze_cents,
 									kanal,
 									aktuellCents: kanal === "gebraucht" ? r.gebraucht_tiefst_cents : r.store_price_cents,
+									// Der Haken, solange er sich zuruecknehmen laesst (06.11.2026).
+									gesehen: gesehen.get(r.id) ?? null,
 								};
 							})(),
 				trophaeen:

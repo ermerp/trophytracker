@@ -1,5 +1,5 @@
 import type { AlarmArt, AlarmAusgang, AlarmKanal, AlarmLage, AlarmReihe, Punkt } from "../domain/preisalarm";
-import { istEntfallen } from "../domain/preisalarm";
+import { GESEHEN_TAGE, istEntfallen } from "../domain/preisalarm";
 
 /**
  * Preisalarm (Stufe 20g): die Lage vor dem Schreiben, die Meldungen hinter
@@ -249,6 +249,26 @@ export class PreisalarmRepository {
 			.bind(id)
 			.run();
 		return (r.meta.changes ?? 0) > 0;
+	}
+
+	/**
+	 * Was das Spieldetail zum Zuruecknehmen anbietet: je Release die Meldung
+	 * mit dem Haken, wenn er juenger als GESEHEN_TAGE ist und zu Release und
+	 * Kanal keine neuere folgte - dann kann `zuruecknehmen` nicht scheitern.
+	 */
+	async gesehen(releaseIds: readonly number[]): Promise<Map<number, { id: number; preisCents: number }>> {
+		if (releaseIds.length === 0) return new Map();
+		const { results } = await this.db
+			.prepare(
+				"SELECT a.id, a.release_id, a.preis_cents FROM preis_alarm a " +
+					`WHERE a.release_id IN (${platzhalter(releaseIds.length)}) AND a.quittiert_am >= datetime('now', '-${GESEHEN_TAGE} days') ` +
+					"AND a.entfallen_am IS NULL " +
+					"AND NOT EXISTS (SELECT 1 FROM preis_alarm b WHERE b.release_id = a.release_id AND b.kanal = a.kanal AND b.id > a.id) " +
+					"ORDER BY a.id",
+			)
+			.bind(...releaseIds)
+			.all<{ id: number; release_id: number; preis_cents: number }>();
+		return new Map((results ?? []).map((z) => [z.release_id, { id: z.id, preisCents: z.preis_cents }]));
 	}
 
 	/**

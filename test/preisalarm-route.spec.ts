@@ -170,6 +170,37 @@ describe("Preisalarm in der Markt-Route", () => {
 		expect((await sende(`/api/preisalarme/${meldung!.id}/zuruecknehmen`, {})).status).toBe(409);
 	});
 
+	it("das Spieldetail bietet den Haken 15 Tage zum Zuruecknehmen an", async () => {
+		await release(1);
+		await punkte(1, "markt", [[40, 1000], [20, 1000]]);
+		await sende("/api/sync/markt/ergebnisse", { ergebnisse: [ergebnis(1, 850)] });
+		const gesehen = async () => {
+			const spiel = (await (await hole("/api/games/1")).json()) as { releases: Array<{ preisalarm: { gesehen: unknown } }> };
+			return spiel.releases[0]!.preisalarm.gesehen;
+		};
+		expect(await gesehen()).toBeNull(); // offen, noch kein Haken
+		const { alarme: [meldung] } = (await (await hole("/api/preisalarme")).json()) as { alarme: Array<{ id: number }> };
+		await sende(`/api/preisalarme/${meldung!.id}/quittieren`, {});
+		expect(await gesehen()).toEqual({ id: meldung!.id, preisCents: 850 });
+
+		await env.DB.prepare("UPDATE preis_alarm SET quittiert_am = ?").bind(vor(14)).run();
+		expect(await gesehen()).toEqual({ id: meldung!.id, preisCents: 850 });
+		await env.DB.prepare("UPDATE preis_alarm SET quittiert_am = ?").bind(vor(16)).run();
+		expect(await gesehen()).toBeNull();
+	});
+
+	it("eine neuere Meldung nimmt dem Haken das Angebot im Spieldetail", async () => {
+		await release(1);
+		const r = repos();
+		const neu = { releaseId: 1, kanal: "gebraucht" as const, art: "tief" as const, reihe: "markt" as const, preisCents: 800, vorherCents: 1000, ebayItemId: null, ersetzt: null };
+		await r.preisalarm.schreibAnweisung(neu).run();
+		const { results } = await env.DB.prepare("SELECT id FROM preis_alarm").all<{ id: number }>();
+		await r.preisalarm.quittieren(results[0]!.id);
+		expect((await r.preisalarm.gesehen([1])).size).toBe(1);
+		await r.preisalarm.schreibAnweisung({ ...neu, preisCents: 700 }).run();
+		expect((await r.preisalarm.gesehen([1])).size).toBe(0);
+	});
+
 	it("eine neuere offene Meldung sperrt das Zuruecknehmen, statt am Index zu scheitern", async () => {
 		await release(1);
 		const r = repos();
@@ -399,7 +430,7 @@ describe("Spieldetail: Grenze und Kanal", () => {
 		await sende("/api/releases/1", { preisGrenzeCents: 1500 }, env.DB, "PATCH");
 		const d = (await (await hole("/api/games/1")).json()) as { releases: Array<{ id: number; preisalarm: unknown }> };
 		const r = new Map(d.releases.map((x) => [x.id, x.preisalarm]));
-		expect(r.get(1)).toEqual({ grenzeCents: 1500, kanal: "store", aktuellCents: null });
+		expect(r.get(1)).toEqual({ grenzeCents: 1500, kanal: "store", aktuellCents: null, gesehen: null });
 		expect(r.get(2)).toBeNull();
 
 		// Sobald eine Gebrauchtreihe besteht, gilt der Gebrauchtzweig.
