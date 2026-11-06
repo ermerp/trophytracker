@@ -897,3 +897,17 @@ Frage des Nutzers, was die Glocke bei einem günstigeren Angebot zeigt; dieselbe
 Meldung nach dem Verkauf des Angebots mit dem alten Preis stehen blieb.
 → Ein Test zu einer Regel nimmt den Fall, in dem **nur** diese Regel greift, nicht einen, den eine andere
 schon erledigt.
+
+---
+
+## Die Unabhängigkeit, die nur behauptet war
+
+**06.11.2026.** Für den Cron wurde die Nacht zum 07.11. abgewartet, weil eine Änderung die Spitze stören
+könnte; die Nacht zum 08.11. sollte dagegen frei sein, weil der Sync vom Auffrischen unabhängig sei. Die
+Spielzeit läuft aber direkt hinter dem Sync. Erst die Nachfrage des Nutzers legte offen, dass dieselbe
+Begründung zweimal entgegengesetzt verwendet wurde.
+→ Ob zwei Schritte sich stören, wird an der Kette im Fenster geprüft, nicht am Namen des Schritts.
+
+**Am selben Tag – „Rückgängig":** Die zurückgeholte Zeile sprang an den Anfang der Liste, statt an ihren
+Platz. Das verletzte die bestehende Regel, dass ein Rückgängig den Stand vor der Aktion vollständig
+herstellt: Die Position gehört dazu.

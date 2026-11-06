@@ -8,7 +8,7 @@ unten ausdrücklich als offen.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 09.10.2026): **20h**, dann **20f**, dann
 **20g** – danach die finalen Stufen 1, 2, 4, 5. Stufe 3 (Refactoring) ist abgetragen.
-20h und 20f sind am 11.10.2026 abgenommen, 20g ist am 30.10.2026 gebaut; offen bleibt dort nur die relative Regel, messbar ab dem 03.11.2026.
+20h und 20f sind am 11.10.2026 abgenommen, 20g ist am 30.10.2026 gebaut; offen bleibt dort nur die relative Regel, neu zu messen ab Anfang Dezember 2026 ([16-2-preisalarm.md](16-2-preisalarm.md)).
 
 **Vor 20g eingeschoben** (16.10.2026): Stufe 18g und die Frage, ob der Free Tier die Automatik noch trägt ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), dazu die Betriebswarnungen (18m, gebaut am 18.10.2026).
 
