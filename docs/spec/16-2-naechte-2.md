@@ -73,3 +73,58 @@ Ein Auffrisch-Aufruf liest also rund **700–1 000** Zeilen über dem Leerlauf, 
 Zahl hatte Jahre mitgerechnet. Das ist aus Stundensummen hergeleitet, nicht je Aufruf gemessen, und liegt
 noch über den 450 für den Schreibschritt in `test/lesekosten.spec.ts`. Die Stunde 07 lag am 01.–03.11.
 mit 27 864 / 26 064 / 24 264 über dem Leerlauf von 23 940; warum, ist nicht geklärt.
+
+#### Nächte zum 05. und 06.11.2026 – Messtermin 18o
+
+Erste Nächte mit 18o ([7.7](07-7-psn-weitere-daten.md)). **Beide: alle 72 Cron-Aufrufe `ok`**, kein
+Abbruch (`workersInvocationsAdaptive` 71 und 72 `success`, 05.11. 08:25 ohne Standort), Warnungen nur
+`zugang_endet` (rot, erwartet). Sync `erfolg` um 03:50 (431 Titel), Zugang lebt, keine Kaufliste, kein
+Auffrischen. 24 und 21 Standorte.
+
+| Schritt | 05.11.: n, Median, min–max | 06.11.: n, Median, min–max |
+|---|---|---|
+| Sync | 11, 14, 10–34 (9 über 10, 5 über 15) | 11, 14, 8–28 (9 über 10, 5 über 15) |
+| Spielzeit | 2, 22,5, 22–23 (`frist`) | **1, 14** (`spitze`) |
+| Einzeltrophäen | – | 1, 19 (IAD, 78 Trophäen) |
+| Level | 1, 16 (LAX) | 1, 9 (AMS) |
+| Jahre | 1, 5 (CDG) | 1, 5 (MIA) |
+| PSN- / Wartungs-Leerlauf | 22 / 35, 5 / 5, 4–12 / 4–13 | 22 / 35, 6,5 / 6, 4–13 / 4–15 |
+
+**Spielzeit: 14 ms statt 22, aus zwei Aufrufen wird einer** – 25 Titel geholt, 21 geschrieben, FRA. Der
+Leerlauf in FRA lag in derselben Nacht bei 4, die Spitze kostet also rund 10 ms darüber; der Volllauf
+22 und 23 ms bei einem Leerlauf von 4–7 in LHR. Damit unter der Marke von 15 ms, aber über 10 und über
+der Schätzung von 11–12 ms: **n = 1, an einem günstigen Standort** – ob sie an einem langsamen unter 15
+bleibt, ist offen. Der Volllauf schrieb 303 von 379 Titeln und `psn_spielzeit_runde` wie gebaut
+(`vollAm` 05.11., `spitzeAm` 06.11.). Kein `sortierung=abweichend`, geprüft wird das nur auf der Spitze,
+also erst eine Nacht lang. Kein Weiterblättern.
+
+**Gelesene Zeilen:** PSN 15 691 und 14 424, Wartung je 94 240, Abendläufe 14 146 und 14 250.
+`rows_read_24h` am 06.11. gegen 14:20 UTC **122 914**, `rows_written_24h` 3 101. Das PSN-Fenster fällt
+um 1 267, gerechnet waren für die Spitze gegen zwei volle Seiten rund 2 300 weniger; dass die
+Einzeltrophäen vom 06.11. den Rest erklären, ist eine Vermutung. Stunde 06 minus Stunde 07 ist in beiden
+Nächten **22 348**, auf die Zeile der Wert vom 31.10., ebenfalls ohne Auffrischen – das stützt, dass
+dieser Sockel Jahre ist. Die Stunde 07 steht bei 23 964, die Abweichung der Nächte 01.–03.11. ist nicht
+wiedergekommen.
+
+**Abendläufe des 04. und 05.11.:** Alle acht grün, je 431 und 79 geprüft, 0 offen, die beiden zweiten
+Läufe jeweils ohne Arbeit. Die Verspätung bleibt bei 4 bis 4 h 41; das Ende des letzten Laufs liegt mit
+02:49 und 02:50 UTC nur noch rund zehn Minuten vor dem PSN-Fenster. `preis_alarm` hält **2 Meldungen**,
+beide offen (04.11.: 1).
+
+| Lauf | Start 04.11. → Verspätung | Start 05.11. → Verspätung | Ergebnis |
+|---|---|---|---|
+| Markt | 00:52 → 4 h 35 | 00:58 → 4 h 41 | 87 Portionen, 502 und 473 s |
+| Store | 01:04 → 4 h 17 | 01:08 → 4 h 21 | 8 Portionen, 76 Anfragen, 62 und 69 s |
+| Markt, zweiter | 02:33 → 4 h 16 | 02:33 → 4 h 16 | leer |
+| Store, zweiter | 02:48 → 4 h 01 | 02:50 → 4 h 03 | leer |
+
+**CPU der Portionsrouten** (Telemetry, alle 108 Aufrufe je Abend erfasst, alle `ok`):
+
+| Route | n | Median 04. / 05.11. | höchstens | über 10 / 15 ms |
+|---|---|---|---|---|
+| `POST /api/sync/markt/ergebnisse` | 87 | 4 / 2 | 27 / 20 | 9 und 5 / 5 und 2 |
+| `POST /api/sync/store/ergebnisse` | 8 | 3,5 / 9,5 | 14 / 21 | 2 und 3 / 0 und 2 |
+| `POST /api/sync/markt/ausgang` | 4 | 6,5 / 7,5 | 14 / 13 | je 1 / 0 |
+| `POST /api/sync/store/ausgang` | 4 | 6 / 5,5 | 17 / 7 | 1 und 0 / 1 und 0 |
+| `GET /api/sync/markt/lage` | 2 | 10 / 4,5 | 10 / 6 | 0 / 0 |
+| `GET /api/sync/store/lage` | 2 | 9 / 12,5 | 11 / 13 | 1 und 2 / 0 |

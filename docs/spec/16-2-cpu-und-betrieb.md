@@ -37,7 +37,7 @@ gilt weiter Median um 5, P99 unter 10. Grundlage, gemessen in den Nächten 18. u
 Leerlauf allein liegt im Median bei 5,8 ms (n = 41), dieselbe Arbeit kostet je Standort das Doppelte
 bis 2,5-Fache – P99 unter 10 ließe praktisch keine Arbeit zu. Bewusst eine Wette auf die Duldung
 „gelegentlicher" Überschreitungen. **Bewertet am 03.11.2026: bleibt Ziel, wird nicht gelockert, und
-die Schritte werden gezielt darauf gebracht**, zuerst der Sync – Zahlen, Abbrüche und Reihenfolge, dazu
+die Schritte werden gezielt darauf gebracht**, vom teuersten Aufruf abwärts – Zahlen, Abbrüche und Reihenfolge, dazu
 Sicherung und Kaufliste: [16-2-bewertung-02-11.md](16-2-bewertung-02-11.md).
 
 **Die Wege je Schritt** (Entscheidungen des Nutzers vom 19.10.2026), gerechnet mit der kleinsten

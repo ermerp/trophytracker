@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 156 | 06.11.2026 | **Nachtrag: Nächte zum 05. und 06.11., Messtermin 18o.** Je 72 Cron-Aufrufe `ok`, Sync `erfolg`, Zugang lebt; Volllauf 22 und 23 ms, erste Spitze 14 ms (FRA, n = 1, geschätzt 11–12), kein `sortierung=abweichend`; Abendläufe grün, Verspätung 4 bis 4 h 41, 2 Preisalarme; Reihenfolge in 16.2 auf die Entscheidung vom 04.11. nachgezogen (7.7, 16.2) |
 | 155 | 04.11.2026 | **Nachtrag: Abschluss der Sitzung.** Kapazitätszahlen vor 20i als veraltet markiert, Stand und verworfene Wege von 18o, Lehre zur Differenz ohne Gegenprobe (7.7, 16.2) |
 | 154 | 04.11.2026 | **Nachtrag: Auffrischen abwarten.** Die 22 ms vom 04.11. ändern vorerst nichts, entschieden wird nach dem nächsten Stau ab dem 08.11. (16.2) |
 | 153 | 04.11.2026 | **Stufe 18o: Spielzeit von der Spitze.** Nachts die 25 zuletzt gespielten Titel statt aller 303; Volllauf nur bei neuem Release, abweichender Sortierung oder nach 30 Tagen; Stand und Fehlerstatus im Schreib-Batch der Seite (6 statt 8 D1-Aufrufe); Reihenfolge der Optimierung jetzt vom teuersten Aufruf abwärts; Rückgängig für den Preisalarm-Haken vorgemerkt (7.7, 10.1, 16.2) |
