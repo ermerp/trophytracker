@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 160 | 06.11.2026 | **Nachtrag: Abschluss der Sitzung.** Stand der relativen Regel in 16.2, zwei Lehren, zwei Regeln geschärft |
 | 159 | 06.11.2026 | **Nachtrag: Abgehakte Zeile bleibt an ihrem Platz.** Kleiner, der Titel bleibt Link, Rückgängig stellt sie an derselben Stelle wieder her (16.2) |
 | 158 | 06.11.2026 | **Nachtrag: Haken im Spieldetail zurücknehmbar.** 15 Tage, die Länge eines Store-Sales (31 von 31 gemessen bei 14 oder 15 Tagen) (12, 16.2) |
 | 157 | 06.11.2026 | **Nachtrag: Preisalarm folgt dem Preis.** Jeder tiefere Preis ersetzt die offene Meldung (bisher nur einer, der selbst auslöste), ist der Preis weg, entfällt sie, außer eine Grenz-Meldung unter der Grenze, und kommt er wieder, meldet er neu; Haken zurücknehmbar; Logzeile der Actions nennt Preisalarme; relative Regel gemessen, Entscheidung ab Dezember (12, 16.2) |
