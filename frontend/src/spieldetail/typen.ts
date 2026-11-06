@@ -78,9 +78,15 @@ export type Release = {
   /**
    * Preisalarm (Stufe 20g); null heißt: keine offene Absicht, also keine
    * Grenze. `kanal` ist der Kanal, der gerade alarmiert, `aktuellCents` der
-   * Preis, an dem die Grenze misst (null: unbekannt).
+   * Preis, an dem die Grenze misst (null: unbekannt); `gesehen` der Haken,
+   * solange er sich zurücknehmen lässt.
    */
-  preisalarm: { grenzeCents: number | null; kanal: 'gebraucht' | 'store'; aktuellCents: number | null } | null
+  preisalarm: {
+    grenzeCents: number | null
+    kanal: 'gebraucht' | 'store'
+    aktuellCents: number | null
+    gesehen: { id: number; preisCents: number } | null
+  } | null
   trophaeen: Trophaeen | null
   bewertung: Bewertung | null
   exemplare: Exemplar[]

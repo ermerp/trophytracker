@@ -113,10 +113,14 @@ tiefsten Preis des Kanals** (Entscheidung vom 06.11.2026, „wenn weg, dann weg"
 - **Quittiert wird über den Haken** (Entscheidung vom 30.10.2026). Der Titel führt ins Spieldetail,
   ohne zu quittieren.
 - **Der Haken lässt sich zurücknehmen** (`POST /api/preisalarme/:id/zuruecknehmen`, gebaut am
-  06.11.2026): In der Tafel steht dann „… gesehen. Rückgängig", solange die Startseite steht – wie die
-  übrigen Rückgängig-Zeilen der Anwendung; nach dem Neuladen ist die Zeile fort. Gibt es zu Release und
-  Kanal inzwischen eine neuere offene Meldung, antwortet die Route `409`. Den Preis korrigiert der
-  nächste Abendlauf.
+  06.11.2026) – an zwei Stellen. In der Tafel steht „… gesehen. Rückgängig", solange die Startseite
+  steht. **Im Spieldetail** steht unter dem Grenzfeld „Preisalarm … € gesehen · Rückgängig", **15 Tage**
+  nach dem Haken (`GESEHEN_TAGE`), aus der Datenbank, also auch nach dem Neuladen; nur bei offener
+  Absicht und nur, solange zu Release und Kanal keine neuere Meldung folgte. Die 15 Tage sind die
+  Länge eines Store-Sales: 31 von 31 abgeschlossenen am 06.11.2026 lagen bei 14 oder 15 Tagen, alle
+  aus den ersten fünf Wochen der Reihen, Sales wie um Weihnachten sind nicht dabei. Die Zeile zählt
+  nicht an der Glocke und geht von selbst. Gibt es eine neuere offene Meldung, antwortet die Route
+  `409`. Den Preis korrigiert der nächste Abendlauf: Ist der Sale vorbei, entfällt die Meldung wieder.
 - **Stammt die Meldung aus einem später verworfenen Angebot (20h), entfällt sie** (`entfallen_am`).
   Der danach tiefste Punkt löst keine neue aus – er stand schon da. **Die Rücknahme des Verwerfens
   stellt sie wieder her**, wenn zu Release und Kanal inzwischen keine andere offen ist.

@@ -80,6 +80,22 @@ export function PreisGrenze({
               ? `Liegt schon darunter (${euro(alarm.aktuellCents)}) – der nächste Abendlauf meldet. Gilt für ${kanal}.`
               : `Gilt für ${kanal}.`}
       </p>
+      {alarm.gesehen && (
+        <p className="ruhig klein">
+          Preisalarm {euro(alarm.gesehen.preisCents)} gesehen ·{' '}
+          <button
+            type="button"
+            className="klein"
+            disabled={laeuft}
+            onClick={() => {
+              const id = alarm.gesehen?.id
+              void tue(() => anfrage(`/api/preisalarme/${id}/zuruecknehmen`, { methode: 'POST' }), 'Preisalarm wieder offen.')
+            }}
+          >
+            Rückgängig
+          </button>
+        </p>
+      )}
     </div>
   )
 }

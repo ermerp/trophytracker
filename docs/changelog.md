@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 158 | 06.11.2026 | **Nachtrag: Haken im Spieldetail zurücknehmbar.** 15 Tage, die Länge eines Store-Sales (31 von 31 gemessen bei 14 oder 15 Tagen) (12, 16.2) |
 | 157 | 06.11.2026 | **Nachtrag: Preisalarm folgt dem Preis.** Jeder tiefere Preis ersetzt die offene Meldung (bisher nur einer, der selbst auslöste), ist der Preis weg, entfällt sie, außer eine Grenz-Meldung unter der Grenze, und kommt er wieder, meldet er neu; Haken zurücknehmbar; Logzeile der Actions nennt Preisalarme; relative Regel gemessen, Entscheidung ab Dezember (12, 16.2) |
 | 156 | 06.11.2026 | **Nachtrag: Nächte zum 05. und 06.11., Messtermin 18o.** Je 72 Cron-Aufrufe `ok`, Sync `erfolg`, Zugang lebt; Volllauf 22 und 23 ms, erste Spitze 14 ms (FRA, n = 1, geschätzt 11–12), kein `sortierung=abweichend`; Abendläufe grün, Verspätung 4 bis 4 h 41, 2 Preisalarme; Reihenfolge in 16.2 auf die Entscheidung vom 04.11. nachgezogen (7.7, 16.2) |
 | 155 | 04.11.2026 | **Nachtrag: Abschluss der Sitzung.** Kapazitätszahlen vor 20i als veraltet markiert, Stand und verworfene Wege von 18o, Lehre zur Differenz ohne Gegenprobe (7.7, 16.2) |

@@ -38,6 +38,12 @@ export const MINDEST_PUNKTE = 3;
 export const MINDEST_TIEFE = 0.1;
 
 /**
+ * So lange steht ein Haken zum Zuruecknehmen im Spieldetail. 15 Tage, weil
+ * ein Store-Sale so lange laeuft: 31 von 31 am 06.11.2026 gemessenen 14 oder 15.
+ */
+export const GESEHEN_TAGE = 15;
+
+/**
  * Der Kanal, der fuer ein Release alarmiert - zur LESEZEIT entschieden, nie
  * gespeichert (Entscheidung vom 11.10.2026): Disc `ja` -> Gebrauchtpreis;
  * `nein` oder "physisch nicht gewuenscht" (verworfener Kauf, 5.3) -> Store;
