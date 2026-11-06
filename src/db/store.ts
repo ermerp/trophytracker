@@ -2,7 +2,7 @@ import { OHNE_WEBSTORE, type StoreBefund, type StoreErgebnis } from "../domain/s
 import type { Plattform } from "../domain/titel";
 import { eins, einzeln, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
-import type { AlarmLage, AlarmSchreiben } from "../domain/preisalarm";
+import type { AlarmAusgang, AlarmLage } from "../domain/preisalarm";
 import type { PreisalarmRepository } from "./preisalarm";
 
 /**
@@ -237,7 +237,7 @@ export class StoreRepository {
 	 */
 	async rueckmeldungenSchreiben(
 		liste: readonly StoreRueckmeldung[],
-		alarme: readonly AlarmSchreiben[] = [],
+		alarme: readonly AlarmAusgang[] = [],
 	): Promise<Array<{ neuZugeordnet: boolean }>> {
 		const teile = liste.map((r) =>
 			"preis" in r ? this.preisAnweisungen(r.releaseId, r.preis) : [this.befundAnweisung(r.releaseId, r.befund, r.nurKatalog)],

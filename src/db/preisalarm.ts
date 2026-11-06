@@ -1,4 +1,5 @@
-import type { AlarmKanal, AlarmLage, AlarmReihe, AlarmSchreiben, Punkt } from "../domain/preisalarm";
+import type { AlarmArt, AlarmAusgang, AlarmKanal, AlarmLage, AlarmReihe, Punkt } from "../domain/preisalarm";
+import { istEntfallen } from "../domain/preisalarm";
 
 /**
  * Preisalarm (Stufe 20g): die Lage vor dem Schreiben, die Meldungen hinter
@@ -77,7 +78,7 @@ export class PreisalarmRepository {
 				.bind(...ids),
 			this.db
 				.prepare(
-					"SELECT id, release_id, kanal, preis_cents FROM preis_alarm " +
+					"SELECT id, release_id, kanal, art, preis_cents, vorher_cents FROM preis_alarm " +
 						`WHERE release_id IN (${p}) AND quittiert_am IS NULL AND entfallen_am IS NULL`,
 				)
 				.bind(...ids),
@@ -116,9 +117,16 @@ export class PreisalarmRepository {
 						letzteGrenzeAm: z.letzte_grenze,
 					});
 				}
-				for (const z of (offen?.results ?? []) as Array<{ id: number; release_id: number; kanal: AlarmKanal; preis_cents: number }>) {
+				for (const z of (offen?.results ?? []) as Array<{
+					id: number;
+					release_id: number;
+					kanal: AlarmKanal;
+					art: AlarmArt;
+					preis_cents: number;
+					vorher_cents: number;
+				}>) {
 					const l = lage.get(z.release_id);
-					if (l) l.offen[z.kanal] = { id: z.id, preisCents: z.preis_cents };
+					if (l) l.offen[z.kanal] = { id: z.id, art: z.art, preisCents: z.preis_cents, vorherCents: z.vorher_cents };
 				}
 				for (const z of (punkte?.results ?? []) as Array<{
 					release_id: number;
@@ -144,9 +152,15 @@ export class PreisalarmRepository {
 	 * und Schreiben quittiert hat. Eine neue Meldung kommt als `INSERT OR
 	 * IGNORE`: Besteht schon eine offene zu Release und Kanal, haelt der
 	 * eindeutige Teilindex sie fest, ohne den ganzen Batch - und damit die
-	 * Preise der Portion - scheitern zu lassen.
+	 * Preise der Portion - scheitern zu lassen. Eine entfallende Meldung (der
+	 * Preis ist weg) laeuft mit derselben Bedingung ins Leere.
 	 */
-	schreibAnweisung(a: AlarmSchreiben): D1PreparedStatement {
+	schreibAnweisung(a: AlarmAusgang): D1PreparedStatement {
+		if (istEntfallen(a)) {
+			return this.db
+				.prepare("UPDATE preis_alarm SET entfallen_am = datetime('now') WHERE id = ? AND quittiert_am IS NULL AND entfallen_am IS NULL")
+				.bind(a.entfaellt);
+		}
 		if (a.ersetzt !== null) {
 			return this.db
 				.prepare(
@@ -220,6 +234,24 @@ export class PreisalarmRepository {
 	async quittieren(id: number): Promise<boolean> {
 		const r = await this.db
 			.prepare("UPDATE preis_alarm SET quittiert_am = datetime('now') WHERE id = ? AND quittiert_am IS NULL AND entfallen_am IS NULL")
+			.bind(id)
+			.run();
+		return (r.meta.changes ?? 0) > 0;
+	}
+
+	/**
+	 * Den Haken zuruecknehmen. Nur, wenn zu Release und Kanal inzwischen keine
+	 * andere offen ist - der eindeutige Teilindex liesse das UPDATE sonst
+	 * scheitern, und die neuere Meldung traegt ohnehin den aktuelleren Preis.
+	 * Ist der Preis inzwischen ein anderer, korrigiert das der naechste Abendlauf.
+	 */
+	async zuruecknehmen(id: number): Promise<boolean> {
+		const r = await this.db
+			.prepare(
+				"UPDATE preis_alarm SET quittiert_am = NULL WHERE id = ? AND quittiert_am IS NOT NULL AND entfallen_am IS NULL " +
+					"AND NOT EXISTS (SELECT 1 FROM preis_alarm b WHERE b.release_id = preis_alarm.release_id AND b.kanal = preis_alarm.kanal " +
+					"AND b.id != preis_alarm.id AND b.quittiert_am IS NULL AND b.entfallen_am IS NULL)",
+			)
 			.bind(id)
 			.run();
 		return (r.meta.changes ?? 0) > 0;

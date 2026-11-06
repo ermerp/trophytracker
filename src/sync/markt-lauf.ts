@@ -47,6 +47,10 @@ export type MarktLaufErgebnis = MarktErgebnis & {
 	uebersprungen: number;
 	/** Wie viele POSTs an die Schreibroute gingen - fuer die CPU-Messung je POST. */
 	portionen: number;
+	/** Preisalarme dieses Laufs, neue und tiefere - nur fuers Log. */
+	preisalarme: number;
+	/** Meldungen, deren Preis weg ist - nur fuers Log. */
+	alarmeEntfallen: number;
 };
 
 /** Ein Aufruf der Anwendung mit JSON hin und zurueck - auch fuer die Store-Action (Stufe 20j). */
@@ -70,6 +74,8 @@ export async function marktLauf(
 	const zahlen = { geprueft: 0, mitPreis: 0, discBelegt: 0, ohneAngebot: 0 };
 	let uebersprungen = 0;
 	let portionen = 0;
+	let preisalarme = 0;
+	let alarmeEntfallen = 0;
 	let fehler: Fehlercode | undefined;
 
 	await json(app, "/api/sync/markt/ausgang", { art: "begonnen" });
@@ -101,12 +107,16 @@ export async function marktLauf(
 			}
 			// Was vor einem Ratenlimit schon gefragt ist, wird noch geschrieben.
 			if (portion.length === 0) continue;
-			const g = await json<typeof zahlen>(app, "/api/sync/markt/ergebnisse", { ergebnisse: portion });
+			const g = await json<typeof zahlen & { preisalarme: number; alarmeEntfallen: number }>(app, "/api/sync/markt/ergebnisse", {
+				ergebnisse: portion,
+			});
 			portionen++;
 			zahlen.geprueft += g.geprueft;
 			zahlen.mitPreis += g.mitPreis;
 			zahlen.discBelegt += g.discBelegt;
 			zahlen.ohneAngebot += g.ohneAngebot;
+			preisalarme += g.preisalarme;
+			alarmeEntfallen += g.alarmeEntfallen;
 		}
 	} catch (f) {
 		// Auch ein Netzfehler zur Anwendung endet mit einem vermerkten Ausgang,
@@ -119,5 +129,5 @@ export async function marktLauf(
 		...zahlen,
 		...(fehler ? { fehler } : {}),
 	});
-	return { ...ausgang, uebersprungen, portionen };
+	return { ...ausgang, uebersprungen, portionen, preisalarme, alarmeEntfallen };
 }

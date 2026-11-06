@@ -18,6 +18,12 @@
  *   scharf, wenn der Preis ueber die Grenze zurueckgeht - oder die Grenze neu
  *   gesetzt wird. Eine neue Grenze ueber dem aktuellen Preis meldet beim
  *   naechsten Lauf (Entscheidung vom 30.10.2026).
+ *
+ * Die Ausloeser gelten nur, solange keine Meldung offen ist. Eine offene folgt
+ * dem Preis des Kanals: Jeder tiefere ersetzt sie, und ist der gemeldete Preis
+ * weg, entfaellt sie (Entscheidung vom 06.11.2026, "wenn weg, dann weg") -
+ * ausser bei einer Grenz-Meldung, solange der Preis weiter unter der Grenze
+ * liegt: Dann stimmt sie noch und zeigt den neuen Preis.
  */
 
 export type AlarmKanal = "gebraucht" | "store";
@@ -56,7 +62,7 @@ export type AlarmLage = {
 	/** Bisherige Punkte je Reihe, verworfene Angebote schon herausgenommen. */
 	punkte: Partial<Record<AlarmReihe, Punkt[]>>;
 	/** Die offene Meldung dieses Kanals, falls es eine gibt. */
-	offen: Partial<Record<AlarmKanal, { id: number; preisCents: number }>>;
+	offen: Partial<Record<AlarmKanal, { id: number; art: AlarmArt; preisCents: number; vorherCents: number }>>;
 	/** Wann zuletzt eine Grenz-Meldung entstand (gleich welcher Zustand), oder null. */
 	letzteGrenzeAm: string | null;
 };
@@ -77,6 +83,13 @@ export type AlarmSchreiben = {
 	ersetzt: number | null;
 };
 
+/** Der gemeldete Preis ist weg: Die offene Meldung mit dieser Id entfaellt. */
+export type AlarmEntfaellt = { entfaellt: number };
+
+export type AlarmAusgang = AlarmSchreiben | AlarmEntfaellt;
+
+export const istEntfallen = (a: AlarmAusgang): a is AlarmEntfaellt => "entfaellt" in a;
+
 const REIHEN_JE_KANAL: Record<AlarmKanal, readonly AlarmReihe[]> = {
 	gebraucht: ["haendler", "markt"],
 	store: ["store"],
@@ -86,11 +99,14 @@ const REIHEN_JE_KANAL: Record<AlarmKanal, readonly AlarmReihe[]> = {
 const ms = (am: string): number => Date.parse(`${am.replace(" ", "T")}Z`);
 
 /**
- * Ob die neuen Preise eines Laufs eine Meldung ausloesen.
+ * Was die Preise eines Laufs an den Meldungen aendern.
  *
  * `kanal` ist der Kanal des Schritts, der die Preise liefert. Gehoert das
  * Release zum anderen Kanal, meldet dieser Schritt nichts - ein Release mit
  * Disc meldet nicht ueber den Store.
+ *
+ * `neu` ist alles, was der Lauf im Kanal gefunden hat: Leer heisst "kein
+ * Preis mehr da" - das darf nur ein Aufrufer sagen, der wirklich gefragt hat.
  *
  * Gibt null zurueck, wenn nichts zu schreiben ist.
  */
@@ -99,10 +115,14 @@ export function alarmPruefen(
 	kanal: AlarmKanal,
 	neu: readonly NeuerPreis[],
 	jetzt: Date,
-): AlarmSchreiben | null {
-	if (alarmKanal(lage.disc, lage.kaufVerworfen, lage.hatGebrauchtreihe) !== kanal) return null;
+): AlarmAusgang | null {
 	const eigene = neu.filter((n) => REIHEN_JE_KANAL[kanal].includes(n.reihe));
-	if (eigene.length === 0) return null;
+	const offen = lage.offen[kanal];
+	const aktuell = eigene.length === 0 ? null : eigene.reduce((a, b) => (b.preisCents < a.preisCents ? b : a));
+	if (aktuell === null) return offen ? { entfaellt: offen.id } : null;
+	if (alarmKanal(lage.disc, lage.kaufVerworfen, lage.hatGebrauchtreihe) !== kanal) {
+		return offen && aktuell.preisCents > offen.preisCents ? { entfaellt: offen.id } : null;
+	}
 
 	const kandidaten: Omit<AlarmSchreiben, "ersetzt" | "releaseId" | "kanal">[] = [];
 
@@ -121,7 +141,7 @@ export function alarmPruefen(
 	// --- Grenze, ueber den tiefsten Preis des Kanals -----------------------
 	const grenze = lage.grenzeCents;
 	if (grenze !== null) {
-		const tiefster = eigene.reduce((a, b) => (b.preisCents < a.preisCents ? b : a));
+		const tiefster = aktuell;
 		if (tiefster.preisCents < grenze) {
 			// Der tiefste juengste Punkt VOR diesem Lauf: Lag er auf oder ueber
 			// der Grenze, ist das hier ein Unterschreiten.
@@ -139,18 +159,34 @@ export function alarmPruefen(
 		}
 	}
 
-	if (kandidaten.length === 0) return null;
 	// Der tiefste Preis traegt die Meldung; bei Gleichstand das Allzeittief,
 	// weil es mehr sagt als "unter deiner Grenze".
-	const wahl = kandidaten.reduce((a, b) =>
-		b.preisCents < a.preisCents || (b.preisCents === a.preisCents && b.art === "tief" && a.art !== "tief") ? b : a,
-	);
+	const wahl =
+		kandidaten.length === 0
+			? null
+			: kandidaten.reduce((a, b) =>
+					b.preisCents < a.preisCents || (b.preisCents === a.preisCents && b.art === "tief" && a.art !== "tief") ? b : a,
+				);
 
-	const offen = lage.offen[kanal];
-	if (offen) {
-		// Hoechstens eine offene Meldung: Nur ein tieferer Preis aendert sie.
-		if (wahl.preisCents >= offen.preisCents) return null;
-		return { ...wahl, releaseId: lage.releaseId, kanal, ersetzt: offen.id };
+	if (!offen) return wahl ? { ...wahl, releaseId: lage.releaseId, kanal, ersetzt: null } : null;
+
+	// Hoechstens eine offene Meldung, und sie folgt dem Preis.
+	if (aktuell.preisCents === offen.preisCents) return null;
+	const folgen = (art: AlarmArt, vorherCents: number): AlarmSchreiben => ({
+		art,
+		reihe: aktuell.reihe,
+		preisCents: aktuell.preisCents,
+		vorherCents,
+		ebayItemId: aktuell.ebayItemId,
+		releaseId: lage.releaseId,
+		kanal,
+		ersetzt: offen.id,
+	});
+	if (aktuell.preisCents < offen.preisCents) {
+		// Ob der neue Preis selbst ausgeloest haette, spielt keine Rolle: Auch
+		// fuenf Prozent tiefer ist der bessere Preis.
+		return wahl?.preisCents === aktuell.preisCents ? { ...wahl, releaseId: lage.releaseId, kanal, ersetzt: offen.id } : folgen(offen.art, offen.vorherCents);
 	}
-	return { ...wahl, releaseId: lage.releaseId, kanal, ersetzt: null };
+	if (offen.art === "grenze" && grenze !== null && aktuell.preisCents < grenze) return folgen("grenze", grenze);
+	return { entfaellt: offen.id };
 }

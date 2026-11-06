@@ -88,12 +88,29 @@ die Reihen der offenen Absichten im Mittel 13 Punkte.
 #### Wie eine Meldung lebt
 
 `preis_alarm` (Migration 0037): höchstens **eine offene je Release und Kanal** (eindeutiger
-Teilindex); ein tieferer Preis aktualisiert sie, ein gleicher oder höherer lässt sie stehen – ein
-Preis, der dreimal fällt, meldet einmal mit dem tiefsten Stand. Keine Sperrfrist (Entscheidung vom
-11.10.2026).
+Teilindex). Keine Sperrfrist (Entscheidung vom 11.10.2026). **Die offene Meldung folgt dem aktuell
+tiefsten Preis des Kanals** (Entscheidung vom 06.11.2026, „wenn weg, dann weg"):
+
+- **Jeder tiefere Preis ersetzt sie**, auch wenn er selbst nicht ausgelöst hätte; ein gleicher lässt
+  sie stehen. Ein Preis, der dreimal fällt, meldet einmal mit dem tiefsten Stand.
+- **Ist der gemeldete Preis weg, entfällt sie** (`entfallen_am`): teurer als gemeldet oder gar kein
+  Preis mehr im Kanal. Gilt nur für einen Lauf, der wirklich gefragt hat: eine übersprungene Portion,
+  ein unlesbarer Store-Befund ändern nichts.
+- **Ausnahme Grenze:** Liegt der Preis noch unter der Grenze, bleibt die Grenz-Meldung und zeigt den
+  neuen Preis. Sie stimmt weiter, und entfiele sie, käme keine neue: Die Grenze wird erst über ihr
+  wieder scharf.
+- **Das Entfallen kennt keine Karenz:** Ein Angebot, das eBay an einem Abend nicht liefert, nimmt die
+  Meldung mit, und ein Rückgängig gibt es dafür nicht. Kehrt es zurück, meldet ein Allzeittief nicht
+  neu – sein Punkt steht schon in der Reihe. Die Meldungen von vor dem 06.11. folgen ab dem ersten
+  Abendlauf danach; dafür gibt es nichts zurückzunehmen.
 
 - **Quittiert wird über den Haken** (Entscheidung vom 30.10.2026). Der Titel führt ins Spieldetail,
   ohne zu quittieren.
+- **Der Haken lässt sich zurücknehmen** (`POST /api/preisalarme/:id/zuruecknehmen`, gebaut am
+  06.11.2026): In der Tafel steht dann „… gesehen. Rückgängig", solange die Startseite steht – wie die
+  übrigen Rückgängig-Zeilen der Anwendung; nach dem Neuladen ist die Zeile fort. Gibt es zu Release und
+  Kanal inzwischen eine neuere offene Meldung, antwortet die Route `409`. Den Preis korrigiert der
+  nächste Abendlauf.
 - **Stammt die Meldung aus einem später verworfenen Angebot (20h), entfällt sie** (`entfallen_am`).
   Der danach tiefste Punkt löst keine neue aus – er stand schon da. **Die Rücknahme des Verwerfens
   stellt sie wieder her**, wenn zu Release und Kanal inzwischen keine andere offen ist.
@@ -117,10 +134,19 @@ gerade gilt.
 #### Offen, ausdrücklich
 
 - **Die relative Regel** („20 % unter dem 30-Tage-Median") ist **nicht entschieden** und bleibt ein
-  möglicher Nachtrag, messbar ab dem 03.11.2026. Der Median über `price_snapshot` ist **nicht** der
-  Median des Preises – geschrieben wird nur bei Änderung, Tage mit Bewegung wiegen schwerer. Richtig
-  gerechnet braucht es eine Treppenfunktion oder eine bewusst in Kauf genommene Verzerrung.
-- **Ein Rückgängig für den Haken fehlt.** Eine quittierte Meldung ist fort; der Nutzer will das
-  zurücknehmen können, aber nicht jetzt (04.11.2026). Vorgemerkt, nicht geplant.
-- **Die Logzeile der Markt- und Store-Action nennt die Preisalarme noch nicht** – die Routen liefern
-  `preisalarme` mit, `scripts/markt-action.ts` und `store-action.ts` geben es nicht aus.
+  möglicher Nachtrag. Der Median über `price_snapshot` ist **nicht** der Median des Preises –
+  geschrieben wird nur bei Änderung, Tage mit Bewegung wiegen schwerer. **Gemessen am 06.11.2026** auf
+  den 125 Reihen der offenen Absichten (897 Punkte, im Median 5 je Reihe, erste Punkte 03.–24.10.),
+  zeitgewichtet als Treppe gegen den einfachen Median der Punkte:
+
+  | Mindestalter der Reihe | Auslöser bei 20 %: Treppe / einfach | Nächte | höchstens je Nacht |
+  |---|---|---|---|
+  | 14 Tage | 52 / 54 | 16 | 13 |
+  | 21 Tage | 34 / 34 | 9 | 13 |
+  | 30 Tage | 14 / 16 | 3 | 12 |
+
+  **Die befürchtete Verzerrung ist auf diesem Stand klein**, die Treppe wäre kaum nötig. Rund ein
+  Drittel der Auslöser sagt nichts Neues (auch ein Tief von mindestens 10 %), und der Store trägt die
+  Spitze: 12 Auslöser in **einer** Nacht, ein Sale. Volle 30 Tage hat die Reihe erst seit dem 03.11.,
+  belastbar ist das noch nicht. **Neu messen, wenn die Reihen zwei volle Fenster haben (ab Anfang
+  Dezember 2026), dann entscheiden.** Das Mess-Skript liest Preisreihen und bleibt im Scratchpad.

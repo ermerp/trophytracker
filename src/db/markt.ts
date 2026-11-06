@@ -2,7 +2,7 @@ import type { AngebotUrteil, AngebotWahl, MarktKanal } from "../domain/markt";
 import type { Plattform } from "../domain/titel";
 import { eins, einzeln, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
-import type { AlarmLage, AlarmSchreiben } from "../domain/preisalarm";
+import type { AlarmAusgang, AlarmLage } from "../domain/preisalarm";
 import type { PreisalarmRepository } from "./preisalarm";
 
 /**
@@ -235,7 +235,7 @@ export class MarktRepository {
 	 */
 	async ergebnisseSchreiben(
 		liste: ReadonlyArray<{ ziel: ZuPruefen; angebote: AngebotJeKanal; rohangebote: number }>,
-		alarme: readonly AlarmSchreiben[] = [],
+		alarme: readonly AlarmAusgang[] = [],
 	): Promise<Array<{ discBelegt: boolean; preis: AngezeigtesAngebot | null }>> {
 		const teile = liste.map((e) => this.ergebnisAnweisungen(e.ziel, e.angebote, e.rohangebote));
 		if (teile.length === 0) return [];

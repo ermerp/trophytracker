@@ -3,7 +3,7 @@ import { meldungFuer } from "../psn/store";
 import { OHNE_WEBSTORE, PRODUKT_ID, STORE_BEFUNDE, storeAdresse, type StoreErgebnis } from "../domain/store";
 import { storeConceptIds } from "../domain/igdb";
 import { STORE_LAGE_HOECHSTENS, type Rueckbefund, type StoreRueckmeldung } from "../db/store";
-import { alarmPruefen } from "../domain/preisalarm";
+import { alarmPruefen, istEntfallen } from "../domain/preisalarm";
 import { einesPruefen, storeActionZeile, STORE_JE_POST, type StoreActionErgebnis } from "../sync/store";
 import { liesJson } from "./validierung";
 import type { AppEnv } from "../types";
@@ -142,8 +142,10 @@ export const storeRoutes = new Hono<AppEnv>()
 		const jetzt = new Date();
 		const alarme = schreiben.flatMap((r) => {
 			const lage = alarmLage.get(r.releaseId);
-			if (!lage || !("preis" in r)) return [];
-			const a = alarmPruefen(lage, "store", [{ reihe: "store", preisCents: r.preis.preisCents, ebayItemId: null }], jetzt);
+			if (!lage) return [];
+			// Ein Befund heisst "kein Preis": Unlesbares kommt gar nicht bis hierher.
+			const neu = "preis" in r ? [{ reihe: "store" as const, preisCents: r.preis.preisCents, ebayItemId: null }] : [];
+			const a = alarmPruefen(lage, "store", neu, jetzt);
 			return a ? [a] : [];
 		});
 		const geschrieben = await c.var.repos.store.rueckmeldungenSchreiben(schreiben, alarme);
@@ -156,7 +158,8 @@ export const storeRoutes = new Hono<AppEnv>()
 			zugeordnet: geschrieben.filter((g) => g.neuZugeordnet).length,
 			ohneTreffer: schreiben.length - preise.length,
 			unbekannt: rueckmeldungen.length - schreiben.length,
-			preisalarme: alarme.length,
+			preisalarme: alarme.filter((a) => !istEntfallen(a)).length,
+			alarmeEntfallen: alarme.filter(istEntfallen).length,
 		});
 	})
 

@@ -42,7 +42,13 @@ export type OffeneDaten = {
 	preise: Preisalarm[]
 	/** Quittieren über den Haken (Stufe 20g); die Zeile verschwindet sofort. */
 	quittieren: (id: number) => void
+	/** Eben Quittiertes, solange die Seite steht – je Zeile ein „Rückgängig". */
+	gesehen: Gesehen[]
+	zuruecknehmen: (id: number) => void
 }
+
+/** Eine eben quittierte Meldung; `fehler` sagt, warum sie nicht zurückkam. */
+export type Gesehen = { alarm: Preisalarm; fehler?: string }
 
 /** Eine Betriebswarnung, wie der Server sie urteilt (src/domain/betrieb.ts). */
 export type Betriebswarnung = {
@@ -96,6 +102,7 @@ export function useOffenePosten(): OffeneDaten {
 	const [storeOffen, setStoreOffen] = useState(0)
 	const [betrieb, setBetrieb] = useState<Betriebswarnung[]>([])
 	const [preise, setPreise] = useState<Preisalarm[]>([])
+	const [gesehen, setGesehen] = useState<Gesehen[]>([])
 
 	useEffect(() => {
 		// Fehler bleiben hier still: Ein Posten, der sich nicht laden lässt,
@@ -249,11 +256,26 @@ export function useOffenePosten(): OffeneDaten {
 	// Die Zeile geht sofort weg; scheitert die Anfrage, kommt sie mit dem
 	// nächsten Laden zurück - es geht nichts verloren, was der Server hält.
 	const quittieren = (id: number) => {
+		const alarm = preise.find((a) => a.id === id)
+		if (alarm) setGesehen((g) => [{ alarm }, ...g])
 		setPreise((p) => p.filter((a) => a.id !== id))
 		anfrage(`/api/preisalarme/${id}/quittieren`, { methode: 'POST' }).catch(() => {})
 	}
 
-	return { rot, kenntnis, posten, preise, quittieren }
+	const zuruecknehmen = (id: number) => {
+		anfrage(`/api/preisalarme/${id}/zuruecknehmen`, { methode: 'POST' })
+			.then(() => {
+				const eintrag = gesehen.find((g) => g.alarm.id === id)
+				if (eintrag) setPreise((p) => [eintrag.alarm, ...p])
+				setGesehen((g) => g.filter((e) => e.alarm.id !== id))
+			})
+			.catch((f: unknown) => {
+				const fehler = f instanceof Error ? f.message : 'Rückgängig fehlgeschlagen.'
+				setGesehen((g) => g.map((e) => (e.alarm.id === id ? { ...e, fehler } : e)))
+			})
+	}
+
+	return { rot, kenntnis, posten, preise, quittieren, gesehen, zuruecknehmen }
 }
 
 /**
@@ -347,7 +369,7 @@ export function Warnblock({ rot }: { rot: Posten[] }) {
  * ist. Der Preisalarm aus 20g steht als eigene Gruppe zwischen Warnungen und
  * Posten, in seinem eigenen Ton (16.2).
  */
-export function Tafel({ rot, kenntnis, posten, preise, quittieren }: OffeneDaten) {
+export function Tafel({ rot, kenntnis, posten, preise, quittieren, gesehen, zuruecknehmen }: OffeneDaten) {
 	return (
 		<div className="tafel glockentafel" role="region" aria-label="Offene Posten">
 			{rot.length > 0 && (
@@ -360,7 +382,7 @@ export function Tafel({ rot, kenntnis, posten, preise, quittieren }: OffeneDaten
 					</ul>
 				</>
 			)}
-			{preise.length > 0 && (
+			{preise.length + gesehen.length > 0 && (
 				<>
 					<div className="tafelname preisalarm">Preise</div>
 					{/* Der Titel führt ins Spieldetail, ohne zu quittieren; quittiert
@@ -381,6 +403,18 @@ export function Tafel({ rot, kenntnis, posten, preise, quittieren }: OffeneDaten
 								>
 									<Zeichen name="haken" />
 								</button>
+							</li>
+						))}
+						{gesehen.map(({ alarm, fehler }) => (
+							<li key={`gesehen-${alarm.id}`}>
+								<div className="preisalarmtext ruhig klein" role="status">
+									„{alarm.titel}" gesehen.{' '}
+									{fehler ?? (
+										<button type="button" className="klein" onClick={() => zuruecknehmen(alarm.id)}>
+											Rückgängig
+										</button>
+									)}
+								</div>
 							</li>
 						))}
 					</ul>

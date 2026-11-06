@@ -7,7 +7,7 @@ Fünf Stufen zum Abschluss, **bewusst ohne Nummer** (Entscheidung des Nutzers vo
 **Warum diese Reihenfolge.** Der erste Entwurf stellte die Oberflächenprüfung vor die Finalisierung der Sammlung. Der Nutzer hat eingewandt, dass ihm dann das Material fehlt – und das sticht. Die 22 Ansichten zerfallen nämlich in zwei Gruppen, die **entgegengesetzte** Datenlagen brauchen:
 
 - **Arbeitsansichten** (`/scannen`, `/import`, `/pruefliste`, `/zuordnung`, `/ohne-zuordnung`, `/igdb`, `/pruefen`, Block B der Lücken) brauchen offenes Material. Nach der Finalisierung lassen sie sich gar nicht mehr ernsthaft prüfen, ohne Arbeit zu erfinden – zehn ungelesene Wunschlisten und 157 offene Disc-Fragen sind das letzte echte Material.
-- **Leseansichten** (`/start`, `/sammlung`, `/spiel/:id`, die vier Listen, `/erscheint-bald`, `/trophaeen`, `/aenderungen`, `/einstellungen`) sehen auf unvollständigen Daten falsch aus.
+- **Leseansichten** (`/start`, `/sammlung`, `/spiel/:id`, die vier Listen, `/erscheint-bald`, `/aenderungen`, `/einstellungen`) sehen auf unvollständigen Daten falsch aus.
 
 Deshalb trägt Stufe 1 die Usability-Arbeit an den Arbeitsansichten mit, und Stufe 2 beschränkt sich auf die Leseansichten. So wird keine Ansicht auf der falschen Datenlage beurteilt.
 

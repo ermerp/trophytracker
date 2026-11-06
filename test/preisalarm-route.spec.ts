@@ -99,6 +99,52 @@ describe("Preisalarm in der Markt-Route", () => {
 		expect(await alarme()).toMatchObject([{ preis_cents: 700, vorher_cents: 850 }]);
 	});
 
+	it("eine Meldung entfaellt, wenn der Lauf das Angebot nicht mehr findet", async () => {
+		await release(1);
+		await punkte(1, "markt", [[40, 1000], [20, 1000]]);
+		await sende("/api/sync/markt/ergebnisse", { ergebnisse: [ergebnis(1, 850)] });
+		const leer = { releaseId: 1, rohangebote: 0, angebote: { haendler: { preis: null, beleg: null }, markt: { preis: null, beleg: null } } };
+		const a = await sende("/api/sync/markt/ergebnisse", { ergebnisse: [leer] });
+		expect(await a.json()).toMatchObject({ preisalarme: 0, alarmeEntfallen: 1 });
+		expect(await alarme()).toMatchObject([{ preis_cents: 850, quittiert: 0, entfallen: 1 }]);
+		expect(await (await hole("/api/preisalarme")).json()).toEqual({ alarme: [] });
+	});
+
+	it("eine Portion ohne gefragte Reihen laesst die Meldung stehen", async () => {
+		await release(1);
+		await punkte(1, "markt", [[40, 1000], [20, 1000]]);
+		await sende("/api/sync/markt/ergebnisse", { ergebnisse: [ergebnis(1, 850)] });
+		const a = await sende("/api/sync/markt/ergebnisse", { ergebnisse: [ergebnis(1, null)] });
+		expect(await a.json()).toMatchObject({ alarmeEntfallen: 0 });
+		expect(await alarme()).toMatchObject([{ entfallen: 0 }]);
+	});
+
+	it("der Haken laesst sich zuruecknehmen, die Meldung ist wieder offen", async () => {
+		await release(1);
+		await punkte(1, "markt", [[40, 1000], [20, 1000]]);
+		await sende("/api/sync/markt/ergebnisse", { ergebnisse: [ergebnis(1, 850)] });
+		const { alarme: [meldung] } = (await (await hole("/api/preisalarme")).json()) as { alarme: Array<{ id: number }> };
+		await sende(`/api/preisalarme/${meldung!.id}/quittieren`, {});
+		expect(await (await hole("/api/preisalarme")).json()).toEqual({ alarme: [] });
+		expect((await sende(`/api/preisalarme/${meldung!.id}/zuruecknehmen`, {})).status).toBe(200);
+		expect(await (await hole("/api/preisalarme")).json()).toMatchObject({ alarme: [{ id: meldung!.id, preisCents: 850 }] });
+		// Zweimal zurueckholen geht nicht: Sie ist ja offen.
+		expect((await sende(`/api/preisalarme/${meldung!.id}/zuruecknehmen`, {})).status).toBe(409);
+	});
+
+	it("eine neuere offene Meldung sperrt das Zuruecknehmen, statt am Index zu scheitern", async () => {
+		await release(1);
+		const r = repos();
+		const neu = { releaseId: 1, kanal: "gebraucht" as const, art: "tief" as const, reihe: "markt" as const, preisCents: 800, vorherCents: 1000, ebayItemId: null, ersetzt: null };
+		await r.preisalarm.schreibAnweisung(neu).run();
+		const { results } = await env.DB.prepare("SELECT id FROM preis_alarm").all<{ id: number }>();
+		const erste = results[0]!.id;
+		await r.preisalarm.quittieren(erste);
+		await r.preisalarm.schreibAnweisung({ ...neu, preisCents: 700 }).run();
+		expect((await sende(`/api/preisalarme/${erste}/zuruecknehmen`, {})).status).toBe(409);
+		expect(await r.preisalarm.offene()).toMatchObject([{ preisCents: 700 }]);
+	});
+
 	it("meldet nichts ohne offene Absicht und nichts auf einer zu jungen Reihe", async () => {
 		await release(1, "ja", false);
 		await punkte(1, "markt", [[40, 1000], [20, 1000]]);

@@ -351,3 +351,5 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 04.11.2026 | **Die Spielzeit holt nachts nur die Spitze; voll läuft sie nur bei neuem Release, abweichender Sortierung oder nach 30 Tagen** – dass ein nicht frisch gespielter Titel dadurch später zugeordnet wird, ist in Ordnung (Stufe 18o) | [7.7](spec/07-7-psn-weitere-daten.md) |
 | 04.11.2026 | **Der Haken am Preisalarm soll zurücknehmbar werden, aber nicht jetzt** | [16.2](spec/16-2-preisalarm.md) |
 | 04.11.2026 | **Die 22 ms beim IGDB-Auffrischen ändern vorerst nichts**: Entschieden wird nach dem nächsten Stau ab dem 08.11., an mehreren Aufrufen und Standorten | [16.2](spec/16-2-bewertung-02-11.md) |
+| 06.11.2026 | **Am Cron wird frühestens nach der Auswertung der Nacht zum 08.11. etwas geändert**, und der Sync-Plan wartet bis dahin | [16.2](spec/16-2-naechte-2.md) |
+| 06.11.2026 | **Ein Preisalarm entfällt automatisch, wenn der Preis weg ist** („wenn weg, dann weg") | [16.2](spec/16-2-preisalarm.md) |

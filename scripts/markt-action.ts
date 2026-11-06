@@ -42,7 +42,7 @@ const sekunden = Math.round((Date.now() - beginn) / 1000);
 console.log(
 	`Gebrauchtpreise: ${e.status}, ${e.geprueft} geprüft in ${e.portionen} Portionen (${sekunden} s), ` +
 		`${e.mitPreis} mit Preis, ${e.discBelegt} Disc belegt, ${e.ohneAngebot} ohne Angebot, ` +
-		`${e.uebersprungen} übersprungen, ${e.nochOffen} offen.`,
+		`${e.uebersprungen} übersprungen, ${e.nochOffen} offen, ${e.preisalarme} Preisalarme, ${e.alarmeEntfallen} entfallen.`,
 );
 // Die Meldung ist ein fester Text der Anwendung (MARKT_MELDUNG), kein Fremdtext.
 if (e.meldung) console.log(`::error::${e.meldung}`);
