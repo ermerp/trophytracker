@@ -18,4 +18,13 @@ export const preisalarmRoutes = new Hono<AppEnv>()
 			return c.json({ fehler: "Keine offene Meldung mit dieser Id." }, 404);
 		}
 		return c.json({ id });
+	})
+
+	.post("/:id/zuruecknehmen", async (c) => {
+		const id = Number(c.req.param("id"));
+		if (!Number.isInteger(id) || id <= 0) return c.json({ fehler: "Ungültige Id." }, 400);
+		if (!(await c.var.repos.preisalarm.zuruecknehmen(id))) {
+			return c.json({ fehler: "Diese Meldung lässt sich nicht zurückholen – es gibt inzwischen eine neuere." }, 409);
+		}
+		return c.json({ id });
 	});

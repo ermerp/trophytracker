@@ -37,6 +37,10 @@ export type StoreLaufErgebnis = StoreActionErgebnis & {
 	portionen: number;
 	/** Anfragen an den Store - fuer den Vergleich mit dem Probelauf vom 19.10.2026. */
 	anfragen: number;
+	/** Preisalarme dieses Laufs, neue und tiefere - nur fuers Log. */
+	preisalarme: number;
+	/** Meldungen, deren Preis weg ist - nur fuers Log. */
+	alarmeEntfallen: number;
 };
 
 export async function storeLauf(
@@ -49,13 +53,17 @@ export async function storeLauf(
 	let uebersprungen = 0;
 	let portionen = 0;
 	let anfragen = 0;
+	let preisalarme = 0;
+	let alarmeEntfallen = 0;
 	let fehler: "app" | undefined;
 
 	const schreiben = async (portion: StoreRueckmeldung[]) => {
 		if (portion.length === 0) return;
-		const g = await json<Zahlen>(app, "/api/sync/store/ergebnisse", { ergebnisse: portion });
+		const g = await json<Zahlen & { preisalarme: number; alarmeEntfallen: number }>(app, "/api/sync/store/ergebnisse", { ergebnisse: portion });
 		portionen++;
 		for (const k of Object.keys(zahlen) as (keyof Zahlen)[]) zahlen[k] += g[k];
+		preisalarme += g.preisalarme;
+		alarmeEntfallen += g.alarmeEntfallen;
 	};
 
 	await json(app, "/api/sync/store/ausgang", { art: "begonnen" });
@@ -114,5 +122,5 @@ export async function storeLauf(
 		...zahlen,
 		...(fehler ? { fehler } : {}),
 	});
-	return { ...ausgang, uebersprungen, portionen, anfragen };
+	return { ...ausgang, uebersprungen, portionen, anfragen, preisalarme, alarmeEntfallen };
 }

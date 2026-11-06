@@ -884,3 +884,16 @@ könnte und es nicht tut.
 so teuer?" den eigentlichen Hebel: 303 Zeilen je Nacht für einen gespielten Titel je Woche.
 → Ein Budget je Aufruf wird am teuersten Aufruf abgearbeitet, und vor dem Bündeln steht die Frage, ob
 die Arbeit überhaupt nötig ist.
+
+---
+
+## Die Regel, die nur am Auslöser hing
+
+**06.11.2026.** Die Spezifikation sagte seit 20g: „ein tieferer Preis aktualisiert die offene Meldung". Der
+Code prüfte das erst, nachdem der neue Preis selbst ausgelöst hätte: mindestens 10 % unter dem Tief, und
+eine Grenz-Meldung gar nicht mehr, solange der Preis unter der Grenze blieb. Der Test fiel von 850 auf 700
+und traf genau den Fall, der ohnehin auslöst. Aufgefallen ist es nicht in einer Prüfung, sondern an der
+Frage des Nutzers, was die Glocke bei einem günstigeren Angebot zeigt; dieselbe Frage ergab, dass eine
+Meldung nach dem Verkauf des Angebots mit dem alten Preis stehen blieb.
+→ Ein Test zu einer Regel nimmt den Fall, in dem **nur** diese Regel greift, nicht einen, den eine andere
+schon erledigt.

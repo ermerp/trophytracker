@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { AppEnv } from "../types";
-import { alarmPruefen } from "../domain/preisalarm";
+import { alarmPruefen, istEntfallen } from "../domain/preisalarm";
 import { einesPruefen, MARKT_JE_POST, marktZeile, type MarktErgebnis } from "../sync/markt";
 import { liesJson } from "./validierung";
 import { meldungFuer } from "../ebay/client";
@@ -99,6 +99,8 @@ export const marktRoutes = new Hono<AppEnv>()
 				const preis = s.angebote[reihe]?.preis;
 				return preis ? [{ reihe, preisCents: preis.angebot.preisCents, ebayItemId: preis.angebot.itemId }] : [];
 			});
+			// Leer heisst "kein Preis mehr da" nur, wenn beide Reihen gefragt sind.
+			if (neu.length === 0 && (!s.angebote.haendler || !s.angebote.markt)) return [];
 			const a = alarmPruefen(lage, "gebraucht", neu, jetzt);
 			return a ? [a] : [];
 		});
@@ -109,7 +111,8 @@ export const marktRoutes = new Hono<AppEnv>()
 			discBelegt: geschrieben.filter((g) => g.discBelegt).length,
 			ohneAngebot: schreiben.filter((s) => s.rohangebote === 0).length,
 			unbekannt: ergebnisse.length - schreiben.length,
-			preisalarme: alarme.length,
+			preisalarme: alarme.filter((a) => !istEntfallen(a)).length,
+			alarmeEntfallen: alarme.filter(istEntfallen).length,
 		});
 	})
 

@@ -98,13 +98,90 @@ describe("alarmPruefen - Allzeittief", () => {
 		});
 	});
 
-	it("eine offene Meldung wird nur von einem tieferen Preis ersetzt", () => {
-		const mitOffen = { ...alt, offen: { gebraucht: { id: 3, preisCents: 800 } } };
-		expect(alarmPruefen(lage(mitOffen), "gebraucht", [{ reihe: "markt", preisCents: 850, ebayItemId: null }], JETZT)).toBeNull();
-		expect(alarmPruefen(lage(mitOffen), "gebraucht", [{ reihe: "markt", preisCents: 700, ebayItemId: null }], JETZT)).toMatchObject({
+});
+
+describe("alarmPruefen - eine offene Meldung folgt dem Preis (06.11.2026)", () => {
+	const markt = (preisCents: number) => [{ reihe: "markt" as const, preisCents, ebayItemId: "neu" }];
+	// Die Lage NACH der Meldung: Der gemeldete Preis steht schon in der Reihe.
+	const tief = {
+		punkte: { markt: reihe([40, 1000], [20, 1000], [1, 800]) },
+		offen: { gebraucht: { id: 3, art: "tief" as const, preisCents: 800, vorherCents: 1000, ebayItemId: "neu" } },
+	};
+	const grenze = {
+		grenzeCents: 1500,
+		grenzeAm: "2026-10-01 10:00:00",
+		letzteGrenzeAm: "2026-10-30 10:00:00",
+		punkte: { markt: reihe([40, 2000], [1, 1200]) },
+		offen: { gebraucht: { id: 4, art: "grenze" as const, preisCents: 1200, vorherCents: 1500, ebayItemId: "neu" } },
+	};
+
+	it("ein gleicher Preis aendert nichts", () => {
+		expect(alarmPruefen(lage(tief), "gebraucht", markt(800), JETZT)).toBeNull();
+	});
+
+	it("gleicher Preis, anderes Angebot: Die Meldung bleibt und zeigt auf das Angebot, das noch da ist", () => {
+		expect(alarmPruefen(lage(tief), "gebraucht", [{ reihe: "markt", preisCents: 800, ebayItemId: "b" }], JETZT)).toMatchObject({
+			art: "tief",
+			preisCents: 800,
+			vorherCents: 1000,
+			ebayItemId: "b",
 			ersetzt: 3,
-			preisCents: 700,
 		});
+	});
+
+	it("kommt der entfallene Preis wieder, meldet er neu - auch ohne eigenen Ausloeser", () => {
+		const wieder = { punkte: tief.punkte, entfallen: { gebraucht: { id: 3, art: "tief" as const, preisCents: 800, vorherCents: 1000 } } };
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(800), JETZT)).toMatchObject({ art: "tief", preisCents: 800, vorherCents: 1000, ersetzt: null });
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(790), JETZT)).toMatchObject({ preisCents: 790, ersetzt: null });
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(801), JETZT)).toBeNull();
+	});
+
+	it("eine entfallene Grenz-Meldung kommt wieder, sobald der Preis unter der Grenze liegt", () => {
+		const { offen: _, ...ohne } = grenze;
+		const wieder = { ...ohne, entfallen: { gebraucht: { id: 4, art: "grenze" as const, preisCents: 1200, vorherCents: 1500 } } };
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(1400), JETZT)).toMatchObject({ art: "grenze", preisCents: 1400, vorherCents: 1500, ersetzt: null });
+		expect(alarmPruefen(lage(wieder), "gebraucht", markt(1500), JETZT)).toBeNull();
+		expect(alarmPruefen(lage({ ...wieder, grenzeCents: null }), "gebraucht", markt(1400), JETZT)).toBeNull();
+	});
+
+	it("ein tieferer Preis ersetzt sie auch dann, wenn er selbst nicht ausgeloest haette", () => {
+		// 760 ist nur 5 % unter dem Tief von 800.
+		expect(alarmPruefen(lage(tief), "gebraucht", markt(760), JETZT)).toEqual({
+			art: "tief",
+			reihe: "markt",
+			preisCents: 760,
+			vorherCents: 1000,
+			ebayItemId: "neu",
+			releaseId: lage().releaseId,
+			kanal: "gebraucht",
+			ersetzt: 3,
+		});
+		expect(alarmPruefen(lage(grenze), "gebraucht", markt(1100), JETZT)).toMatchObject({ art: "grenze", preisCents: 1100, vorherCents: 1500, ersetzt: 4 });
+	});
+
+	it("ein Preis, der selbst ausloest, traegt sein neues Tief", () => {
+		expect(alarmPruefen(lage(tief), "gebraucht", markt(700), JETZT)).toMatchObject({ art: "tief", preisCents: 700, vorherCents: 800, ersetzt: 3 });
+	});
+
+	it("ist der Preis weg, entfaellt sie - teurer oder gar kein Angebot", () => {
+		expect(alarmPruefen(lage(tief), "gebraucht", markt(900), JETZT)).toEqual({ entfaellt: 3 });
+		expect(alarmPruefen(lage(tief), "gebraucht", [], JETZT)).toEqual({ entfaellt: 3 });
+	});
+
+	it("eine Grenz-Meldung bleibt, solange der Preis unter der Grenze liegt", () => {
+		expect(alarmPruefen(lage(grenze), "gebraucht", markt(1300), JETZT)).toMatchObject({ art: "grenze", preisCents: 1300, vorherCents: 1500, ersetzt: 4 });
+		expect(alarmPruefen(lage(grenze), "gebraucht", markt(1500), JETZT)).toEqual({ entfaellt: 4 });
+		expect(alarmPruefen(lage(grenze), "gebraucht", [], JETZT)).toEqual({ entfaellt: 4 });
+	});
+
+	it("ohne offene Meldung und ohne Preis geschieht nichts", () => {
+		expect(alarmPruefen(lage({ punkte: tief.punkte }), "gebraucht", [], JETZT)).toBeNull();
+	});
+
+	it("gehoert das Release inzwischen zum anderen Kanal, faellt die Meldung nur noch weg", () => {
+		const anders = { ...tief, disc: "nein" };
+		expect(alarmPruefen(lage(anders), "gebraucht", markt(700), JETZT)).toBeNull();
+		expect(alarmPruefen(lage(anders), "gebraucht", markt(900), JETZT)).toEqual({ entfaellt: 3 });
 	});
 });
 

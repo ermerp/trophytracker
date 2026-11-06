@@ -40,7 +40,7 @@ const sekunden = Math.round((Date.now() - beginn) / 1000);
 console.log(
 	`Store-Preise: ${e.status}, ${e.geprueft} geprüft in ${e.portionen} Portionen (${sekunden} s, ${e.anfragen} Anfragen), ` +
 		`${e.mitPreis} mit Preis, ${e.imAngebot} im Angebot, ${e.imPlusKatalog} im Plus-Katalog, ${e.ohneTreffer} ohne Preis, ` +
-		`${e.zugeordnet} neu zugeordnet, ${e.uebersprungen} übersprungen, ${e.nochOffen} offen.`,
+		`${e.zugeordnet} neu zugeordnet, ${e.uebersprungen} übersprungen, ${e.nochOffen} offen, ${e.preisalarme} Preisalarme, ${e.alarmeEntfallen} entfallen.`,
 );
 // Die Meldung ist ein fester Text der Anwendung (STORE_MELDUNG), kein Fremdtext.
 if (e.meldung) console.log(`::error::${e.meldung}`);
