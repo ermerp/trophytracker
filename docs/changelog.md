@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 165 | 07.11.2026 | **Nachtrag: Abschluss der Sitzung.** Zwei Lehren (Desktop-Breite des Nutzers, ein „gut" ist keine Wahl), zwei Regeln geschärft |
 | 164 | 07.11.2026 | **Nachtrag: Wrap-up ohne Zwischenhalt.** Der Abschluss committet, mergt und pusht selbständig und meldet sich erst danach, geänderte Regeln als Diff im Bericht (CLAUDE.md) |
 | 163 | 07.11.2026 | **Nachtrag 24b: Kästen als Links, Trophäensymbol.** Spiele, Physisch und Digital führen in die Sammlung (`owned=physisch`/`digital`); die letzte Trophäe zeigt ihr Symbol aus PSN, unser Pokal als Rückfall (12, 13.1) |
 | 162 | 07.11.2026 | **Stufe 24: Dashboard neu angeordnet.** Flächen je Abschnitt, flache Kästen mit Pokalgruppe, Regal, Disc und Wolke (Digital mit PS-Plus-Anteil), letzte Trophäe am Desktop, dreispaltig nach Breite der linken Spalte; Backlog/To-Do-Kästen entfallen; Plattformen überall PS5 → Vita; Regal in der Navigation; `/api/stats` mit `nurPlus` und `letzteTrophaee` (12, 13.1, 13.2, 16.2) |
