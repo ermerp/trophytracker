@@ -376,9 +376,12 @@ a.kachel:hover {
   color: var(--text-still);
 }
 
+/* So breit wie ihr längster Eintrag: Die Zahlen stehen dicht am Text statt
+   am Rand der Fläche (Wunsch des Nutzers vom 07.11.2026). */
 .legende {
-  flex: 1;
-  min-width: 0;
+  flex: none;
+  width: max-content;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -402,6 +405,7 @@ a.kachel:hover {
 
 .legende .zustand .n {
   margin-left: auto;
+  padding-left: var(--a4);
   font-family: var(--schrift-display);
   font-variant-numeric: tabular-nums;
   color: var(--text);
@@ -542,6 +546,30 @@ table.plattformtabelle {
   color: var(--text-still);
 }
 
+/* Die letzte Trophäe (Stufe 24): der Pokal in der Farbe seiner Stufe auf
+   einem Feld in Covergröße, daneben dieselben Zeilen wie beim Platin. */
+.lt-ikon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r2);
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+}
+
+.lt-spiel {
+  min-width: 0;
+  font-size: 0.8rem;
+  color: var(--text-leise);
+}
+
+.b-lt .lp-zeile {
+  flex-wrap: wrap;
+}
+
 /* --- Feed ---------------------------------------------------------------- */
 
 .feed .zeile {
@@ -602,6 +630,169 @@ table.plattformtabelle {
   border-color: var(--gold-rand);
 }
 
+/* --- Flächen und Kästen (Stufe 24) --------------------------------------
+   Am Prototyp abgestimmt (Nutzer, 07.11.2026, Variante „Flächen" von drei):
+   Jeder Abschnitt steht auf einer eigenen Fläche – ohne Grenze liefen die
+   Blöcke ineinander, und die Seite wirkte überladen. Auf dem Handy und am
+   Desktop dieselben Flächen, nur anders angeordnet. */
+
+.dashboard .dflaeche {
+  margin-bottom: var(--a3);
+  padding: var(--a3) var(--a4);
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--r3);
+}
+
+/* Ein Block in einer Fläche bringt seinen eigenen Abstand nicht mit. */
+.dashboard .dflaeche > .block {
+  margin-bottom: 0;
+}
+
+.dunter {
+  padding-top: var(--a4);
+}
+
+.dashboard .b-zahlen {
+  margin-bottom: var(--a3);
+}
+
+/* Die Kästen: flach, das Zeichen links (rund 58 statt 82 px hoch). Auf dem
+   Handy zwei mal zwei – vier in einer Reihe ließen bei 360 px neben dem
+   Zeichen keine Schrift zu. */
+.kastenreihe {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--a2);
+}
+
+.kasten {
+  display: flex;
+  align-items: center;
+  gap: var(--a3);
+  min-width: 0;
+  padding: var(--a2) var(--a3);
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+  color: var(--text-leise);
+}
+
+.kasten > svg {
+  flex: none;
+}
+
+.ktext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.kzahl {
+  font-family: var(--schrift-display);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.kzahl.gold {
+  color: var(--gold);
+}
+
+.kwort {
+  font-size: 0.68rem;
+  color: var(--text-still);
+}
+
+/* Auf dem Handy eine eigene Zeile: „Spiele · 445 Releases" brach bei 360 px
+   mitten durch (gesehen am Prototyp). */
+.kzusatz {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Kreis, letztes Platin und letzte Trophäe. Ob sie nebeneinander passen,
+   entscheidet die Breite der linken Spalte, nicht das Fenster – deshalb eine
+   Container-Abfrage. Darunter stehen sie untereinander. */
+.dlinks {
+  container-type: inline-size;
+}
+
+.dmitte > .dflaeche:last-child,
+.dzuletzt > .dflaeche:last-child {
+  margin-bottom: var(--a3);
+}
+
+/* Zwei Spalten: links der Kreis, rechts Platin und Trophäe übereinander.
+   Ab rund 640 px, darunter wäre die Legende neben dem Kreis zu eng. */
+@container (min-width: 40rem) {
+  .dmitte {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--a3);
+    margin-bottom: var(--a3);
+  }
+
+  .dmitte > .dflaeche,
+  .dmitte > .dflaeche:last-child,
+  .dzuletzt > .dflaeche:last-child {
+    margin-bottom: 0;
+  }
+
+  .dzuletzt {
+    display: flex;
+    flex-direction: column;
+    gap: var(--a3);
+  }
+
+  .dzuletzt .deckel {
+    width: 64px !important;
+  }
+}
+
+/* Drei Spalten, sobald alle drei hineinpassen (Wunsch des Nutzers vom
+   07.11.2026 auf seinem Bildschirm). Bei 1280 px Fensterbreite ist die linke
+   Spalte rund 700 px breit – dort quetschten drei Spalten Legende und
+   Platin-Text (gesehen am Prototyp). */
+@container (min-width: 54rem) {
+  .dmitte {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .dzuletzt {
+    display: contents;
+  }
+
+  .dzuletzt .deckel {
+    width: 92px !important;
+  }
+
+  /* Der Zusatz der Kästen steht hier hinter dem Wort, mit einem Punkt
+     dazwischen. Schmaler schnitt „Spiele · 432 Releases" am Kastenrand ab
+     (gesehen bei 1280 px, 07.11.2026) – dort bleibt er in der zweiten Zeile. */
+  .kwort {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .kzusatz {
+    display: inline-flex;
+    font-size: inherit;
+  }
+
+  .kzusatz::before {
+    content: "·";
+    margin: 0 var(--a1);
+  }
+}
+
 /* --- Desktop ------------------------------------------------------------- */
 
 /* Drei Stufen ab 48 rem (Entscheidung des Nutzers vom 20.10.2026). Eine
@@ -613,60 +804,14 @@ table.plattformtabelle {
    die Glocke lag fast ganz außerhalb des Fensters –, bei 800 px auf 978.
    - 48–64 rem: der Feed unter dem Inhalt, links eine Spalte;
    - 64–72 rem: der Feed rechts, links eine Spalte (rund 440 px);
-   - ab 72 rem: links zwei Spalten, je ab rund 270 px, die Tabellen
-     nebeneinander. */
+   - ab 72 rem: oben zwei Flächen nebeneinander. */
 @media (min-width: 48rem) {
-  .dlinks {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0 var(--a5);
-    align-items: start;
+  .kastenreihe {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  /* Die Reihenfolge unterscheidet sich vom Handy: Dort stehen die Plattformen
-     vor dem Kreis, hier teilt sich der Kreis die Zeile mit „Zuletzt gespielt"
-     und die Plattformen mit den Trophäen. Der Quelltext bleibt in der
-     Handy-Reihenfolge, damit ein Vorleseprogramm sie so hört, wie die Seite
-     ohne Layout gemeint ist. */
-  .dlinks > .b-zahlen {
-    order: 1;
-    grid-column: 1 / -1;
-  }
-
-  .dlinks > .b-dastehen {
-    order: 2;
-  }
-
-  .dlinks > .b-platin {
-    order: 3;
-  }
-
-  .dlinks > .b-plattform {
-    order: 4;
-  }
-
-  .dlinks > .b-trophaeen {
-    order: 5;
-  }
-
-  /* Die Jahre stehen unter den Trophäen und über die ganze Breite: Fünfzehn
-     Säulen in einer halben Spalte wären drei Pixel breit. Ohne eigene
-     Ordnungszahl landet ein Block hier ganz vorn – `order: 0` ist die Vorgabe
-     (gesehen beim Rendern am 01.10.2026: „Trophäen je Jahr" stand über den
-     Kennzahlen). */
-  .dlinks > .b-jahre {
-    order: 6;
-    grid-column: 1 / -1;
-  }
-
-  .dlinks > .dtabellen {
-    order: 7;
-    grid-column: 1 / -1;
-  }
-
-  /* Die Legende gehört neben den Kreis, nicht über die halbe Seite. */
-  .dlinks .legende {
-    max-width: 21rem;
+  .kasten {
+    justify-content: center;
   }
 
   /* Am Desktop hängt die Tafel an der Glocke, nicht am Fensterrand. */
@@ -691,20 +836,24 @@ table.plattformtabelle {
 }
 
 @media (min-width: 72rem) {
-  /* Kreis und „Zuletzt gespielt" teilen sich eine Zeile, ebenso die beiden
-     Tabellen darunter. Darunter steht links alles untereinander. */
-  .dlinks {
+  /* Oben links Trophäen-Level mit „Anteil je Stufe", rechts „Je Plattform"
+     mit dem Bestand (Nutzer, 07.11.2026). Beide Flächen enden auf gleicher
+     Höhe; die Tabellen schließen unten ab, der Rest rückt nach oben. */
+  .doben {
+    display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--a3);
+    margin-bottom: var(--a3);
   }
 
-  /* Die beiden Tabellen nebeneinander erst hier: Mit den echten Zahlen
-     brauchen sie 269 und 179 px, mit Abstand 472 – bei 1024 px sind links 440
-     (gemessen in der Produktion am 20.10.2026; mit den erfundenen 438). */
-  .dtabellen {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 var(--a5);
-    align-items: start;
+  .doben > .dflaeche {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+  }
+
+  .doben .dunter {
+    margin-top: auto;
   }
 }
 

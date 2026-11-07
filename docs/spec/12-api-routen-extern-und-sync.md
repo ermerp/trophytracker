@@ -123,7 +123,10 @@ GET    /api/sync/status               zugang, trophaeen, letzterLauf und letzter
 POST   /api/settings/npsso            nimmt den GANZEN eingefuegten Text (Wert, JSON oder ganze Seite, Stufe 19e);
                                       400, wenn darin nicht genau ein 64-Zeichen-Wert steht
 
-GET    /api/stats                     Kennzahlen fuers Dashboard (Stufe 19a): { spiele, releases, plattformen[], status, trophaeen, listen, letztesPlatin }
+GET    /api/stats                     Kennzahlen fuers Dashboard (Stufe 19a): { spiele, releases, plattformen[], status, trophaeen, listen, letztesPlatin, letzteTrophaee }
+                                      plattformen[] in der Reihenfolge PS5, PS4, PS3, PSVITA, je mit nurPlus (Stufe 24): digital nur ueber PS Plus.
+                                      letzteTrophaee: zuletzt erspielte Trophaee jeder Stufe, ohne Zuordnung mit spielId null.
+                                      Liest gegen die Produktion rund 486 Zeilen mehr als vorher (Plattformabfrage 3 831 statt 3 345, 07.11.2026).
                                       plattformen je PS3/PS4/PS5/PSVITA mit releases, spiele, mitListe, platin, platinMoeglich, disc, digital – immer alle vier, fehlende als 0;
                                       status als Record ueber die sieben play_status-Werte (ein Release ohne Zeile zaehlt als nicht_gespielt);
                                       trophaeen mit listen, ohneZuordnung, erspielt, definiert, platinErspielt, platinMoeglich und stufen[] (Platin, Gold, Silber, Bronze – in dieser Reihenfolge);

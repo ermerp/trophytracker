@@ -8,12 +8,13 @@ import {
 	STATUSTEXT,
 	STUFENTEXT,
 	type Kennzahlen as Zahlen,
+	type LetzteTrophaee,
 	type LetztesPlatin,
 	type PlattformZahlen,
 	type PlayStatus,
 } from './api'
 import { Cover, PlattformChip, zustandsFarbe } from './SpielTeile'
-import { Zeichen } from './Symbole'
+import { PokalGruppe, Zeichen } from './Symbole'
 
 /**
  * Die Kennzahlen des Dashboards (Stufe 19a, Abschnitt 13).
@@ -23,10 +24,10 @@ import { Zeichen } from './Symbole'
  * Wunsch tragen, bleiben außen vor (Abschnitt 3), sonst stünden hier 489
  * Releases und dort 438.
  *
- * Aufbau auf dem Handy: vier Kennzahlen, Plattformen, „Wie ich dastehe",
- * Trophäen. Auf dem Desktop kommt „Zuletzt gespielt · mit Platin" neben den
- * Kreis und die beiden Tabellen kommen fest dazu, die das Handy hinter dem
- * Aufklappen hält – dort ist der Platz da.
+ * Aufbau seit Stufe 24 (13.1, 13.2): auf dem Handy Trophäen-Level und Je
+ * Plattform (beide aufklappbar), die vier Kästen, „Wie ich dastehe", die
+ * Jahre. Am Desktop stehen die beiden Tabellen fest in den oberen Flächen,
+ * und neben den Kreis kommen letztes Platin und letzte Trophäe.
  */
 
 /** Deutsche Tausendertrennung mit schmalem Leerraum, wie überall in den Zahlen. */
@@ -52,144 +53,207 @@ export function Kennzahlen() {
 	const anteil = zahlen.trophaeen.definiert
 		? Math.round((100 * zahlen.trophaeen.erspielt) / zahlen.trophaeen.definiert)
 		: null
+	const summe = (feld: 'disc' | 'digital' | 'nurPlus') => zahlen.plattformen.reduce((s, p) => s + p[feld], 0)
+	const nurPlus = summe('nurPlus')
 
+	/*
+	 * Aufbau seit Stufe 24 (am Prototyp abgestimmt, Nutzer 07.11.2026). Der
+	 * Quelltext steht in der Handy-Reihenfolge – Trophäen-Level, Je Plattform,
+	 * die vier Kästen, Wie ich dastehe, Trophäen je Jahr –, damit ein
+	 * Vorleseprogramm die Seite so hört, wie sie ohne Layout gemeint ist. Am
+	 * Desktop werden daraus Flächen in vier Zeilen (13.2): oben zwei Spalten,
+	 * die auf gleicher Höhe enden, darunter die Kästen über die volle Breite,
+	 * dann Kreis, letztes Platin und letzte Trophäe, unten die Jahre.
+	 */
 	return (
 		<>
+			<div className="doben">
+				<div className="dflaeche">
+					<Aufklappbar
+						klasse="b-trophaeen"
+						name="Trophäen-Level"
+						rechts={`${t(zahlen.trophaeen.erspielt)} von ${t(zahlen.trophaeen.definiert)}`}
+						offen={auf === 'trophaeen'}
+						umschalten={() => setAuf(auf === 'trophaeen' ? null : 'trophaeen')}
+						tabelle={<Stufenzeilen stufen={zahlen.trophaeen.stufen} />}
+					>
+						{/*
+						  Level und die vier Stufen in EINER Zeile (Stufe 19b, am Prototyp in
+						  vier Runden abgestimmt). Auf dem Gerät des Nutzers (360 px) rutscht
+						  die Stufenreihe auf eine eigene Zeile – gemessen, auch mit kleineren
+						  Maßen.
+						*/}
+						<div className="levelzeile">
+							{zahlen.level && (
+								<div className="level">
+									<span className="wert">{t(zahlen.level.level)}</span>
+									<span className="wort">Level</span>
+								</div>
+							)}
+							<div className="stufenkurz">
+								{zahlen.trophaeen.stufen.map((s) => (
+									<span key={s.stufe} className="sk" style={{ color: `var(--troph-${s.stufe})` }}>
+										{/* Unser eigener Pokal, nie Sonys Formen (Abschnitt 13). */}
+										<Zeichen name="pokal" groesse={22} strich={1.5} />
+										{t(s.erspielt)}
+										<span className="nur-vorlesen">
+											{STUFENTEXT[s.stufe]}: {s.erspielt} von {s.definiert}
+										</span>
+									</span>
+								))}
+							</div>
+						</div>
+
+						{/* Der Balken gehört zum Level und fehlt ohne es ganz – eine leere
+						    Spur unter vier Zahlen wäre ein Fortschritt zu nichts. */}
+						{zahlen.level && (
+							<>
+								<div className="balken levelbalken">
+									<div style={{ width: `${zahlen.level.prozent}%`, background: 'var(--gold)' }} />
+								</div>
+								<div className="levelfuss">
+									<span>{t(zahlen.level.punkte)} Punkte</span>
+									<span>
+										{t(zahlen.level.bisNaechstes)} bis Level {t(zahlen.level.level + 1)}
+									</span>
+								</div>
+							</>
+						)}
+					</Aufklappbar>
+					{/* Am Desktop steht die Tabelle fest, statt hinter dem Aufklappen. */}
+					<div className="block nur-desktop dunter">
+						<div className="blockname">Anteil je Stufe</div>
+						<Stufenzeilen stufen={zahlen.trophaeen.stufen} />
+					</div>
+				</div>
+
+				<div className="dflaeche">
+					<Aufklappbar
+						klasse="b-plattform"
+						name="Je Plattform"
+						offen={auf === 'plattform'}
+						umschalten={() => setAuf(auf === 'plattform' ? null : 'plattform')}
+						tabelle={<PlattformTabelle zeilen={zahlen.plattformen} />}
+					>
+						<div className="reihe">
+							{PLATTFORMEN.map((p) => {
+								const z = zahlen.plattformen.find((x) => x.plattform === p)
+								return (
+									<Link key={p} className="kachel pk" to={`/sammlung?platform=${p}`}>
+										<PlattformChip plattform={p} />
+										<span className="zahl">{t(z?.releases ?? 0)}</span>
+									</Link>
+								)
+							})}
+						</div>
+					</Aufklappbar>
+					<div className="block nur-desktop dunter">
+						<div className="blockname">Bestand je Plattform</div>
+						<PlattformTabelle zeilen={zahlen.plattformen} />
+					</div>
+				</div>
+			</div>
+
+			{/*
+			  Die vier Kästen (Stufe 24): flach, das Zeichen links, rechts Zahl und
+			  eine Zeile. Backlog und To-Do sind gewichen – beide stehen in der
+			  Navigation (Entscheidung des Nutzers vom 07.11.2026).
+			*/}
 			<div className="block b-zahlen">
-				<div className="reihe">
-					<div className="kachel">
-						{/* Fehlt jede Trophäenliste, ist der Anteil unbekannt – nie 0 % (Abschnitt 13). */}
-						<span className="zahl gold">{anteil === null ? 'unbekannt' : `${anteil} %`}</span>
-						<span className="wort">Trophäen</span>
-					</div>
-					<div className="kachel">
-						<span className="zahl">{t(zahlen.spiele)}</span>
-						<span className="wort">Spiele</span>
-					</div>
-					<Link className="kachel" to="/backlog">
-						<span className="zahl">{t(zahlen.listen.backlog)}</span>
-						<span className="wort">Backlog</span>
-					</Link>
-					<Link className="kachel" to="/todo">
-						<span className="zahl">{t(zahlen.listen.todo)}</span>
-						<span className="wort">To-Do</span>
-					</Link>
+				<div className="kastenreihe">
+					{/* Fehlt jede Trophäenliste, ist der Anteil unbekannt – nie 0 % (Abschnitt 13). */}
+					<Kasten ikon={<PokalGruppe />} zahl={anteil === null ? 'unbekannt' : `${anteil} %`} wort="Trophäen" gold />
+					<Kasten
+						ikon={<Zeichen name="regal" groesse={40} strich={1} />}
+						zahl={t(zahlen.spiele)}
+						wort="Spiele"
+						zusatz={`${t(zahlen.releases)} Releases`}
+					/>
+					<Kasten ikon={<Zeichen name="disc" groesse={36} strich={1.1} />} zahl={t(summe('disc'))} wort="Physisch" />
+					<Kasten
+						ikon={<Zeichen name="wolke" groesse={36} strich={1.1} />}
+						zahl={t(summe('digital'))}
+						wort="Digital"
+						zusatz={
+							/* Das Zeichen statt des Worts (Wunsch des Nutzers vom 07.11.2026);
+							   das Wort steht für Vorleseprogramme daneben. */
+							nurPlus > 0 ? (
+								<>
+									davon {t(nurPlus)}
+									<Zeichen name="psplus" groesse={15} strich={2} />
+									<span className="nur-vorlesen">nur über PS Plus</span>
+								</>
+							) : undefined
+						}
+					/>
 				</div>
 			</div>
 
-			<Aufklappbar
-				klasse="b-plattform"
-				name="Je Plattform"
-				offen={auf === 'plattform'}
-				umschalten={() => setAuf(auf === 'plattform' ? null : 'plattform')}
-				tabelle={<PlattformTabelle zeilen={zahlen.plattformen} />}
-			>
-				<div className="reihe">
-					{PLATTFORMEN.map((p) => {
-						const z = zahlen.plattformen.find((x) => x.plattform === p)
-						return (
-							<Link key={p} className="kachel pk" to={`/sammlung?platform=${p}`}>
-								<PlattformChip plattform={p} />
-								<span className="zahl">{t(z?.releases ?? 0)}</span>
-							</Link>
-						)
-					})}
-				</div>
-			</Aufklappbar>
-
-			{/* Ohne Releases gäbe es hier nur eine Überschrift über nichts. */}
-			{zahlen.releases > 0 && (
-			<div className="block b-dastehen">
-				<div className="blockname">Wie ich dastehe</div>
-				<div className="dastehen">
-					<Kreis status={zahlen.status} gesamt={zahlen.releases} />
-					<div className="legende">
-						{PLAY_STATUS.filter((s) => zahlen.status[s] > 0)
-							.sort((a, b) => zahlen.status[b] - zahlen.status[a])
-							.map((s) => (
-								<Link key={s} className="zustand" to={`/sammlung?playStatus=${s}`}>
-									<span className="punkt" style={{ background: zustandsFarbe(s) }} />
-									{STATUSTEXT[s]}
-									<span className="n">{t(zahlen.status[s])}</span>
-								</Link>
-							))}
+			<div className="dmitte">
+				{/* Ohne Releases gäbe es hier nur eine Überschrift über nichts. */}
+				{zahlen.releases > 0 && (
+					<div className="dflaeche block b-dastehen">
+						<div className="blockname">Wie ich dastehe</div>
+						<div className="dastehen">
+							<Kreis status={zahlen.status} gesamt={zahlen.releases} />
+							<div className="legende">
+								{PLAY_STATUS.filter((s) => zahlen.status[s] > 0)
+									.sort((a, b) => zahlen.status[b] - zahlen.status[a])
+									.map((s) => (
+										<Link key={s} className="zustand" to={`/sammlung?playStatus=${s}`}>
+											<span className="punkt" style={{ background: zustandsFarbe(s) }} />
+											{STATUSTEXT[s]}
+											<span className="n">{t(zahlen.status[s])}</span>
+										</Link>
+									))}
+							</div>
+						</div>
 					</div>
-				</div>
-			</div>
-			)}
-
-			<Aufklappbar
-				klasse="b-trophaeen"
-				name="Trophäen"
-				rechts={`${t(zahlen.trophaeen.erspielt)} von ${t(zahlen.trophaeen.definiert)}`}
-				offen={auf === 'trophaeen'}
-				umschalten={() => setAuf(auf === 'trophaeen' ? null : 'trophaeen')}
-				tabelle={<Stufenzeilen stufen={zahlen.trophaeen.stufen} />}
-			>
-				{/*
-				  Level und die vier Stufen in EINER Zeile (Stufe 19b, am Prototyp in
-				  vier Runden abgestimmt). Die Kacheln sind weg: Wort und „von 338"
-				  stehen ohnehin in der Tabelle darunter, und die Zahlen nehmen die
-				  Fläche neben der Level-Zahl ein, statt an ihrem Rand zu kleben.
-				  Auf dem Gerät des Nutzers (360 px) rutscht die Stufenreihe auf eine
-				  eigene Zeile – gemessen, auch mit kleineren Maßen.
-				*/}
-				<div className="levelzeile">
-					{zahlen.level && (
-						<div className="level">
-							<span className="wert">{t(zahlen.level.level)}</span>
-							<span className="wort">Level</span>
-						</div>
-					)}
-					<div className="stufenkurz">
-						{zahlen.trophaeen.stufen.map((s) => (
-							<span key={s.stufe} className="sk" style={{ color: `var(--troph-${s.stufe})` }}>
-								{/* Unser eigener Pokal, nie Sonys Formen (Abschnitt 13). */}
-								<Zeichen name="pokal" groesse={22} strich={1.5} />
-								{t(s.erspielt)}
-								<span className="nur-vorlesen">
-									{STUFENTEXT[s.stufe]}: {s.erspielt} von {s.definiert}
-								</span>
-							</span>
-						))}
-					</div>
-				</div>
-
-				{/* Der Balken gehört zum Level und fehlt ohne es ganz – eine leere
-				    Spur unter vier Zahlen wäre ein Fortschritt zu nichts. */}
-				{zahlen.level && (
-					<>
-						<div className="balken levelbalken">
-							<div style={{ width: `${zahlen.level.prozent}%`, background: 'var(--gold)' }} />
-						</div>
-						<div className="levelfuss">
-							<span>{t(zahlen.level.punkte)} Punkte</span>
-							<span>
-								{t(zahlen.level.bisNaechstes)} bis Level {t(zahlen.level.level + 1)}
-							</span>
-						</div>
-					</>
 				)}
-			</Aufklappbar>
+
+				{/* Nur am Desktop (wie bisher das letzte Platin): Auf dem Handy wären
+				    es zwei weitere Blöcke auf einer Seite, die schon scrollt. */}
+				<div className="dzuletzt nur-desktop">
+					{zahlen.letztesPlatin && <LetztesPlatinBlock spiel={zahlen.letztesPlatin} />}
+					{zahlen.letzteTrophaee && <LetzteTrophaeeBlock trophaee={zahlen.letzteTrophaee} />}
+				</div>
+			</div>
 
 			<JahreBlock />
-
-			{/* Nur am Desktop: neben dem Kreis ist dort Platz, auf dem Handy wäre es
-			    ein sechster Block auf einer Seite, die schon scrollt. */}
-			{zahlen.letztesPlatin && <LetztesPlatinBlock spiel={zahlen.letztesPlatin} />}
-
-			{/* Am Desktop stehen die beiden Tabellen fest, statt hinter dem Aufklappen. */}
-			<div className="nur-desktop dtabellen">
-				<div className="block">
-					<div className="blockname">Bestand je Plattform</div>
-					<PlattformTabelle zeilen={zahlen.plattformen} />
-				</div>
-				<div className="block">
-					<div className="blockname">Anteil je Stufe</div>
-					<Stufenzeilen stufen={zahlen.trophaeen.stufen} />
-				</div>
-			</div>
 		</>
+	)
+}
+
+/**
+ * Ein flacher Kasten der Kennzahlen (Stufe 24). Der Zusatz steht am Desktop
+ * mit einem Punkt hinter dem Wort, auf dem Handy in einer eigenen Zeile –
+ * dort bräche „Spiele · 445 Releases" bei 360 px mitten durch (gesehen am
+ * Prototyp, 07.11.2026).
+ */
+function Kasten({
+	ikon,
+	zahl,
+	wort,
+	zusatz,
+	gold = false,
+}: {
+	ikon: React.ReactNode
+	zahl: string
+	wort: string
+	zusatz?: React.ReactNode
+	gold?: boolean
+}) {
+	return (
+		<div className="kasten">
+			{ikon}
+			<span className="ktext">
+				<span className={gold ? 'kzahl gold' : 'kzahl'}>{zahl}</span>
+				<span className="kwort">
+					{wort}
+					{zusatz && <span className="kzusatz">{zusatz}</span>}
+				</span>
+			</span>
+		</div>
 	)
 }
 
@@ -243,7 +307,7 @@ function PlattformTabelle({ zeilen }: { zeilen: PlattformZahlen[] }) {
 					<th>Spiele</th>
 					<th>Platin</th>
 					<th>Disc</th>
-					<th>Download</th>
+					<th>Digital</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -328,7 +392,7 @@ function JahreBlock() {
 	}, [])
 
 	return (
-		<div className="block b-jahre">
+		<div className="dflaeche block b-jahre">
 			<div className="blockname">Trophäen je Jahr</div>
 			{jahre ? <Saeulen jahre={jahre} /> : <p className="ruhig klein">Wird geladen …</p>}
 		</div>
@@ -419,7 +483,7 @@ function Saeulen({ jahre }: { jahre: Array<{ jahr: number; anzahl: number }> }) 
 
 function LetztesPlatinBlock({ spiel }: { spiel: LetztesPlatin }) {
 	return (
-		<div className="block nur-desktop b-platin">
+		<div className="dflaeche block b-platin">
 			{/* Seit Stufe 19b das ECHTE letzte Platin: `trophy.earned_at` nennt
 			    den Zeitpunkt. Bis dahin hieß der Block „Zuletzt gespielt · mit
 			    Platin", weil die Datenbank nur das wusste (Frage des Nutzers vom
@@ -447,6 +511,44 @@ function LetztesPlatinBlock({ spiel }: { spiel: LetztesPlatin }) {
 					<div className="lp-fuss">
 						{spiel.fortschritt}&thinsp;% der Liste · erspielt {datum(spiel.erspieltAm)}
 					</div>
+				</div>
+			</div>
+		</div>
+	)
+}
+
+/**
+ * Die zuletzt erspielte Trophäe, gleich welcher Stufe (Stufe 24). Unser
+ * Pokal in der Farbe ihrer Stufe statt des Trophäenbilds von Sony (Wahl des
+ * Nutzers vom 07.11.2026). Ohne Zuordnung steht der Titel ohne Link da.
+ */
+function LetzteTrophaeeBlock({ trophaee: tr }: { trophaee: LetzteTrophaee }) {
+	const titel = tr.spielId === null ? <span className="lp-titel">{tr.name}</span> : (
+		<Link className="lp-titel" to={`/spiel/${tr.spielId}`}>
+			{tr.name}
+		</Link>
+	)
+	return (
+		<div className="dflaeche block b-lt">
+			<div className="blockname">Letzte Trophäe</div>
+			<div className="lp">
+				<span className="lt-ikon" style={{ color: `var(--troph-${tr.stufe})` }}>
+					<Zeichen name="pokal" groesse={40} strich={1.4} gefuellt={tr.stufe === 'platin'} />
+				</span>
+				<div className="lp-text">
+					{titel}
+					<div className="lp-zeile">
+						{tr.plattform && <PlattformChip plattform={tr.plattform} />}
+						<span className="lt-spiel">{tr.titel}</span>
+					</div>
+					<div className="lp-zahlen">
+						<span style={{ color: `var(--troph-${tr.stufe})` }}>{STUFENTEXT[tr.stufe]}</span>
+						{/* Unbekannt bleibt unbekannt – weggelassen wie in der Trophäenliste, nie „0 %". */}
+						{tr.seltenheit !== null && (
+							<span>{tr.seltenheit.toLocaleString('de-DE', { maximumFractionDigits: 1 })} % der Spieler</span>
+						)}
+					</div>
+					<div className="lp-fuss">erspielt {datum(tr.erspieltAm)}</div>
 				</div>
 			</div>
 		</div>
