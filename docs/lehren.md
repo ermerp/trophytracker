@@ -911,3 +911,20 @@ Begründung zweimal entgegengesetzt verwendet wurde.
 **Am selben Tag – „Rückgängig":** Die zurückgeholte Zeile sprang an den Anfang der Liste, statt an ihren
 Platz. Das verletzte die bestehende Regel, dass ein Rückgängig den Stand vor der Aktion vollständig
 herstellt: Die Position gehört dazu.
+
+---
+
+## Die Breite, die nur meine war
+
+**07.11.2026.** Am Prototyp des Dashboards riet ich von drei Spalten ab, weil sie bei 1280 px Legende und
+Platin-Text quetschten. Der Nutzer arbeitet aber mit rund 2 030 CSS-px (Skalierung 1,25); erst sein
+Bildschirmfoto zeigte, dass die linke Spalte dort 915 statt 700 px breit ist und drei Spalten passen. Die
+Empfehlung beruhte auf einer Breite, die nur auf dem Entwicklungsrechner galt.
+→ Eine Layout-Entscheidung wird auch in der Breite vorgelegt, in der der Nutzer arbeitet, nicht nur in den
+drei Testbreiten.
+
+**Am selben Tag – ein „gut" auf ein Entweder-oder:** Gefragt war, ob die letzte Trophäe unseren Pokal oder das
+Bild aus PSN tragen soll; die Antwort „finde ich gut" habe ich als Wahl des Pokals gelesen und so gebaut.
+Gemeint war das PSN-Symbol, korrigiert nach dem Deploy (Nachtrag 24b).
+→ Eine Zustimmung ohne Nennung einer der Möglichkeiten ist keine Wahl; dann wird nachgefragt.
+
