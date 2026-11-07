@@ -153,6 +153,14 @@ export const ERLAUBTE_PLATTFORMEN = ["PS3", "PS4", "PS5", "PSVITA"] as const;
 
 export type Plattform = (typeof ERLAUBTE_PLATTFORMEN)[number];
 
+/**
+ * Die Reihenfolge, in der die Oberflaeche Plattformen zeigt: die neueste
+ * zuerst (Entscheidung des Nutzers vom 07.11.2026, Stufe 24). Nur fuer
+ * Antworten an die Oberflaeche - Pruefung und Abgleich bleiben bei
+ * ERLAUBTE_PLATTFORMEN, deren Reihenfolge dort nichts bedeutet.
+ */
+export const ANZEIGE_PLATTFORMEN: readonly Plattform[] = ["PS5", "PS4", "PS3", "PSVITA"];
+
 export function istErlaubtePlattform(wert: string): wert is Plattform {
 	return (ERLAUBTE_PLATTFORMEN as readonly string[]).includes(wert);
 }

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import type { Kennzahlen, LetztesPlatinZeile, PlattformZeile } from "../db/stats";
-import { ERLAUBTE_PLATTFORMEN } from "../domain/titel";
+import type { Kennzahlen, LetzteTrophaeeZeile, LetztesPlatinZeile, PlattformZeile } from "../db/stats";
+import { ANZEIGE_PLATTFORMEN } from "../domain/titel";
 import { jahreStand, levelStand } from "../sync/trophaeen";
 import type { AppEnv } from "../types";
 
@@ -33,6 +33,23 @@ function plattformAntwort(z: PlattformZeile) {
 		platinMoeglich: z.platin_moeglich,
 		disc: z.disc,
 		digital: z.digital,
+		/** Davon nur ueber PS Plus (Stufe 24) - im Abo, nicht gekauft. */
+		nurPlus: z.nur_plus,
+	};
+}
+
+/** Die zuletzt erspielte Trophaee (Stufe 24); ohne Zuordnung ohne Spiel-Id. */
+function letzteTrophaeeAntwort(z: LetzteTrophaeeZeile | null) {
+	if (!z) return null;
+	return {
+		name: z.name,
+		stufe: z.grade,
+		erspieltAm: z.erspielt_am,
+		/** null heisst unbekannt - die Oberflaeche laesst die Angabe dann weg, wie die Trophaeenliste. */
+		seltenheit: z.earned_rate,
+		titel: z.title,
+		spielId: z.game_id,
+		plattform: z.platform,
 	};
 }
 
@@ -70,7 +87,7 @@ function antwort(k: Kennzahlen) {
 	return {
 		spiele: k.spiele,
 		releases: k.releases,
-		plattformen: ERLAUBTE_PLATTFORMEN.map((p) => plattformAntwort(k.plattformen[p])),
+		plattformen: ANZEIGE_PLATTFORMEN.map((p) => plattformAntwort(k.plattformen[p])),
 		status: k.status,
 		trophaeen: {
 			listen: t.listen,
@@ -89,6 +106,7 @@ function antwort(k: Kennzahlen) {
 		},
 		listen: k.listen,
 		letztesPlatin: letztesPlatinAntwort(k.letztesPlatin),
+		letzteTrophaee: letzteTrophaeeAntwort(k.letzteTrophaee),
 	};
 }
 

@@ -52,7 +52,12 @@ export const PLATTFORM_SQL =
 	"SUM(EXISTS (SELECT 1 FROM trophy_progress t3 WHERE t3.release_id = r.id " +
 	"AND t3.defined_platinum > 0 AND t3.earned_platinum > 0)) AS platin, " +
 	"SUM(EXISTS (SELECT 1 FROM physical_copy p1 WHERE p1.release_id = r.id)) AS disc, " +
-	"SUM(EXISTS (SELECT 1 FROM digital_entitlement d1 WHERE d1.release_id = r.id)) AS digital " +
+	"SUM(EXISTS (SELECT 1 FROM digital_entitlement d1 WHERE d1.release_id = r.id)) AS digital, " +
+	// Digital NUR ueber PS Plus (Stufe 24): eine Berechtigung aus dem Abo und
+	// keine andere. Zwei Unterabfragen statt eines OR (CLAUDE.md), beide ueber
+	// den Fremdschluesselindex. Am 07.11.2026 waren das 159 der 215.
+	"SUM(EXISTS (SELECT 1 FROM digital_entitlement d2 WHERE d2.release_id = r.id AND d2.source = 'plus') " +
+	"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d3 WHERE d3.release_id = r.id AND d3.source <> 'plus')) AS nur_plus " +
 	`FROM release r WHERE NOT ${NUR_WUNSCH} GROUP BY r.platform`;
 
 /** Ein Release ohne Zeile in play_status zaehlt als 'nicht_gespielt' (Abschnitt 12). */
@@ -132,6 +137,24 @@ export const LETZTES_PLATIN_SQL =
 	"WHERE tr.earned = 1 AND tr.grade = 'platin' AND tr.earned_at IS NOT NULL " +
 	"ORDER BY tr.earned_at DESC LIMIT 1";
 
+/**
+ * Die zuletzt erspielte Trophaee, gleich welcher Stufe (Stufe 24).
+ *
+ * Derselbe Rueckwaertslauf ueber den Teilindex auf `earned_at` wie beim
+ * Platin, der bei der ersten Zeile stehenbleibt (9 gelesene Zeilen gegen die
+ * Produktion, 07.11.2026). Anders als dort mit LEFT JOIN: Auch eine noch
+ * nicht zugeordnete Liste traegt erspielte Trophaeen, dann steht der Rohtitel
+ * von Sony da und kein Link.
+ */
+export const LETZTE_TROPHAEE_SQL =
+	"SELECT tr.name, tr.grade, tr.earned_at AS erspielt_am, tr.earned_rate, " +
+	"COALESCE(g.title, tp.title_name) AS title, g.id AS game_id, r.platform " +
+	"FROM trophy tr " +
+	"JOIN trophy_progress tp ON tp.np_communication_id = tr.np_communication_id " +
+	"LEFT JOIN release r ON r.id = tp.release_id LEFT JOIN game g ON g.id = r.game_id " +
+	"WHERE tr.earned = 1 AND tr.earned_at IS NOT NULL " +
+	"ORDER BY tr.earned_at DESC LIMIT 1";
+
 export type PlattformZeile = {
 	platform: string;
 	releases: number;
@@ -141,6 +164,8 @@ export type PlattformZeile = {
 	platin: number;
 	disc: number;
 	digital: number;
+	/** Digital nur ueber PS Plus (Stufe 24). */
+	nur_plus: number;
 };
 
 export type TrophaeenZeile = {
@@ -174,6 +199,18 @@ export type LetztesPlatinZeile = {
 	earned_platinum: number;
 };
 
+export type LetzteTrophaeeZeile = {
+	name: string;
+	grade: string;
+	erspielt_am: string;
+	/** Anteil der Spieler in Prozent; null heisst unbekannt. */
+	earned_rate: number | null;
+	title: string;
+	/** null, solange die Liste keinem Spiel zugeordnet ist. */
+	game_id: number | null;
+	platform: string | null;
+};
+
 export type Kennzahlen = {
 	spiele: number;
 	releases: number;
@@ -182,6 +219,7 @@ export type Kennzahlen = {
 	trophaeen: TrophaeenZeile;
 	listen: { backlog: number; todo: number };
 	letztesPlatin: LetztesPlatinZeile | null;
+	letzteTrophaee: LetzteTrophaeeZeile | null;
 };
 
 /** Eine leere Zeile, damit eine Plattform ohne Release als 0 erscheint statt zu fehlen. */
@@ -195,6 +233,7 @@ function leerePlattform(platform: string): PlattformZeile {
 		platin: 0,
 		disc: 0,
 		digital: 0,
+		nur_plus: 0,
 	};
 }
 
@@ -209,13 +248,14 @@ export class StatsRepository {
 	 * ReviewRepository.zaehlungNachGrund).
 	 */
 	async kennzahlen(): Promise<Kennzahlen> {
-		const [plattformen, status, trophaeen, listen, spiele, letztes] = await this.db.batch([
+		const [plattformen, status, trophaeen, listen, spiele, letztes, letzteTrophaee] = await this.db.batch([
 			this.db.prepare(PLATTFORM_SQL),
 			this.db.prepare(STATUS_SQL),
 			this.db.prepare(TROPHAEEN_SQL),
 			this.db.prepare(LISTEN_SQL),
 			this.db.prepare(SPIELE_SQL),
 			this.db.prepare(LETZTES_PLATIN_SQL),
+			this.db.prepare(LETZTE_TROPHAEE_SQL),
 		]);
 
 		const jePlattform = Object.fromEntries(
@@ -246,6 +286,7 @@ export class StatsRepository {
 			trophaeen: trophaeen.results[0] as TrophaeenZeile,
 			listen: jeListe,
 			letztesPlatin: (letztes.results[0] as LetztesPlatinZeile | undefined) ?? null,
+			letzteTrophaee: (letzteTrophaee.results[0] as LetzteTrophaeeZeile | undefined) ?? null,
 		};
 	}
 }

@@ -29,7 +29,7 @@ type Eintrag = {
 
 const EINTRAEGE: readonly Eintrag[] = [
 	{ ziel: '/start', name: 'haus', text: 'Start', unter: [] },
-	{ ziel: '/sammlung', name: 'raster', text: 'Sammlung', unter: [] },
+	{ ziel: '/sammlung', name: 'regal', text: 'Sammlung', unter: [] },
 	{
 		ziel: '/wunschliste',
 		name: 'stern',

@@ -22,6 +22,7 @@ import { EXPORT_ORDNUNG, EXPORT_TABELLEN } from "../src/db/export";
 import { VERLAUF_SQL } from "../src/db/preise";
 import { FAELLIG_IN_AUSWAHL } from "../src/db/markt";
 import {
+	LETZTE_TROPHAEE_SQL,
 	LETZTES_PLATIN_SQL,
 	LISTEN_SQL,
 	PLATTFORM_SQL,
@@ -1394,6 +1395,10 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const dl = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, 'kauf')");
 		for (let i = 1; i <= ANZAHL; i += 3) anweisungen.push(disc.bind(i));
 		for (let i = 2; i <= ANZAHL; i += 7) anweisungen.push(dl.bind(i));
+		// Stufe 24: PS Plus wie in der Produktion (159 von 215 digital nur im
+		// Abo, 07.11.2026) - sonst messen die beiden Plus-Unterabfragen nichts.
+		const plus = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, 'plus')");
+		for (let i = 3; i <= ANZAHL; i += 3) anweisungen.push(plus.bind(i));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 		await env.DB.batch([
 			env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (9001, 'Wunschspiel', 'wunschspiel')"),
@@ -1409,8 +1414,11 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const listen = await zeilenGelesen(LISTEN_SQL);
 		const spiele = await zeilenGelesen(SPIELE_SQL);
 		const letztesPlatin = await zeilenGelesen(LETZTES_PLATIN_SQL);
-		const summe = plattform + status + trophaeen + listen + spiele + letztesPlatin;
-		console.info({ plattform, status, trophaeen, listen, spiele, letztesPlatin, summe });
+		// Stufe 24: die letzte Trophaee jeder Stufe, derselbe Rueckwaertslauf
+		// ueber den Teilindex wie beim Platin.
+		const letzteTrophaee = await zeilenGelesen(LETZTE_TROPHAEE_SQL);
+		const summe = plattform + status + trophaeen + listen + spiele + letztesPlatin + letzteTrophaee;
+		console.info({ plattform, status, trophaeen, listen, spiele, letztesPlatin, letzteTrophaee, summe });
 
 		// Groessenordnung: Die Plattformabfrage laeuft einmal ueber release und
 		// macht je Zeile fuenf Index-Lookups (Migration 0008); die uebrigen
@@ -1422,6 +1430,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(trophaeen).toBeLessThan(ANZAHL + 100);
 		expect(listen).toBeLessThan(500);
 		expect(letztesPlatin).toBeLessThan(2 * ANZAHL);
+		expect(letzteTrophaee).toBeLessThan(2 * ANZAHL);
 		expect(summe).toBeLessThan(25 * ANZAHL);
 
 		const antwort = await SELF.fetch(`${B}/api/stats`);

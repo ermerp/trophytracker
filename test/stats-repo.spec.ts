@@ -165,6 +165,55 @@ describe("Kennzahlen fuers Dashboard (Stufe 19a)", () => {
 		expect(k.letztesPlatin?.platin_name).toBe("Alles erreicht");
 	});
 
+	/**
+	 * Stufe 24: "davon … PS Plus" in der Box "Digital". Gezaehlt wird ein
+	 * Release, dessen digitale Berechtigungen ALLE aus dem Abo stammen. Wer
+	 * dasselbe Spiel auch gekauft hat, besitzt es - das zaehlt nicht mit.
+	 */
+	it("zaehlt digital nur ueber PS Plus, nicht gekauft und Plus zugleich (Stufe 24)", async () => {
+		await spiel(1, "PS4"); // nur Plus
+		await spiel(2, "PS4"); // gekauft
+		await spiel(3, "PS4"); // Plus und gekauft
+		await spiel(4, "PS4"); // nur Disc
+		const recht = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, ?)");
+		await env.DB.batch([recht.bind(1, "plus"), recht.bind(2, "kauf"), recht.bind(3, "plus"), recht.bind(3, "kauf")]);
+		await env.DB.prepare("INSERT INTO physical_copy (release_id, condition) VALUES (4, 'gut')").run();
+
+		const k = await repos().stats.kennzahlen();
+		expect(k.plattformen.PS4.digital).toBe(3);
+		expect(k.plattformen.PS4.nur_plus).toBe(1);
+	});
+
+	/**
+	 * Stufe 24: die zuletzt erspielte Trophaee, gleich welcher Stufe - auch
+	 * aus einer Liste ohne Zuordnung. Dann steht der Rohtitel von Sony da und
+	 * keine Spiel-Id, statt dass die Trophaee fehlt.
+	 */
+	it("nennt die zuletzt erspielte Trophaee jeder Stufe, auch ohne Zuordnung (Stufe 24)", async () => {
+		await spiel(1, "PS5");
+		await liste(1, { erspieltPlatin: 1, zuletzt: "2026-03-01T00:00:00Z" });
+		await liste(null);
+		const trophaee = env.DB.prepare(
+			"INSERT INTO trophy (np_communication_id, trophy_id, grade, name, earned, earned_at, earned_rate) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		);
+		await env.DB.batch([
+			trophaee.bind("NPWR1", 5, "bronze", "Spaeter", 1, "2026-04-01T00:00:00Z", 18.5),
+			// Nicht erspielt, aber mit Datum - darf nicht zaehlen.
+			trophaee.bind("NPWR1", 6, "gold", "Offen", 0, "2026-09-01T00:00:00Z", 3.1),
+		]);
+
+		let k = await repos().stats.kennzahlen();
+		expect(k.letzteTrophaee).toMatchObject({ name: "Spaeter", grade: "bronze", earned_rate: 18.5, game_id: 1, platform: "PS5", title: "Spiel 1" });
+
+		await trophaee.bind("NPWRfrei", 1, "silber", "Ohne Spiel", 1, "2026-05-01T00:00:00Z", null).run();
+		k = await repos().stats.kennzahlen();
+		expect(k.letzteTrophaee).toMatchObject({ name: "Ohne Spiel", game_id: null, platform: null, title: "x" });
+
+		const d = (await (await SELF.fetch(`${B}/api/stats`)).json()) as any;
+		// Unbekannte Seltenheit bleibt null, nie 0 (Abschnitt 3).
+		expect(d.letzteTrophaee).toMatchObject({ name: "Ohne Spiel", stufe: "silber", spielId: null, seltenheit: null });
+	});
+
 	it("kommt mit einer leeren Datenbank aus", async () => {
 		const k = await repos().stats.kennzahlen();
 		expect(k.spiele).toBe(0);
@@ -180,6 +229,7 @@ describe("Kennzahlen fuers Dashboard (Stufe 19a)", () => {
 		expect(daten.trophaeen.definiert).toBe(0);
 		expect(daten.plattformen).toHaveLength(4);
 		expect(daten.letztesPlatin).toBeNull();
+		expect(daten.letzteTrophaee).toBeNull();
 	});
 
 	it("liefert die Route in der Form aus Abschnitt 12", async () => {
@@ -195,7 +245,9 @@ describe("Kennzahlen fuers Dashboard (Stufe 19a)", () => {
 		const d = (await antwort.json()) as any;
 		expect(d.spiele).toBe(1);
 		expect(d.releases).toBe(1);
-		expect(d.plattformen[1]).toMatchObject({ plattform: "PS4", releases: 1, disc: 1, platin: 1, platinMoeglich: 1 });
+		// Die neueste Plattform zuerst (Stufe 24, Entscheidung vom 07.11.2026).
+		expect(d.plattformen.map((p: any) => p.plattform)).toEqual(["PS5", "PS4", "PS3", "PSVITA"]);
+		expect(d.plattformen[1]).toMatchObject({ plattform: "PS4", releases: 1, disc: 1, platin: 1, platinMoeglich: 1, nurPlus: 0 });
 		expect(d.listen).toEqual({ backlog: 1, todo: 0 });
 		// Platin steht oben (Wertigkeit, Abschnitt 13).
 		expect(d.trophaeen.stufen.map((s: any) => s.stufe)).toEqual(["platin", "gold", "silber", "bronze"]);

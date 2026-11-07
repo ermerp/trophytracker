@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 162 | 07.11.2026 | **Stufe 24: Dashboard neu angeordnet.** Flächen je Abschnitt, flache Kästen mit Pokalgruppe, Regal, Disc und Wolke (Digital mit PS-Plus-Anteil), letzte Trophäe am Desktop, dreispaltig nach Breite der linken Spalte; Backlog/To-Do-Kästen entfallen; Plattformen überall PS5 → Vita; Regal in der Navigation; `/api/stats` mit `nurPlus` und `letzteTrophaee` (12, 13.1, 13.2, 16.2) |
 | 161 | 07.11.2026 | **Nachtrag: Nacht zum 07.11.** 72 Cron-Aufrufe `ok`, Sync `erfolg`; zweite Spielzeit-Spitze 38 ms in LAX (erste 14 in FRA), kein `sortierung=abweichend`; Preisalarm #1 folgt dem Preis wie gebaut, Logzeile nennt Preisalarme; Startseite liest 13 424 Zeilen je Aufruf; Abendläufe 3 h 33 bis 3 h 49 verspätet (7.7, 16.2) |
 | 160 | 06.11.2026 | **Nachtrag: Abschluss der Sitzung.** Stand der relativen Regel in 16.2, zwei Lehren, zwei Regeln geschärft |
 | 159 | 06.11.2026 | **Nachtrag: Abgehakte Zeile bleibt an ihrem Platz.** Kleiner, der Titel bleibt Link, Rückgängig stellt sie an derselben Stelle wieder her (16.2) |

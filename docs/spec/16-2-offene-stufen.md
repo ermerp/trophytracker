@@ -57,6 +57,7 @@ Das Budget arbeitender Aufrufe ist am 03.11.2026 bewertet: Ziel bleibt, gearbeit
   weitere: `/pruefen` ist die einzige Stelle für „Release abtrennen" und „Sortierschlüssel neu berechnen"
   ([13.1](13-1-ansichten-listen-und-werkzeuge.md)), die übrigen Werkzeuge verlinken Offenes, Listen oder
   Feed, „Abweichungen" zeigt sonst niemand, „Anzeige" ist bewusst dauerhaft.
+- **Dashboard neu angeordnet** (Stufe 24, 07.11.2026, am Prototyp in mehreren Runden entschieden): Flächen je Abschnitt, flache Kästen mit eigenen Zeichen (Pokalgruppe, Regal – das Regal auch in der Navigation), letzte Trophäe am Desktop, Plattformen überall PS5 → Vita ([13.1](13-1-ansichten.md), [13.2](13-2-darstellungsregeln.md)). Den Cron berührt sie nicht. **Offen, nicht angefasst:** Das Öffnen der Startseite liest 13 424 Zeilen (07.11.2026, [16-2-naechte-2.md](16-2-naechte-2.md)), mit Stufe 24 rund 490 mehr.
 
 #### 20h – Angebotskorrektur (**abgeschlossen am 11.10.2026**)
 

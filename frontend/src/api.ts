@@ -37,7 +37,12 @@ export async function anfrage<T>(
   return daten as T
 }
 
-export const PLATTFORMEN = ['PS3', 'PS4', 'PS5', 'PSVITA'] as const
+/**
+ * Die neueste zuerst – so stehen Plattformen überall in der Oberfläche,
+ * in Filtern, Chips und Auswahlen (Entscheidung des Nutzers vom 07.11.2026,
+ * Stufe 24). Dieselbe Reihenfolge wie `ANZEIGE_PLATTFORMEN` im Worker.
+ */
+export const PLATTFORMEN = ['PS5', 'PS4', 'PS3', 'PSVITA'] as const
 export type Plattform = (typeof PLATTFORMEN)[number]
 
 /** Die neueste der genannten Plattformen – der Vorschlag für einen Wunsch (Abschnitt 5); '' wenn keine. */
@@ -637,6 +642,21 @@ export type PlattformZahlen = {
   platinMoeglich: number
   disc: number
   digital: number
+  /** Davon nur über PS Plus – im Abo, nicht gekauft (Stufe 24). */
+  nurPlus: number
+}
+
+/** Die zuletzt erspielte Trophäe, gleich welcher Stufe (Stufe 24). */
+export type LetzteTrophaee = {
+  name: string
+  stufe: TrophaeenStufe
+  erspieltAm: string
+  /** Anteil der Spieler in Prozent; `null` heißt unbekannt und wird weggelassen, nie „0 %". */
+  seltenheit: number | null
+  titel: string
+  /** `null`, solange die Liste keinem Spiel zugeordnet ist – dann ohne Link. */
+  spielId: number | null
+  plattform: Plattform | null
 }
 
 /** Das zuletzt **gespielte** Spiel mit Platin – nicht das zuletzt erspielte (19b, 7.7). */
@@ -672,6 +692,7 @@ export type Kennzahlen = {
   }
   listen: { backlog: number; todo: number }
   letztesPlatin: LetztesPlatin | null
+  letzteTrophaee: LetzteTrophaee | null
   /**
    * Das Trophäen-Level von Sony (Stufe 19b). `null`, solange der nächtliche
    * Schritt es noch nicht geholt hat – dann zeigt die Oberfläche es gar

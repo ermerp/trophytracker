@@ -61,6 +61,14 @@ export const ZEICHEN = {
 	winkel: '<path d="M9 5.4 15.6 12 9 18.6"/>',
 	filter: '<path d="M4 7.2h9M19.4 7.2h.6M4 12h3.4M11.8 12h8.2M4 16.8h8.2M17 16.8h3"/>' +
 		'<circle cx="16" cy="7.2" r="2.1"/><circle cx="9.6" cy="12" r="2.1"/><circle cx="14.8" cy="16.8" r="2.1"/>',
+	// Stufe 24: die Sammlung als Regal – Huellenruecken unterschiedlicher Hoehe,
+	// der letzte lehnt. Aus vier Ideen gewaehlt (Nutzer, 07.11.2026); das
+	// Raster bleibt fuer den Umschalter "Kacheln", dort heisst es genau das.
+	regal:
+		'<path d="M3 20.4h18"/><rect x="4.2" y="6" width="3" height="14.4" rx=".6"/>' +
+		'<rect x="7.8" y="4.2" width="3" height="16.2" rx=".6"/><rect x="11.4" y="7.2" width="3" height="13.2" rx=".6"/>' +
+		'<rect x="15.36" y="5.4" width="3" height="15" rx=".6" transform="rotate(14 16.8 20.4)"/>' +
+		'<path d="M5.7 8.4v2.4M9.3 6.6v2.4M12.9 9.6v2.4"/>',
 	// Stufe 19a: die offenen Posten des Dashboards. Eigene Zeichnung wie alle
 	// anderen; eine Glocke ist kein geschuetztes Zeichen.
 	glocke:
@@ -101,6 +109,42 @@ export function Zeichen({ name, groesse = 22, gefuellt = false, strich = 1.7, cl
 			focusable="false"
 			dangerouslySetInnerHTML={{ __html: ZEICHEN[name] }}
 		/>
+	)
+}
+
+/**
+ * Die vier Trophäenstufen als Gruppe (Stufe 24, Kachel „Trophäen" auf dem
+ * Dashboard): Platin groß im Hintergrund, Silber links und Bronze rechts
+ * leicht dahinter, Gold vorn in der Mitte (Wunsch des Nutzers vom
+ * 07.11.2026, Variante 4 von zweien). Es ist unser eigener Pokal, nie Sonys
+ * Formen (Abschnitt 13).
+ *
+ * Jeder Pokal trägt eine Füllung in der Farbe seines Grundes und verdeckt so,
+ * was hinter ihm steht – ohne sie liefen die Linien ineinander. Der Grund ist
+ * deshalb ein Parameter: Wer die Gruppe auf eine andere Fläche stellt, gibt
+ * deren Token mit.
+ */
+export function PokalGruppe({ hoehe = 40, grund = 'var(--flaeche)' }: { hoehe?: number; grund?: string }) {
+	const pokal = (stufe: string, x: number, y: number, s: number) => (
+		<g
+			transform={`translate(${x} ${y}) scale(${s})`}
+			stroke={`var(--troph-${stufe})`}
+			strokeWidth={1.5 / s}
+			fill="none"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		>
+			<path d="M8 4.2h8v4.4a4 4 0 0 1-8 0z M8.4 19.8h7.2l-.9-3.1H9.3z M11 12.4h2v4.4h-2z" fill={grund} stroke="none" />
+			<g dangerouslySetInnerHTML={{ __html: ZEICHEN.pokal }} />
+		</g>
+	)
+	return (
+		<svg width={hoehe * 1.5} height={hoehe} viewBox="0 0 60 40" aria-hidden="true" focusable="false">
+			{pokal('platin', 14.4, -3.5, 1.3)}
+			{pokal('silber', 5, 6.5, 1.05)}
+			{pokal('bronze', 29.8, 6.5, 1.05)}
+			{pokal('gold', 15.6, 10, 1.2)}
+		</svg>
 	)
 }
 
