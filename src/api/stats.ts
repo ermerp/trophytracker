@@ -47,6 +47,8 @@ function letzteTrophaeeAntwort(z: LetzteTrophaeeZeile | null) {
 		erspieltAm: z.erspielt_am,
 		/** null heisst unbekannt - die Oberflaeche laesst die Angabe dann weg, wie die Trophaeenliste. */
 		seltenheit: z.earned_rate,
+		/** Das Symbol aus PSN, wie in der Trophaeenliste; null, dann zeigt die Oberflaeche unseren Pokal (Stufe 24b). */
+		symbol: z.icon_url,
 		titel: z.title,
 		spielId: z.game_id,
 		plattform: z.platform,

@@ -211,7 +211,12 @@ describe("Kennzahlen fuers Dashboard (Stufe 19a)", () => {
 
 		const d = (await (await SELF.fetch(`${B}/api/stats`)).json()) as any;
 		// Unbekannte Seltenheit bleibt null, nie 0 (Abschnitt 3).
-		expect(d.letzteTrophaee).toMatchObject({ name: "Ohne Spiel", stufe: "silber", spielId: null, seltenheit: null });
+		expect(d.letzteTrophaee).toMatchObject({ name: "Ohne Spiel", stufe: "silber", spielId: null, seltenheit: null, symbol: null });
+
+		// Stufe 24b: das Symbol aus PSN kommt mit.
+		await env.DB.prepare("UPDATE trophy SET icon_url = 'https://bild.example/t.png' WHERE name = 'Ohne Spiel'").run();
+		const mitSymbol = (await (await SELF.fetch(`${B}/api/stats`)).json()) as any;
+		expect(mitSymbol.letzteTrophaee.symbol).toBe("https://bild.example/t.png");
 	});
 
 	it("kommt mit einer leeren Datenbank aus", async () => {
