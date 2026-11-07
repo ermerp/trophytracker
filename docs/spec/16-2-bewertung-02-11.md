@@ -84,7 +84,7 @@ Worker mit 321 ms.
 
 **Wie gearbeitet wird:** nach dem Muster von 18n-c – erst je Schritt die D1-Aufrufe zählen, dann
 bündeln. Reihenfolge von oben nach unten, nach dem teuersten Aufruf (Entscheidung des Nutzers vom 04.11.2026; 29.10.–04.11.
-gemessen): **Spielzeit** (Median 22, 14 von 14 über 15 ms, gebaut als 18o, erste Spitze 14 ms, [7.7](07-7-psn-weitere-daten.md)), dann
+gemessen): **Spielzeit** (Median 22, 14 von 14 über 15 ms, gebaut als 18o, Spitzen 14 ms in FRA und 38 ms in LAX, [7.7](07-7-psn-weitere-daten.md)), dann
 Sync (Median 13, 27 von 77), dann Kaufliste (15 einmal je Woche, Median 13). **Das Auffrischen bleibt, wie
 es ist** (Entscheidung vom 03.11.2026): 8–10 ms nach 18n-c; erst bei einem Abbruch oder einem Wert über
 15 ms wird es wieder angesehen. **Am 04.11. stand ein Aufruf bei 22 ms** (LAX, 28 Spiele, n = 1, [16-2-naechte-2.md](16-2-naechte-2.md)); entschieden wird nach dem nächsten Stau ab dem 08.11. (Entscheidung des Nutzers vom 04.11.2026).

@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 161 | 07.11.2026 | **Nachtrag: Nacht zum 07.11.** 72 Cron-Aufrufe `ok`, Sync `erfolg`; zweite Spielzeit-Spitze 38 ms in LAX (erste 14 in FRA), kein `sortierung=abweichend`; Preisalarm #1 folgt dem Preis wie gebaut, Logzeile nennt Preisalarme; Startseite liest 13 424 Zeilen je Aufruf; Abendläufe 3 h 33 bis 3 h 49 verspätet (7.7, 16.2) |
 | 160 | 06.11.2026 | **Nachtrag: Abschluss der Sitzung.** Stand der relativen Regel in 16.2, zwei Lehren, zwei Regeln geschärft |
 | 159 | 06.11.2026 | **Nachtrag: Abgehakte Zeile bleibt an ihrem Platz.** Kleiner, der Titel bleibt Link, Rückgängig stellt sie an derselben Stelle wieder her (16.2) |
 | 158 | 06.11.2026 | **Nachtrag: Haken im Spieldetail zurücknehmbar.** 15 Tage, die Länge eines Store-Sales (31 von 31 gemessen bei 14 oder 15 Tagen) (12, 16.2) |

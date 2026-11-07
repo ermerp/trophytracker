@@ -128,3 +128,59 @@ beide offen (04.11.: 1).
 | `POST /api/sync/store/ausgang` | 4 | 6 / 5,5 | 17 / 7 | 1 und 0 / 1 und 0 |
 | `GET /api/sync/markt/lage` | 2 | 10 / 4,5 | 10 / 6 | 0 / 0 |
 | `GET /api/sync/store/lage` | 2 | 9 / 12,5 | 11 / 13 | 1 und 2 / 0 |
+
+#### Nacht zum 07.11.2026 – zweite Spitze, erster Abendlauf mit „Preisalarm folgt dem Preis"
+
+**Alle 72 Cron-Aufrufe `ok`**, kein Abbruch (`workersInvocationsAdaptive` 83 `success`: 72 Cron, 11 der
+Startseite um 07:38; 05:15 ohne Standort), Warnungen nur `zugang_endet` (rot, erwartet). Sync `erfolg`
+um 03:50 (431 Titel), Zugang lebt, keine Kaufliste, kein Auffrischen. 27 Standorte.
+
+| Schritt | n | Median | min–max | über 10 / 15 ms |
+|---|---|---|---|---|
+| Sync | 11 | 13 | 8–22 | 9 / 2 |
+| Spielzeit (`spitze`, LAX) | 1 | **38** | | 1 / 1 |
+| Level, Jahre | je 1 | 9, 5 | | 0 / 0 |
+| PSN- / Wartungs-Leerlauf | 23 / 35 | 6 / 5 | 4–13 / 4–17 | 2 / 1 |
+
+**Spielzeit: die zweite Spitze kostet 38 ms, an einem langsamen Standort.** 25 Titel geholt, 21
+geschrieben, wie am 06.11. Damit weit über der Marke von 15 ms und über dem Volllauf (22 und 23 ms in
+LHR). LAX lag in derselben Nacht im Wartungs-Leerlauf bei 17 ms (08:05), dem höchsten der Nacht, und
+LAX trug am 04.11. Sync 35 und Auffrischen 22. **Zwei Werte, zwei Standorte: 14 (FRA) und 38 (LAX)** –
+ob die Spitze im Mittel unter 15 bleibt, ist offen; dass sie es an jedem Standort tut, ist widerlegt.
+Kein `sortierung=abweichend` in der zweiten Spitzennacht.
+
+**Preisalarm folgt dem Preis, erster Abendlauf (06.11.):** Die Logzeile der Actions nennt
+„Preisalarme/entfallen" (Markt: 1 und 0, Store: 0 und 0). **Meldung #1 ist auf den aktuellen Preis
+gegangen** (`aktualisiert_am` 07.11. 00:08, Grenz-Meldung, Marktreihe): Ihr bisheriger Preis war
+seit dem 05.11. weg, der neue liegt weiter unter der Grenze – die Ausnahme Grenze, wie gebaut. Der
+Marktpreis selbst ist der vom 05.11.: `price_snapshot` schreibt nur bei Änderung. `preis_alarm` hält
+**2 Meldungen**, beide offen, keine entfallen.
+
+**Abendläufe:** Alle vier grün, 431 und 79 geprüft, 0 offen, die zweiten Läufe leer. Verspätung kleiner
+als in den Nächten davor (4 bis 4 h 41), das letzte Ende liegt 36 Minuten vor dem PSN-Fenster.
+
+| Lauf | Start (UTC) | Verspätung | Ergebnis |
+|---|---|---|---|
+| Markt | 00:06 | 3 h 49 | 87 Portionen, 498 s |
+| Store | 00:20 | 3 h 33 | 8 Portionen, 76 Anfragen, 74 s |
+| Markt, zweiter | 01:59 | 3 h 42 | leer |
+| Store, zweiter | 02:23 | 3 h 36 | leer |
+
+**CPU der Portionsrouten** (Telemetry, alle 108 Aufrufe erfasst, alle `ok`):
+
+| Route | n | Median | P90 | höchstens | über 10 / 15 ms |
+|---|---|---|---|---|---|
+| `POST /api/sync/markt/ergebnisse` | 87 | 3 | 6 | 28 | 7 / 3 |
+| `POST /api/sync/store/ergebnisse` | 8 | 5 | 11 | 11 | 1 / 0 |
+| `POST /api/sync/markt/ausgang` | 4 | 6,5 | 8 | 8 | 0 / 0 |
+| `POST /api/sync/store/ausgang` | 4 | 8 | 12 | 12 | 1 / 0 |
+| `GET /api/sync/markt/lage` | 2 | 9 | | 14 | 1 / 0 |
+| `GET /api/sync/store/lage` | 2 | 12 | | 19 | 1 / 1 |
+
+**Gelesene Zeilen:** PSN 14 291, Wartung 107 664, Abend 27 958. **Das Öffnen der Startseite liest
+13 424 Zeilen** – je einmal um 22:07 und 07:38, beide Male genau diese Zahl, und um 07 UTC erklärt sie
+den Überschuss über den Leerlauf auf die Zeile (37 388 gegen 23 964). Ohne sie: Wartung 94 240 wie am
+05. und 06.11., Abendläufe 14 534. Gemessen aus Stundensummen, nicht je Route. Ob das für die Startseite
+zu viel ist, ist nicht bewertet. `rows_read_24h` am 07.11. gegen 09:25 UTC **449 936**,
+`rows_written_24h` 3 025; davon 244 029 in der Stunde 15 UTC des 06.11. mit drei Deploys, deren Job je
+eine Sicherung zieht – dass es diese Sicherungen sind, ist eine Vermutung (03.11.: 124 540 für einen).
