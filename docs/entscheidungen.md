@@ -359,3 +359,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 07.11.2026 | **Plattformen stehen überall die neueste zuerst**: PS5, PS4, PS3, Vita | [13.2](spec/13-2-darstellungsregeln.md) |
 | 07.11.2026 | **Zeichen:** Trophäen als Gruppe (Platin groß hinten, Silber und Bronze leicht dahinter, Gold vorn), die Sammlung als **Regal** – auch in der Navigation | [13.1](spec/13-1-ansichten.md) |
 | 07.11.2026 | **Die letzte Trophäe zeigt ihr Symbol aus PSN** wie die Trophäenliste, unser Pokal nur als Rückfall; **Spiele, Physisch und Digital führen in die Sammlung**, nach Besitz gefiltert (Stufe 24b) | [13.1](spec/13-1-ansichten.md) |
+| 07.11.2026 | **Der Wrap-up läuft ohne Zwischenhalt durch:** schreiben, committen, mergen, pushen, erst danach melden – geänderte Regeln stehen als Diff im Abschlussbericht statt vorab zur Freigabe | [CLAUDE.md](../CLAUDE.md) |
