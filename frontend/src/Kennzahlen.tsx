@@ -164,13 +164,20 @@ export function Kennzahlen() {
 					{/* Fehlt jede Trophäenliste, ist der Anteil unbekannt – nie 0 % (Abschnitt 13). */}
 					<Kasten ikon={<PokalGruppe />} zahl={anteil === null ? 'unbekannt' : `${anteil} %`} wort="Trophäen" gold />
 					<Kasten
+						ziel="/sammlung"
 						ikon={<Zeichen name="regal" groesse={40} strich={1} />}
 						zahl={t(zahlen.spiele)}
 						wort="Spiele"
 						zusatz={`${t(zahlen.releases)} Releases`}
 					/>
-					<Kasten ikon={<Zeichen name="disc" groesse={36} strich={1.1} />} zahl={t(summe('disc'))} wort="Physisch" />
 					<Kasten
+						ziel="/sammlung?owned=physisch"
+						ikon={<Zeichen name="disc" groesse={36} strich={1.1} />}
+						zahl={t(summe('disc'))}
+						wort="Physisch"
+					/>
+					<Kasten
+						ziel="/sammlung?owned=digital"
 						ikon={<Zeichen name="wolke" groesse={36} strich={1.1} />}
 						zahl={t(summe('digital'))}
 						wort="Digital"
@@ -236,15 +243,18 @@ function Kasten({
 	wort,
 	zusatz,
 	gold = false,
+	ziel,
 }: {
 	ikon: React.ReactNode
 	zahl: string
 	wort: string
 	zusatz?: React.ReactNode
 	gold?: boolean
+	/** Wohin ein Tipp führt (Stufe 24b): die Sammlung, gefiltert nach Besitz. */
+	ziel?: string
 }) {
-	return (
-		<div className="kasten">
+	const inhalt = (
+		<>
 			{ikon}
 			<span className="ktext">
 				<span className={gold ? 'kzahl gold' : 'kzahl'}>{zahl}</span>
@@ -253,7 +263,14 @@ function Kasten({
 					{zusatz && <span className="kzusatz">{zusatz}</span>}
 				</span>
 			</span>
-		</div>
+		</>
+	)
+	return ziel ? (
+		<Link className="kasten" to={ziel}>
+			{inhalt}
+		</Link>
+	) : (
+		<div className="kasten">{inhalt}</div>
 	)
 }
 
@@ -518,9 +535,9 @@ function LetztesPlatinBlock({ spiel }: { spiel: LetztesPlatin }) {
 }
 
 /**
- * Die zuletzt erspielte Trophäe, gleich welcher Stufe (Stufe 24). Unser
- * Pokal in der Farbe ihrer Stufe statt des Trophäenbilds von Sony (Wahl des
- * Nutzers vom 07.11.2026). Ohne Zuordnung steht der Titel ohne Link da.
+ * Die zuletzt erspielte Trophäe, gleich welcher Stufe (Stufe 24): ihr Symbol
+ * aus PSN, ohne Symbol unser Pokal in der Farbe ihrer Stufe (Stufe 24b).
+ * Ohne Zuordnung steht der Titel ohne Link da.
  */
 function LetzteTrophaeeBlock({ trophaee: tr }: { trophaee: LetzteTrophaee }) {
 	const titel = tr.spielId === null ? <span className="lp-titel">{tr.name}</span> : (
@@ -532,8 +549,14 @@ function LetzteTrophaeeBlock({ trophaee: tr }: { trophaee: LetzteTrophaee }) {
 		<div className="dflaeche block b-lt">
 			<div className="blockname">Letzte Trophäe</div>
 			<div className="lp">
+				{/* Das Symbol aus PSN wie in der Trophäenliste (Wunsch des Nutzers vom
+				    07.11.2026); fehlt es, unser Pokal in der Farbe der Stufe. */}
 				<span className="lt-ikon" style={{ color: `var(--troph-${tr.stufe})` }}>
-					<Zeichen name="pokal" groesse={40} strich={1.4} gefuellt={tr.stufe === 'platin'} />
+					{tr.symbol ? (
+						<img src={tr.symbol} alt="" loading="lazy" />
+					) : (
+						<Zeichen name="pokal" groesse={40} strich={1.4} gefuellt={tr.stufe === 'platin'} />
+					)}
 				</span>
 				<div className="lp-text">
 					{titel}

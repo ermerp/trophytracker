@@ -560,6 +560,14 @@ table.plattformtabelle {
   border: 1px solid var(--linie);
 }
 
+/* Das Symbol aus PSN füllt das Feld, wie in der Trophäenliste. */
+.lt-ikon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--r2);
+}
+
 .lt-spiel {
   min-width: 0;
   font-size: 0.8rem;
@@ -680,6 +688,16 @@ table.plattformtabelle {
 
 .kasten > svg {
   flex: none;
+}
+
+/* Spiele, Physisch und Digital führen in die Sammlung (Stufe 24b) – derselbe
+   Hinweis beim Überfahren wie die Plattform-Kacheln. */
+a.kasten {
+  text-decoration: none;
+}
+
+a.kasten:hover {
+  border-color: var(--aus);
 }
 
 .ktext {

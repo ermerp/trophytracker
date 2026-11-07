@@ -653,6 +653,8 @@ export type LetzteTrophaee = {
   erspieltAm: string
   /** Anteil der Spieler in Prozent; `null` heißt unbekannt und wird weggelassen, nie „0 %". */
   seltenheit: number | null
+  /** Das Trophäensymbol aus PSN (Stufe 24b); `null`, dann steht unser Pokal in der Stufenfarbe. */
+  symbol: string | null
   titel: string
   /** `null`, solange die Liste keinem Spiel zugeordnet ist – dann ohne Link. */
   spielId: number | null

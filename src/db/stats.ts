@@ -147,7 +147,7 @@ export const LETZTES_PLATIN_SQL =
  * von Sony da und kein Link.
  */
 export const LETZTE_TROPHAEE_SQL =
-	"SELECT tr.name, tr.grade, tr.earned_at AS erspielt_am, tr.earned_rate, " +
+	"SELECT tr.name, tr.grade, tr.earned_at AS erspielt_am, tr.earned_rate, tr.icon_url, " +
 	"COALESCE(g.title, tp.title_name) AS title, g.id AS game_id, r.platform " +
 	"FROM trophy tr " +
 	"JOIN trophy_progress tp ON tp.np_communication_id = tr.np_communication_id " +
@@ -205,6 +205,8 @@ export type LetzteTrophaeeZeile = {
 	erspielt_am: string;
 	/** Anteil der Spieler in Prozent; null heisst unbekannt. */
 	earned_rate: number | null;
+	/** Das Trophaeensymbol von Sony (Stufe 24b), wie in der Trophaeenliste. */
+	icon_url: string | null;
 	title: string;
 	/** null, solange die Liste keinem Spiel zugeordnet ist. */
 	game_id: number | null;
