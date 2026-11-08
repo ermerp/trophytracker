@@ -184,3 +184,50 @@ den Überschuss über den Leerlauf auf die Zeile (37 388 gegen 23 964). Ohne sie
 zu viel ist, ist nicht bewertet. `rows_read_24h` am 07.11. gegen 09:25 UTC **449 936**,
 `rows_written_24h` 3 025; davon 244 029 in der Stunde 15 UTC des 06.11. mit drei Deploys, deren Job je
 eine Sicherung zieht – dass es diese Sicherungen sind, ist eine Vermutung (03.11.: 124 540 für einen).
+
+#### Nacht zum 08.11.2026 – Kaufliste, Auffrischen-Stau, dritte Spitze
+
+**Alle 72 Cron-Aufrufe `ok`**, kein Abbruch (`workersInvocationsAdaptive` 72 `success`), Warnungen nur
+`zugang_endet` (rot, erwartet). Sync `erfolg` um 03:50 (431 Titel), Zugang lebt. Kaufliste-Nacht und
+Auffrischen fällig. 25 Standorte. PSN-Fenster belegt: Sync 11, Spielzeit 1, Kaufliste 15, Level 1 – 28 von 36.
+
+| Schritt | n | Median | min–max | über 10 / 15 ms |
+|---|---|---|---|---|
+| Sync | 11 | 12 | 9–26 | 9 / 2 |
+| Spielzeit (`spitze`, SIN) | 1 | **22** | | 1 / 1 |
+| Kaufliste (14 × 50, 1 × 34) | 15 | 15 | 11–30 | 15 / 7 |
+| Auffrischen (3 × 50) | 3 | 13 | 10–16 | 2 / 1 |
+| Level, Jahre | je 1 | 10, 16 | | 0 / 1 |
+| PSN- / Wartungs-Leerlauf | 8 / 32 | 6 / 5 | 4–10 / 3–12 | 0 / 1 |
+
+**Spielzeit: dritte Spitze 22 ms in SIN** (25 geholt, 21 geschrieben, 18 zugeordnet). Damit drei Werte
+an drei Standorten: 14 (FRA), 38 (LAX), 22 (SIN) – zweimal über 15. Kein `sortierung=abweichend`.
+
+**Kaufliste: Median 15 statt 13 (01.11.) und 19 (25.10.)**, höchstens 30 (ORD, 04:05; derselbe
+Standort 14 um 04:25). SIN 15–19 (n = 4), SJC 24, Europa 11–17. Keine Änderung (`kauf=0 plus=0
+entfallen=0`), 734 Einträge wie am 01.11.
+
+**Auffrischen: der Stau ist in einer Nacht abgetragen.** Drei Aufrufe zu 50 (ORD 10, DFW 13 und 16; 150
+angefragt, 150 aktualisiert, keiner ohne Antwort), danach keine Zeile `auffrischen=grenze` – es blieb
+nichts fällig. Gegen die 22 ms vom 04.11. (LAX, 28 Spiele) liegen alle drei darunter; LAX kam in dieser
+Nacht im Auffrischen nicht vor, ein Vergleich am selben Standort ist damit **weiter offen**.
+
+**Abendläufe:** Alle vier grün, Verspätung 3 h 04 bis 3 h 21, das letzte Ende 01:51 – 1 h 08 vor dem
+PSN-Fenster.
+
+| Lauf | Start (UTC) | Verspätung | Ergebnis |
+|---|---|---|---|
+| Markt | 23:38 | 3 h 21 | 431 in 87 Portionen, 492 s, 1 Preisalarm, 0 entfallen |
+| Store | 23:57 | 3 h 10 | 79 in 8 Portionen, 76 Anfragen, 59 s, 0 Preisalarme |
+| Markt, zweiter | 01:29 | 3 h 12 | leer |
+| Store, zweiter | 01:51 | 3 h 04 | leer |
+
+**Gelesene Zeilen:** PSN 17 856 (Kaufliste-Nacht; 01.11.: 18 624), Wartung 96 880 (06 UTC mit Jahren und
+Auffrischen 48 952, danach je Stunde 23 964 wie in den Nächten davor), Abend 14 359. `rows_read_24h` am
+08.11. gegen 09:27 UTC **685 536**, `rows_written_24h` 3 234. Davon 473 575 in der Stunde 11 UTC des
+07.11. mit zwei Deploys. **Nach der Stichprobe (`d1QueriesAdaptiveGroups`) sind das ganz überwiegend die
+Abfragen der Startseite** (Statistik, je 26 bis 34 Mal) – rund 34 Aufrufe zu je etwa 13 900 Zeilen,
+also Produktionsprüfung und Nutzung nach dem Deploy, nicht die Sicherungen des Deploy-Jobs.
+
+**Wöchentliche Sicherung** (Sonntag 03:17 UTC): Bis 09:30 UTC noch nicht gestartet. Das war bisher normal,
+die letzten zwei Sonntage starteten erst um 08:30 und 10:34.
