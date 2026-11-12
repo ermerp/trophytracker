@@ -757,8 +757,13 @@ a.kasten:hover {
     margin-bottom: var(--a3);
   }
 
+  /* Alle drei ohne Außenabstand – den Abstand gibt hier `gap`. Bis 24c galt
+     das für Platin nicht: Es endete in drei Spalten um --a3 über den Nachbarn,
+     in zwei Spalten stand es doppelt so weit von der Trophäe weg (gemessen
+     am 12.11.2026, gemeldet vom Nutzer). */
   .dmitte > .dflaeche,
   .dmitte > .dflaeche:last-child,
+  .dzuletzt > .dflaeche,
   .dzuletzt > .dflaeche:last-child {
     margin-bottom: 0;
   }
