@@ -360,3 +360,7 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 07.11.2026 | **Zeichen:** Trophäen als Gruppe (Platin groß hinten, Silber und Bronze leicht dahinter, Gold vorn), die Sammlung als **Regal** – auch in der Navigation | [13.1](spec/13-1-ansichten.md) |
 | 07.11.2026 | **Die letzte Trophäe zeigt ihr Symbol aus PSN** wie die Trophäenliste, unser Pokal nur als Rückfall; **Spiele, Physisch und Digital führen in die Sammlung**, nach Besitz gefiltert (Stufe 24b) | [13.1](spec/13-1-ansichten.md) |
 | 07.11.2026 | **Der Wrap-up läuft ohne Zwischenhalt durch:** schreiben, committen, mergen, pushen, erst danach melden – geänderte Regeln stehen als Diff im Abschlussbericht statt vorab zur Freigabe | [CLAUDE.md](../CLAUDE.md) |
+| 08.11.2026 | **Das IGDB-Auffrischen bleibt, wie es ist** – auch mit zwei Aufrufen knapp über 15 ms | [16.2](spec/16-2-bewertung-02-11.md) |
+| 08.11.2026 | **Sync-Plan: alles planen und am Stück bauen, ausgeliefert getrennt** – Änderungen an einzelnen Schritten dürfen zusammen raus, gemeinsamer Code (Token, Lage) in eigener Nacht | [16.2](spec/16-2-bewertung-02-11.md) |
+| 08.11.2026 | **Das PSN-Access-Token wird wiederverwendet** statt in jedem Aufruf erneuert, verschlüsselt in `psn_credentials` wie das Refresh-Token (Nachtrag 18q) | [7.1](spec/07-1-psn-trophaeen.md) |
+| 12.11.2026 | **18q (Token-Pfad) vor 18p (Schritte bündeln)**, 18p erst nach der Kaufliste-Nacht zum 15.11. ausgeliefert; was sinnvoll ist, wird gleich deployt | [16.2](spec/16-2-bewertung-02-11.md) |

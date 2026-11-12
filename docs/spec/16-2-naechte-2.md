@@ -1,4 +1,4 @@
-← [Inhaltsverzeichnis](README.md) · [16.2 CPU-Grenze](16-2-cpu-und-betrieb.md) · [Nächte bis 03.11.](16-2-naechte.md)
+← [Inhaltsverzeichnis](README.md) · [16.2 CPU-Grenze](16-2-cpu-und-betrieb.md) · [Nächte bis 03.11.](16-2-naechte.md) · [ab 09.11.](16-2-naechte-3.md)
 
 ## 16. Nachtmessungen ab dem 04.11.2026
 
@@ -185,7 +185,7 @@ zu viel ist, ist nicht bewertet. `rows_read_24h` am 07.11. gegen 09:25 UTC **449
 `rows_written_24h` 3 025; davon 244 029 in der Stunde 15 UTC des 06.11. mit drei Deploys, deren Job je
 eine Sicherung zieht – dass es diese Sicherungen sind, ist eine Vermutung (03.11.: 124 540 für einen).
 
-#### Nacht zum 08.11.2026 – Kaufliste, Auffrischen-Stau, dritte Spitze
+#### Nacht zum 08.11.2026 – Kaufliste, Auffrischen, dritte Spitze
 
 **Alle 72 Cron-Aufrufe `ok`**, kein Abbruch (`workersInvocationsAdaptive` 72 `success`), Warnungen nur
 `zugang_endet` (rot, erwartet). Sync `erfolg` um 03:50 (431 Titel), Zugang lebt. Kaufliste-Nacht und
@@ -207,10 +207,11 @@ an drei Standorten: 14 (FRA), 38 (LAX), 22 (SIN) – zweimal über 15. Kein `sor
 Standort 14 um 04:25). SIN 15–19 (n = 4), SJC 24, Europa 11–17. Keine Änderung (`kauf=0 plus=0
 entfallen=0`), 734 Einträge wie am 01.11.
 
-**Auffrischen: der Stau ist in einer Nacht abgetragen.** Drei Aufrufe zu 50 (ORD 10, DFW 13 und 16; 150
-angefragt, 150 aktualisiert, keiner ohne Antwort), danach keine Zeile `auffrischen=grenze` – es blieb
-nichts fällig. Gegen die 22 ms vom 04.11. (LAX, 28 Spiele) liegen alle drei darunter; LAX kam in dieser
-Nacht im Auffrischen nicht vor, ein Vergleich am selben Standort ist damit **weiter offen**.
+**Auffrischen:** Drei Aufrufe zu 50 (ORD 10, DFW 13 und 16; 150 angefragt, 150 aktualisiert, keiner ohne
+Antwort), danach keine Zeile `auffrischen=grenze` – in dieser Nacht war nichts mehr fällig. Ein Stau war es
+nicht: Die Stempel vom 01. bis 04.11. werden reihum wieder fällig ([16-2-naechte-3.md](16-2-naechte-3.md),
+korrigiert am 12.11.). LAX kam im Auffrischen nicht vor; ein Vergleich am selben Standort mit den 22 ms
+vom 04.11. fehlt.
 
 **Abendläufe:** Alle vier grün, Verspätung 3 h 04 bis 3 h 21, das letzte Ende 01:51 – 1 h 08 vor dem
 PSN-Fenster.
