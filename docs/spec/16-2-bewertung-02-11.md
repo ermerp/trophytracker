@@ -88,3 +88,28 @@ gemessen): **Spielzeit** (Median 22, 14 von 14 über 15 ms, gebaut als 18o, Spit
 Sync (Median 13, 27 von 77), dann Kaufliste (15 einmal je Woche, Median 13). **Das Auffrischen bleibt, wie
 es ist** (Entscheidung vom 03.11.2026): 8–10 ms nach 18n-c; erst bei einem Abbruch oder einem Wert über
 15 ms wird es wieder angesehen. **Am 04.11. stand ein Aufruf bei 22 ms** (LAX, 28 Spiele, n = 1, [16-2-naechte-2.md](16-2-naechte-2.md)); in den Nächten 08. bis 11.11. lagen sieben Aufrufe bei 8–16 ms, zweimal 16 ([16-2-naechte-3.md](16-2-naechte-3.md)). **Es bleibt, wie es ist** (Entscheidung des Nutzers vom 08.11.2026).
+
+#### Der Sync-Plan: 18q und 18p (geplant am 08.11., Reihenfolge vom 12.11.2026)
+
+**Gezählt am 08.11.2026** über den echten Einstieg mit nachgebauten Antworten (D1-Aufrufe je
+arbeitendem Aufruf, Leerlauf 2): Sync-Abruf 7 (der erste des Laufs 9), Normalisierung 7 mit einem Batch
+von **104 Anweisungen** (D1 dokumentiert 50), Abschluss 12, Spitze 6, Kaufliste 7, Auffrischen 4. Jeder
+PSN-Aufruf las die Zugangszeile zweimal und erneuerte das Token; der Sync liest den laufenden Lauf
+doppelt. Ein D1-Aufruf kostet in der Produktion rund 1,4–1,9 ms (0,7 im Messworker von 18h, Faktor
+2–2,7) – **eine Schätzung**; das Budget erreicht damit kein PSN-Schritt an den langsamen Standorten,
+deren Leerlauf allein bis 17 ms liegt.
+
+- **18q – Token-Pfad** (gemeinsamer Code, eigene Nacht; gebaut am 12.11.2026): die Zugangszeile aus
+  der Lage, das Access Token wiederverwendet ([7.1](07-1-psn-trophaeen.md)). Gezählt mit gespeichertem
+  Token: **Spitze 6 → 4, Kaufliste 7 → 5, Sync-Abruf 7 → 5, Level 3**, Fremdanfragen je Aufruf 2 → 1
+  (`test/token-wiederverwenden.spec.ts`). Erneuert wird rund alle 50 Minuten.
+- **18p – Schritte bündeln** (nur einzelne Schritte, ein Deploy): Sync-Abruf → 3 (laufender Lauf aus der
+  Lage, Rohantwort und Offset in einem Batch), Normalisierung 7 → 4 (Upsert, Markieren und Zählen in
+  einem Batch, mehrzeilige Upserts: 104 → rund 12 Anweisungen), Abschluss 12 → rund 5, Kaufliste 5 → 4,
+  automatische Zuordnung neuer Listen in einer Abfrage statt einer je Titel.
+
+**Reihenfolge** (Entscheidung des Nutzers vom 12.11.2026): 18q zuerst – die Spitze, der teuerste Aufruf,
+fragt in sich nur zweimal und gewinnt allein durch 18q. 18p wird **nach der Kaufliste-Nacht zum
+15.11.** ausgeliefert, damit die Kaufliste 18q allein zeigt. **Verworfen:** den Ausgang in den
+Schreib-Batch des Schritts zu legen – er muss auch bei einem Fehler im Schritt stehen und bräuchte
+einen Rückfallweg, mehr Risiko als ein D1-Aufruf wert ist.
