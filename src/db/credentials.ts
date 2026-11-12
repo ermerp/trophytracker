@@ -31,8 +31,27 @@ type Zeile = {
 	refresh_ciphertext: string | null;
 	refresh_iv: string | null;
 	refresh_expires_at: string | null;
+	/** Seit Nachtrag 18q (Migration 0038): das Access Token, wiederverwendet. */
+	access_ciphertext: string | null;
+	access_iv: string | null;
+	access_expires_at: string | null;
 	last_success_at: string | null;
 };
+
+/**
+ * Die Zeile mit den Chiffraten, wie der Lage-Batch des Crons sie schon liest
+ * (Nachtrag 18q) - KEIN Klartext; entschluesselt wird nur hier im Repository.
+ */
+export type ZugangsZeile = Zeile;
+
+/**
+ * So viel Gueltigkeit muss ein gespeichertes Access Token noch haben, damit es
+ * wiederverwendet wird (Nachtrag 18q). Ein Aufruf dauert Sekunden; die zehn
+ * Minuten decken eine abweichende Uhr bei Sony und den Rest des Aufrufs. Mit
+ * einer Stunde Gueltigkeit erneuert eine Nacht damit rund alle 50 Minuten
+ * statt in jedem der rund 28 arbeitenden PSN-Aufrufe.
+ */
+export const ACCESS_RESTZEIT_MS = 10 * 60_000;
 
 /**
  * NPSSO und Refresh-Token, AES-GCM-verschluesselt in psn_credentials.
@@ -53,6 +72,11 @@ export class CredentialsRepository {
 		return this.db.prepare("SELECT * FROM psn_credentials WHERE id = 1").first<Zeile>();
 	}
 
+	/** Die Zeile selbst, fuer einen Aufrufer ohne Lage (Knopf, Routen). */
+	zeileLesen(): Promise<ZugangsZeile | null> {
+		return this.zeile();
+	}
+
 	async anzeige(): Promise<CredentialAnzeige> {
 		return einzeln(this.db, this.anzeigeBaustein());
 	}
@@ -62,6 +86,18 @@ export class CredentialsRepository {
 		return eins(this.db.prepare("SELECT * FROM psn_credentials WHERE id = 1"), (e) =>
 			CredentialsRepository.anzeigeAus(ersteZeile<Zeile>(e)),
 		);
+	}
+
+	/**
+	 * Anzeige UND Zeile aus derselben Anweisung - fuer den Lage-Batch des Crons
+	 * (Nachtrag 18q). Bis dahin las jeder arbeitende PSN-Aufruf die Zeile ein
+	 * zweites Mal, weil die Lage nur die Anzeige weiterreichte.
+	 */
+	zugangBaustein(): Baustein<{ anzeige: CredentialAnzeige; zeile: ZugangsZeile | null }> {
+		return eins(this.db.prepare("SELECT * FROM psn_credentials WHERE id = 1"), (e) => {
+			const zeile = ersteZeile<Zeile>(e);
+			return { anzeige: CredentialsRepository.anzeigeAus(zeile), zeile };
+		});
 	}
 
 	private static anzeigeAus(z: Zeile | null): CredentialAnzeige {
@@ -85,15 +121,15 @@ export class CredentialsRepository {
 		};
 	}
 
-	async npsso(): Promise<Geheimnis | null> {
-		const z = await this.zeile();
+	async npsso(gelesen?: ZugangsZeile | null): Promise<Geheimnis | null> {
+		const z = gelesen === undefined ? await this.zeile() : gelesen;
 		if (!z?.npsso_ciphertext || !z.npsso_iv) return null;
 		return entschluesseln({ chiffre: z.npsso_ciphertext, iv: z.npsso_iv }, this.key);
 	}
 
 	/** Liefert den Refresh-Token nur, solange er laut Ablaufzeitpunkt gilt. */
-	async gueltigerRefreshToken(jetzt = new Date()): Promise<Geheimnis | null> {
-		const z = await this.zeile();
+	async gueltigerRefreshToken(jetzt = new Date(), gelesen?: ZugangsZeile | null): Promise<Geheimnis | null> {
+		const z = gelesen === undefined ? await this.zeile() : gelesen;
 		if (!z?.refresh_ciphertext || !z.refresh_iv) return null;
 		if (z.refresh_expires_at && new Date(z.refresh_expires_at) <= jetzt) return null;
 		return entschluesseln({ chiffre: z.refresh_ciphertext, iv: z.refresh_iv }, this.key);
@@ -138,12 +174,51 @@ export class CredentialsRepository {
 		]);
 	}
 
+	/**
+	 * Das Access Token, wenn es noch mindestens ACCESS_RESTZEIT_MS gilt
+	 * (Nachtrag 18q). Ohne Zeile, ohne Token oder zu knapp: null - dann wird
+	 * erneuert. Liest selbst nichts: Die Zeile kommt vom Aufrufer.
+	 */
+	async gueltigerAccessToken(z: ZugangsZeile | null, jetzt = new Date()): Promise<Geheimnis | null> {
+		if (!z?.access_ciphertext || !z.access_iv || !z.access_expires_at) return null;
+		const bis = Date.parse(z.access_expires_at);
+		if (!Number.isFinite(bis) || bis - jetzt.getTime() < ACCESS_RESTZEIT_MS) return null;
+		return entschluesseln({ chiffre: z.access_ciphertext, iv: z.access_iv }, this.key);
+	}
+
+	/**
+	 * Refresh- und Access Token einer frischen Sitzung in EINER Anweisung
+	 * (Nachtrag 18q). Das Refresh-Token rotiert - deshalb bleibt das ein
+	 * eigener Schreibvorgang VOR der Arbeit: Bricht die Laufzeit danach ab, ist
+	 * das neue Token trotzdem gesichert.
+	 */
+	async sitzungSpeichern(s: {
+		refreshToken: Geheimnis;
+		refreshLaeuftAbUm: string;
+		accessToken: Geheimnis;
+		accessLaeuftAbUm: string;
+	}): Promise<void> {
+		const refresh = await verschluesseln(s.refreshToken, this.key);
+		const access = await verschluesseln(s.accessToken, this.key);
+		await this.db
+			.prepare(
+				"UPDATE psn_credentials SET refresh_ciphertext = ?, refresh_iv = ?, refresh_expires_at = ?, " +
+					"access_ciphertext = ?, access_iv = ?, access_expires_at = ? WHERE id = 1",
+			)
+			.bind(refresh.chiffre, refresh.iv, s.refreshLaeuftAbUm, access.chiffre, access.iv, s.accessLaeuftAbUm)
+			.run();
+	}
+
+	/**
+	 * Nur das Refresh-Token - ein gespeichertes Access Token gehoert dann nicht
+	 * mehr zur Kette und wird verworfen.
+	 */
 	async refreshTokenSpeichern(token: Geheimnis, laeuftAbUm: string): Promise<void> {
 		const { chiffre, iv } = await verschluesseln(token, this.key);
 		await this.db
 			.prepare(
 				"UPDATE psn_credentials SET refresh_ciphertext = ?, refresh_iv = ?, " +
-					"refresh_expires_at = ? WHERE id = 1",
+					"refresh_expires_at = ?, access_ciphertext = NULL, access_iv = NULL, access_expires_at = NULL WHERE id = 1",
 			)
 			.bind(chiffre, iv, laeuftAbUm)
 			.run();

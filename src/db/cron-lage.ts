@@ -1,5 +1,5 @@
 import type { Baustein } from "./baustein";
-import type { CredentialAnzeige, CredentialsRepository } from "./credentials";
+import type { CredentialAnzeige, CredentialsRepository, ZugangsZeile } from "./credentials";
 import type { GamesRepository } from "./games";
 import type { IgdbRepository } from "./igdb";
 import { CRON_SCHLUESSEL, verlaufAus, type CronMarke, type SyncLauf, type SyncRepository } from "./sync";
@@ -56,6 +56,11 @@ export type CronLage = {
 		laufend: SyncLauf | null;
 		heutige: SyncLauf[];
 		zugang: CredentialAnzeige;
+		/**
+		 * Dieselbe Zeile mit den Chiffraten (Nachtrag 18q): Die PSN-Schritte
+		 * holen ihre Sitzung daraus, statt sie ein zweites Mal zu lesen.
+		 */
+		zugangsdaten: ZugangsZeile | null;
 		naechsteListe: ZuFuellen | null;
 		/** Die hoechste Release-Id: Gab es Neues seit dem Volllauf? (Stufe 18o) */
 		neuestesRelease: number;
@@ -114,7 +119,7 @@ export class CronLageRepository {
 					abgebrochen: merke(this.q.sync.haengendeAbbrechenBaustein(o.haengtNachStunden)),
 					laufend: merke(this.q.sync.laufenderLaufBaustein()),
 					heutige: merke(this.q.sync.laeufeSeitBaustein(o.heute)),
-					zugang: merke(this.q.credentials.anzeigeBaustein()),
+					zugang: merke(this.q.credentials.zugangBaustein()),
 					liste: merke(this.q.trophaeen.naechsteZumFuellenBaustein(1)),
 					neuestesRelease: merke(this.q.games.neuestesReleaseBaustein()),
 				}
@@ -150,7 +155,8 @@ export class CronLageRepository {
 							abgebrochen: wert<number>(p.abgebrochen),
 							laufend: wert<SyncLauf | null>(p.laufend),
 							heutige: wert<SyncLauf[]>(p.heutige),
-							zugang: wert<CredentialAnzeige>(p.zugang),
+							zugang: wert<{ anzeige: CredentialAnzeige }>(p.zugang).anzeige,
+							zugangsdaten: wert<{ zeile: ZugangsZeile | null }>(p.zugang).zeile,
 							naechsteListe: wert<ZuFuellen[]>(p.liste)[0] ?? null,
 							neuestesRelease: wert<number>(p.neuestesRelease),
 						},

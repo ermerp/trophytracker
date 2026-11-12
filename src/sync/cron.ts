@@ -13,7 +13,8 @@ import {
 	type PhysischErgebnis,
 } from "./igdb";
 import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis, type SpielzeitLauf } from "./besitz";
-import { FEHLVERSUCHE_HOECHSTENS, sitzungBesorgen, syncSchritt, type SyncErgebnis } from "./run";
+import { FEHLVERSUCHE_HOECHSTENS, psnSitzung, syncSchritt, type SyncErgebnis } from "./run";
+import type { ZugangsZeile } from "../db/credentials";
 import {
 	eineListe,
 	jahreSchritt,
@@ -320,6 +321,9 @@ export async function cronSchritt(
 	// Entscheidung des Nutzers vom 17.10.2026) - Aufraeumen ist kein eigener
 	// Schritt mehr.
 	const stand = (s: string) => lage.einstellungen.get(s) ?? null;
+	// Die Zugangszeile hat der Lage-Batch schon gelesen (Nachtrag 18q); fehlt
+	// sie (Lage ohne PSN-Bereich), liest die Sitzung selbst.
+	const zeile = lage.psn?.zugangsdaten;
 	// Ein Schritt, der ruht, sagt warum (CLAUDE.md): Faellig, aber die Grenze
 	// der Nacht ist erreicht, steht an der Zeile jedes weiteren Aufrufs.
 	const gekappt =
@@ -340,9 +344,9 @@ export async function cronSchritt(
 	})) {
 		switch (kandidat) {
 			case "sync":
-				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn) };
+				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { zeile }) };
 			case "sync_starten":
-				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron" }) };
+				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron", zeile }) };
 
 			// 4.-7. Spielzeit, Kaufliste, Einzeltrophaeen, Level (7.7). Erst nach
 			//       dem Sync: Die Zuordnung laeuft ueber die Titel der Sammlung.
@@ -358,11 +362,13 @@ export async function cronSchritt(
 							stand: stand(SCHLUESSEL_SPIELZEIT),
 							runde: spielzeitRundeAus(stand(SCHLUESSEL_SPIELZEIT_RUNDE)),
 							neuestesRelease: lage.psn?.neuestesRelease ?? 0,
+							zeile,
 						});
 						if (spielzeit) return { ...basis, getan: "spielzeit", spielzeit };
 					} else if (kandidat === "besitz") {
 						const besitz = await besitzLauf(repos, psn, heute, {
 							gespeichert: besitzStandAus(stand(SCHLUESSEL_BESITZ)),
+							zeile,
 						});
 						if (besitz) return { ...basis, getan: "besitz", besitz };
 					} else if (kandidat === "trophaeen") {
@@ -371,16 +377,16 @@ export async function cronSchritt(
 						// (Stufe 19b). Dieselbe Auswahl wie der Knopf.
 						const liste = lage.psn?.naechsteListe;
 						if (liste) {
-							const { accessToken } = await sitzungBesorgen(repos, psn);
-							const trophaeen = await eineListe(repos, psn, accessToken, liste);
+							const sitzung = psnSitzung(repos, psn, zeile);
+							const trophaeen = await eineListe(repos, sitzung.psn, await sitzung.token(), liste);
 							await zugangGeglueckt(repos);
 							return { ...basis, getan: "trophaeen", trophaeen };
 						}
 					} else {
 						// Die Sitzung holt der Schritt erst, wenn das Level faellig
 						// ist (Stufe 18i) - vorher erneuerte jeder Leerlauf das Token.
-						const token = async () => (await sitzungBesorgen(repos, psn)).accessToken;
-						const level = await levelSchritt(repos, psn, token, heute, levelStandAus(stand(SCHLUESSEL_LEVEL)));
+						const sitzung = psnSitzung(repos, psn, zeile);
+						const level = await levelSchritt(repos, sitzung.psn, sitzung.token, heute, levelStandAus(stand(SCHLUESSEL_LEVEL)));
 						if (level) return { ...basis, getan: "level", level: level.level };
 					}
 				} catch (fehler) {
@@ -520,13 +526,13 @@ const spielzeitFaellig = (stand: string | null, heute: string) => spielzeitStand
  * holt fuenf Minuten spaeter dieselbe Seite erneut. Nach
  * FEHLVERSUCHE_HOECHSTENS Anlaeufen ruht der Tag wie bisher; jeder Fortschritt
  * setzt den Zaehler zurueck. Ein abgelehnter Token kommt hier nicht an: Den
- * wirft `sitzungBesorgen` als PsnAuthError, bevor der Schritt laeuft.
+ * wirft `psnSitzung` als PsnAuthError, bevor der Schritt laeuft.
  */
 async function spielzeitLauf(
 	repos: Repositories,
 	psn: PsnClient,
 	heute: string,
-	lage: { stand: string | null; runde: SpielzeitRunde | null; neuestesRelease: number },
+	lage: { stand: string | null; runde: SpielzeitRunde | null; neuestesRelease: number; zeile?: ZugangsZeile | null },
 ): Promise<SpielzeitErgebnis | null> {
 	const { offset, bisher, faellig, lauf: gemerkt } = spielzeitStand(lage.stand, heute);
 	if (!faellig) return null;
@@ -534,12 +540,13 @@ async function spielzeitLauf(
 	const lauf: SpielzeitLauf = gemerkt ?? spielzeitAnlass(runde, neuestesRelease, heute) ?? "spitze";
 	const voll = lauf !== "spitze";
 
-	const { accessToken } = await sitzungBesorgen(repos, psn);
+	const sitzung = psnSitzung(repos, psn, lage.zeile);
+	const accessToken = await sitzung.token();
 	// Ein Tag Spielraum: Bis zum Abend der letzten fertigen Nacht kann Sony
 	// noch nachgezogen haben. Die Runde fehlt nur ohne Vorgeschichte, und dann
 	// ist `spielzeitAnlass` schon "frist" - das `heute` ist nur der Typ.
 	const spitzeBis = voll ? undefined : `${tagDavor(runde?.spitzeAm ?? heute)}T00:00:00Z`;
-	const ergebnis = await spielzeitSchritt(repos, psn, accessToken, offset, {
+	const ergebnis = await spielzeitSchritt(repos, sitzung.psn, accessToken, offset, {
 		spitzeBis,
 		abschluss: ({ geholt, weiter, ungeordnet }) => {
 			const stand = (wert: string) => repos.sync.fortschrittAnweisung(SCHLUESSEL_SPIELZEIT, wert);
@@ -634,16 +641,18 @@ export async function besitzLauf(
 	heute: string,
 	// `gespeichert` hat der Cron im Lage-Batch gelesen (Stufe 18j); der Knopf
 	// liest selbst.
-	optionen: { erzwingen?: boolean; gespeichert?: BesitzStand } = {},
+	// `zeile`: die Zugangszeile aus dem Lage-Batch (Nachtrag 18q).
+	optionen: { erzwingen?: boolean; gespeichert?: BesitzStand; zeile?: ZugangsZeile | null } = {},
 ): Promise<BesitzErgebnis | null> {
 	const gespeichert = optionen.gespeichert ?? (await besitzStand(repos));
 	const laeuft = typeof gespeichert.start === "number";
 	if (!besitzFaellig(gespeichert, heute, optionen.erzwingen)) return null;
 
-	const { accessToken } = await sitzungBesorgen(repos, psn);
+	const sitzung = psnSitzung(repos, psn, optionen.zeile);
+	const accessToken = await sitzung.token();
 	const gesehen = laeuft ? (gespeichert.gesehen ?? []) : [];
 	const start = laeuft ? (gespeichert.start ?? 0) : 0;
-	const ergebnis = await besitzSchritt(repos, psn, accessToken, start, gesehen);
+	const ergebnis = await besitzSchritt(repos, sitzung.psn, accessToken, start, gesehen);
 	if (ergebnis.status === "erfolg") await zugangGeglueckt(repos);
 
 	if (ergebnis.status === "fehler") {

@@ -53,6 +53,14 @@ async function bisFertig(psn: ReturnType<typeof erstellePsnClient>, max = 30) {
 
 beforeEach(leeren);
 
+/**
+ * Das gespeicherte Access Token als abgelaufen markieren (Nachtrag 18q): Ohne
+ * das nimmt ein zweiter Lauf innerhalb der Stunde das gespeicherte Token, und
+ * die Tests darunter erreichten den Refresh-Weg nicht mehr.
+ */
+const accessAbgelaufen = () =>
+	env.DB.prepare("UPDATE psn_credentials SET access_expires_at = datetime('now', '-1 minute') WHERE id = 1").run();
+
 describe("syncSchritt", () => {
 	it("meldet einen Fehler, wenn kein NPSSO hinterlegt ist", async () => {
 		const { psn } = psnMit(10);
@@ -132,6 +140,7 @@ describe("syncSchritt", () => {
 	it("nutzt beim zweiten Lauf den Refresh-Token statt des NPSSO", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
 		await bisFertig(psnMit(20).psn);
+		await accessAbgelaufen();
 
 		const { psn, aufrufe } = psnMit(20);
 		await syncSchritt(repos(), psn);
@@ -143,6 +152,7 @@ describe("syncSchritt", () => {
 	it("faellt auf das NPSSO zurueck, wenn der Refresh-Token abgelehnt wird", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
 		await bisFertig(psnMit(20).psn);
+		await accessAbgelaufen();
 
 		let ersterTokenAufruf = true;
 		const { fetch, aufrufe } = fakeFetch([
@@ -169,6 +179,7 @@ describe("syncSchritt", () => {
 	it("setzt bei abgelaufenem Zugang den Status, ohne Daten anzutasten", async () => {
 		await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
 		await bisFertig(psnMit(20).psn);
+		await accessAbgelaufen();
 		const vorher = await env.DB.prepare("SELECT COUNT(*) AS n FROM psn_raw_response").first<{
 			n: number;
 		}>();

@@ -5,7 +5,7 @@ import { Geheimnis } from "../domain/secret";
 import { PsnAuthError } from "../psn/client";
 import { heuteIso } from "../domain/igdb";
 import { besitzLauf, besitzStand } from "../sync/cron";
-import { normalisierungWiederholen, sitzungBesorgen, syncSchritt } from "../sync/run";
+import { normalisierungWiederholen, psnSitzung, syncSchritt } from "../sync/run";
 import {
 	jahreSchritt,
 	knopfStand,
@@ -71,10 +71,9 @@ export const psnRoutes = new Hono<AppEnv>()
 		}
 
 		await c.var.repos.credentials.npssoSpeichern(npsso, erkannt.laeuftAbUm);
-		await c.var.repos.credentials.refreshTokenSpeichern(
-			sitzung.refreshToken,
-			sitzung.refreshLaeuftAbUm,
-		);
+		// Refresh- und Access Token zusammen (Nachtrag 18q): Der naechste
+		// Abruf kann das Access Token gleich wiederverwenden.
+		await c.var.repos.credentials.sitzungSpeichern(sitzung);
 
 		return c.json({ gespeichert: true, ...(await c.var.repos.credentials.anzeige()) });
 	})
@@ -148,8 +147,8 @@ export const psnRoutes = new Hono<AppEnv>()
 		 * Cron holt (Rueckmeldung des Nutzers).
 		 */
 		if (vorher.offen === 0) {
-			const token = async () => (await sitzungBesorgen(c.var.repos, c.var.psn)).accessToken;
-			const level = await levelSchritt(c.var.repos, c.var.psn, token, heute);
+			const sitzung = psnSitzung(c.var.repos, c.var.psn);
+			const level = await levelSchritt(c.var.repos, sitzung.psn, sitzung.token, heute);
 			await jahreSchritt(c.var.repos, heute);
 			return c.json({
 				listen: 0,
@@ -161,8 +160,8 @@ export const psnRoutes = new Hono<AppEnv>()
 			});
 		}
 
-		const { accessToken } = await sitzungBesorgen(c.var.repos, c.var.psn);
-		const ergebnis = await trophaeenPortion(c.var.repos, c.var.psn, accessToken);
+		const sitzung = psnSitzung(c.var.repos, c.var.psn);
+		const ergebnis = await trophaeenPortion(c.var.repos, sitzung.psn, await sitzung.token());
 		// Ist der Bestand damit vollstaendig, stimmen die Jahre nicht mehr.
 		if (ergebnis.offen === 0) await jahreSchritt(c.var.repos, heute);
 

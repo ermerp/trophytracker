@@ -240,7 +240,7 @@ describe("entscheide: die Reihenfolge als reine Funktion (Stufe 18j)", () => {
 	const lage = (psn: Partial<NonNullable<CronLage["psn"]>> = {}, einstellungen: Record<string, string> = {}): CronLage => ({
 		verlauf: [],
 		einstellungen: new Map(Object.entries(einstellungen)),
-		psn: { abgebrochen: 0, laufend: null, heutige: [lauf], zugang, naechsteListe: null, neuestesRelease: 0, ...psn },
+		psn: { abgebrochen: 0, laufend: null, heutige: [lauf], zugang, zugangsdaten: null, naechsteListe: null, neuestesRelease: 0, ...psn },
 	});
 	const k = { heute: HEUTE, igdbKonfiguriert: true };
 	const fertig = {
