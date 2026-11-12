@@ -91,11 +91,21 @@ ursprünglichen Regel ist erfüllt, ihr Wortlaut nicht.
 Der Refresh-Token nimmt denselben Weg, weil er rotiert und damit genau das Problem hat, an dem die
 Secret-Lösung scheitert.
 
-**Reihenfolge beim Anmelden:**
+**Reihenfolge beim Anmelden** (`psnSitzung`, `src/sync/run.ts`):
 
+0. Gespeichertes Access Token, das noch mindestens zehn Minuten gilt (`ACCESS_RESTZEIT_MS`) → wiederverwenden
 1. Refresh-Token vorhanden und `refresh_expires_at` in der Zukunft → damit einen Access Token holen
 2. Schlägt das fehl oder fehlt der Token → aus dem NPSSO neu ableiten, frischen Refresh-Token ablegen
 3. Scheitert auch das → `status = 'abgelaufen'`, vorhandene Daten bleiben unangetastet
+
+Jede Erneuerung legt Refresh- **und** Access Token in einer Anweisung ab, verschlüsselt wie das NPSSO
+(Migration 0038), und zwar **vor** der Arbeit – das Refresh-Token rotiert. **Seit Nachtrag 18q
+(12.11.2026)** wird das Access Token wiederverwendet: Vorher erneuerte jeder arbeitende PSN-Aufruf
+des Crons, rund 28-mal je Nacht für ein Token, das eine Stunde gilt (Entscheidung des Nutzers vom
+08.11.2026). **Lehnt Sony ein wiederverwendetes Token ab (401), wird genau einmal erneuert und der
+Abruf wiederholt**; ohne das setzte ein 401 im Sync den Zugang auf `abgelaufen`, und die PSN-Automatik
+stünde still, obwohl der Refresh-Token lebt. Die Ablehnung eines frisch geholten Tokens bleibt, was sie
+war: `abgelaufen`. Ein Refresh-Token, das allein abgelegt wird, verwirft das gespeicherte Access Token.
 
 Der normale Sync fasst das NPSSO damit gar nicht an – schonend gegenüber einer inoffiziellen
 Schnittstelle.

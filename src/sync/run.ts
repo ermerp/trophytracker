@@ -1,5 +1,6 @@
 import type { Repositories } from "../db";
 import { einreihungSumme, type Einreihung } from "../db/review";
+import type { ZugangsZeile } from "../db/credentials";
 import type { SyncAusloeser } from "../db/sync";
 import { normalisiereSeite } from "../domain/normalize";
 import { Geheimnis } from "../domain/secret";
@@ -51,33 +52,105 @@ export class KeinNpssoError extends Error {}
 export const FEHLVERSUCHE_HOECHSTENS = 3;
 
 /**
- * Besorgt einen Access Token.
+ * Eine PSN-Sitzung fuer EINEN Aufruf (Nachtrag 18q, Abschnitt 7.1).
  *
- * Reihenfolge nach Abschnitt 7.1: erst der Refresh-Token, das NPSSO nur als
- * Rueckfall. Ein normaler Sync fasst das NPSSO damit gar nicht an - schonend
- * gegenueber einer inoffiziellen Schnittstelle.
+ * Reihenfolge: ein gespeichertes Access Token, das noch mindestens
+ * ACCESS_RESTZEIT_MS gilt; sonst der Refresh-Token; das NPSSO nur als
+ * Rueckfall. Bis 18q erneuerte jeder arbeitende Aufruf das Token bei Sony -
+ * rund 28-mal je Nacht fuer ein Token, das eine Stunde gilt.
+ *
+ * `token` ist eine Funktion und holt erst beim ersten Bedarf (Stufe 18i: Ein
+ * Leerlauf soll Sony nicht anfragen); danach gilt dasselbe Token fuer den
+ * ganzen Aufruf. `zeile` ist die Zeile aus dem Lage-Batch des Crons - ohne sie
+ * wird gelesen (Knopf, Routen).
+ *
+ * **`psn` ist der Client, den der Aufrufer benutzen muss.** Lehnt Sony ein
+ * WIEDERVERWENDETES Token ab (401), wird genau einmal erneuert und derselbe
+ * Abruf wiederholt. Ohne das stuende ein abgelehntes, aber gespeichertes Token
+ * bis zu seinem Ablauf da, und ein 401 setzt den Zugang im Sync auf
+ * 'abgelaufen' - die ganze PSN-Automatik stuende still, obwohl der
+ * Refresh-Token lebt. Ein FRISCH geholtes Token wird nicht wiederholt: Dessen
+ * Ablehnung ist eine Antwort, kein Ueberbleibsel.
  */
-export async function sitzungBesorgen(repos: Repositories, psn: PsnClient): Promise<Sitzung> {
-	const refresh = await repos.credentials.gueltigerRefreshToken();
+export function psnSitzung(
+	repos: Repositories,
+	psn: PsnClient,
+	zeile?: ZugangsZeile | null,
+): { token: () => Promise<Geheimnis>; psn: PsnClient } {
+	let aktuell: Promise<{ token: Geheimnis; wiederverwendet: boolean }> | null = null;
+	// Nach einer Erneuerung: das abgelehnte Token und sein Ersatz. Ein Schritt,
+	// der das Token einmal geholt hat und mehrere Abrufe macht, reicht weiter
+	// das alte herein - es wird bei jedem Abruf getauscht.
+	let ersetzt: { alt: Geheimnis; neu: Geheimnis } | null = null;
+
+	const besorgen = () => (aktuell ??= sitzungHolen(repos, psn, zeile, true));
+	const token = async () => (await besorgen()).token;
+
+	const client = new Proxy(psn, {
+		get(ziel, name, empf) {
+			const wert = Reflect.get(ziel, name, empf);
+			if (typeof wert !== "function") return wert;
+			return async (...argumente: unknown[]) => {
+				if (ersetzt && argumente[0] === ersetzt.alt) argumente = [ersetzt.neu, ...argumente.slice(1)];
+				try {
+					return await wert.apply(ziel, argumente);
+				} catch (fehler) {
+					const stand = aktuell ? await aktuell.catch(() => null) : null;
+					if (
+						!(fehler instanceof PsnAuthError) ||
+						ersetzt ||
+						!stand?.wiederverwendet ||
+						argumente[0] !== stand.token
+					) {
+						throw fehler;
+					}
+					aktuell = sitzungHolen(repos, psn, zeile, false);
+					ersetzt = { alt: stand.token, neu: (await aktuell).token };
+					return wert.apply(ziel, [ersetzt.neu, ...argumente.slice(1)]);
+				}
+			};
+		},
+	});
+	return { token, psn: client };
+}
+
+async function sitzungHolen(
+	repos: Repositories,
+	psn: PsnClient,
+	gelesen: ZugangsZeile | null | undefined,
+	wiederverwenden: boolean,
+): Promise<{ token: Geheimnis; wiederverwendet: boolean }> {
+	const zeile = gelesen === undefined ? await repos.credentials.zeileLesen() : gelesen;
+	if (wiederverwenden) {
+		const gespeichert = await repos.credentials.gueltigerAccessToken(zeile);
+		if (gespeichert) return { token: gespeichert, wiederverwendet: true };
+	}
+
+	const refresh = await repos.credentials.gueltigerRefreshToken(new Date(), zeile);
 	if (refresh) {
 		try {
-			return await sitzungMerken(repos, await psn.tokenAusRefresh(refresh));
+			return { token: await sitzungMerken(repos, await psn.tokenAusRefresh(refresh)), wiederverwendet: false };
 		} catch (fehler) {
 			if (!(fehler instanceof PsnAuthError)) throw fehler;
 			// Refresh abgelehnt - unten ueber das NPSSO versuchen.
 		}
 	}
 
-	const npsso = await repos.credentials.npsso();
+	const npsso = await repos.credentials.npsso(zeile);
 	if (!npsso) {
 		throw new KeinNpssoError("Es ist kein NPSSO hinterlegt.");
 	}
-	return sitzungMerken(repos, await psn.tokenAusNpsso(npsso));
+	return { token: await sitzungMerken(repos, await psn.tokenAusNpsso(npsso)), wiederverwendet: false };
 }
 
-async function sitzungMerken(repos: Repositories, sitzung: Sitzung): Promise<Sitzung> {
-	await repos.credentials.refreshTokenSpeichern(sitzung.refreshToken, sitzung.refreshLaeuftAbUm);
-	return sitzung;
+/** Nur das Token, ohne Wiederholung - fuer Tests und Aufrufer ohne eigenen Client. */
+export async function sitzungBesorgen(repos: Repositories, psn: PsnClient): Promise<{ accessToken: Geheimnis }> {
+	return { accessToken: await psnSitzung(repos, psn).token() };
+}
+
+async function sitzungMerken(repos: Repositories, sitzung: Sitzung): Promise<Geheimnis> {
+	await repos.credentials.sitzungSpeichern(sitzung);
+	return sitzung.accessToken;
 }
 
 /**
@@ -92,7 +165,8 @@ async function sitzungMerken(repos: Repositories, sitzung: Sitzung): Promise<Sit
 export async function syncSchritt(
 	repos: Repositories,
 	psn: PsnClient,
-	optionen: { ausloeser?: SyncAusloeser } = {},
+	// `zeile`: die Zugangszeile aus dem Lage-Batch des Crons (Nachtrag 18q).
+	optionen: { ausloeser?: SyncAusloeser; zeile?: ZugangsZeile | null } = {},
 ): Promise<SyncErgebnis> {
 	// Ein laufender Lauf wird fortgesetzt, egal wer ihn startete; nur ein
 	// neuer traegt den Ausloeser (Stufe 18: der Cron nimmt dieselben Pfade).
@@ -107,12 +181,13 @@ export async function syncSchritt(
 	let seitenGeholt = 0;
 
 	try {
-		const sitzung = await sitzungBesorgen(repos, psn);
+		const sitzung = psnSitzung(repos, psn, optionen.zeile);
+		const accessToken = await sitzung.token();
 		let gesamt: number | null = null;
 
 		while (seitenGeholt < SEITEN_JE_AUFRUF) {
-			const { pfad, roh } = await psn.holeTrophyTitlesSeite(
-				sitzung.accessToken,
+			const { pfad, roh } = await sitzung.psn.holeTrophyTitlesSeite(
+				accessToken,
 				offset,
 				SEITENGROESSE,
 			);

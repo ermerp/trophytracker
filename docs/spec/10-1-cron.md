@@ -55,7 +55,9 @@ Leerlauf der Wartung, 16 im PSN-Fenster. Seither:
 
 Ein Leerlauf sind damit **zwei** D1-Aufrufe; `test/cron-lage.spec.ts` zählt sie über eine D1, die
 ihre Aufrufe zählt (`test/d1-zaehler.ts`). Die Spielzeit fragt seit 18k gebündelt – zwei D1-Aufrufe
-für die Seite statt 217, dazu Lage, Ausgang und die Token-Erneuerung, zusammen sechs seit 18o ([7.7](07-7-psn-weitere-daten.md)); was die übrigen arbeitenden Schritte in sich
+für die Seite statt 217, dazu Lage und Ausgang – **vier** seit 18q; bis dahin las jeder PSN-Aufruf die
+Zugangszeile ein zweites Mal und erneuerte das Token, zusammen sechs ([7.1](07-1-psn-trophaeen.md),
+[7.7](07-7-psn-weitere-daten.md)). Die Lage reicht die Zeile mit den Chiffraten seit 18q an die Schritte durch; was die übrigen arbeitenden Schritte in sich
 abfragen, bleibt bis 20i, wie es ist (18l änderte den Store-Leser, nicht seine D1-Aufrufe).
 
 **Scheitert eine Anweisung des Lage-Batchs, scheitert er ganz** – auch die Marke wird nicht gesetzt,
