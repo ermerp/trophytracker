@@ -103,10 +103,19 @@ deren Leerlauf allein bis 17 ms liegt.
   der Lage, das Access Token wiederverwendet ([7.1](07-1-psn-trophaeen.md)). Gezählt mit gespeichertem
   Token: **Spitze 6 → 4, Kaufliste 7 → 5, Sync-Abruf 7 → 5, Level 3**, Fremdanfragen je Aufruf 2 → 1
   (`test/token-wiederverwenden.spec.ts`). Erneuert wird rund alle 50 Minuten.
-- **18p – Schritte bündeln** (nur einzelne Schritte, ein Deploy): Sync-Abruf → 3 (laufender Lauf aus der
-  Lage, Rohantwort und Offset in einem Batch), Normalisierung 7 → 4 (Upsert, Markieren und Zählen in
-  einem Batch, mehrzeilige Upserts: 104 → rund 12 Anweisungen), Abschluss 12 → rund 5, Kaufliste 5 → 4,
-  automatische Zuordnung neuer Listen in einer Abfrage statt einer je Titel.
+- **18p – Schritte bündeln** (nur einzelne Schritte, ein Deploy; gebaut am 12.11.2026, ausgeliefert
+  nach der Nacht zum 15.11.): Sync-Abruf 5 → **3** (laufender Lauf aus der Lage, Rohantwort und
+  Fortschritt in einem Batch), Normalisierung 7 → **4** (Rohantwort und offene Listen in einem
+  Lese-Batch; Protokoll, Upsert, Markieren und Zählen in einem Schreib-Batch; mehrzeilige Upserts zu
+  sechs Titeln, 104 → 21 Anweisungen je Seite), Abschluss 12 → **4** (mit offenen Listen 5: ein
+  Schreib-Batch für Vorbelegen, Einreihen, Abschließen und Erfolg), Kaufliste 5 → **4** (Stand und
+  Fehlerstatus in einem Batch); die automatische Zuordnung fragt Kandidaten und belegte Releases je in
+  einer Abfrage statt zwei bis drei je Liste. Gelesene und geschriebene Zeilen bleiben gleich
+  (gemessen gegen den unberührten Stand, ein Aufruf liest 1–3 weniger). Kein Aufruf schickt mehr als
+  50 Anweisungen (`test/sync-buendel.spec.ts`). **Nebenwirkung, gewollt:** Die Batches machen drei
+  Halbzustände unmöglich – eine Seite abgelegt, aber nicht weitergezählt (beim nächsten Mal doppelt
+  abgelegt), eine Seite geschrieben, aber nicht markiert (zweimal normalisiert), ein Lauf vorbelegt,
+  aber nicht abgeschlossen.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 12.11.2026): 18q zuerst – die Spitze, der teuerste Aufruf,
 fragt in sich nur zweimal und gewinnt allein durch 18q. 18p wird **nach der Kaufliste-Nacht zum

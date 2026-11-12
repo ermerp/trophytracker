@@ -1,4 +1,5 @@
 import type { Repositories } from "../db";
+import type { TrophyEintrag } from "../domain/gruppen";
 import { plattformenAus, titelSchluessel } from "../domain/titel";
 
 /**
@@ -20,27 +21,40 @@ export type ZuordnungsErgebnis = {
 	offen: number;
 };
 
-export async function ordneAutomatischZu(repos: Repositories): Promise<ZuordnungsErgebnis> {
-	const offen = await repos.games.unzugeordnet();
-	let zugeordnet = 0;
+export async function ordneAutomatischZu(
+	repos: Repositories,
+	// Die offenen Listen, wenn der Aufrufer sie schon gelesen hat (Stufe 18p).
+	gelesen?: TrophyEintrag[],
+): Promise<ZuordnungsErgebnis> {
+	const offen = gelesen ?? (await repos.games.unzugeordnet());
+	if (offen.length === 0) return { geprueft: 0, zugeordnet: 0, offen: 0 };
 
-	for (const eintrag of offen) {
-		const schluessel = titelSchluessel(eintrag.title_name);
-		const kandidaten = await repos.games.releasesNachSchluessel(schluessel);
-		if (kandidaten.length === 0) continue;
-
+	// Kandidaten und belegte Releases fuer ALLE offenen Listen in je einer
+	// Abfrage (Stufe 18p) - bis dahin zwei bis drei je Liste. Dieselbe Regel
+	// wie vorher: genau ein Release mit passender Plattform.
+	const mitSchluessel = offen.map((eintrag) => ({ eintrag, schluessel: titelSchluessel(eintrag.title_name) }));
+	const kandidaten = await repos.games.releasesNachSchluesseln(
+		mitSchluessel.map((m) => m.schluessel).filter((s) => s !== ""),
+	);
+	const passendJe = mitSchluessel.map(({ eintrag, schluessel }) => {
 		const plattformen = plattformenAus(eintrag.platform);
-		const passend = kandidaten.filter((k) => plattformen.includes(k.platform));
-
+		const passend = (kandidaten.get(schluessel) ?? []).filter((k) => plattformen.includes(k.platform));
 		// Genau ein Treffer, sonst nichts. Zwei Kandidaten bedeuten, dass die
 		// Entscheidung dem Nutzer gehoert.
-		if (passend.length !== 1) continue;
+		return { eintrag, releaseId: passend.length === 1 ? passend[0].id : null };
+	});
+	// Ein Release, das bereits eine Liste traegt, wird nicht ueberschrieben -
+	// auch nicht von einer zweiten Liste desselben Laufs (deshalb wachsend).
+	const belegt = await repos.trophies.belegteReleases(
+		passendJe.flatMap((p) => (p.releaseId === null ? [] : [p.releaseId])),
+	);
 
-		// Ein Release, das bereits eine Liste traegt, wird nicht ueberschrieben.
-		if (await repos.trophies.releaseIstBelegt(passend[0].id)) continue;
-
-		if (await repos.games.listeZuordnen(eintrag.np_communication_id, passend[0].id, "automatisch")) {
+	let zugeordnet = 0;
+	for (const { eintrag, releaseId } of passendJe) {
+		if (releaseId === null || belegt.has(releaseId)) continue;
+		if (await repos.games.listeZuordnen(eintrag.np_communication_id, releaseId, "automatisch")) {
 			zugeordnet++;
+			belegt.add(releaseId);
 		}
 	}
 

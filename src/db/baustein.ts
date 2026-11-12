@@ -35,3 +35,21 @@ export const ersteZeile = <T>(e: D1Result) => ((e.results ?? [])[0] as T | undef
 
 /** Wie viele Zeilen eine schreibende Anweisung geaendert hat. */
 export const geaendert = (e: D1Result) => e.meta.changes ?? 0;
+
+/**
+ * Mehrere Bausteine in EINEM D1-Aufruf, in der gegebenen Reihenfolge (Stufe
+ * 18p) - dasselbe, was der Lage-Batch von Hand tut. Der Batch ist eine
+ * Transaktion: Scheitert eine Anweisung, scheitern alle.
+ */
+export async function gemeinsam<T extends readonly Baustein<unknown>[]>(
+	db: D1Database,
+	bausteine: T,
+): Promise<{ [K in keyof T]: T[K] extends Baustein<infer W> ? W : never }> {
+	const ergebnisse = await db.batch(bausteine.flatMap((b) => b.anweisungen));
+	let pos = 0;
+	return bausteine.map((b) => {
+		const teil = ergebnisse.slice(pos, pos + b.anweisungen.length);
+		pos += b.anweisungen.length;
+		return b.lesen(teil);
+	}) as { [K in keyof T]: T[K] extends Baustein<infer W> ? W : never };
+}

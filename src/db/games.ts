@@ -236,15 +236,20 @@ export class GamesRepository {
 
 	/** Alle noch nicht zugeordneten Trophaeenlisten, als Rohdaten fuer die Gruppierung. */
 	async unzugeordnet(): Promise<TrophyEintrag[]> {
-		const { results } = await this.db
-			.prepare(
+		return einzeln(this.db, this.unzugeordnetBaustein());
+	}
+
+	/** Dasselbe als Baustein - der Normalisierungsschritt liest es mit der Rohantwort (Stufe 18p). */
+	unzugeordnetBaustein(): Baustein<TrophyEintrag[]> {
+		return eins(
+			this.db.prepare(
 				"SELECT np_communication_id, title_name, platform, progress_pct, " +
 					"defined_bronze, defined_silver, defined_gold, defined_platinum, " +
 					"earned_platinum, icon_url " +
 					"FROM trophy_progress WHERE release_id IS NULL",
-			)
-			.all<TrophyEintrag>();
-		return results;
+			),
+			(e) => zeilen<TrophyEintrag>(e),
+		);
 	}
 
 	async anzahlUnzugeordnet(): Promise<number> {
@@ -333,25 +338,6 @@ export class GamesRepository {
 				)
 				.bind(releaseId, quelle, npCommunicationId),
 		];
-	}
-
-	/**
-	 * Kandidaten fuer die automatische Zuordnung.
-	 *
-	 * Liefert je Titelschluessel und Plattform die Releases. Der Aufrufer
-	 * ordnet nur zu, wenn es genau einen Treffer gibt (Abschnitt 7.2).
-	 */
-	async releasesNachSchluessel(
-		schluessel: string,
-	): Promise<Array<{ id: number; platform: string }>> {
-		const { results } = await this.db
-			.prepare(
-				"SELECT r.id, r.platform FROM release r JOIN game g ON g.id = r.game_id " +
-					"WHERE g.sort_title = ?",
-			)
-			.bind(schluessel)
-			.all<{ id: number; platform: string }>();
-		return results;
 	}
 
 	/**
@@ -833,7 +819,7 @@ aeenliste haengt
 	 *
 	 * Der Fall, den die Zuordnung nicht abdeckt: eine Disc im Regal, die nie
 	 * gestartet wurde. Dublettenpruefung macht die Route ueber
-	 * releasesNachSchluessel, damit sie dem Nutzer Kandidaten zeigen kann.
+	 * releasesNachSchluesseln, damit sie dem Nutzer Kandidaten zeigen kann.
 	 */
 	async spielAnlegen(titel: string, plattform: Plattform): Promise<{ gameId: number; releaseId: number }> {
 		const spiel = await this.db

@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 170 | 12.11.2026 | **Stufe 18p: PSN-Schritte bündeln** (gebaut, ausgeliefert nach der Nacht zum 15.11.). Sync-Abruf 5 → 3 D1-Aufrufe, Normalisierung 7 → 4 (104 → 21 Anweisungen je Seite), Abschluss 12 → 4, Kaufliste 5 → 4; automatische Zuordnung gebündelt (16.2)
 | 169 | 12.11.2026 | **Stufe 18q: Access Token wiederverwenden.** Gespeichert verschlüsselt (Migration 0038), erneuert erst bei weniger als zehn Minuten Restzeit; ein abgelehntes gespeichertes Token wird einmal erneuert und der Abruf wiederholt; die Zugangszeile kommt aus der Lage. Spitze 6 → 4 D1-Aufrufe, Kaufliste 7 → 5, Sync-Abruf 7 → 5; Sync-Plan mit 18p (7.1, 10.1, 16.2)
 | 168 | 12.11.2026 | **Nachtrag 24c: Letztes Platin so hoch wie die Nachbarn.** In drei Spalten enden Kreis, Platin und Trophäe gleich hoch, in zwei Spalten ein einfacher statt doppelter Abstand (13.2)
 | 167 | 12.11.2026 | **Nachtrag: Nächte zum 09. bis 12.11.** 288 Cron-Aufrufe `ok`, Sync jede Nacht `erfolg`; Spitze 15–35 ms (Median über sieben Nächte 22); Auffrischen ist ein Wochenrhythmus, kein Stau (Nacht 08.11. korrigiert); Abendläufe bis 6 h 26 verspätet, zweite Läufe im PSN-Fenster (16.2)

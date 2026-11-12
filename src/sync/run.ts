@@ -1,7 +1,7 @@
 import type { Repositories } from "../db";
 import { einreihungSumme, type Einreihung } from "../db/review";
 import type { ZugangsZeile } from "../db/credentials";
-import type { SyncAusloeser } from "../db/sync";
+import type { SyncAusloeser, SyncLauf } from "../db/sync";
 import { normalisiereSeite } from "../domain/normalize";
 import { Geheimnis } from "../domain/secret";
 import {
@@ -165,13 +165,15 @@ async function sitzungMerken(repos: Repositories, sitzung: Sitzung): Promise<Geh
 export async function syncSchritt(
 	repos: Repositories,
 	psn: PsnClient,
-	// `zeile`: die Zugangszeile aus dem Lage-Batch des Crons (Nachtrag 18q).
-	optionen: { ausloeser?: SyncAusloeser; zeile?: ZugangsZeile | null } = {},
+	// Aus dem Lage-Batch des Crons: die Zugangszeile (Nachtrag 18q) und der
+	// laufende Lauf (Stufe 18p) - `null` heisst "keiner", fehlt der Schluessel,
+	// wird gelesen (Knopf).
+	optionen: { ausloeser?: SyncAusloeser; zeile?: ZugangsZeile | null; laufend?: SyncLauf | null } = {},
 ): Promise<SyncErgebnis> {
 	// Ein laufender Lauf wird fortgesetzt, egal wer ihn startete; nur ein
 	// neuer traegt den Ausloeser (Stufe 18: der Cron nimmt dieselben Pfade).
-	const lauf =
-		(await repos.sync.laufenderLauf()) ?? (await repos.sync.starten(optionen.ausloeser ?? "nutzer"));
+	const laufend = optionen.laufend === undefined ? await repos.sync.laufenderLauf() : optionen.laufend;
+	const lauf = laufend ?? (await repos.sync.starten(optionen.ausloeser ?? "nutzer"));
 
 	if (lauf.phase === "normalisierung") {
 		return normalisierungsSchritt(repos, lauf.id, lauf.titles_seen);
@@ -191,18 +193,19 @@ export async function syncSchritt(
 				offset,
 				SEITENGROESSE,
 			);
-			await repos.sync.rohantwortSpeichern(lauf.id, pfad, roh);
-			seitenGeholt++;
-
 			gesamt = extractTotalItemCount(roh);
 			const weiterAb = naechsterOffset(offset, SEITENGROESSE, gesamt);
+			// Rohantwort und Fortschritt in EINEM Batch (Stufe 18p).
+			// `extractTotalItemCount` wirft nie - die Rohantwort geht also nicht
+			// verloren, weil vorher ausgewertet wird.
+			await repos.sync.abrufSichern(lauf.id, pfad, roh, weiterAb);
+			seitenGeholt++;
 
 			if (weiterAb === null) {
 				// Abruf fertig - jetzt normalisieren, im naechsten Aufruf.
 				// Der Lauf wird hier bewusst NICHT abgeschlossen: Er bleibt
 				// 'laufend', damit der naechste Aufruf ihn wiederfindet, statt
 				// einen neuen zu starten und erneut PSN abzurufen.
-				await repos.sync.phaseSetzen(lauf.id, "normalisierung");
 				return {
 					status: "laufend",
 					phase: "normalisierung",
@@ -215,7 +218,6 @@ export async function syncSchritt(
 			offset = weiterAb;
 		}
 
-		await repos.sync.fortschrittSetzen(lauf.id, offset);
 		return {
 			status: "laufend",
 			phase: "abruf",
@@ -298,28 +300,44 @@ export async function normalisierungsSchritt(
 	laufId: number,
 	titlesSeen: number | null,
 ): Promise<SyncErgebnis> {
-	const roh = await repos.sync.naechsteUnverarbeitete(laufId);
+	// EIN Lese-Batch (Stufe 18p): die naechste Rohantwort und die Listen ohne
+	// Zuordnung. Die zweite braucht nur der Abschluss; sie laeuft trotzdem in
+	// jedem Aufruf mit, weil sie ueber den Index auf release_id nur die Zeilen
+	// ohne Zuordnung liest - meist keine (test/lesekosten.spec.ts).
+	const [roh, unzugeordnet] = await repos.gemeinsam([
+		repos.sync.naechsteUnverarbeiteteBaustein(laufId),
+		repos.games.unzugeordnetBaustein(),
+	] as const);
 
 	if (!roh) {
 		// Nach der Normalisierung: neue Listen, die eindeutig zu einem
 		// bestehenden Release passen, automatisch zuordnen (Abschnitt 7.2).
 		// Beim Erstlauf greift das nie - es gibt noch keine Spiele.
-		await ordneAutomatischZu(repos);
+		if (unzugeordnet.length > 0) await ordneAutomatischZu(repos, unzugeordnet);
 
-		// Abschnitt 4.2: Erst jetzt, mit zugeordneten Listen, bekommt ein
-		// Release seinen ersten Status. Schreibt nur ohne Zeile oder bei
-		// 'nicht_gespielt' - ein gesetzter Status ueberlebt jeden Sync.
-		const vorbelegt = await repos.playStatus.vorbelegen();
-		// Abschnitt 8.1: Der Sync schreibt nur in die Warteschlange, nie einen
-		// Status - nie durchgesehene Listen als 'erstimport', Aenderungen
-		// gegenueber dem Stempel der letzten Durchsicht als 'neue_trophaeen'
-		// oder 'dlc_erweitert'.
-		const { erstimport, neueTrophaeen, dlcErweitert } = await repos.review.einreihen();
+		// EIN Schreib-Batch fuer den ganzen Abschluss (Stufe 18p), statt
+		// zehn Aufrufen nacheinander. Die Reihenfolge ist die von vorher:
+		//  1. Abschnitt 4.2: Erst jetzt, mit zugeordneten Listen, bekommt ein
+		//     Release seinen ersten Status. Schreibt nur ohne Zeile oder bei
+		//     'nicht_gespielt' - ein gesetzter Status ueberlebt jeden Sync.
+		//  2. Abschnitt 8.1: Der Sync schreibt nur in die Warteschlange, nie
+		//     einen Status - nie durchgesehene Listen als 'erstimport',
+		//     Aenderungen gegenueber dem Stempel der letzten Durchsicht als
+		//     'neue_trophaeen' oder 'dlc_erweitert'. Sieht den Status aus 1.
+		//  3. Den Lauf abschliessen, die Listen zaehlt dieselbe Anweisung.
+		//  4. Den Erfolg am Zugang vermerken.
+		// Scheitert eine Anweisung, scheitert der ganze Abschluss: Der Lauf
+		// bleibt 'laufend' ohne offene Rohantwort, und der naechste Aufruf
+		// versucht genau diesen Abschluss erneut. Halb geschehen ist nichts -
+		// bis 18p konnte ein Lauf vorbelegt, aber nicht abgeschlossen sein.
+		const [vorbelegt, einreihung, gesamt] = await repos.gemeinsam([
+			repos.playStatus.vorbelegenBaustein(),
+			repos.review.einreihenBaustein(),
+			repos.sync.abschliessenBaustein(laufId),
+			repos.credentials.erfolgVermerkenBaustein(),
+		] as const);
+		const { erstimport, neueTrophaeen, dlcErweitert } = einreihung;
 		const eingereihtNachGrund = { erstimport, neueTrophaeen, dlcErweitert };
-
-		const gesamt = await repos.trophies.anzahl();
-		await repos.sync.abschliessen(laufId, gesamt);
-		await repos.credentials.erfolgVermerken();
 		return {
 			status: "erfolg",
 			phase: "normalisierung",
@@ -336,10 +354,15 @@ export async function normalisierungsSchritt(
 
 	try {
 		const { titel, verworfen } = normalisiereSeite(roh.payload);
-		const geschrieben = await repos.trophies.upsertSeite(titel);
-		await repos.sync.alsNormalisiertMarkieren(roh.id);
-
-		const offen = await repos.sync.offeneRohantworten(laufId);
+		// EIN Schreib-Batch (Stufe 18p): Protokoll und Upsert der Seite, dann
+		// die Rohantwort als normalisiert markieren, dann zaehlen, was offen
+		// bleibt. Scheitert eine Anweisung, bleibt die Rohantwort offen und
+		// nichts von der Seite ist geschrieben - bis 18p konnte eine Seite
+		// geschrieben, aber nicht markiert sein und lief dann zweimal.
+		const [geschrieben, offen] = await repos.gemeinsam([
+			repos.trophies.upsertSeiteBaustein(titel),
+			repos.sync.normalisiertBaustein(roh.id, laufId),
+		] as const);
 		return {
 			status: "laufend",
 			phase: "normalisierung",

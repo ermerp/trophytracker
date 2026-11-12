@@ -1,5 +1,6 @@
 import { wirkung, type ReviewAktion, type ReviewGrund } from "../domain/review";
 import type { PlayStatus } from "../domain/play-status";
+import type { Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 import type { Kopplung } from "./kopplung";
 import type { PlayStatusRepository } from "./play-status";
@@ -97,8 +98,20 @@ export class ReviewRepository {
 	 * nach dem Batch - meta.changes zaehlte aktualisierte Details mit.
 	 */
 	async einreihen(): Promise<Einreihung> {
-		const vorher = await this.zaehlungNachGrund();
-		const [, gestempelt] = await this.db.batch([
+		const b = this.einreihenBaustein();
+		return b.lesen(await this.db.batch(b.anweisungen));
+	}
+
+	/**
+	 * Dasselbe als Baustein (Stufe 18p): Zaehlung davor, die vier Anweisungen,
+	 * Zaehlung danach - alles in einem Batch statt drei D1-Aufrufen. Die
+	 * Zaehlungen sind Lesungen im Schreib-Batch; sie sehen den Stand an ihrer
+	 * Stelle der Transaktion.
+	 */
+	einreihenBaustein(): Baustein<Einreihung> {
+		const zaehlung = () => this.db.prepare("SELECT reason, COUNT(*) AS n FROM review_queue GROUP BY reason");
+		const anweisungen = [
+			zaehlung(),
 			// Protokoll (8.5) zuerst, mit der Bedingung von Schritt 3 und nur
 			// fuer Listen, die noch nicht in der Warteschlange stehen: Ein
 			// offener Eintrag, dessen Detail aktualisiert wird, ist kein neues
@@ -145,22 +158,26 @@ export class ReviewRepository {
 					`OR (${EARNED} > t.reviewed_earned_total AND ps.status <> 'am_spielen')) ` +
 					"ON CONFLICT(release_id) DO UPDATE SET reason = excluded.reason, detail = excluded.detail",
 			),
-		]);
-		const nachher = await this.zaehlungNachGrund();
+			zaehlung(),
+		];
 		return {
-			erstimport: nachher.erstimport - vorher.erstimport,
-			neueTrophaeen: nachher.neue_trophaeen - vorher.neue_trophaeen,
-			dlcErweitert: nachher.dlc_erweitert - vorher.dlc_erweitert,
-			alsKomplettGestempelt: gestempelt.meta.changes ?? 0,
+			anweisungen,
+			lesen: ([vor, , gestempelt, , , nach]) => {
+				const vorher = ReviewRepository.nachGrund(vor);
+				const nachher = ReviewRepository.nachGrund(nach);
+				return {
+					erstimport: nachher.erstimport - vorher.erstimport,
+					neueTrophaeen: nachher.neue_trophaeen - vorher.neue_trophaeen,
+					dlcErweitert: nachher.dlc_erweitert - vorher.dlc_erweitert,
+					alsKomplettGestempelt: gestempelt.meta.changes ?? 0,
+				};
+			},
 		};
 	}
 
-	private async zaehlungNachGrund(): Promise<Record<ReviewGrund, number>> {
-		const { results } = await this.db
-			.prepare("SELECT reason, COUNT(*) AS n FROM review_queue GROUP BY reason")
-			.all<{ reason: ReviewGrund; n: number }>();
+	private static nachGrund(e: D1Result): Record<ReviewGrund, number> {
 		const z: Record<ReviewGrund, number> = { erstimport: 0, neue_trophaeen: 0, dlc_erweitert: 0 };
-		for (const r of results) z[r.reason] = r.n;
+		for (const r of (e.results ?? []) as Array<{ reason: ReviewGrund; n: number }>) z[r.reason] = r.n;
 		return z;
 	}
 

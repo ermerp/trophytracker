@@ -235,6 +235,11 @@ export class CredentialsRepository {
 	}
 
 	/** Dasselbe als Anweisung fuer den Batch eines Schritts (Stufe 18o). */
+	/** Dasselbe als Baustein - zum Buendeln mit dem Stand eines Schritts (Stufe 18p). */
+	fehlerStatusLoeschenBaustein(): Baustein<void> {
+		return { anweisungen: [this.fehlerStatusLoeschenAnweisung()], lesen: () => undefined };
+	}
+
 	fehlerStatusLoeschenAnweisung(): D1PreparedStatement {
 		return this.db.prepare("UPDATE psn_credentials SET status = 'ok' WHERE id = 1 AND status = 'fehler'");
 	}
@@ -264,7 +269,14 @@ export class CredentialsRepository {
 	}
 
 	async erfolgVermerken(): Promise<void> {
-		await this.db.batch([
+		await this.db.batch(this.erfolgVermerkenBaustein().anweisungen);
+	}
+
+	/** Dasselbe als Baustein - fuer den Abschluss-Batch des Syncs (Stufe 18p). */
+	erfolgVermerkenBaustein(): Baustein<void> {
+		return {
+			lesen: () => undefined,
+			anweisungen: [
 			this.db.prepare(
 				"UPDATE psn_credentials SET status = 'ok', last_success_at = datetime('now') WHERE id = 1",
 			),
@@ -275,7 +287,8 @@ export class CredentialsRepository {
 				"UPDATE psn_zugang SET letzter_erfolg_am = datetime('now') " +
 					"WHERE gestorben_am IS NULL AND ersetzt_am IS NULL",
 			),
-		]);
+			],
+		};
 	}
 
 	/**

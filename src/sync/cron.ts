@@ -344,9 +344,9 @@ export async function cronSchritt(
 	})) {
 		switch (kandidat) {
 			case "sync":
-				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { zeile }) };
+				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { zeile, laufend: lage.psn?.laufend }) };
 			case "sync_starten":
-				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron", zeile }) };
+				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron", zeile, laufend: lage.psn?.laufend }) };
 
 			// 4.-7. Spielzeit, Kaufliste, Einzeltrophaeen, Level (7.7). Erst nach
 			//       dem Sync: Die Zuordnung laeuft ueber die Titel der Sammlung.
@@ -653,18 +653,23 @@ export async function besitzLauf(
 	const gesehen = laeuft ? (gespeichert.gesehen ?? []) : [];
 	const start = laeuft ? (gespeichert.start ?? 0) : 0;
 	const ergebnis = await besitzSchritt(repos, sitzung.psn, accessToken, start, gesehen);
-	if (ergebnis.status === "erfolg") await zugangGeglueckt(repos);
 
 	if (ergebnis.status === "fehler") {
 		await repos.sync.fortschrittSetzenWert(SCHLUESSEL_BESITZ, JSON.stringify({ fehlerAm: heute }));
 		return ergebnis;
 	}
-	await repos.sync.fortschrittSetzenWert(
-		SCHLUESSEL_BESITZ,
-		ergebnis.weiter
-			? JSON.stringify({ start: start + ergebnis.geholt, gesehen })
-			: JSON.stringify({ fertigAm: heute }),
-	);
+	// Stand und "Zugang geglueckt" in EINEM Batch (Stufe 18p) - bis dahin zwei
+	// Aufrufe. Scheitert er, steht weder das eine noch das andere; der Stand
+	// von vorher bleibt, und der naechste Aufruf holt dieselbe Seite erneut.
+	await repos.gemeinsam([
+		repos.sync.fortschrittBaustein(
+			SCHLUESSEL_BESITZ,
+			ergebnis.weiter
+				? JSON.stringify({ start: start + ergebnis.geholt, gesehen })
+				: JSON.stringify({ fertigAm: heute }),
+		),
+		repos.credentials.fehlerStatusLoeschenBaustein(),
+	] as const);
 	return ergebnis;
 }
 

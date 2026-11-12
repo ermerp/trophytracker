@@ -1,3 +1,4 @@
+import { gemeinsam, type Baustein } from "./baustein";
 import { CredentialsRepository } from "./credentials";
 import { CronLageRepository } from "./cron-lage";
 import { BetriebRepository } from "./betrieb";
@@ -47,6 +48,12 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 	const markt = new MarktRepository(db, events, preisalarm);
 	const store = new StoreRepository(db, events, preisalarm);
 	return {
+		/**
+		 * Bausteine mehrerer Repositories in EINEM D1-Aufruf (Stufe 18p) - fuer
+		 * Schritte, die ihre Lesungen oder Schreibungen buendeln. Die Verbindung
+		 * selbst verlaesst src/db/ dabei nicht.
+		 */
+		gemeinsam: <T extends readonly Baustein<unknown>[]>(bausteine: T) => gemeinsam(db, bausteine),
 		credentials,
 		sync,
 		trophies: new TrophiesRepository(db, events),

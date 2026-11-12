@@ -1,4 +1,5 @@
 import type { PlayStatus } from "../domain/play-status";
+import type { Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 
 export type PlayStatusZeile = {
@@ -201,9 +202,15 @@ export class PlayStatusRepository {
 	 * Rueckgabe: Zahl der angelegten oder geaenderten Zeilen.
 	 */
 	async vorbelegen(): Promise<number> {
+		const b = this.vorbelegenBaustein();
+		return b.lesen(await this.db.batch(b.anweisungen));
+	}
+
+	/** Dasselbe als Baustein - fuer den Abschluss-Batch des Syncs (Stufe 18p). */
+	vorbelegenBaustein(): Baustein<number> {
 		// Protokoll (8.5) im selben Batch davor, mit derselben Bedingung wie
 		// der Konfliktzweig: nur Releases ohne Zeile oder mit 'nicht_gespielt'.
-		const [, ergebnis] = await this.db.batch([
+		const anweisungen = [
 			this.events.insertSelect(
 				"SELECT 'sync', r.game_id, t.release_id, g.title || ' (' || r.platform || ')', 'status_vorbelegt', 'status', " +
 					"ps.status, CASE WHEN t.progress_pct >= 100 THEN 'komplettiert' ELSE 'am_spielen' END, NULL " +
@@ -219,8 +226,9 @@ export class PlayStatusRepository {
 					"ON CONFLICT(release_id) DO UPDATE SET status = excluded.status, updated_at = datetime('now') " +
 					"WHERE play_status.status = 'nicht_gespielt'",
 			),
-		]);
-		return ergebnis.meta.changes ?? 0;
+		];
+		// meta.changes nur vom INSERT, nie die Summe mit dem Protokoll (CLAUDE.md).
+		return { anweisungen, lesen: ([, ergebnis]) => ergebnis.meta.changes ?? 0 };
 	}
 
 	async abweichungen(): Promise<AbweichungZeile[]> {
