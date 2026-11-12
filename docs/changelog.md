@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 167 | 12.11.2026 | **Nachtrag: Nächte zum 09. bis 12.11.** 288 Cron-Aufrufe `ok`, Sync jede Nacht `erfolg`; Spitze 15–35 ms (Median über sieben Nächte 22); Auffrischen ist ein Wochenrhythmus, kein Stau (Nacht 08.11. korrigiert); Abendläufe bis 6 h 26 verspätet, zweite Läufe im PSN-Fenster (16.2)
 | 166 | 08.11.2026 | **Nachtrag: Nacht zum 08.11.** 72 Cron-Aufrufe `ok`, Sync `erfolg`; dritte Spielzeit-Spitze 22 ms in SIN; Kaufliste Median 15 (11–30); Auffrischen-Stau in drei Aufrufen abgetragen (10–16 ms); `rows_read_24h` 685 536, überwiegend Startseite nach den Deploys vom 07.11. (16.2)
 | 165 | 07.11.2026 | **Nachtrag: Abschluss der Sitzung.** Zwei Lehren (Desktop-Breite des Nutzers, ein „gut" ist keine Wahl), zwei Regeln geschärft |
 | 164 | 07.11.2026 | **Nachtrag: Wrap-up ohne Zwischenhalt.** Der Abschluss committet, mergt und pusht selbständig und meldet sich erst danach, geänderte Regeln als Diff im Bericht (CLAUDE.md) |
