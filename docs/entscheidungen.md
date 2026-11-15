@@ -374,3 +374,7 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 15.11.2026 | **Zurück schließt die offene Filtertafel** am Handy, wie bei der Suche (f2b) | [13.3](spec/13-3-bedienung.md) |
 | 15.11.2026 | **„Spiel anlegen“ als Zeichen in der Kopfzeile der Sammlung**, am Handy und am Desktop; im Scanner bleibt der Textknopf (f2c) | [13.2](spec/13-2-darstellungsregeln.md) |
 | 15.11.2026 | **Auch im Sortiermenü stehen „Favoriten zuerst“ und „Release“** – je Kriterium eine Beschriftung (Nachtrag f2b-b) | [5.1](spec/05-1-favorit-und-sortierung.md) |
+| 15.11.2026 | **Zurück schließt auch das offene Sortiermenü**; Zurück aus einer Suche nimmt nur den Begriff, nie Filter oder Sortierung (Nachtrag f2b-c) | [13.3](spec/13-3-bedienung.md) |
+| 15.11.2026 | **Das Suchfeld bleibt nach dem Leeren per Kreuz offen** | [13.3](spec/13-3-bedienung.md) |
+| 15.11.2026 | **Die Platin-Zahl der Plattformtabelle im Dashboard bleibt golden** – nur das Platin-Zeichen der Sammlung ist platinblau | [16.4](spec/16-4-finale-stufen.md) |
+| 15.11.2026 | **Fehlende PS+-Berechtigungen (Befund GTA V) gehören zu Stufe 1**, nicht vor die Nacht zum 22.11.; bis dahin von Hand im Spieldetail | [16.4](spec/16-4-finale-stufen.md) |
