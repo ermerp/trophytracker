@@ -41,19 +41,26 @@ describe("stateZumOeffnen", () => {
 });
 
 describe("stateNachFilter", () => {
-	it("behaelt bei offener Tafel nur ihre Markierung", () => {
-		expect(stateNachFilter({ ...SUCH_STATE, filtertafel: true })).toEqual(TAFEL_STATE);
+	it("behaelt bei offener Tafel ihre Markierung und die der Suche", () => {
+		expect(stateNachFilter({ ...SUCH_STATE, filtertafel: true })).toEqual({ ...SUCH_STATE, ...TAFEL_STATE });
+		expect(stateNachFilter(TAFEL_STATE)).toEqual(TAFEL_STATE);
 	});
 
 	it("behaelt die Markierung des Sortiermenues, allein oder ueber der Tafel", () => {
 		// Sonst schloesse die gewaehlte Sortierung das Menue per replace, und sein Eintrag bliebe verwaist.
-		expect(stateNachFilter({ ...SUCH_STATE, ...MENUE_STATE })).toEqual(MENUE_STATE);
+		expect(stateNachFilter(MENUE_STATE)).toEqual(MENUE_STATE);
 		expect(stateNachFilter({ ...TAFEL_STATE, ...MENUE_STATE })).toEqual({ ...TAFEL_STATE, ...MENUE_STATE });
 	});
 
-	it("schreibt ohne Tafel keinen state, wie bisher", () => {
-		expect(stateNachFilter(SUCH_STATE)).toBeNull();
+	it("behaelt die Such-Markierung: Zurueck aus der Suche nimmt den Filter dann mit", () => {
+		// Bis f2b-c fiel sie hier, und das Kreuz ersetzte statt zurueckzugehen.
+		expect(stateNachFilter(SUCH_STATE)).toEqual(SUCH_STATE);
+	});
+
+	it("schreibt ohne Markierung keinen state und laesst fremde Schluessel fallen", () => {
 		expect(stateNachFilter(null)).toBeNull();
+		expect(stateNachFilter({ anderes: 1 })).toBeNull();
+		expect(stateNachFilter({ ...SUCH_STATE, anderes: 1 })).toEqual(SUCH_STATE);
 	});
 });
 

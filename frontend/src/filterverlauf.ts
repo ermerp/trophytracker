@@ -10,8 +10,6 @@
  *   selbst, nicht in einem React-Zustand: Zurück schließt sie von allein.
  * - **Filter in der Tafel** ersetzen den Eintrag (`replace`) und behalten die
  *   Markierung – die Tafel bleibt offen, ein Zurück schließt sie weiterhin.
- *   Die Such-Markierung fällt dabei, wie bisher bei jedem Chip
- *   (`suchverlauf.ts`): Ihr Eintrag davor trüge sonst die alten Filter.
  * - **Schließen** über „Filter" oder „zurücksetzen" geht zurück, wenn der
  *   Eintrag unserer ist – ein zweiter Eintrag läge doppelt im Verlauf.
  * - **Nach dem Zurück** trägt der Eintrag davor noch die Filter von vor dem
@@ -39,9 +37,9 @@
  * - **Schließen** über die Pille oder einen Klick daneben geht immer zurück:
  *   Offen ist das Menü nur in einem Eintrag, den es selbst angelegt hat.
  *
- * Beim Übernehmen fällt die Such-Markierung wie bei jeder Sortierung
- * (`stateNachFilter`) – sonst ginge ein Leeren des Suchfelds auf den
- * Eintrag vor der Suche zurück und nähme die neue Sortierung mit.
+ * Beim Übernehmen bleibt eine Such-Markierung wie bei jeder Sortierung
+ * (`stateNachFilter`): Ein späteres Leeren der Suche geht zurück und nimmt
+ * die Sortierung über `nachSuche` (`suchverlauf.ts`) mit.
  */
 
 /** Die Markierung im `location.state` eines Eintrags, den die Tafel angelegt hat. */
@@ -77,20 +75,23 @@ export function stateZumMenue(state: unknown): Objekt {
   return { ...rest, ...MENUE_STATE }
 }
 
-type Markierungen = { filtertafel?: true; sortiermenue?: true }
+type Markierungen = { suche?: true; filtertafel?: true; sortiermenue?: true }
 
 /**
- * Der `state` beim Ersetzen durch einen Filter-Chip oder die Sortierung: nur
- * die Markierungen von Tafel und Menü bleiben. Auch die Sortierung behaelt
- * sie – sonst schloesse sie eine offene Tafel (oder das Menü) und deren
- * Eintrag bliebe verwaist im Verlauf, ein Zurueck nähme dann die Filter und
- * die Sortierung mit.
+ * Der `state` beim Ersetzen durch einen Filter-Chip oder die Sortierung: Die
+ * Markierungen von Suche, Tafel und Menü bleiben, sonst nichts. Fiele die
+ * Markierung von Tafel oder Menü, schlösse der Chip sie per `replace`, und
+ * ihr Eintrag bliebe verwaist im Verlauf. Die Such-Markierung bleibt seit
+ * f2b-c ebenfalls: Das Zurück aus der Suche nimmt Filter und Sortierung auf
+ * den Eintrag davor mit (`nachSuche` in `suchverlauf.ts`), und so tun
+ * Zurück und das Kreuz im Suchfeld wieder dasselbe.
  */
 export function stateNachFilter(state: unknown): Markierungen | null {
   const m: Markierungen = {}
+  if (istObjekt(state) && state.suche === true) m.suche = true
   if (tafelOffen(state)) m.filtertafel = true
   if (menueOffen(state)) m.sortiermenue = true
-  return m.filtertafel || m.sortiermenue ? m : null
+  return m.suche || m.filtertafel || m.sortiermenue ? m : null
 }
 
 /** Schließen über „Filter" oder „zurücksetzen": zurück, wenn der Eintrag unserer ist. */
@@ -130,7 +131,7 @@ function nachSchliessen(
 }
 
 /** Zwei Suchstrings, unabhängig von der Reihenfolge der Schlüssel. */
-function gleicheParameter(a: string, b: string): boolean {
+export function gleicheParameter(a: string, b: string): boolean {
   const ordnen = (s: string) => {
     const p = new URLSearchParams(s)
     p.sort()
