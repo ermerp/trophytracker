@@ -114,6 +114,10 @@
 
 	--kopf-hoehe: 56px;
 	--leiste-hoehe: 64px;
+	/* Eine Pillenhoehe fuer Filter, Sortierung und Trophaeenliste (Stufe f2b,
+	   28px nach Wahl des Nutzers am Bild) - vorher hatten Filter 32px und die
+	   Sortierung daneben 28px. */
+	--chip-hoehe: 28px;
 
 	/* Cover sind Hochformat (264 x 374, `t_cover_big`, Abschnitt 7.6). */
 	--cover: 264 / 374;

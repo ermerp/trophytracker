@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { anfrage, gebrauchtpreis, type KaufKandidat } from './api'
 import { Preis } from './Preis'
-import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
+import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERBAR, SORTIERKURZ, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
 import { useAnsicht } from './Ansicht'
 import { Chips } from './Chips'
 import { Sortierleiste } from './Sortierung'
@@ -139,7 +139,19 @@ export function Kaufliste() {
     <>
       <Kopfzeile titel="Kaufliste" sucheParam="suche" ansicht={ansicht} />
       <Reiter eintraege={WUNSCH_REITER} />
-      <Chips gruppen={PLAN_CHIPS} />
+      <Chips
+        gruppen={PLAN_CHIPS}
+        rechts={
+          <Sortierleiste
+            texte={SORTIERBAR}
+            kurz={SORTIERKURZ}
+            natuerlich={SORTIER_NATUERLICH}
+            wert={sortierung as ListenSortierung}
+            richtung={richtung}
+            waehlen={(w, r) => setzeSortierung(w, r)}
+          />
+        }
+      />
 
       <div className="seite">
       <p className="ruhig klein">
@@ -163,13 +175,6 @@ export function Kaufliste() {
         <>
           <div className="listenkopf">
             <span>{daten.eintraege.length} Einträge</span>
-            <Sortierleiste
-                texte={SORTIERBAR}
-                natuerlich={SORTIER_NATUERLICH}
-                wert={sortierung as ListenSortierung}
-                richtung={richtung}
-                waehlen={(w, r) => setzeSortierung(w, r)}
-              />
           </div>
           <ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>
             {daten.eintraege.map((e) => (

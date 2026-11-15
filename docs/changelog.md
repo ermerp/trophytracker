@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 175 | 15.11.2026 | **Finale Stufe 2, Teil f2b: Filterzeile.** Sortierung und Richtungspfeil in der Zeile von „Filter", gesetzte Filter brechen um (Handy: eigene Zeile), alle Pillen 28 px, Kurztexte „Favoriten zuerst" und „Release" in der Pille, Zurück schließt die Filtertafel; Vitest schließt `.claude/` aus (5.1, 13.3) |
 | 174 | 15.11.2026 | **Finale Stufe 2, Teil f2d: Feed so hoch wie die linke Spalte.** Am Desktop ab 64 rem endet „Neu" auf der Unterkante der Kennzahlen und zeigt nur ganze Einträge; `/api/feed?anzahl=` (8 ohne Parameter, höchstens 20), Lesekosten 853 → 865 nur am Desktop (8.5, 13.2) |
 | 173 | 15.11.2026 | **Finale Stufe 2, Teil f2a: Suche und Platin.** Zurück leert zuerst die Suche (Verlaufseintrag beim ersten Begriff), Suchfeld ohne natives Kreuz und über die volle Breite (448 → 1 114 px bei 2 030 px Fenster), erspieltes Platin in der Platinfarbe statt Gold (13.2, 13.3) |
 | 172 | 15.11.2026 | **Nachtrag 18q-b: Klartext-Prüfung des Dumps kennt das Access Token.** `scripts/dump-pruefen.sh` nimmt `d1_migrations` aus (Dateiname `0038_access_token.sql`) und erwartet sechs statt vier Chiffrat-/IV-Werte; der Deploy von 18p war daran vor der Migration gestoppt (14.5) |

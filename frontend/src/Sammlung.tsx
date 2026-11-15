@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Link, useNavigationType, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router-dom'
+import { stateNachFilter } from './filterverlauf'
 import {
 	PLATTFORMEN,
 	PLAY_STATUS,
@@ -112,6 +113,8 @@ const SORTIERTEXT = {
 	release: 'Erscheinungsdatum',
 } as const
 type SammlungSortierung = keyof typeof SORTIERTEXT
+/** Kürzere Beschriftung in der Sortier-Pille (Stufe f2b); im Menü steht der volle Text. */
+const SORTIERKURZ_SAMMLUNG: Partial<Record<SammlungSortierung, string>> = { release: 'Release' }
 
 /**
  * Die natürliche Richtung je Kriterium – beim Titel A–Z, bei allen
@@ -139,6 +142,7 @@ function weitester(releases: readonly Release[]): Release | null {
 
 export function Sammlung() {
 	const [params, setParams] = useSearchParams()
+	const location = useLocation()
 	const sortierung: SammlungSortierung =
 		(params.get('sort') as SammlungSortierung) in SORTIERTEXT ? (params.get('sort') as SammlungSortierung) : 'titel'
 	const richtung: Richtung =
@@ -309,7 +313,29 @@ export function Sammlung() {
 				ansicht={ansicht}
 				aktion={{ name: 'barcode', text: 'Regal scannen', ziel: '/scannen' }}
 			/>
-			<Chips gruppen={GRUPPEN} />
+			<Chips
+				gruppen={GRUPPEN}
+				rechts={
+					<Sortierleiste
+						texte={SORTIERTEXT}
+						kurz={SORTIERKURZ_SAMMLUNG}
+						natuerlich={SAMMLUNG_NATUERLICH}
+						wert={sortierung}
+						richtung={richtung}
+						waehlen={(w, r) => {
+							const neu = new URLSearchParams(params)
+							if (w === 'titel') neu.delete('sort')
+							else neu.set('sort', w)
+							if (r === SAMMLUNG_NATUERLICH[w]) neu.delete('richtung')
+							else neu.set('richtung', r)
+							// Eine andere Reihenfolge heisst: wieder von vorn (neuer Schlüssel).
+							neu.delete('offset')
+							// Eine offene Filtertafel bleibt offen (Stufe f2b, `filterverlauf.ts`).
+							setParams(neu, { replace: true, state: stateNachFilter(location.state) })
+						}}
+					/>
+				}
+			/>
 
 			<div className="seite">
 				<SpielAnlegen onAngelegt={angelegt} />
@@ -332,22 +358,6 @@ export function Sammlung() {
 					<>
 						<div className="listenkopf">
 							<span>{daten.gesamt} {daten.gesamt === 1 ? 'Spiel' : 'Spiele'}</span>
-							<Sortierleiste
-								texte={SORTIERTEXT}
-								natuerlich={SAMMLUNG_NATUERLICH}
-								wert={sortierung}
-								richtung={richtung}
-								waehlen={(w, r) => {
-									const neu = new URLSearchParams(params)
-									if (w === 'titel') neu.delete('sort')
-									else neu.set('sort', w)
-									if (r === SAMMLUNG_NATUERLICH[w]) neu.delete('richtung')
-									else neu.set('richtung', r)
-									// Eine andere Reihenfolge heisst: wieder von vorn (neuer Schlüssel).
-									neu.delete('offset')
-									setParams(neu, { replace: true })
-								}}
-							/>
 						</div>
 
 						<ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>
