@@ -871,8 +871,13 @@ a.kasten:hover {
     margin-bottom: 0;
   }
 
+  /* Die Mindesthöhe hält den Feed sichtbar, solange die linke Spalte leer
+     oder niedrig ist (Kennzahlen nicht geladen, `/api/stats` gescheitert):
+     Überschrift und rund drei Einträge. Im Normalfall ist die linke Spalte
+     höher und bestimmt die Zeile weiter allein. */
   .drechts {
     position: relative;
+    min-height: 19rem;
   }
 
   .dashboard .drechts > .block {
