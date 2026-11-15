@@ -401,6 +401,21 @@ danebengreift.
 
 ---
 
+**15.11.2026 – die Klartext-Prüfung kannte die neue Spalte nicht, und der Deploy, der
+sie anlegte, konnte das nicht zeigen.** Stufe 18q legte am 12.11. das Access Token
+verschlüsselt in `psn_credentials` ab (Migration 0038). `scripts/dump-pruefen.sh`
+erwartete höchstens vier Base64-Werte und kein `access_token` in einer `INSERT`-Zeile.
+Der Deploy von 18q lief grün, weil der Dump **vor** der Migration entsteht: Die Spalten
+gab es noch nicht. Der nächste Deploy – 18p, drei Tage später – stand mit zwei Meldungen
+vor der Migration: sechs Werte statt vier (108/16/72/16/3 856/16 Zeichen, alle Chiffrat
+oder IV) und ein Treffer für `access_token`, der in keiner der 27 Datentabellen stand,
+sondern im Dateinamen `0038_access_token.sql` in `d1_migrations`. Die Produktion blieb
+unberührt auf 18q; die wöchentliche Sicherung desselben Tages wäre an derselben Prüfung
+gescheitert. Nachtrag 18q-b nimmt `d1_migrations` aus und erwartet sechs Werte, gegen
+fünf eingebaute Defekte belegt.
+→ Regel in [14.5](spec/14-backup-export.md): Wer eine verschlüsselte Spalte anlegt,
+ändert die Prüfung in derselben Stufe – ihr eigener Deploy beweist nichts.
+
 ## Das Dokument hat sich dreimal selbst korrigiert
 
 Jedes Mal war eine Zahl in der Spezifikation falsch, und jedes Mal war der Grund

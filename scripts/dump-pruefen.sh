@@ -37,12 +37,19 @@ meldung() { echo "::error::$1"; fehler=1; }
 #
 # Nur INSERT-Zeilen, nicht das Schema: Die Spalten heissen npsso_ciphertext
 # und refresh_ciphertext, ihre Namen im CREATE TABLE sind kein Fund.
+#
+# Ohne d1_migrations: Dort stehen Dateinamen aus diesem oeffentlichen
+# Repository, keine Daten - `0038_access_token.sql` ist ein Name, kein Token
+# (Nachtrag 18q-b). Die Zeilen werden gezaehlt und ausgewiesen, damit die
+# Ausnahme sichtbar bleibt.
 # --------------------------------------------------------------------------
-inserts=$(grep -c '^INSERT INTO' "$dump" || true)
-echo "INSERT-Zeilen geprüft: $inserts"
+migrationen='^INSERT INTO "\{0,1\}d1_migrations"\{0,1\} '
+inserts=$(grep '^INSERT INTO' "$dump" | grep -c -v "$migrationen" || true)
+ausgenommen=$(grep -c "$migrationen" "$dump" || true)
+echo "INSERT-Zeilen geprüft: $inserts (ohne $ausgenommen Zeilen aus d1_migrations)"
 
 for muster in 'access_token' 'refresh_token' '"npsso"' 'npsso='; do
-  treffer=$(grep '^INSERT INTO' "$dump" | grep -c -F "$muster" || true)
+  treffer=$(grep '^INSERT INTO' "$dump" | grep -v "$migrationen" | grep -c -F "$muster" || true)
   echo "  Muster '$muster': $treffer Treffer"
   [ "$treffer" = 0 ] || meldung "Muster '$muster' steht in $treffer Datenzeilen"
 done
@@ -100,11 +107,14 @@ else
     fi
   done <<< "$werte"
 
-  # Vier Chiffrat-/IV-Spalten: npsso_ciphertext, npsso_iv, refresh_ciphertext,
-  # refresh_iv. Mehr Base64-Werte hiesse, dass eine fuenfte dazugekommen ist,
-  # ohne dass dieses Skript sie kennt.
-  echo "  Base64-Werte gesamt: $base64_werte (erwartet höchstens 4)"
-  [ "$base64_werte" -le 4 ] || meldung "mehr Base64-Werte als die vier bekannten Chiffrat-/IV-Spalten"
+  # Sechs Chiffrat-/IV-Spalten: npsso_ciphertext, npsso_iv, refresh_ciphertext,
+  # refresh_iv und seit Migration 0038 access_ciphertext, access_iv. Mehr
+  # Base64-Werte hiesse, dass eine siebte dazugekommen ist, ohne dass dieses
+  # Skript sie kennt. Wer eine solche Spalte anlegt, aendert die Zahl hier in
+  # DERSELBEN Stufe - der Deploy der Migration selbst sieht sie noch nicht,
+  # weil der Dump davor entsteht.
+  echo "  Base64-Werte gesamt: $base64_werte (erwartet höchstens 6)"
+  [ "$base64_werte" -le 6 ] || meldung "mehr Base64-Werte als die sechs bekannten Chiffrat-/IV-Spalten"
 fi
 
 if [ "$fehler" = 0 ]; then
