@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { Link, NavLink, useSearchParams } from 'react-router-dom'
+import { Link, NavLink, useLocation, useSearchParams } from 'react-router-dom'
+import { stateNachFilter } from './filterverlauf'
 import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, gebrauchtpreis, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
 import { Preis } from './Preis'
 import { StorePreis } from './StorePreis'
@@ -30,7 +31,7 @@ import { Zeichen, type ZeichenName } from './Symbole'
  * Sortierung und Filter liegen in der URL, wie in der Sammlung.
  */
 
-export { SORTIERBAR, SORTIERTEXT, SORTIER_NATUERLICH, VERGLEICH, type ListenSortierung, type Sortierung } from './vergleich'
+export { SORTIERBAR, SORTIERKURZ, SORTIERTEXT, SORTIER_NATUERLICH, VERGLEICH, type ListenSortierung, type Sortierung } from './vergleich'
 
 // Seit Stufe 19d ohne 'ohne': Jeder Eintrag hängt an einem Release (Abschnitt 5).
 const PLATTFORM_FILTER = PLATTFORMEN
@@ -58,6 +59,7 @@ type Antwort = { sortierung: Sortierung; eintraege: PlanEintrag[] }
  */
 export function usePlanListe(art: PlanArt) {
   const [params, setParams] = useSearchParams()
+  const location = useLocation()
   const [daten, setDaten] = useState<Antwort | null>(null)
   const [meldung, setMeldung] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
@@ -108,7 +110,9 @@ export function usePlanListe(art: PlanArt) {
     else neu.set('sort', w)
     if (r === SORTIER_NATUERLICH[w]) neu.delete('richtung')
     else neu.set('richtung', r)
-    setParams(neu, { replace: true })
+    // Bei offener Filtertafel bleibt ihre Markierung - sonst schloesse die
+    // Sortierung sie und ihr Eintrag bliebe verwaist im Verlauf (Stufe f2b).
+    setParams(neu, { replace: true, state: stateNachFilter(location.state) })
   }
 
   function setzeParam(name: string, wert: string) {

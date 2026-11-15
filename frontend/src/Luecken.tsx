@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { stateNachFilter } from './filterverlauf'
 import { STATUSTEXT, anfrage, gebrauchtpreis, marktBefund, type DiscFassung, type PlayStatus } from './api'
 import { Preis } from './Preis'
 import { Sortierleiste, type Richtung } from './Sortierung'
@@ -91,6 +92,7 @@ type Eben =
 export function Luecken() {
   // Die beiden Umschalter schreibt jetzt die Chip-Leiste in die URL.
   const [params, setParams] = useSearchParams()
+  const location = useLocation()
   const mitVerworfenen = params.get('verworfene') === '1'
   const moeglichOffen = params.get('unbekannte') === '1'
   const sortierung: LueckenSortierung =
@@ -182,7 +184,8 @@ export function Luecken() {
               // Nur eine Abweichung von der natürlichen Richtung in die URL.
               if (r === LUECKEN_NATUERLICH[w]) neu.delete('richtung')
               else neu.set('richtung', r)
-              setParams(neu, { replace: true })
+              // Eine offene Filtertafel bleibt offen (Stufe f2b, `filterverlauf.ts`).
+              setParams(neu, { replace: true, state: stateNachFilter(location.state) })
             }}
           />
         }

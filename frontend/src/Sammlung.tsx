@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Link, useNavigationType, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router-dom'
+import { stateNachFilter } from './filterverlauf'
 import {
 	PLATTFORMEN,
 	PLAY_STATUS,
@@ -139,6 +140,7 @@ function weitester(releases: readonly Release[]): Release | null {
 
 export function Sammlung() {
 	const [params, setParams] = useSearchParams()
+	const location = useLocation()
 	const sortierung: SammlungSortierung =
 		(params.get('sort') as SammlungSortierung) in SORTIERTEXT ? (params.get('sort') as SammlungSortierung) : 'titel'
 	const richtung: Richtung =
@@ -325,7 +327,8 @@ export function Sammlung() {
 							else neu.set('richtung', r)
 							// Eine andere Reihenfolge heisst: wieder von vorn (neuer Schlüssel).
 							neu.delete('offset')
-							setParams(neu, { replace: true })
+							// Eine offene Filtertafel bleibt offen (Stufe f2b, `filterverlauf.ts`).
+							setParams(neu, { replace: true, state: stateNachFilter(location.state) })
 						}}
 					/>
 				}

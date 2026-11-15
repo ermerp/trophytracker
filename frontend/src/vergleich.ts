@@ -64,6 +64,12 @@ export const SORTIERBAR = {
   angelegt: 'zuletzt angelegt',
 } as const
 export const SORTIERTEXT = { ...SORTIERBAR, position: 'eigene Reihenfolge' } as const
+/**
+ * Kürzere Beschriftung in der Sortier-Pille (Stufe f2b, Entscheidung des
+ * Nutzers): Der volle Text passte bei 360 px nicht neben „Filter 3". Im Menü
+ * steht weiter der volle Text. Was hier fehlt, heißt in der Pille wie im Menü.
+ */
+export const SORTIERKURZ: Partial<Record<Sortierung, string>> = { favorit: 'Favoriten zuerst' }
 /** Was alle Listen ausser To-Do anbieten – „eigene Reihenfolge" gibt es nur dort. */
 export type ListenSortierung = keyof typeof SORTIERBAR
 export type Sortierung = keyof typeof SORTIERTEXT

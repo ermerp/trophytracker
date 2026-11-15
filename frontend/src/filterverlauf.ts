@@ -42,7 +42,12 @@ export function stateZumOeffnen(state: unknown): Objekt {
   return { ...rest, ...TAFEL_STATE }
 }
 
-/** Der `state` beim Ersetzen durch einen Filter-Chip: nur die Tafel-Markierung bleibt. */
+/**
+ * Der `state` beim Ersetzen durch einen Filter-Chip oder die Sortierung: nur
+ * die Tafel-Markierung bleibt. Auch die Sortierung behaelt sie – sonst
+ * schloesse sie eine offene Tafel und deren Eintrag bliebe verwaist im
+ * Verlauf, ein Zurueck nähme dann die Filter und die Sortierung mit.
+ */
 export function stateNachFilter(state: unknown): typeof TAFEL_STATE | null {
   return tafelOffen(state) ? TAFEL_STATE : null
 }
