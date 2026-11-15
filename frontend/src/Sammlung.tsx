@@ -113,6 +113,8 @@ const SORTIERTEXT = {
 	release: 'Erscheinungsdatum',
 } as const
 type SammlungSortierung = keyof typeof SORTIERTEXT
+/** Kürzere Beschriftung in der Sortier-Pille (Stufe f2b); im Menü steht der volle Text. */
+const SORTIERKURZ_SAMMLUNG: Partial<Record<SammlungSortierung, string>> = { release: 'Release' }
 
 /**
  * Die natürliche Richtung je Kriterium – beim Titel A–Z, bei allen
@@ -316,6 +318,7 @@ export function Sammlung() {
 				rechts={
 					<Sortierleiste
 						texte={SORTIERTEXT}
+						kurz={SORTIERKURZ_SAMMLUNG}
 						natuerlich={SAMMLUNG_NATUERLICH}
 						wert={sortierung}
 						richtung={richtung}

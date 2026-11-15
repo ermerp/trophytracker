@@ -69,7 +69,7 @@ export const SORTIERTEXT = { ...SORTIERBAR, position: 'eigene Reihenfolge' } as 
  * Nutzers): Der volle Text passte bei 360 px nicht neben „Filter 3". Im Menü
  * steht weiter der volle Text. Was hier fehlt, heißt in der Pille wie im Menü.
  */
-export const SORTIERKURZ: Partial<Record<Sortierung, string>> = { favorit: 'Favoriten zuerst' }
+export const SORTIERKURZ: Partial<Record<Sortierung, string>> = { favorit: 'Favoriten zuerst', release: 'Release' }
 /** Was alle Listen ausser To-Do anbieten – „eigene Reihenfolge" gibt es nur dort. */
 export type ListenSortierung = keyof typeof SORTIERBAR
 export type Sortierung = keyof typeof SORTIERTEXT
@@ -175,6 +175,8 @@ export const LUECKEN_SORTIERUNG = {
   release: 'Erscheinungsdatum',
 } as const
 export type LueckenSortierung = keyof typeof LUECKEN_SORTIERUNG
+/** Kürzere Beschriftung in der Sortier-Pille, wie `SORTIERKURZ`. */
+export const LUECKEN_KURZ: Partial<Record<LueckenSortierung, string>> = { release: 'Release' }
 
 /** Was bei welchem Kriterium die natürliche Reihenfolge ist. */
 export const LUECKEN_NATUERLICH: Record<LueckenSortierung, Richtung> = {
