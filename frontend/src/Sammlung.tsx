@@ -217,6 +217,15 @@ export function Sammlung() {
 	// Eine neue Filterkombination: aus dem Speicher, wenn es ein "Zurück" ist,
 	// sonst von vorn und oben.
 	useEffect(() => {
+		// Die bisherige Liste merken, bevor die neue sie ersetzt: Die Suche legt
+		// einen Verlaufseintrag an (Stufe f2a), und ein Zurueck daraus soll die
+		// Liste ohne Suche an ihrer Stelle zeigen - nicht leer von oben und nicht
+		// mit einer Hoehe von einem frueheren Besuch. `stand` haelt hier noch die
+		// alte Liste; mitgeschrieben wird erst im Effekt weiter unten.
+		const vorher = stand.current
+		if (vorher.name !== name && vorher.daten) {
+			merken(vorher.name, { eintraege: vorher.daten.spiele, gesamt: vorher.daten.gesamt, scrollY: vorher.scrollY })
+		}
 		aktuell.current = name
 		setMeldung(null)
 		const gemerkt = navigation === 'POP' ? holen<Spiel>(name) : null

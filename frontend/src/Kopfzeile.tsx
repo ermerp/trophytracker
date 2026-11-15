@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import type { Ansicht } from './Ansicht'
+import { SUCH_STATE, suchSchritt } from './suchverlauf'
 import { AppSymbol, Zeichen, type ZeichenName } from './Symbole'
 
 /**
@@ -19,6 +20,11 @@ import { AppSymbol, Zeichen, type ZeichenName } from './Symbole'
  * Der Suchparameter heißt in der Sammlung `search` und in den Listen `suche` –
  * das sind die Namen der jeweiligen Route, und sie werden hier durchgereicht
  * statt vereinheitlicht: Ein alter Link soll weiter funktionieren.
+ *
+ * **Zurück leert zuerst die Suche** (Stufe f2a): Der erste Begriff legt einen
+ * Verlaufseintrag an, jedes weitere Tippen ersetzt ihn, und das Leeren geht
+ * zurück, statt einen zweiten gleichen Eintrag anzulegen. Die Entscheidung
+ * steht in `suchverlauf.ts`.
  */
 
 /** Eine Zusatzaktion: entweder ein Ziel (Scannen) oder ein Schalter (Formular auf/zu). */
@@ -57,30 +63,48 @@ type Props = {
 export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz, zurueck, stillerTitel }: Props) {
 	const [params, setParams] = useSearchParams()
 	const navigate = useNavigate()
+	const location = useLocation()
 	const gesetzt = sucheParam ? (params.get(sucheParam) ?? '') : ''
 	const [offen, setOffen] = useState(gesetzt !== '')
 	const [text, setText] = useState(gesetzt)
 	const feld = useRef<HTMLInputElement>(null)
+	// Der Begriff, den wir zuletzt selbst in die URL geschrieben haben - damit
+	// der Effekt auf `gesetzt` die eigene Aenderung von einer fremden (Zurueck,
+	// „Filter zuruecksetzen") unterscheidet.
+	const geschrieben = useRef<string | null>(null)
 
 	// Entprellen: erst 300 ms nach dem letzten Tastendruck in die URL. Stand
 	// vorher in Sammlung.tsx und gilt jetzt fuer alle Listen gleich.
 	useEffect(() => {
-		if (!sucheParam || text === gesetzt) return
+		if (!sucheParam) return
+		const schritt = suchSchritt(gesetzt, text, location.state)
+		if (schritt === 'keiner') return
 		const t = setTimeout(() => {
+			geschrieben.current = text
+			if (schritt === 'zurueck') {
+				navigate(-1)
+				return
+			}
 			const neu = new URLSearchParams(params)
 			if (text) neu.set(sucheParam, text)
 			else neu.delete(sucheParam)
 			neu.delete('offset')
-			setParams(neu, { replace: true })
+			if (schritt === 'push') setParams(neu, { state: SUCH_STATE })
+			else setParams(neu, { replace: true, state: location.state })
 		}, 300)
 		return () => clearTimeout(t)
-	}, [text, gesetzt, sucheParam, params, setParams])
+	}, [text, gesetzt, sucheParam, params, setParams, location.state, navigate])
 
-	// Ein Wechsel der Ansicht (oder „Filter zuruecksetzen") kann den Begriff
-	// von aussen leeren - das Feld folgt, statt den alten Stand zu zeigen.
+	// Ein Zurueck, ein Wechsel der Ansicht oder „Filter zuruecksetzen" kann den
+	// Begriff von aussen aendern - das Feld folgt, statt den alten Stand zu
+	// zeigen, und klappt zu, wenn er leer ist. Die eigene Aenderung laesst es
+	// stehen: Wer mit dem Kreuz leert, will meist gleich Neues tippen.
 	useEffect(() => {
+		const eigene = geschrieben.current === gesetzt
+		geschrieben.current = null
+		if (eigene) return
 		setText(gesetzt)
-		if (gesetzt) setOffen(true)
+		setOffen(gesetzt !== '')
 	}, [gesetzt])
 
 	function schliessen() {
