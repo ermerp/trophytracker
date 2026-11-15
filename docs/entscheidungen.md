@@ -369,3 +369,6 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 15.11.2026 | **Erspieltes Platin in der Platinfarbe**, nicht in Gold (f2a) | [13.2](spec/13-2-darstellungsregeln.md) |
 | 15.11.2026 | **Der Feed „Neu“ endet am Desktop mit der linken Spalte** und wird auf ganze Einträge abgeschnitten, kein Scrollbereich (f2d) | [13.2](spec/13-2-darstellungsregeln.md) |
 | 15.11.2026 | **Zeichen für Kaufliste, Lücken und Backlog nur am Desktop** (Reiter und Seitenleiste, dort auch Stern und Haken); gewählt Einkaufswagen, gestrichelte Hülle, Sanduhr, für „Spiel anlegen“ die Hülle mit Plus (f2c, noch nicht gebaut) | [13.3](spec/13-3-gestaltung-und-pwa.md) |
+| 15.11.2026 | **Filter und Sortierung in einer Zeile**, alle Pillen **28 px**; gesetzte Filter am Handy in eigener Zeile (f2b) | [13.3](spec/13-3-gestaltung-und-pwa.md) |
+| 15.11.2026 | **Kurztext in der Sortier-Pille**, voller Text im Menü: „Favoriten zuerst“ und „Release“ (für Erscheinungsdatum) (f2b) | [5.1](spec/05-1-favorit-und-sortierung.md) |
+| 15.11.2026 | **Zurück schließt die offene Filtertafel** am Handy, wie bei der Suche (f2b) | [13.3](spec/13-3-gestaltung-und-pwa.md) |
