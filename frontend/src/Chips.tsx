@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { useLocation, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom'
+import { nachTafel, schliessSchritt, stateNachFilter, stateZumOeffnen, tafelOffen } from './filterverlauf'
 import { Zeichen } from './Symbole'
 
 /**
@@ -47,7 +48,38 @@ type Chip = { schluessel: string; text: string; aktiv: boolean; umschalten: () =
 
 export function Chips({ gruppen, rechts }: { gruppen: readonly ChipGruppe[]; rechts?: ReactNode }) {
 	const [params, setParams] = useSearchParams()
-	const [offen, setOffen] = useState(false)
+	const location = useLocation()
+	const navigate = useNavigate()
+	const navigationsart = useNavigationType()
+	// Offen ist die Tafel, wenn der Verlaufseintrag sie traegt - so schliesst
+	// Zurueck sie von allein (Stufe f2b, `filterverlauf.ts`).
+	const offen = tafelOffen(location.state)
+	const warOffen = useRef(false)
+	// Was nach dem Schliessen auf dem Eintrag davor gelten soll.
+	const mitnehmen = useRef<string | null>(null)
+
+	useEffect(() => {
+		const uebernehmen = nachTafel(warOffen.current, location.state, navigationsart === 'POP', mitnehmen.current, location.search)
+		warOffen.current = offen
+		mitnehmen.current = offen ? location.search : null
+		if (uebernehmen !== null) setParams(new URLSearchParams(uebernehmen), { replace: true, state: location.state })
+		// Nur bei einem Wechsel des Eintrags; der Rest wird dabei frisch gelesen.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [location.key])
+
+	function oeffnen() {
+		navigate({ pathname: location.pathname, search: location.search }, { state: stateZumOeffnen(location.state) })
+	}
+
+	/** Schliesst die Tafel; `danach` gilt anschliessend auf dem Eintrag davor. */
+	function schliessen(danach: string) {
+		if (schliessSchritt(location.state) === 'zurueck') {
+			mitnehmen.current = danach
+			navigate(-1)
+		} else {
+			setParams(new URLSearchParams(danach), { replace: true })
+		}
+	}
 
 	function setze(param: string, wert: string) {
 		const neu = new URLSearchParams(params)
@@ -55,7 +87,7 @@ export function Chips({ gruppen, rechts }: { gruppen: readonly ChipGruppe[]; rec
 		else neu.delete(param)
 		// Ein geaenderter Filter macht die Seitenzahl sinnlos.
 		neu.delete('offset')
-		setParams(neu, { replace: true })
+		setParams(neu, { replace: true, state: stateNachFilter(location.state) })
 	}
 
 	const nachGruppe = gruppen.map((gruppe) => {
@@ -91,8 +123,8 @@ export function Chips({ gruppen, rechts }: { gruppen: readonly ChipGruppe[]; rec
 			const wert = params.get(p)
 			if (wert) neu.set(p, wert)
 		}
-		setParams(neu, { replace: true })
-		setOffen(false)
+		if (offen) schliessen(neu.toString())
+		else setParams(neu, { replace: true })
 	}
 
 	return (
@@ -102,7 +134,7 @@ export function Chips({ gruppen, rechts }: { gruppen: readonly ChipGruppe[]; rec
 					type="button"
 					className={offen ? 'chip griff offen' : 'chip griff'}
 					aria-expanded={offen}
-					onClick={() => setOffen(!offen)}
+					onClick={() => (offen ? schliessen(params.toString()) : oeffnen())}
 				>
 					<Zeichen name="filter" groesse={15} />
 					Filter
