@@ -365,3 +365,5 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 08.11.2026 | **Das PSN-Access-Token wird wiederverwendet** statt in jedem Aufruf erneuert, verschlüsselt in `psn_credentials` wie das Refresh-Token (Nachtrag 18q) | [7.1](spec/07-1-psn-trophaeen.md) |
 | 12.11.2026 | **18q (Token-Pfad) vor 18p (Schritte bündeln)**, 18p erst nach der Kaufliste-Nacht zum 15.11. ausgeliefert; was sinnvoll ist, wird gleich deployt | [16.2](spec/16-2-bewertung-02-11.md) |
 | 15.11.2026 | **Die Klartext-Prüfung des Dumps wird an 18q angepasst** – `d1_migrations` ausgenommen, sechs statt vier Chiffrat-/IV-Werte (Nachtrag 18q-b) | [14.5](spec/14-backup-export.md) |
+| 15.11.2026 | **Zurück leert zuerst die Suche** und bleibt in der Liste – für alle Listen mit Suche, nicht nur die Sammlung (finale Stufe 2, f2a) | [13.3](spec/13-3-gestaltung-und-pwa.md) |
+| 15.11.2026 | **Erspieltes Platin in der Platinfarbe**, nicht in Gold (f2a) | [13.2](spec/13-2-darstellungsregeln.md) |
