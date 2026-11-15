@@ -74,7 +74,7 @@ zuzudecken gibt. Die Überschrift steht über den Trophäenzeichen und nennt die
 („Trophäen – 11 von 49", mit dem Winkel zum Aufklappen).
 
 **Der Dashboard-Feed liest seine zwei Quellen über `GET /api/feed`.** Das Änderungsprotokoll behält
-`/api/events` und sein Keyset; der Feed mischt zur Lesezeit und zeigt acht Zeilen. Den Satz bildet
+`/api/events` und sein Keyset; der Feed mischt zur Lesezeit und zeigt eine Handvoll Zeilen (wie viele: [8.5](08-5-aenderungsprotokoll.md)). Den Satz bildet
 der Worker (`beschreibeFeedTrophaeen`), nicht die Oberfläche. **Bronze wird nie genannt:** Es ist
 die Grundmenge, und „12 Trophäen, davon 1 Gold und 11 Bronze" sagt dasselbe zweimal. Besteht eine
 Zeile nur aus einer Stufe, heißt sie direkt so.
