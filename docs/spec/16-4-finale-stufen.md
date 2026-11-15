@@ -43,6 +43,10 @@ Die **Leseansichten** final durchgehen, in allen drei Breiten, dazu drei Dinge, 
 
 Ergebnis ist eine **Checkliste im Repository**, damit ein zweiter Durchgang vergleichbar ist.
 
+**Begonnen am 15.11.2026 mit den Wünschen des Nutzers**, in vier Teilen ausgeliefert: f2a Suche (Zurück leert zuerst die Suche, ein Kreuz, volle Breite) und Platin in der Platinfarbe, f2d Feed so hoch wie die linke Spalte, f2b Filterzeile (Sortierung neben „Filter", Pillen 28 px, Zurück schließt die Filtertafel), f2c Zeichen für Reiter und Seitenleiste am Desktop und „Spiel anlegen" in der Kopfzeile (13.1–13.3, 5.1, 8.5). **Offen bleiben** die vier Punkte oben (leere Zustände, Offline, sichere Bereiche, Sortierwert sichtbar) und die Checkliste. Nebenbei notiert, nicht angefasst: die Platin-Zahl im Dashboard steht noch in Gold (`Kennzahlen.tsx`), und im Sortiermenü schließt Zurück noch nicht wie bei Suche und Filtertafel.
+
+**Befund für Stufe 1 (15.11.2026):** Eine PS+-Berechtigung kann still fehlen. Bei einem Spiel mit PS4- und PS5-Release und PSN-Spielzeit auf beiden gibt es keine Zeile in `digital_entitlement` und nie ein `berechtigung_angelegt`; der Abgleich der Kaufliste (`src/sync/besitz.ts`) verlangt Titelschlüssel und Plattform bei genau einem Release und verwirft alles andere **ohne Spur**. Wie Sony den Titel dort nennt, ist nirgends abgelegt – die Ursache ist deshalb **nicht belegt**. Vorschlag, offen: Der Schritt schreibt die Zahl der Einträge ohne Treffer in seinen Stand, und eine Arbeitsansicht zeigt sie zum Zuordnen.
+
 #### 3. Refactoring
 
 Effizienz, Redundanz, Netz- und Fensterauslastung, toter Code.

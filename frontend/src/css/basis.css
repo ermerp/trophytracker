@@ -244,6 +244,16 @@ textarea {
   color: var(--text);
 }
 
+/* Am Desktop steht vor dem Text das Zeichen des Reiters (Stufe f2c); am
+   Handy blendet `.nur-desktop` es aus, dort reicht der Platz nicht. */
+@media (min-width: 48rem) {
+  .reiter a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--a2);
+  }
+}
+
 /* --- Listenkopf -------------------------------------------------------- */
 
 .listenkopf {
@@ -696,9 +706,12 @@ textarea {
     display: none;
   }
 
+  /* Das Zeichen des Unterpunkts steht dort, wo der Text des Haupteintrags
+     beginnt (Stufe f2c). */
   .nav-unter {
     display: flex;
     align-items: center;
+    gap: var(--a2);
     height: 32px;
     padding: 0 0.85rem 0 3rem;
     border-radius: var(--r2);
