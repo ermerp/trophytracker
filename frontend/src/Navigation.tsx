@@ -16,7 +16,8 @@ import { Zeichen, type ZeichenName } from './Symbole'
  *
  * Am Desktop dieselben Einträge als Seitenleiste – dort **mit** Text und mit
  * den Reitern als Unterpunkten, weil der Platz da ist (Wunsch des Nutzers vom
- * 23.09.2026).
+ * 23.09.2026). Seit Stufe f2c tragen die Unterpunkte ihr eigenes Zeichen,
+ * dasselbe wie ihr Reiter.
  */
 
 type Eintrag = {
@@ -24,7 +25,7 @@ type Eintrag = {
 	name: ZeichenName
 	text: string
 	/** Pfade, die denselben Eintrag markieren (Reiter derselben Seite). */
-	unter: ReadonlyArray<{ ziel: string; text: string }>
+	unter: ReadonlyArray<{ ziel: string; text: string; name: ZeichenName }>
 }
 
 const EINTRAEGE: readonly Eintrag[] = [
@@ -35,11 +36,11 @@ const EINTRAEGE: readonly Eintrag[] = [
 		name: 'stern',
 		text: 'Wunschliste',
 		unter: [
-			{ ziel: '/kaufliste', text: 'Kaufliste' },
-			{ ziel: '/luecken', text: 'Lücken' },
+			{ ziel: '/kaufliste', text: 'Kaufliste', name: 'wagen' },
+			{ ziel: '/luecken', text: 'Lücken', name: 'luecke' },
 		],
 	},
-	{ ziel: '/todo', name: 'haken', text: 'To-Do', unter: [{ ziel: '/backlog', text: 'Backlog' }] },
+	{ ziel: '/todo', name: 'haken', text: 'To-Do', unter: [{ ziel: '/backlog', text: 'Backlog', name: 'sanduhr' }] },
 ]
 
 export function Navigation() {
@@ -58,6 +59,7 @@ export function Navigation() {
 						</NavLink>
 						{e.unter.map((u) => (
 							<NavLink key={u.ziel} to={u.ziel} className="nav-unter">
+								<Zeichen name={u.name} groesse={17} />
 								{u.text}
 							</NavLink>
 						))}

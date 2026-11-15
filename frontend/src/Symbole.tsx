@@ -75,6 +75,20 @@ export const ZEICHEN = {
 		'<path d="M12 3.6a5.6 5.6 0 0 0-5.6 5.6c0 4.2-1.3 5.6-1.9 6.3-.3.3-.1.9.4.9h14.2' +
 		'c.5 0 .7-.6.4-.9-.6-.7-1.9-2.1-1.9-6.3A5.6 5.6 0 0 0 12 3.6z"/>' +
 		'<path d="M10.1 19.1a2 2 0 0 0 3.8 0"/>',
+	// Stufe f2c: die Reiter Kaufliste, Luecken und Backlog tragen am Desktop
+	// ein Zeichen wie ihre Hauptseiten (Wunschliste: Stern, To-Do: Haken).
+	// Alle vier dieses Blocks gewaehlt vom Nutzer am 15.11.2026 aus einem
+	// Vorschlagsblatt.
+	// Kaufliste: ein Einkaufswagen (K1).
+	wagen: '<path d="M2.8 4.6h2.4l2.3 10.4h10.4l2.3-7.6H5.8"/><circle cx="9" cy="18.8" r="1.5"/><circle cx="16.6" cy="18.8" r="1.5"/>',
+	// Luecken: eine einzelne gestrichelte Huelle – die Disc, die fehlt (L2).
+	luecke: '<rect x="5.2" y="3.4" width="13.6" height="17.2" rx="1.6" pathLength="54" stroke-dasharray="2 3.4"/>',
+	// Backlog: eine Sanduhr – was wartet (B2).
+	sanduhr:
+		'<path d="M6 4.4h12M6 19.6h12"/><path d="M7.6 4.4v1.8c0 2.6 4.4 4.6 4.4 5.8s-4.4 3.2-4.4 5.8v1.8M16.4 4.4v1.8c0 2.6-4.4 4.6-4.4 5.8s4.4 3.2 4.4 5.8v1.8"/><path d="M10.2 17.6h3.6"/>',
+	// Spiel anlegen: eine Huelle mit Ruecken, ein Plus darin (A1) – in der
+	// Kopfzeile der Sammlung neben dem Barcode.
+	anlegen: '<rect x="5" y="3.4" width="14" height="17.2" rx="1.6"/><path d="M8 3.4v17.2"/><path d="M13.5 8.8v6.4M10.3 12h6.4"/>',
 } as const
 
 export type ZeichenName = keyof typeof ZEICHEN

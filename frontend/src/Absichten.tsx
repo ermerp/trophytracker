@@ -288,11 +288,18 @@ export function Meldungen({ liste }: { liste: PlanListe }) {
  * zwei Reiter; seit Stufe 19 sind Kaufliste und Lücken die Reiter der
  * Wunschliste, damit die untere Leiste vier Symbole trägt statt sieben.
  */
-export function Reiter({ eintraege }: { eintraege: ReadonlyArray<readonly [ziel: string, text: string]> }) {
+export function Reiter({
+  eintraege,
+}: {
+  eintraege: ReadonlyArray<readonly [ziel: string, text: string, zeichen: ZeichenName]>
+}) {
+  // Das Zeichen nur am Desktop (Stufe f2c): Auf 360 px ragte die Zeile
+  // „Wunschliste | Kaufliste | Lücken" mit Zeichen 48 px über.
   return (
     <nav className="reiter" aria-label="Listen">
-      {eintraege.map(([ziel, text]) => (
+      {eintraege.map(([ziel, text, zeichen]) => (
         <NavLink key={ziel} to={ziel}>
+          <Zeichen name={zeichen} groesse={17} className="nur-desktop" />
           {text}
         </NavLink>
       ))}

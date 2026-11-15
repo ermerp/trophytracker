@@ -152,6 +152,9 @@ export function Sammlung() {
 	const [daten, setDaten] = useState<Liste | null>(null)
 	const [laedt, setLaedt] = useState(false)
 	const [meldung, setMeldung] = useState<string | null>(null)
+	// „Spiel anlegen" ist seit Stufe f2c ein Zeichen in der Kopfzeile und
+	// schaltet das Formular auf und zu – wie „Wunsch hinzufügen".
+	const [anlegenOffen, setAnlegenOffen] = useState(false)
 	const ansicht = useAnsicht('sammlung')
 	const navigation = useNavigationType()
 
@@ -311,7 +314,10 @@ export function Sammlung() {
 				titel="Sammlung"
 				sucheParam="search"
 				ansicht={ansicht}
-				aktion={{ name: 'barcode', text: 'Regal scannen', ziel: '/scannen' }}
+				aktionen={[
+					{ name: 'anlegen', text: 'Spiel anlegen', offen: anlegenOffen, onClick: () => setAnlegenOffen(!anlegenOffen) },
+					{ name: 'barcode', text: 'Regal scannen', ziel: '/scannen' },
+				]}
 			/>
 			<Chips
 				gruppen={GRUPPEN}
@@ -338,7 +344,7 @@ export function Sammlung() {
 			/>
 
 			<div className="seite">
-				<SpielAnlegen onAngelegt={angelegt} />
+				{anlegenOffen && <SpielAnlegen onAngelegt={angelegt} onSchliessen={() => setAnlegenOffen(false)} />}
 
 				{meldung && (
 					<p role="alert" className="auffaellig">

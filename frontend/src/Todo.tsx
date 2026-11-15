@@ -28,8 +28,8 @@ import { Zeichen } from './Symbole'
  */
 
 export const TODO_REITER = [
-	['/todo', 'To-Do'],
-	['/backlog', 'Backlog'],
+	['/todo', 'To-Do', 'haken'],
+	['/backlog', 'Backlog', 'sanduhr'],
 ] as const
 
 export function Todo() {

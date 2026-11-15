@@ -28,14 +28,22 @@ export function SpielAnlegen({
   titelVorgabe = '',
   plattformVorgabe = 'PS4',
   vorhandenesVerwenden = false,
+  onSchliessen,
 }: {
   onAngelegt: (releaseId: number) => Promise<void> | void
   titelVorgabe?: string
   plattformVorgabe?: Plattform
   /** Bei einem Kandidaten mit der gewählten Plattform dessen Release anbieten (Scanner). */
   vorhandenesVerwenden?: boolean
+  /**
+   * Von außen gesteuert (Sammlung, Stufe f2c): Der Aufrufer zeigt das
+   * Formular nur, solange es offen ist, und schaltet es über ein Zeichen in
+   * der Kopfzeile. Es steht dann gleich offen, ohne eigenen Textknopf, und
+   * „Abbrechen" ruft diese Funktion. Ohne sie bleibt der Textknopf (Scanner).
+   */
+  onSchliessen?: () => void
 }) {
-  const [offen, setOffen] = useState(false)
+  const [offen, setOffen] = useState(onSchliessen !== undefined)
   const [plattform, setPlattform] = useState<Plattform>(plattformVorgabe)
   const [kandidaten, setKandidaten] = useState<Kandidat[]>([])
   const [meldung, setMeldung] = useState<string | null>(null)
@@ -48,6 +56,7 @@ export function SpielAnlegen({
     setMeldung(null)
     setVersuch(null)
     setOffen(false)
+    onSchliessen?.()
   }
 
   async function fertig(a: Angelegt, ziel: Plattform = plattform) {

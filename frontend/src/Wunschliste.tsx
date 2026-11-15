@@ -25,9 +25,9 @@ import { Zeichen } from './Symbole'
 
 /** Die drei Reiter dieser Seite (Stufe 19). */
 export const WUNSCH_REITER = [
-	['/wunschliste', 'Wunschliste'],
-	['/kaufliste', 'Kaufliste'],
-	['/luecken', 'Lücken'],
+	['/wunschliste', 'Wunschliste', 'stern'],
+	['/kaufliste', 'Kaufliste', 'wagen'],
+	['/luecken', 'Lücken', 'luecke'],
 ] as const
 
 export function Wunschliste() {
@@ -49,7 +49,7 @@ export function Wunschliste() {
 				titel="Wunschliste"
 				sucheParam="suche"
 				ansicht={ansicht}
-				aktion={{ name: 'plus', text: 'Wunsch hinzufügen', onClick: () => setHinzufuegen(!hinzufuegen) }}
+				aktionen={[{ name: 'plus', text: 'Wunsch hinzufügen', offen: hinzufuegen, onClick: () => setHinzufuegen(!hinzufuegen) }]}
 			/>
 			<Reiter eintraege={WUNSCH_REITER} />
 			<Chips

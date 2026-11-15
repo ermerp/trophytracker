@@ -9,7 +9,7 @@ import { AppSymbol, Zeichen, type ZeichenName } from './Symbole'
  *
  * Vorher hatte jede Ansicht ihre eigene Überschrift und ihre eigene Suche –
  * die Sammlung ein Dropdown-Band, die Listen eine Kästchenreihe. Hier steht
- * beides einmal: Titel links, rechts Zusatzaktion, Lupe, Ansichtsumschalter
+ * beides einmal: Titel links, rechts Zusatzaktionen, Lupe, Ansichtsumschalter
  * und Zahnrad. Nur Symbole; was sie bedeuten, sagt `aria-label`.
  *
  * **Die Suche klappt erst auf Tippen auf** (Rückmeldung des Nutzers vom
@@ -27,8 +27,12 @@ import { AppSymbol, Zeichen, type ZeichenName } from './Symbole'
  * steht in `suchverlauf.ts`.
  */
 
-/** Eine Zusatzaktion: entweder ein Ziel (Scannen) oder ein Schalter (Formular auf/zu). */
-type Aktion = { name: ZeichenName; text: string; ziel?: string; onClick?: () => void }
+/**
+ * Eine Zusatzaktion: entweder ein Ziel (Scannen) oder ein Schalter (Formular
+ * auf/zu). `offen` sagt beim Schalter, ob sein Formular gerade steht
+ * (`aria-expanded`); eine eigene Farbe dafür gibt es nicht.
+ */
+type Aktion = { name: ZeichenName; text: string; ziel?: string; onClick?: () => void; offen?: boolean }
 
 type Props = {
 	titel: string
@@ -36,8 +40,11 @@ type Props = {
 	sucheParam?: string
 	/** Kacheln/Zeilen; ohne ihn gibt es keinen Umschalter (To-Do, Lücken). */
 	ansicht?: Ansicht
-	/** Ein zusätzliches Symbol vor der Lupe, etwa der Barcode in der Sammlung. */
-	aktion?: Aktion
+	/**
+	 * Zusätzliche Symbole vor der Lupe, in dieser Reihenfolge – in der Sammlung
+	 * „Spiel anlegen" und der Barcode (seit Stufe f2c mehrere).
+	 */
+	aktionen?: readonly Aktion[]
 	/** Das App-Symbol links vom Schriftzug – nur das Dashboard trägt es (Stufe 19a). */
 	logo?: boolean
 	/**
@@ -60,7 +67,7 @@ type Props = {
 	zusatz?: React.ReactNode
 }
 
-export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz, zurueck, stillerTitel }: Props) {
+export function Kopfzeile({ titel, sucheParam, ansicht, aktionen = [], logo, zusatz, zurueck, stillerTitel }: Props) {
 	const [params, setParams] = useSearchParams()
 	const navigate = useNavigate()
 	const location = useLocation()
@@ -161,16 +168,25 @@ export function Kopfzeile({ titel, sucheParam, ansicht, aktion, logo, zusatz, zu
 					{logo && <AppSymbol />}
 					{stillerTitel ? <h1 className="nur-vorlesen">{titel}</h1> : <h1>{titel}</h1>}
 					{stillerTitel && <span className="fueller" />}
-					{aktion &&
-						(aktion.ziel ? (
-							<Link to={aktion.ziel} className="ikone" aria-label={aktion.text} title={aktion.text}>
+					{aktionen.map((aktion) =>
+						aktion.ziel ? (
+							<Link key={aktion.text} to={aktion.ziel} className="ikone" aria-label={aktion.text} title={aktion.text}>
 								<Zeichen name={aktion.name} />
 							</Link>
 						) : (
-							<button type="button" className="ikone" aria-label={aktion.text} title={aktion.text} onClick={aktion.onClick}>
+							<button
+								key={aktion.text}
+								type="button"
+								className="ikone"
+								aria-label={aktion.text}
+								title={aktion.text}
+								aria-expanded={aktion.offen}
+								onClick={aktion.onClick}
+							>
 								<Zeichen name={aktion.name} />
 							</button>
-						))}
+						),
+					)}
 					{sucheParam && (
 						<button type="button" className="ikone" aria-label="Suchen" onClick={() => setOffen(true)}>
 							<Zeichen name="lupe" />
