@@ -44,3 +44,39 @@ erneut darin (03:08, 03:22). Folgen hatte es keine; es gehört zu „Nachtläufe
 09.11. mit **70 974** in der Stunde 21 UTC, App-Nutzung nach Form und Uhrzeit (nicht zerlegt).
 `rows_read_24h` am 12.11. gegen 16:30 UTC **123 564**, `rows_written_24h` 2 965. Die wöchentliche
 Sicherung vom 08.11. startete um 10:29 UTC und lief grün.
+
+#### Nächte zum 13. bis 15.11.2026 – die ersten mit 18q
+
+**Alle 216 Cron-Aufrufe `ok`**, kein Abbruch, Warnungen nur `zugang_endet` (rot, erwartet). Sync jede
+Nacht `erfolg` um 03:50 (431 Titel), Zugang lebt; kein Lauf scheiterte an einem abgelehnten Access Token
+(eine stille einmalige Erneuerung hinterlässt keine Logzeile und ist so nicht ausgeschlossen). 21 bis 26
+Standorte je Nacht – je Standort bleibt fast immer **ein** Wert, verglichen wird deshalb je Schritt.
+Ausgewertet am 15.11.2026 gegen 09:15 UTC, vor dem Merge von 18p.
+
+| Nacht | Sync Median (min–max), über 15 | Spitze | Level | Kaufliste | Auffrischen | Leerlauf PSN / Wartung, Median |
+|---|---|---|---|---|---|---|
+| 13.11. | 16 (8–21), 6 | 11 (ARN) | 9 | – | – | 6 / 6 |
+| 14.11. | 11 (8–31), 3 | 23 (AMS) | 8 | – | – | 5 / 6 |
+| 15.11. | 11 (8–14), 0 | 12 (HKG) | 7 | 13 (9–25), 15 Aufrufe | 8 / 8 / 14 | 5 / 5 |
+
+**Was 18q zeigt – und was nicht.** Die vier Abruf-Aufrufe des Syncs (Offset 100 bis 400) liegen über
+drei Nächte bei Median 10 (8–18, n = 12), Level bei 7–9 statt 9–12. Die Spitze hat zwei Werte unter
+allen sieben davor (11, 12 gegen mindestens 14) und einen darüber (23) – drei Werte tragen kein Urteil.
+Der Sync im Ganzen ist nicht besser als zuvor (16 / 11 / 11 gegen 12–15); teuer bleibt die
+Normalisierung (bis 31 ms, SJC 14.11.), die 18q nicht anfasst und 18p bündelt.
+
+**Kaufliste mit 18q allein:** Median **13** (9–25), 13 von 15 Aufrufen über 10 ms, 4 über 15 (DEN 21,
+MAD 16, NRT 25, IAD 16); 735 Einträge geholt (14 × 50, 1 × 35), keine Änderung. Vorher 19 (25.10.),
+13 (01.11.), 15 (08.11., 11–30) – am unteren Rand der Spanne, nicht darunter.
+
+**Budget arbeitender Aufrufe nicht erreicht:** über 15 ms lagen 6, 4 und 4 Aufrufe je Nacht. Leerlauf
+über 10 ms: 5, 5, 0 Aufrufe, höchstens 14 (SEA).
+
+**Abendläufe:** alle 12 grün. Markt begann um 01:04, 00:53 und 23:54 statt 20:17 (bis 4 h 47 zu spät),
+die zweiten Läufe endeten 02:55, 02:41 und 02:09 – **keiner im PSN-Fenster**, der knappste fünf Minuten davor.
+
+**Gelesene Zeilen:** PSN 14 873 / 14 972 / 18 510 (Kaufliste), Wartung 94 240 und 96 880 – außer am
+13.11. mit **129 764**: die Stunde 07 UTC las 59 488 statt 23 964, und `workersInvocationsAdaptive`
+zählte 96 statt 72 Aufrufe, also 24 außerhalb des Crons (App-Nutzung, nicht zerlegt). Abend rund
+14 600–14 900. `rows_read_24h` am 15.11. gegen 09:16 UTC **130 251**, `rows_written_24h` 3 297. Die
+wöchentliche Sicherung vom 15.11. war zu dem Zeitpunkt noch nicht gestartet (08.11.: 10:29 UTC).
