@@ -488,51 +488,62 @@ export class SyncRepository {
 		return eins(anweisung, geaendert);
 	}
 
-	/** Eine Rohantwort unveraendert ablegen. */
-	async rohantwortSpeichern(laufId: number, endpoint: string, payload: string): Promise<void> {
-		await this.db
-			.prepare(
-				"INSERT INTO psn_raw_response (sync_run_id, endpoint, payload, fetched_at) " +
-					"VALUES (?, ?, ?, datetime('now'))",
-			)
-			.bind(laufId, endpoint, payload)
-			.run();
+	/**
+	 * Eine abgerufene Seite sichern - in EINEM Batch (Stufe 18p): die
+	 * Rohantwort unveraendert, dann der Fortschritt des Laufs. `weiterAb` ist
+	 * der naechste Offset; `null` heisst "Abruf fertig", dann wechselt der Lauf
+	 * in die Normalisierung. Der Fortschritt loescht den Fehlerzaehler
+	 * (Stufe 18e): Gezaehlt werden Fehlversuche an DERSELBEN Stelle.
+	 *
+	 * Reihenfolge: Rohantwort vor Fortschritt. Scheitert eine Anweisung,
+	 * scheitert beides - der Offset bleibt stehen, und der naechste Aufruf holt
+	 * dieselbe Seite erneut. Bis 18p waren es zwei Aufrufe, und ein Scheitern
+	 * dazwischen legte dieselbe Seite beim naechsten Mal ein zweites Mal ab.
+	 */
+	async abrufSichern(laufId: number, endpoint: string, payload: string, weiterAb: number | null): Promise<void> {
+		await this.db.batch([
+			this.db
+				.prepare(
+					"INSERT INTO psn_raw_response (sync_run_id, endpoint, payload, fetched_at) " +
+						"VALUES (?, ?, ?, datetime('now'))",
+				)
+				.bind(laufId, endpoint, payload),
+			weiterAb === null
+				? this.db.prepare("UPDATE psn_sync_run SET phase = 'normalisierung' WHERE id = ?").bind(laufId)
+				: this.db
+						.prepare("UPDATE psn_sync_run SET next_offset = ?, failed_attempts = 0 WHERE id = ?")
+						.bind(weiterAb, laufId),
+		]);
 	}
 
-	/** Wechselt vom Abruf in die Normalisierung. */
-	async phaseSetzen(laufId: number, phase: SyncPhase): Promise<void> {
-		await this.db
-			.prepare("UPDATE psn_sync_run SET phase = ? WHERE id = ?")
-			.bind(phase, laufId)
-			.run();
+	/** Die naechste noch nicht normalisierte Rohantwort dieses Laufs - als Baustein (Stufe 18p). */
+	naechsteUnverarbeiteteBaustein(laufId: number): Baustein<Rohantwort | null> {
+		return eins(
+			this.db
+				.prepare(
+					"SELECT id, endpoint, payload FROM psn_raw_response " +
+						"WHERE sync_run_id = ? AND normalized_at IS NULL ORDER BY id LIMIT 1",
+				)
+				.bind(laufId),
+			(e) => ersteZeile<Rohantwort>(e),
+		);
 	}
 
-	/** Die naechste noch nicht normalisierte Rohantwort dieses Laufs. */
-	async naechsteUnverarbeitete(laufId: number): Promise<Rohantwort | null> {
-		return this.db
-			.prepare(
-				"SELECT id, endpoint, payload FROM psn_raw_response " +
-					"WHERE sync_run_id = ? AND normalized_at IS NULL ORDER BY id LIMIT 1",
-			)
-			.bind(laufId)
-			.first<Rohantwort>();
-	}
-
-	async offeneRohantworten(laufId: number): Promise<number> {
-		const zeile = await this.db
-			.prepare(
-				"SELECT COUNT(*) AS n FROM psn_raw_response WHERE sync_run_id = ? AND normalized_at IS NULL",
-			)
-			.bind(laufId)
-			.first<{ n: number }>();
-		return zeile?.n ?? 0;
-	}
-
-	async alsNormalisiertMarkieren(rohId: number): Promise<void> {
-		await this.db
-			.prepare("UPDATE psn_raw_response SET normalized_at = datetime('now') WHERE id = ?")
-			.bind(rohId)
-			.run();
+	/**
+	 * Eine Rohantwort als normalisiert markieren und zaehlen, was danach noch
+	 * offen ist (Stufe 18p) - zum Anhaengen an den Schreib-Batch der Seite.
+	 * Gezaehlt wird NACH dem Markieren, im selben Batch.
+	 */
+	normalisiertBaustein(rohId: number, laufId: number): Baustein<number> {
+		return {
+			anweisungen: [
+				this.db.prepare("UPDATE psn_raw_response SET normalized_at = datetime('now') WHERE id = ?").bind(rohId),
+				this.db
+					.prepare("SELECT COUNT(*) AS n FROM psn_raw_response WHERE sync_run_id = ? AND normalized_at IS NULL")
+					.bind(laufId),
+			],
+			lesen: ([, offen]) => ersteZeile<{ n: number }>(offen)?.n ?? 0,
+		};
 	}
 
 	/**
@@ -593,6 +604,11 @@ export class SyncRepository {
 	}
 
 	/** Dasselbe als Anweisung fuer den Batch eines Schritts (Stufe 18o). */
+	/** Dasselbe als Baustein - zum Buendeln mit anderen Schreibungen (Stufe 18p). */
+	fortschrittBaustein(schluessel: string, wert: string): Baustein<void> {
+		return { anweisungen: [this.fortschrittAnweisung(schluessel, wert)], lesen: () => undefined };
+	}
+
 	fortschrittAnweisung(schluessel: string, wert: string): D1PreparedStatement {
 		return this.db
 			.prepare(
@@ -758,20 +774,6 @@ export class SyncRepository {
 	}
 
 	/**
-	 * Fortschritt festhalten - und den Fehlerzaehler loeschen (Stufe 18e).
-	 *
-	 * Gezaehlt werden Fehlversuche an DERSELBEN Stelle, nicht ueber die Nacht
-	 * verteilte: Eine Seite, die beim zweiten Anlauf durchgeht, soll die
-	 * naechste nicht belasten.
-	 */
-	async fortschrittSetzen(laufId: number, naechsterOffset: number): Promise<void> {
-		await this.db
-			.prepare("UPDATE psn_sync_run SET next_offset = ?, failed_attempts = 0 WHERE id = ?")
-			.bind(naechsterOffset, laufId)
-			.run();
-	}
-
-	/**
 	 * Einen Fehlversuch vermerken, ohne den Lauf zu beenden (Stufe 18e).
 	 *
 	 * Der Lauf bleibt 'laufend', damit der naechste Cron-Aufruf fuenf Minuten
@@ -790,14 +792,21 @@ export class SyncRepository {
 		return z?.failed_attempts ?? 0;
 	}
 
-	async abschliessen(laufId: number, titlesSeen: number): Promise<void> {
-		await this.db
-			.prepare(
-				"UPDATE psn_sync_run SET status = 'erfolg', finished_at = datetime('now'), " +
-					"titles_seen = ? WHERE id = ?",
-			)
-			.bind(titlesSeen, laufId)
-			.run();
+	/**
+	 * Den Lauf als Erfolg abschliessen - als Baustein fuer den Abschluss-Batch
+	 * (Stufe 18p). `titles_seen` ist die Zahl der Listen danach; gezaehlt in
+	 * derselben Anweisung statt in einer eigenen Abfrage davor.
+	 */
+	abschliessenBaustein(laufId: number): Baustein<number> {
+		return eins(
+			this.db
+				.prepare(
+					"UPDATE psn_sync_run SET status = 'erfolg', finished_at = datetime('now'), " +
+						"titles_seen = (SELECT COUNT(*) FROM trophy_progress) WHERE id = ? RETURNING titles_seen",
+				)
+				.bind(laufId),
+			(e) => ersteZeile<{ titles_seen: number }>(e)?.titles_seen ?? 0,
+		);
 	}
 
 	/** Die Meldung wird vom Aufrufer bereits bereinigt uebergeben. */
