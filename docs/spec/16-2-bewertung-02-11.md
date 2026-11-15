@@ -104,7 +104,7 @@ deren Leerlauf allein bis 17 ms liegt.
   Token: **Spitze 6 → 4, Kaufliste 7 → 5, Sync-Abruf 7 → 5, Level 3**, Fremdanfragen je Aufruf 2 → 1
   (`test/token-wiederverwenden.spec.ts`). Erneuert wird rund alle 50 Minuten.
 - **18p – Schritte bündeln** (nur einzelne Schritte, ein Deploy; gebaut am 12.11.2026, ausgeliefert
-  nach der Nacht zum 15.11.): Sync-Abruf 5 → **3** (laufender Lauf aus der Lage, Rohantwort und
+  am 15.11.2026 gegen 09:30 UTC, erste Nacht zum 16.11.): Sync-Abruf 5 → **3** (laufender Lauf aus der Lage, Rohantwort und
   Fortschritt in einem Batch), Normalisierung 7 → **4** (Rohantwort und offene Listen in einem
   Lese-Batch; Protokoll, Upsert, Markieren und Zählen in einem Schreib-Batch; mehrzeilige Upserts zu
   sechs Titeln, 104 → 21 Anweisungen je Seite), Abschluss 12 → **4** (mit offenen Listen 5: ein
