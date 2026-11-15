@@ -943,3 +943,35 @@ Bild aus PSN tragen soll; die Antwort „finde ich gut" habe ich als Wahl des Po
 Gemeint war das PSN-Symbol, korrigiert nach dem Deploy (Nachtrag 24b).
 → Eine Zustimmung ohne Nennung einer der Möglichkeiten ist keine Wahl; dann wird nachgefragt.
 
+## Der Speicher, den drei Agenten teilten
+
+**15.11.2026 – das WSL ist abgestürzt, der Rechner musste neu starten.** Drei Agenten liefen
+zugleich: zwei bauten und prüften im Hauptarbeitsbaum und in einem eigenen `git worktree`, je mit
+`wrangler dev` (samt `workerd`), headless Chrome und Vitest, der dritte zeichnete und renderte
+Zeichen. Das WSL hat 7,7 GB. Ein Agent sah vor dem Absturz Systemlast um 30, einen abgestürzten
+`wrangler dev`, `/api/games` mit 7,8 s und 12 Tests, die nach 5 s an Zeitüberschreitung scheiterten.
+Verschärft hat es, dass Vitest `.claude/` nicht ausschloss: Ein schlichtes `npm test` im
+Hauptarbeitsbaum lief auch über die Kopie im Worktree des anderen Agenten, die Testmenge doppelt.
+Verloren ging nichts – beide Arbeitsstände lagen uncommittet, aber unversehrt im Arbeitsbaum.
+Seitdem schließt Vitest `.claude/**` aus (f2b), und Agenten mit Browserprüfung laufen nacheinander.
+Die Ursache ist **nicht belegt** – das Kernel-Protokoll war mit dem Neustart fort; Speicher ist
+die Vermutung, die zu allen Zeichen passt.
+→ Höchstens ein `wrangler dev` und ein Chrome zugleich, nie neben Vitest oder dem Build (CLAUDE.md).
+
+**Am selben Tag – ein gekürzter Titel, den es nicht gab.** Das Bild der Produktion zeigte
+„Sammlu…" bei 360 px, obwohl der Agent lokal mit Saira 12 px Luft gemessen hatte. Das Prüfskript
+setzte die Access-Header per `Network.setExtraHTTPHeaders` – für **jede** Anfrage, auch an Google
+Fonts. Die Schrift lud mit `error`, und das Bild maß die breitere Ersatzschrift (113 statt 106 px).
+Mit den Headern nur an die eigene Domain (`Fetch.enable`) war Saira geladen und der Titel ganz.
+→ Access-Header nur an die eigene Domain; vor einer Breitenaussage `document.fonts.check` (CLAUDE.md).
+
+## Zwei Beschriftungen für ein Kriterium
+
+**15.11.2026 – der Nutzer hat korrigiert.** Damit „Favoriten zuerst, dann Wertung" bei 360 px in
+die Sortier-Pille passt, stand dort ein Kurztext, im Menü weiter der lange – so hatte ich die Wahl
+„Kurztext in der Pille" gelesen und so gebaut (f2b). Nach der Abnahme kam: Im Menü sollen dieselben
+Begriffe stehen. Zwei Namen für ein Kriterium sind zwei Dinge, die man lernen muss, und die Pille
+sagte etwas anderes als das Menü, aus dem man sie gewählt hatte. Nachtrag f2b-b hat die
+Kurztext-Mechanik wieder entfernt.
+→ Eine Beschriftung je Sache; reicht der Platz nicht, wird die Sache umbenannt, nicht nur ihre
+Anzeige an einer Stelle.
