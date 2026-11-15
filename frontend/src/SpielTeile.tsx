@@ -112,7 +112,7 @@ export function PlatinZeichen({ platin, groesse = 15 }: { platin: Platin | null;
 		<span
 			className="zeichen"
 			title={PLATINTEXT[platin]}
-			style={{ color: erspielt ? 'var(--gold)' : 'var(--aus)' }}
+			style={{ color: erspielt ? 'var(--troph-platin)' : 'var(--aus)' }}
 		>
 			<Zeichen name="pokal" groesse={groesse} gefuellt={erspielt} strich={1.5} />
 		</span>

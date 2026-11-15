@@ -166,6 +166,9 @@ textarea {
 .suchfeld input {
   flex-grow: 1;
   min-width: 0;
+  /* Die Elementbasis (`input` in elemente.css) kappt jedes Feld bei 28rem –
+     hier soll es die ganze Suchflaeche fuellen, auch am breiten Desktop. */
+  max-width: none;
   margin: 0;
   padding: 0;
   border: none;
@@ -174,6 +177,13 @@ textarea {
   font-size: 0.95rem;
   color: var(--text);
   outline: none;
+}
+
+/* Das Loeschkreuz ist der eigene Knopf „Eingabe loeschen" neben dem Feld –
+   das des Browsers stuende sonst als zweites X direkt hinter dem Text. */
+.suchfeld input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 /* --- Chip-Filter ------------------------------------------------------- */
