@@ -4,7 +4,7 @@ import { stateNachFilter } from './filterverlauf'
 import { STATUSTEXT, anfrage, gebrauchtpreis, marktBefund, type DiscFassung, type PlayStatus } from './api'
 import { Preis } from './Preis'
 import { Sortierleiste, type Richtung } from './Sortierung'
-import { LUECKEN_KURZ, LUECKEN_NATUERLICH, LUECKEN_SORTIERUNG, lueckenVergleich, type LueckenSortierung } from './vergleich'
+import { LUECKEN_NATUERLICH, LUECKEN_SORTIERUNG, lueckenVergleich, type LueckenSortierung } from './vergleich'
 import { Reiter } from './Absichten'
 import { Chips, type ChipGruppe } from './Chips'
 import { Kopfzeile } from './Kopfzeile'
@@ -174,7 +174,6 @@ export function Luecken() {
         rechts={
           <Sortierleiste
             texte={LUECKEN_SORTIERUNG}
-            kurz={LUECKEN_KURZ}
             natuerlich={LUECKEN_NATUERLICH}
             wert={sortierung}
             richtung={richtung}

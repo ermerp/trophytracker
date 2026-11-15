@@ -31,7 +31,7 @@ import { Zeichen, type ZeichenName } from './Symbole'
  * Sortierung und Filter liegen in der URL, wie in der Sammlung.
  */
 
-export { SORTIERBAR, SORTIERKURZ, SORTIERTEXT, SORTIER_NATUERLICH, VERGLEICH, type ListenSortierung, type Sortierung } from './vergleich'
+export { SORTIERBAR, SORTIERTEXT, SORTIER_NATUERLICH, VERGLEICH, type ListenSortierung, type Sortierung } from './vergleich'
 
 // Seit Stufe 19d ohne 'ohne': Jeder Eintrag hängt an einem Release (Abschnitt 5).
 const PLATTFORM_FILTER = PLATTFORMEN

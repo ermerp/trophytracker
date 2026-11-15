@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { anfrage, type BacklogKandidat } from './api'
-import { Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERBAR, SORTIERKURZ, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
+import { Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
 import { useAnsicht } from './Ansicht'
 import { Chips } from './Chips'
 import { Sortierleiste } from './Sortierung'
@@ -58,7 +58,6 @@ export function Backlog() {
         rechts={
           <Sortierleiste
             texte={SORTIERBAR}
-            kurz={SORTIERKURZ}
             natuerlich={SORTIER_NATUERLICH}
             wert={sortierung as ListenSortierung}
             richtung={richtung}
