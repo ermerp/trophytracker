@@ -119,7 +119,8 @@ export function usePlanListe(art: PlanArt) {
     const neu = new URLSearchParams(params)
     if (wert) neu.set(name, wert)
     else neu.delete(name)
-    setParams(neu, { replace: true })
+    // Die Such-Markierung bleibt, damit Zurueck den Filter mitnimmt (`suchverlauf.ts`).
+    setParams(neu, { replace: true, state: stateNachFilter(location.state) })
   }
 
   function plattformFilterUmschalten(p: string) {

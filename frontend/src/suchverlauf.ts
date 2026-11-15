@@ -13,11 +13,17 @@
  * - **Begriff → leer** geht zurück (`zurueck`), wenn der Eintrag unserer
  *   ist: Der Eintrag davor ist genau die Liste ohne Suche, ein weiterer
  *   Eintrag läge doppelt im Verlauf. Ist er **nicht** unserer – ein
- *   aufgerufener Link mit Suchparameter, oder ein Chip oder die Sortierung
- *   haben ihn seitdem ersetzt und die Markierung dabei fallen lassen –, wird
- *   der Begriff wie bisher per `replace` entfernt: Zurück führte sonst aus
- *   der Seite hinaus oder nähme den Filter mit.
+ *   aufgerufener Link mit Suchparameter –, wird der Begriff per `replace`
+ *   entfernt: Zurück führte sonst aus der Seite hinaus.
+ * - **Filter und Sortierung während der Suche** ersetzen den Eintrag und
+ *   behalten die Markierung (`stateNachFilter`). Bis f2b-c ließen sie sie
+ *   fallen, weil das Zurück auf den Eintrag davor die Änderung verloren
+ *   hätte; seitdem nimmt das Zurück sie mit (`nachSuche`): Zurück aus der
+ *   Suche entfernt **nur den Begriff**, nie Filter oder Sortierung – ob über
+ *   die Geste oder das Kreuz, beides ist derselbe Weg.
  */
+
+import { gleicheParameter } from './filterverlauf'
 
 export type SuchSchritt = 'keiner' | 'push' | 'replace' | 'zurueck'
 
@@ -39,4 +45,41 @@ export function suchSchritt(vorher: string, nachher: string, state: unknown): Su
   if (vorher === '') return 'push'
   if (nachher !== '') return 'replace'
   return vonDerSuche(state) ? 'zurueck' : 'replace'
+}
+
+/** Die Parameter eines Eintrags ohne Suchbegriff und Seitenzahl – was ein Zurück aus der Suche mitnimmt. */
+export function ohneSuche(search: string, sucheParam: string): string {
+  const p = new URLSearchParams(search)
+  p.delete(sucheParam)
+  // Eine Seite der Suchergebnisse ist auf der Liste ohne Suche eine andere.
+  p.delete('offset')
+  return p.toString()
+}
+
+/**
+ * Nach einem Wechsel des Eintrags: Was ist nach dem Zurück aus der Suche auf
+ * den jetzigen Eintrag zu übernehmen? Dasselbe Muster wie `nachTafel`.
+ *
+ * @param warSuche ob der Eintrag davor unser Such-Eintrag war (in derselben Ansicht)
+ * @param state `location.state` des jetzigen Eintrags
+ * @param zurueck ob der Wechsel ein Zurück war (`POP`)
+ * @param mitnehmen `ohneSuche` des Such-Eintrags, wie er zuletzt galt
+ * @param jetzt die Parameter des jetzigen Eintrags
+ * @returns die zu schreibenden Parameter, oder `null`, wenn nichts zu tun ist
+ */
+export function nachSuche(
+  warSuche: boolean,
+  state: unknown,
+  zurueck: boolean,
+  mitnehmen: string | null,
+  jetzt: string,
+  sucheParam: string,
+): string | null {
+  if (!warSuche || vonDerSuche(state) || !zurueck || mitnehmen === null) return null
+  if (gleicheParameter(mitnehmen, ohneSuche(jetzt, sucheParam))) return null
+  // Ein Begriff, den der Eintrag davor selbst trägt, bleibt seiner.
+  const neu = new URLSearchParams(mitnehmen)
+  const begriff = new URLSearchParams(jetzt).get(sucheParam)
+  if (begriff) neu.set(sucheParam, begriff)
+  return neu.toString()
 }

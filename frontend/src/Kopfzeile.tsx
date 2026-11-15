@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom'
 import type { Ansicht } from './Ansicht'
-import { SUCH_STATE, suchSchritt } from './suchverlauf'
+import { SUCH_STATE, nachSuche, ohneSuche, suchSchritt, vonDerSuche } from './suchverlauf'
 import { AppSymbol, Zeichen, type ZeichenName } from './Symbole'
 
 /**
@@ -79,6 +79,23 @@ export function Kopfzeile({ titel, sucheParam, ansicht, aktionen = [], logo, zus
 	// der Effekt auf `gesetzt` die eigene Aenderung von einer fremden (Zurueck,
 	// „Filter zuruecksetzen") unterscheidet.
 	const geschrieben = useRef<string | null>(null)
+
+	// Zurueck aus der Suche nimmt nur den Begriff weg (Nachtrag f2b-c): Was
+	// waehrend der Suche an Filtern und Sortierung gesetzt wurde, kommt per
+	// `replace` auf den Eintrag davor. Gemerkt wird je Ansicht - ein Zurueck
+	// auf eine andere Route uebernimmt nichts.
+	const navigationsart = useNavigationType()
+	const suchEintrag = useRef<{ pfad: string; mitnehmen: string } | null>(null)
+	useEffect(() => {
+		if (!sucheParam) return
+		const vorher = suchEintrag.current
+		const warSuche = vorher !== null && vorher.pfad === location.pathname
+		const uebernehmen = nachSuche(warSuche, location.state, navigationsart === 'POP', vorher?.mitnehmen ?? null, location.search, sucheParam)
+		suchEintrag.current = vonDerSuche(location.state) ? { pfad: location.pathname, mitnehmen: ohneSuche(location.search, sucheParam) } : null
+		if (uebernehmen !== null) setParams(new URLSearchParams(uebernehmen), { replace: true, state: location.state })
+		// Nur bei einem Wechsel des Eintrags; der Rest wird dabei frisch gelesen.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [location.key])
 
 	// Entprellen: erst 300 ms nach dem letzten Tastendruck in die URL. Stand
 	// vorher in Sammlung.tsx und gilt jetzt fuer alle Listen gleich.

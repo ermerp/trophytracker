@@ -124,7 +124,8 @@ export function Chips({ gruppen, rechts }: { gruppen: readonly ChipGruppe[]; rec
 			if (wert) neu.set(p, wert)
 		}
 		if (offen) schliessen(neu.toString())
-		else setParams(neu, { replace: true })
+		// Die Such-Markierung bleibt, damit Zurueck das Zuruecksetzen mitnimmt (`suchverlauf.ts`).
+		else setParams(neu, { replace: true, state: stateNachFilter(location.state) })
 	}
 
 	return (
