@@ -58,7 +58,9 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 13 | [13-1-ansichten.md](13-1-ansichten.md) | die Ansichten: Dashboard bis Wunschliste |
 | 13 | [13-1-ansichten-listen-und-werkzeuge.md](13-1-ansichten-listen-und-werkzeuge.md) | die Ansichten: To-Do bis Einstellungen |
 | 13 | [13-2-darstellungsregeln.md](13-2-darstellungsregeln.md) | Navigation, Routing, Darstellungsregeln |
+| 13 | [13-2-trophaeen-und-dashboard.md](13-2-trophaeen-und-dashboard.md) | Darstellungsregeln: Trophäenliste, Dashboard am Desktop |
 | 13 | [13-3-gestaltung-und-pwa.md](13-3-gestaltung-und-pwa.md) | Gestaltung, Tokens, PWA, App-Symbol |
+| 13 | [13-3-bedienung.md](13-3-bedienung.md) | Bedienung: Suche, Filterzeile, Kacheln, sichere Bereiche |
 | 14 | [14-backup-export.md](14-backup-export.md) | Sicherung, Wiederherstellung, CSV-Export |
 | 15 | [15-repository-deployment.md](15-repository-deployment.md) | zwei Repositories, Deployment, Zugriffsschutz |
 | 15 | [15-4-kosten-und-teilen.md](15-4-kosten-und-teilen.md) | Kostenmodell, Schutz vor ungewollten Kosten, was das Teilen wert ist |
