@@ -1,6 +1,6 @@
 import path from "node:path";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 // Migrationen einlesen und als Binding hereinreichen. Der Setup-File wendet
 // sie je Testlauf an, damit die Tests gegen dasselbe Schema laufen wie
@@ -40,6 +40,8 @@ export default defineConfig({
 	],
 	test: {
 		setupFiles: ["./test/setup-migrations.ts"],
+		// Worktree-Kopien von Agenten unter .claude/ nicht mittesten; die Vorgaben bleiben.
+		exclude: [...configDefaults.exclude, ".claude/**"],
 		/*
 		 * Die Messwerte aus `test/lesekosten.spec.ts` und `test/cron.spec.ts`
 		 * mit `MESSWERTE=1 npm test` sichtbar machen.

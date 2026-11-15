@@ -167,7 +167,26 @@ export function Luecken() {
     <>
       <Kopfzeile titel="Lücken" />
       <Reiter eintraege={WUNSCH_REITER} />
-      <Chips gruppen={LUECKEN_CHIPS} />
+      <Chips
+        gruppen={LUECKEN_CHIPS}
+        rechts={
+          <Sortierleiste
+            texte={LUECKEN_SORTIERUNG}
+            natuerlich={LUECKEN_NATUERLICH}
+            wert={sortierung}
+            richtung={richtung}
+            waehlen={(w, r) => {
+              const neu = new URLSearchParams(params)
+              if (w === 'titel') neu.delete('sort')
+              else neu.set('sort', w)
+              // Nur eine Abweichung von der natürlichen Richtung in die URL.
+              if (r === LUECKEN_NATUERLICH[w]) neu.delete('richtung')
+              else neu.set('richtung', r)
+              setParams(neu, { replace: true })
+            }}
+          />
+        }
+      />
 
       <div className="seite">
       <p className="ruhig klein">
@@ -211,21 +230,6 @@ export function Luecken() {
                 </span>
               </button>
             </h2>
-            <Sortierleiste
-              texte={LUECKEN_SORTIERUNG}
-              natuerlich={LUECKEN_NATUERLICH}
-              wert={sortierung}
-              richtung={richtung}
-              waehlen={(w, r) => {
-                const neu = new URLSearchParams(params)
-                if (w === 'titel') neu.delete('sort')
-                else neu.set('sort', w)
-                // Nur eine Abweichung von der natürlichen Richtung in die URL.
-                if (r === LUECKEN_NATUERLICH[w]) neu.delete('richtung')
-                else neu.set('richtung', r)
-                setParams(neu, { replace: true })
-              }}
-            />
           </div>
           {lueckenOffen && (
           <ul className="kandidatenliste">

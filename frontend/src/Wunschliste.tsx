@@ -52,7 +52,18 @@ export function Wunschliste() {
 				aktion={{ name: 'plus', text: 'Wunsch hinzufügen', onClick: () => setHinzufuegen(!hinzufuegen) }}
 			/>
 			<Reiter eintraege={WUNSCH_REITER} />
-			<Chips gruppen={PLAN_CHIPS} />
+			<Chips
+				gruppen={PLAN_CHIPS}
+				rechts={
+					<Sortierleiste
+						texte={SORTIERBAR}
+						natuerlich={SORTIER_NATUERLICH}
+						wert={sortierung as ListenSortierung}
+						richtung={richtung}
+						waehlen={(w, r) => setzeSortierung(w, r)}
+					/>
+				}
+			/>
 
 			<div className="seite">
 				{hinzufuegen && (
@@ -82,13 +93,6 @@ export function Wunschliste() {
 						<div className="listenkopf">
 							<span>{daten.eintraege.length} Einträge</span>
 							<ErscheintBaldLink />
-							<Sortierleiste
-                texte={SORTIERBAR}
-                natuerlich={SORTIER_NATUERLICH}
-                wert={sortierung as ListenSortierung}
-                richtung={richtung}
-                waehlen={(w, r) => setzeSortierung(w, r)}
-              />
 						</div>
 
 						<ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>

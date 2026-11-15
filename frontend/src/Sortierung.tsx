@@ -59,7 +59,9 @@ export function Sortierleiste<T extends string>({ texte, natuerlich, wert, richt
         aria-haspopup="menu"
         onClick={() => setOffen(!offen)}
       >
-        {texte[wert]}
+        {/* Eine eigene Spanne, damit ein zu langer Text auf schmalem Schirm
+            mit Auslassungszeichen endet, statt die Filterzeile zu sprengen. */}
+        <span className="sortiertext">{texte[wert]}</span>
         <span className={offen ? 'pfeil auf' : 'pfeil'}>
           <Zeichen name="winkel" groesse={13} strich={2.1} />
         </span>

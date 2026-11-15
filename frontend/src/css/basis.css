@@ -204,7 +204,7 @@ textarea {
 
 .chip {
   flex: none;
-  height: 32px;
+  height: var(--chip-hoehe);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -256,26 +256,37 @@ textarea {
   color: var(--text-still);
 }
 
-/* Die Überschrift ist in der Lückenansicht ein Schalter und darf die
-   Sortierung nicht an den Rand drängen (Stufe 20e). */
+/* Die Überschrift ist in der Lückenansicht ein Schalter und nimmt nur ihre
+   eigene Breite (Stufe 20e). */
 .listenkopf .knopfname {
   width: auto;
 }
 
 /* Die Sortierung ist ein verankertes Menue (Stufe 20e) - dieselbe Tafel wie
    im Spieldetail, statt eines nativen <select>, das als einziges
-   Bedienelement die Gestaltungslinie aus Stufe 19 nicht mitmachte. */
+   Bedienelement die Gestaltungslinie aus Stufe 19 nicht mitmachte. Seit
+   Stufe f2b steht sie rechts in der Filterzeile, in derselben Pillengroesse
+   wie die Filter (keine eigene Hoehe mehr). */
 .sortierleiste {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
+  min-width: 0;
 }
 
-.sortierleiste .chip {
-  height: 28px;
-  padding: 0 10px;
+/* Die Kriteriumspille darf schrumpfen: Ist ihr Text auf schmalem Schirm zu
+   lang, endet er mit Auslassungszeichen, statt die Zeile zu sprengen. Der
+   volle Text steht im Menue. */
+.sortierleiste .chip.griff {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.sortiertext {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Der Pfeil zeigt die TATSAECHLICHE Richtung, nicht "Standard oder
@@ -859,9 +870,63 @@ main {
   border-bottom: 1px solid var(--linie);
 }
 
-.filter .chips {
-  margin: 0;
-  border-bottom: none;
+/*
+ * Die Filterzeile (Stufe f2b): links „Filter", rechts die Sortierung, die
+ * gesetzten Filter dazwischen oder darunter. Ein Raster statt einer
+ * umbrechenden Flexzeile, weil die Sortierung ihren Platz rechts oben nie
+ * verlieren soll – eine Flexzeile schoebe sie bei Platzmangel in die
+ * naechste Zeile. Kein `overflow` hier: Das Sortiermenue haengt an dieser
+ * Zeile und wuerde sonst abgeschnitten.
+ *
+ * Handy: Die gesetzten Filter beginnen sofort eine zweite Zeile ueber die
+ * ganze Breite und brechen dort um.
+ */
+.filterzeile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 6px;
+  padding: var(--a2) var(--a4);
+}
+
+.filterzeile > .chip.griff {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.filterrechts {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.filtergesetzt {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Desktop: Die gesetzten Filter stehen in der Mitte der ersten Zeile und
+   brechen um, bevor sie die Sortierung erreichen. */
+@media (min-width: 48rem) {
+  .filterzeile {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .filtergesetzt {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .filterrechts {
+    grid-column: 3;
+  }
 }
 
 .chip.griff {

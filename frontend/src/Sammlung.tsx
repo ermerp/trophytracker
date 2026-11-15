@@ -309,7 +309,27 @@ export function Sammlung() {
 				ansicht={ansicht}
 				aktion={{ name: 'barcode', text: 'Regal scannen', ziel: '/scannen' }}
 			/>
-			<Chips gruppen={GRUPPEN} />
+			<Chips
+				gruppen={GRUPPEN}
+				rechts={
+					<Sortierleiste
+						texte={SORTIERTEXT}
+						natuerlich={SAMMLUNG_NATUERLICH}
+						wert={sortierung}
+						richtung={richtung}
+						waehlen={(w, r) => {
+							const neu = new URLSearchParams(params)
+							if (w === 'titel') neu.delete('sort')
+							else neu.set('sort', w)
+							if (r === SAMMLUNG_NATUERLICH[w]) neu.delete('richtung')
+							else neu.set('richtung', r)
+							// Eine andere Reihenfolge heisst: wieder von vorn (neuer Schlüssel).
+							neu.delete('offset')
+							setParams(neu, { replace: true })
+						}}
+					/>
+				}
+			/>
 
 			<div className="seite">
 				<SpielAnlegen onAngelegt={angelegt} />
@@ -332,22 +352,6 @@ export function Sammlung() {
 					<>
 						<div className="listenkopf">
 							<span>{daten.gesamt} {daten.gesamt === 1 ? 'Spiel' : 'Spiele'}</span>
-							<Sortierleiste
-								texte={SORTIERTEXT}
-								natuerlich={SAMMLUNG_NATUERLICH}
-								wert={sortierung}
-								richtung={richtung}
-								waehlen={(w, r) => {
-									const neu = new URLSearchParams(params)
-									if (w === 'titel') neu.delete('sort')
-									else neu.set('sort', w)
-									if (r === SAMMLUNG_NATUERLICH[w]) neu.delete('richtung')
-									else neu.set('richtung', r)
-									// Eine andere Reihenfolge heisst: wieder von vorn (neuer Schlüssel).
-									neu.delete('offset')
-									setParams(neu, { replace: true })
-								}}
-							/>
 						</div>
 
 						<ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>

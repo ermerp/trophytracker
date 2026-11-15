@@ -53,7 +53,18 @@ export function Backlog() {
     <>
       <Kopfzeile titel="Backlog" sucheParam="suche" ansicht={ansicht} />
       <Reiter eintraege={TODO_REITER} />
-      <Chips gruppen={PLAN_CHIPS} />
+      <Chips
+        gruppen={PLAN_CHIPS}
+        rechts={
+          <Sortierleiste
+            texte={SORTIERBAR}
+            natuerlich={SORTIER_NATUERLICH}
+            wert={sortierung as ListenSortierung}
+            richtung={richtung}
+            waehlen={(w, r) => setzeSortierung(w, r)}
+          />
+        }
+      />
 
       <div className="seite">
       <p className="ruhig klein">Pausiert oder nie gestartet. „auf To-Do" zieht einen Eintrag ans Ende der To-Do-Liste und setzt „am Spielen".</p>
@@ -68,13 +79,6 @@ export function Backlog() {
         <>
           <div className="listenkopf">
             <span>{daten.eintraege.length} Einträge</span>
-            <Sortierleiste
-                texte={SORTIERBAR}
-                natuerlich={SORTIER_NATUERLICH}
-                wert={sortierung as ListenSortierung}
-                richtung={richtung}
-                waehlen={(w, r) => setzeSortierung(w, r)}
-              />
           </div>
           <ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>
             {daten.eintraege.map((e) => (

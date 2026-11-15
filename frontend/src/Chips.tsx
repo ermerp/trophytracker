@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Zeichen } from './Symbole'
 
@@ -19,6 +19,15 @@ import { Zeichen } from './Symbole'
  * damit eine einzige Zeile mit einem Knopf; wer filtert, sieht genau seine
  * Filter und nichts sonst.
  *
+ * **Eine Zeile mit der Sortierung, seit Stufe f2b.** Rechts in derselben
+ * Zeile steht, was die Ansicht als `rechts` hereinreicht – die Sortierleiste.
+ * Sie stand vorher im Listenkopf unter den Chips und fehlte damit bei leerer
+ * Trefferliste. Die gesetzten Filter stehen am Desktop zwischen „Filter" und
+ * Sortierung und brechen um, bevor sie die Sortierung erreichen; auf dem
+ * Handy beginnen sie sofort eine zweite Zeile (Wunsch des Nutzers). Die
+ * Leiste scrollt nicht mehr waagerecht: Das schnitt die Pillen am rechten
+ * Rand ab und hätte auch das Sortiermenü abgeschnitten.
+ *
  * Das ist reine Oberfläche: Die Parameter sind dieselben, die `/api/games`
  * und `/api/plans` ohnehin kennen. Ein unbekannter Wert wird von den Routen
  * ignoriert, nicht mit 400 beantwortet – ein alter Link zeigt die Liste.
@@ -36,7 +45,7 @@ export type ChipGruppe = {
 
 type Chip = { schluessel: string; text: string; aktiv: boolean; umschalten: () => void }
 
-export function Chips({ gruppen }: { gruppen: readonly ChipGruppe[] }) {
+export function Chips({ gruppen, rechts }: { gruppen: readonly ChipGruppe[]; rechts?: ReactNode }) {
 	const [params, setParams] = useSearchParams()
 	const [offen, setOffen] = useState(false)
 
@@ -77,16 +86,18 @@ export function Chips({ gruppen }: { gruppen: readonly ChipGruppe[] }) {
 
 	function allesAb() {
 		const neu = new URLSearchParams()
-		// Sortierung ist kein Filter und bleibt stehen.
-		const sort = params.get('sort')
-		if (sort) neu.set('sort', sort)
+		// Sortierung ist kein Filter und bleibt stehen – mit ihrer Richtung.
+		for (const p of ['sort', 'richtung']) {
+			const wert = params.get(p)
+			if (wert) neu.set(p, wert)
+		}
 		setParams(neu, { replace: true })
 		setOffen(false)
 	}
 
 	return (
 		<div className="filter">
-			<div className="chips">
+			<div className="filterzeile">
 				<button
 					type="button"
 					className={offen ? 'chip griff offen' : 'chip griff'}
@@ -98,18 +109,21 @@ export function Chips({ gruppen }: { gruppen: readonly ChipGruppe[] }) {
 					{aktive.length > 0 && <span className="zahl">{aktive.length}</span>}
 				</button>
 
-				{aktive.map((c) => (
-					<button key={c.schluessel} type="button" className="chip aktiv" aria-pressed onClick={c.umschalten}>
-						{c.text}
-						<Zeichen name="kreuz" groesse={13} strich={2} />
-					</button>
-				))}
-
 				{aktive.length > 0 && (
-					<button type="button" className="chip ab" onClick={allesAb}>
-						zurücksetzen
-					</button>
+					<div className="filtergesetzt">
+						{aktive.map((c) => (
+							<button key={c.schluessel} type="button" className="chip aktiv" aria-pressed onClick={c.umschalten}>
+								{c.text}
+								<Zeichen name="kreuz" groesse={13} strich={2} />
+							</button>
+						))}
+						<button type="button" className="chip ab" onClick={allesAb}>
+							zurücksetzen
+						</button>
+					</div>
 				)}
+
+				{rechts && <div className="filterrechts">{rechts}</div>}
 			</div>
 
 			{offen && (
