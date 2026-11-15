@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 174 | 15.11.2026 | **Finale Stufe 2, Teil f2d: Feed so hoch wie die linke Spalte.** Am Desktop ab 64 rem endet „Neu" auf der Unterkante der Kennzahlen und zeigt nur ganze Einträge; `/api/feed?anzahl=` (8 ohne Parameter, höchstens 20), Lesekosten 853 → 865 nur am Desktop (8.5, 13.2) |
 | 173 | 15.11.2026 | **Finale Stufe 2, Teil f2a: Suche und Platin.** Zurück leert zuerst die Suche (Verlaufseintrag beim ersten Begriff), Suchfeld ohne natives Kreuz und über die volle Breite (448 → 1 114 px bei 2 030 px Fenster), erspieltes Platin in der Platinfarbe statt Gold (13.2, 13.3) |
 | 172 | 15.11.2026 | **Nachtrag 18q-b: Klartext-Prüfung des Dumps kennt das Access Token.** `scripts/dump-pruefen.sh` nimmt `d1_migrations` aus (Dateiname `0038_access_token.sql`) und erwartet sechs statt vier Chiffrat-/IV-Werte; der Deploy von 18p war daran vor der Migration gestoppt (14.5) |
 | 171 | 15.11.2026 | **Nachtrag: Nächte zum 13. bis 15.11.** Erste Nächte mit 18q: 216 Cron-Aufrufe `ok`, Sync jede Nacht `erfolg`; Sync-Abruf Median 10, Level 7–9, Spitze 11 / 23 / 12, Kaufliste Median 13 (9–25); Budget weiter nicht erreicht (4–6 Aufrufe über 15 ms je Nacht); Abendläufe bis 4 h 47 verspätet, keiner im PSN-Fenster (16.2) |

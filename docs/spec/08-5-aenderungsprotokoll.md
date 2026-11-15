@@ -61,7 +61,7 @@ folgt die Arbeitsteilung:
 
 Die Trennung ist keine Bequemlichkeit, sondern hält das Keyset der beiden Protokollansichten
 heil: Zwei Quellen mit zwei Zeitachsen lassen sich nicht über eine Id blättern. Der Feed braucht
-das nicht – er zeigt acht Zeilen und verlinkt auf die Ansichten.
+das nicht – er zeigt eine Handvoll Zeilen und verlinkt auf die Ansichten. **Wie viele, sagt der Aufrufer** (`anzahl`, Stufe f2d, 15.11.2026): ohne Parameter acht (Handy), höchstens `FEED_HOECHSTENS = 20` (Desktop); ein ungültiger Wert wird gekappt. Gemessen über die ganze Route mit Bestand in Produktionsgröße: 853 gelesene Zeilen ohne Parameter wie vorher, 865 mit 20 – die Trophäen lesen ihr 30-Tage-Fenster ohnehin ganz, linear wachsen nur Protokoll und Platin.
 
 **Verdichtung (Entscheidung des Nutzers vom 01.10.2026).** Je **Spiel und Tag** eine Zeile:
 „12 Trophäen, davon 1 Gold". **Platin steht immer für sich**, mit seinem eigenen Zeitpunkt, und

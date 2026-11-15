@@ -105,7 +105,7 @@ POST   /api/sync/trophaeen            eine Portion Einzeltrophäen (vier Listen,
                                       vollständiger Durchlauf je Tag – wegen der Schreibgrenze, nicht wegen PSN
 GET    /api/sync/trophaeen            wie weit die Erstbefüllung ist, dazu das Trophäen-Level
 GET    /api/feed                      Dashboard-Feed aus ZWEI Quellen (Stufe 19b): game_event und die
-                                      erspielten Trophäen, zur Lesezeit nach Zeit gemischt; acht Zeilen,
+                                      erspielten Trophäen, zur Lesezeit nach Zeit gemischt; ?anzahl= (8, höchstens 20, 8.5),
                                       kein Blättern. Trophäenzeilen erst, wenn die Erstbefüllung durch ist
 GET    /api/releases/:id/trophaeen    die Trophäen EINES Release mit ihren Gruppen (Stufe 19b);
                                       je Release, nicht je Spiel – zwei Fassungen haben zwei Listen

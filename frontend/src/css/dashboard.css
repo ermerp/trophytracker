@@ -592,6 +592,13 @@ table.plattformtabelle {
   border-top: none;
 }
 
+/* Am Desktop passt nicht jeder geholte Eintrag neben die linke Spalte
+   (Stufe f2d). Unsichtbar statt entfernt: Er behält seine Höhe und lässt
+   sich weiter messen, wenn die Spalte wächst (`Neu.tsx`). */
+.feed .zeile.ueberzaehlig {
+  visibility: hidden;
+}
+
 .feed .text {
   flex: 1;
   min-width: 0;
@@ -853,8 +860,38 @@ a.kasten:hover {
     align-items: stretch;
   }
 
-  .drechts .block {
-    height: 100%;
+  /* Die Höhe gibt allein die linke Spalte vor (Stufe f2d): Der Feed liegt
+     absolut in seiner Spalte und meldet dem Grid keine eigene Höhe – vorher
+     zog er die Zeile über die letzte Kachel hinaus. Seine Unterkante ist die
+     der letzten Kachel; deshalb endet die linke Spalte ohne deren Abstand
+     nach unten, den gibt hier die Seite. Wie viele Einträge ganz
+     hineinpassen, misst `Neu.tsx`; `overflow` schneidet nur ab, solange
+     noch nicht gemessen ist. */
+  .dashboard .dlinks > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* Die Mindesthöhe hält den Feed sichtbar, solange die linke Spalte leer
+     oder niedrig ist (Kennzahlen nicht geladen, `/api/stats` gescheitert):
+     Überschrift und rund drei Einträge. Im Normalfall ist die linke Spalte
+     höher und bestimmt die Zeile weiter allein. */
+  .drechts {
+    position: relative;
+    min-height: 19rem;
+  }
+
+  .dashboard .drechts > .block {
+    position: absolute;
+    inset: 0;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .drechts .feed {
+    flex: 1 1 0;
+    min-height: 0;
   }
 }
 
