@@ -31,11 +31,9 @@ export type SortierleisteProps<T extends string> = {
   wert: T
   richtung: Richtung
   waehlen: (wert: T, richtung: Richtung) => void
-  /** Kürzere Beschriftung in der Pille je Wert; der volle Text bleibt im Menü. */
-  kurz?: Partial<Record<T, string>>
 }
 
-export function Sortierleiste<T extends string>({ texte, natuerlich, wert, richtung, waehlen, kurz }: SortierleisteProps<T>) {
+export function Sortierleiste<T extends string>({ texte, natuerlich, wert, richtung, waehlen }: SortierleisteProps<T>) {
   const [offen, setOffen] = useState(false)
   const anker = useRef<HTMLDivElement>(null)
 
@@ -63,7 +61,7 @@ export function Sortierleiste<T extends string>({ texte, natuerlich, wert, richt
       >
         {/* Eine eigene Spanne, damit ein zu langer Text auf schmalem Schirm
             mit Auslassungszeichen endet, statt die Filterzeile zu sprengen. */}
-        <span className="sortiertext">{kurz?.[wert] ?? texte[wert]}</span>
+        <span className="sortiertext">{texte[wert]}</span>
         <span className={offen ? 'pfeil auf' : 'pfeil'}>
           <Zeichen name="winkel" groesse={13} strich={2.1} />
         </span>
