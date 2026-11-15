@@ -13,7 +13,15 @@ import type { AppEnv } from "../types";
  *
  * Das Aenderungsprotokoll (`/api/events`) behaelt daher seine eine Quelle und
  * sein Keyset ueber `id`: Zwei Zeitachsen liessen sich nicht ueber eine Id
- * blaettern. Der Feed braucht das nicht - er zeigt acht Zeilen.
+ * blaettern. Der Feed braucht das nicht - er zeigt eine Handvoll Zeilen.
+ *
+ * **Wie viele, sagt der Aufrufer (`anzahl`, Stufe f2d), bis zu einer festen
+ * Obergrenze.** Das Handy fragt ohne Parameter und bekommt acht wie vorher;
+ * der Desktop fuellt die Hoehe der linken Spalte und fragt nach
+ * `FEED_HOECHSTENS`. Ein Parameter statt "immer mehr", damit der Aufruf auf
+ * dem Handy nicht mehr liest als noetig; die Obergrenze, damit kein Aufruf
+ * den Feed zur Protokollseite macht. Ein ungueltiger Wert wird gekappt statt
+ * mit 400 beantwortet - wie `limit` bei `/api/events`.
  *
  * **Solange die Erstbefuellung laeuft, kommen keine Trophaeenzeilen.** Das
  * Zeitfenster allein genuegt nicht: Die Befuellung geht Liste fuer Liste, nicht
@@ -21,7 +29,16 @@ import type { AppEnv } from "../types";
  * rueckdatiertem Zeitpunkt - ein Feed, der nach hinten waechst.
  */
 
+/** Ohne Parameter - die Zahl des Handys. */
 const ANZAHL = 8;
+/** Mehr liefert die Route nicht; dieselbe Zahl wie `FEED_DESKTOP` im Frontend (`frontend/src/feedhoehe.ts`). */
+export const FEED_HOECHSTENS = 20;
+
+/** `anzahl` aus der Query: 1..FEED_HOECHSTENS, ohne oder ungueltig die acht. */
+export function feedAnzahl(wert: string | undefined): number {
+	const n = Math.trunc(Number(wert));
+	return Math.min(FEED_HOECHSTENS, Math.max(1, Number.isFinite(n) && n !== 0 ? n : ANZAHL));
+}
 
 type Zeile = {
 	/** Stabil ueber Neuladen, damit React nicht jede Zeile neu baut. */
@@ -35,14 +52,15 @@ type Zeile = {
 };
 
 export const feedRoutes = new Hono<AppEnv>().get("/", async (c) => {
+	const anzahl = feedAnzahl(c.req.query("anzahl"));
 	// Nur die offenen Listen, nicht der ganze Bestand: Diese Route laeuft bei
 	// jedem Oeffnen des Dashboards.
 	const stand = await c.var.repos.trophaeen.offeneListen();
 	const vollstaendig = stand.gesamt > 0 && stand.offen === 0;
 
 	const [ereignisse, trophaeen] = await Promise.all([
-		c.var.repos.events.liste({ quelle: null, limit: ANZAHL, vor: null }),
-		vollstaendig ? c.var.repos.trophaeen.feed(ANZAHL) : Promise.resolve([]),
+		c.var.repos.events.liste({ quelle: null, limit: anzahl, vor: null }),
+		vollstaendig ? c.var.repos.trophaeen.feed(anzahl) : Promise.resolve([]),
 	]);
 
 	const zeilen: Zeile[] = [
@@ -76,7 +94,7 @@ export const feedRoutes = new Hono<AppEnv>().get("/", async (c) => {
 	// Nach Zeit, nicht nach Quelle: Das ist der ganze Zweck des Mischens.
 	zeilen.sort((a, b) => (a.zeitpunkt < b.zeitpunkt ? 1 : a.zeitpunkt > b.zeitpunkt ? -1 : 0));
 
-	return c.json({ zeilen: zeilen.slice(0, ANZAHL), trophaeenVollstaendig: vollstaendig });
+	return c.json({ zeilen: zeilen.slice(0, anzahl), trophaeenVollstaendig: vollstaendig });
 });
 
 /**

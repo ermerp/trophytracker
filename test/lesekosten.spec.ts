@@ -2,6 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { BACKLOG_KANDIDATEN, KAUF_KANDIDATEN, PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
+import { FEED_HOECHSTENS } from "../src/api/feed";
 import { CRON_PSN, CRON_WARTUNG, cronFenster, SCHLUESSEL_AUFFRISCHEN } from "../src/sync/cron";
 import { createExecutionContext } from "cloudflare:test";
 import { createRepositories } from "../src/db";
@@ -1563,7 +1564,26 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		);
 		const feedRoute = feed + feedStand;
 
-		console.info({ jeSpiel, auswahlOffen, auswahlLeer, feed, feedRoute, jahre, jahreIndex, jahrLaufend });
+		/*
+		 * Und die Route selbst, ueber `routeGelesen` (Stufe f2d): Die Summe
+		 * oben ist eine Abschrift und kennt weder die Platin-Abfrage noch das
+		 * Aenderungsprotokoll. Dazu 4 000 Ereignisse wie in der Messung von
+		 * Stufe 16, die das Protokoll danach wieder leert.
+		 */
+		const ereignis = env.DB.prepare(
+			"INSERT INTO game_event (source, game_id, release_id, label, kind, field, old_value, new_value) " +
+				"VALUES ('nutzer', ?, ?, 'Spiel', 'status_geaendert', 'status', 'am_spielen', 'pausiert')",
+		);
+		const ereignisse = Array.from({ length: 4_000 }, (_, i) => ereignis.bind((i % listen.length) + 1, (i % listen.length) + 1));
+		for (let i = 0; i < ereignisse.length; i += 200) await env.DB.batch(ereignisse.slice(i, i + 200));
+		const feedGanz = await routeGelesen("/api/feed");
+		// Der Desktop fragt nach der Obergrenze (Stufe f2d), und mehr als die
+		// gibt es nicht - auch wenn jemand mehr verlangt.
+		const feedDesktop = await routeGelesen(`/api/feed?anzahl=${FEED_HOECHSTENS}`);
+		const feedUeber = await routeGelesen("/api/feed?anzahl=500");
+		await env.DB.prepare("DELETE FROM game_event").run();
+
+		console.info({ jeSpiel, auswahlOffen, auswahlLeer, feed, feedRoute, feedGanz, feedDesktop, feedUeber, jahre, jahreIndex, jahrLaufend });
 
 		// Je Spiel die Groessenordnung einer Liste, nicht der Tabelle.
 		expect(jeSpiel).toBeLessThan(300);
@@ -1576,6 +1596,12 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Sie darf den Bestand nicht ein zweites Mal durchzaehlen.
 		expect(feed).toBeLessThan(2_000);
 		expect(feedRoute).toBeLessThan(2_000);
+		// Die ganze Route, am Handy und am Desktop. Die Trophaeen-Abfrage liest
+		// ihr Zeitfenster ohnehin ganz (GROUP BY vor dem LIMIT); mit der
+		// Anzahl wachsen nur Protokoll und Platin, um je eine Zeile.
+		expect(feedGanz).toBeLessThan(2_000);
+		expect(feedDesktop).toBeLessThan(feedGanz + 100);
+		expect(feedUeber).toBe(feedDesktop);
 		/*
 		 * Die Jahre muessen jede erspielte Trophaee ansehen - das ist der Zweck
 		 * der Zahl, und ein Indexhinweis aendert daran nichts (beides gemessen
