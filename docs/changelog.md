@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 172 | 15.11.2026 | **Nachtrag 18q-b: Klartext-Prüfung des Dumps kennt das Access Token.** `scripts/dump-pruefen.sh` nimmt `d1_migrations` aus (Dateiname `0038_access_token.sql`) und erwartet sechs statt vier Chiffrat-/IV-Werte; der Deploy von 18p war daran vor der Migration gestoppt (14.5) |
 | 171 | 15.11.2026 | **Nachtrag: Nächte zum 13. bis 15.11.** Erste Nächte mit 18q: 216 Cron-Aufrufe `ok`, Sync jede Nacht `erfolg`; Sync-Abruf Median 10, Level 7–9, Spitze 11 / 23 / 12, Kaufliste Median 13 (9–25); Budget weiter nicht erreicht (4–6 Aufrufe über 15 ms je Nacht); Abendläufe bis 4 h 47 verspätet, keiner im PSN-Fenster (16.2) |
 | 170 | 12.11.2026 | **Stufe 18p: PSN-Schritte bündeln** (gebaut, ausgeliefert nach der Nacht zum 15.11.). Sync-Abruf 5 → 3 D1-Aufrufe, Normalisierung 7 → 4 (104 → 21 Anweisungen je Seite), Abschluss 12 → 4, Kaufliste 5 → 4; automatische Zuordnung gebündelt (16.2)
 | 169 | 12.11.2026 | **Stufe 18q: Access Token wiederverwenden.** Gespeichert verschlüsselt (Migration 0038), erneuert erst bei weniger als zehn Minuten Restzeit; ein abgelehntes gespeichertes Token wird einmal erneuert und der Abruf wiederholt; die Zugangszeile kommt aus der Lage. Spitze 6 → 4 D1-Aufrufe, Kaufliste 7 → 5, Sync-Abruf 7 → 5; Sync-Plan mit 18p (7.1, 10.1, 16.2)
