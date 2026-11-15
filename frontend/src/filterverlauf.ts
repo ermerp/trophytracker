@@ -24,6 +24,26 @@
  * die Suche stünde wieder da und die Tafel wäre zu.
  */
 
+/*
+ * Das Sortiermenü (Nachtrag f2b-c) folgt demselben Muster mit eigener
+ * Markierung `state.sortiermenue`:
+ *
+ * - **Öffnen** legt einen Eintrag mit derselben URL an. Eine offene Tafel
+ *   bleibt darin markiert (Tafel → Menü → Zurück: Menü zu, Tafel offen),
+ *   die Such-Markierung fällt aus demselben Grund wie bei der Tafel.
+ * - **Kriterium wählen** ersetzt den Menü-Eintrag mit der neuen Sortierung
+ *   (die Markierung bleibt über `stateNachFilter`), danach geht das Menü
+ *   zurück und übernimmt die Sortierung auf den Eintrag davor – wie die
+ *   Tafel ihre Filter. So bleibt kein Eintrag verwaist, und ein Zurück
+ *   danach geht dahin, wohin es vor dem Öffnen gegangen wäre.
+ * - **Schließen** über die Pille oder einen Klick daneben geht immer zurück:
+ *   Offen ist das Menü nur in einem Eintrag, den es selbst angelegt hat.
+ *
+ * Beim Übernehmen fällt die Such-Markierung wie bei jeder Sortierung
+ * (`stateNachFilter`) – sonst ginge ein Leeren des Suchfelds auf den
+ * Eintrag vor der Suche zurück und nähme die neue Sortierung mit.
+ */
+
 /** Die Markierung im `location.state` eines Eintrags, den die Tafel angelegt hat. */
 export const TAFEL_STATE = { filtertafel: true } as const
 
@@ -42,14 +62,35 @@ export function stateZumOeffnen(state: unknown): Objekt {
   return { ...rest, ...TAFEL_STATE }
 }
 
+/** Die Markierung im `location.state` eines Eintrags, den das Sortiermenü angelegt hat. */
+export const MENUE_STATE = { sortiermenue: true } as const
+
+/** Ob ein Eintrag das offene Sortiermenü trägt. */
+export function menueOffen(state: unknown): boolean {
+  return istObjekt(state) && state.sortiermenue === true
+}
+
+/** Der `state` des neuen Eintrags beim Öffnen des Menüs: wie bei der Tafel, die Tafel-Markierung bleibt. */
+export function stateZumMenue(state: unknown): Objekt {
+  const rest: Objekt = istObjekt(state) ? { ...state } : {}
+  delete rest.suche
+  return { ...rest, ...MENUE_STATE }
+}
+
+type Markierungen = { filtertafel?: true; sortiermenue?: true }
+
 /**
  * Der `state` beim Ersetzen durch einen Filter-Chip oder die Sortierung: nur
- * die Tafel-Markierung bleibt. Auch die Sortierung behaelt sie – sonst
- * schloesse sie eine offene Tafel und deren Eintrag bliebe verwaist im
- * Verlauf, ein Zurueck nähme dann die Filter und die Sortierung mit.
+ * die Markierungen von Tafel und Menü bleiben. Auch die Sortierung behaelt
+ * sie – sonst schloesse sie eine offene Tafel (oder das Menü) und deren
+ * Eintrag bliebe verwaist im Verlauf, ein Zurueck nähme dann die Filter und
+ * die Sortierung mit.
  */
-export function stateNachFilter(state: unknown): typeof TAFEL_STATE | null {
-  return tafelOffen(state) ? TAFEL_STATE : null
+export function stateNachFilter(state: unknown): Markierungen | null {
+  const m: Markierungen = {}
+  if (tafelOffen(state)) m.filtertafel = true
+  if (menueOffen(state)) m.sortiermenue = true
+  return m.filtertafel || m.sortiermenue ? m : null
 }
 
 /** Schließen über „Filter" oder „zurücksetzen": zurück, wenn der Eintrag unserer ist. */
@@ -68,7 +109,23 @@ export function schliessSchritt(state: unknown): 'zurueck' | 'keiner' {
  * @returns die zu schreibenden Parameter, oder `null`, wenn nichts zu tun ist
  */
 export function nachTafel(warOffen: boolean, state: unknown, zurueck: boolean, mitnehmen: string | null, jetzt: string): string | null {
-  if (!warOffen || tafelOffen(state) || !zurueck || mitnehmen === null) return null
+  return nachSchliessen(tafelOffen, warOffen, state, zurueck, mitnehmen, jetzt)
+}
+
+/** Dasselbe für das Sortiermenü: was nach seinem Zurück auf den Eintrag davor gehört. */
+export function nachMenue(warOffen: boolean, state: unknown, zurueck: boolean, mitnehmen: string | null, jetzt: string): string | null {
+  return nachSchliessen(menueOffen, warOffen, state, zurueck, mitnehmen, jetzt)
+}
+
+function nachSchliessen(
+  offen: (state: unknown) => boolean,
+  warOffen: boolean,
+  state: unknown,
+  zurueck: boolean,
+  mitnehmen: string | null,
+  jetzt: string,
+): string | null {
+  if (!warOffen || offen(state) || !zurueck || mitnehmen === null) return null
   return gleicheParameter(mitnehmen, jetzt) ? null : mitnehmen
 }
 
