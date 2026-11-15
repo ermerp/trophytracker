@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 177 | 15.11.2026 | **Nachtrag f2b-b: Sortiertexte auch im Menü.** „Favoriten zuerst" und „Release" stehen jetzt auch im Sortiermenü; die Kurztext-Mechanik (`kurz`, `SORTIERKURZ`) ist entfernt (5.1) |
 | 176 | 15.11.2026 | **Finale Stufe 2, Teil f2c: Zeichen.** Vier neue Zeichen (Einkaufswagen, gestrichelte Hülle, Sanduhr, Hülle mit Plus); Reiter und Unterpunkte der Seitenleiste tragen am Desktop ein Zeichen, am Handy nicht; „Spiel anlegen“ als Zeichen in der Kopfzeile der Sammlung. 13.2 und 13.3 aufgeteilt (`13-2-trophaeen-und-dashboard.md`, `13-3-bedienung.md`) (13.1, 13.2, 13.3) |
 | 175 | 15.11.2026 | **Finale Stufe 2, Teil f2b: Filterzeile.** Sortierung und Richtungspfeil in der Zeile von „Filter", gesetzte Filter brechen um (Handy: eigene Zeile), alle Pillen 28 px, Kurztexte „Favoriten zuerst" und „Release" in der Pille, Zurück schließt die Filtertafel; Vitest schließt `.claude/` aus (5.1, 13.3) |
 | 174 | 15.11.2026 | **Finale Stufe 2, Teil f2d: Feed so hoch wie die linke Spalte.** Am Desktop ab 64 rem endet „Neu" auf der Unterkante der Kennzahlen und zeigt nur ganze Einträge; `/api/feed?anzahl=` (8 ohne Parameter, höchstens 20), Lesekosten 853 → 865 nur am Desktop (8.5, 13.2) |
