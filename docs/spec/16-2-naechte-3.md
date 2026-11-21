@@ -80,3 +80,48 @@ die zweiten Läufe endeten 02:55, 02:41 und 02:09 – **keiner im PSN-Fenster**,
 zählte 96 statt 72 Aufrufe, also 24 außerhalb des Crons (App-Nutzung, nicht zerlegt). Abend rund
 14 600–14 900. `rows_read_24h` am 15.11. gegen 09:16 UTC **130 251**, `rows_written_24h` 3 297. Die
 wöchentliche Sicherung vom 15.11. war zu dem Zeitpunkt noch nicht gestartet (08.11.: 10:29 UTC).
+
+#### Nächte zum 16. bis 21.11.2026 – die ersten mit 18p
+
+**Alle 431 Cron-Aufrufe `ok`**, kein Abbruch, Warnungen nur `zugang_endet` (rot, erwartet). Sync jede
+Nacht `erfolg` um 03:50, 431 Titel, ab dem 20.11. 432 (der Schritt „Trophäen" holte am 20. und 21.11. je
+eine Liste nach); Zugang lebt, zuletzt am 21.11. 03:50 UTC. 23 bis 27 Standorte je Nacht. Keine
+Kaufliste-Nacht – die erste mit 18p ist die zum 22.11. Ausgewertet am 21.11.2026 gegen 09:00 UTC.
+
+| Nacht | Sync Median (min–max), über 15 | Spitze | Level | Auffrischen | Leerlauf PSN / Wartung, Median |
+|---|---|---|---|---|---|
+| 16.11. | 9 (7–25), 1 | 25 (KIX) | 6 | 8 / 8 / 8 | 6 / 5 |
+| 17.11. | 11 (6–20), 3 | 17 (IAD) | 6 | 9 / 9 / 10 | 5 / 6 |
+| 18.11. | 10 (7–18), 1 | 11 (LIS) | 6 | 7 | 5 / 5 |
+| 19.11. | 9 (7–14), 0 | 12 / 13 (zwei Aufrufe) | 8 | – | 4 / 5 |
+| 20.11. | 8 (5–16), 1 | 14 (WAW) | 7 | – | 4,5 / 4 |
+| 21.11. | 8 (6–17), 1 | 9 (MAD) | 5 | – | 4,5 / 4 |
+
+**Urteil über 18p für den Sync** (nach sechs Nächten; die Kaufliste läuft wöchentlich und wird
+eigens nachgetragen): Die Normalisierung ist der Gewinn – Median **9** (5–18, n = 36) statt Spitzen
+bis 31 ms. Der Abruf bleibt bei Median **10** (6–25, n = 24), wie mit 18q allein (10, 8–18). Der
+Abschluss liegt bei Median 9 (7–17, n = 6). Der Sync im Ganzen sinkt von 16 / 11 / 11 auf 8–11 je
+Nacht. Ob es je Phase die erwarteten 3 / 4 / 4 D1-Aufrufe sind, belegen die Logzeilen nicht – sie
+tragen keine Aufrufzahl.
+
+**Budget arbeitender Aufrufe nicht erreicht:** über 15 ms lagen 5, 5, 1, 0, 1, 1 Aufrufe je Nacht
+(vorher 6, 4, 4). Leerlauf über 10 ms: 3, 1, 0, 2, 0, 0 Aufrufe, höchstens 16 (SJC 17.11.).
+
+**Die Disc-Prüfung ist der teuerste Aufruf:** fällig nach 30 Tagen am 16.11., 159 Spiele in vier
+Aufrufen (50 / 50 / 50 / 9), **35, 38, 33 und 10 ms**, nichts gesetzt. Vorher nur ein Wert (29.10.,
+16 ms). Ursache im Code: je Spiel ein eigener Batch (`discFassungAusIgdb`) plus eine Zählabfrage –
+gut 50 D1-Aufrufe in einem Cron-Aufruf, bei rund 0,7 ms je Aufruf genau die gemessene Höhe. Erfasste
+Discs verkürzen die Liste (ein Exemplar setzt `ja`), nicht den einzelnen Aufruf. Nächste Fälligkeit
+um den 16.12.
+
+**Abendläufe:** alle 24 grün. Markt begann um 23:57, 02:55, 02:25, 01:52, 01:46 und 01:29 statt
+20:17 (**bis 6 h 38 zu spät**, vorher bis 4 h 47). **Die zweiten Läufe liegen wieder im PSN-Fenster**,
+fünf Nächte in Folge: Store endete 04:48 (17.11.), 03:52, 03:51, 03:44 und 03:29 – während des Syncs;
+am 17.11. reichte schon der erste Markt-Lauf bis 03:03. Folgen hatte es keine (Sync jede Nacht
+`erfolg`); es gehört zu „Nachtläufe bis 05:00 UTC" ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)).
+
+**Gelesene Zeilen:** PSN 15 099–22 643, Wartung 94 240–110 945, Abend 7 258–14 603 – außer am 19.11.
+mit **60 478** (Stunde 22 UTC am 18.11.: 47 501, App-Nutzung nach Uhrzeit, nicht zerlegt). Am 16.11.
+las die Stunde 06 UTC 52 601 (Disc-Prüfung), am 21.11. die Stunde 08 UTC 40 665 statt 23 964 (nicht
+zerlegt). `rows_read_24h` am 21.11. gegen 09:00 UTC **159 431**, `rows_written_24h` 3 075. Die
+wöchentliche Sicherung vom 15.11. lief um 11:04 UTC grün – die erste mit der Dump-Prüfung aus 18q-b.
