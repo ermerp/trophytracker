@@ -82,7 +82,15 @@ zusammenfallen. Zwei Prüffragen:
    schlimmste Fall der Wartung (Auffrischen und Disc-Prüfung zugleich) und die Überschneidung mit den
    Abendläufen: bis zum 01.11. rund drei Stunden verspätet, bis gegen 02:00 UTC; am 02.11. **4 h 55 bis
    6 h 00**, die zweiten Läufe um 03:29 und 03:42 UTC erstmals im PSN-Fenster ([16-2-naechte.md](16-2-naechte.md)).
-   Sie rufen Routen des Workers, keinen Cron-Schritt – was das für das Fenster heißt, ist offen.
+   Sie rufen Routen des Workers, keinen Cron-Schritt. **Entschieden am 21.11.2026: Die Grenze 05:00 UTC
+   gilt nur für den Cron des Workers, nicht für die Actions.** In den Nächten 16.–21.11. starteten die
+   Hauptläufe (geplant 20:17 / 20:47) zwischen 23:57 und 02:55 und waren nach 8–10 (Markt) und 1–2 Minuten
+   (Store) fertig, die Rückfälle (22:17 / 22:47) endeten 02:14–04:48, leer, nach 20–40 s
+   ([16-2-naechte-3.md](16-2-naechte-3.md)). Nur ein Rückfall mit über rund 6 h 40 Verspätung endet nach
+   05:00. Mit einem PSN-Fenster ab 00:00 ist der Sync gegen 00:50 fertig und der Markt sieht ihn meist
+   schon in derselben Nacht (heute läuft er vor dem Sync, ein neues Spiel wird einen Tag später Lücke).
+   **Vorschlag, noch nicht entschieden:** PSN 00:00–02:55, Wartung 03:00–04:55 UTC – alles am selben
+   UTC-Tag; Plan und Deploy nach der Kaufliste-Nacht zum 22.11.
 
 **Offen, vom Nutzer zu entscheiden:** ob der Index-Nachtrag davor kommen muss – laut 16.2 ist er nur
 Bedingung für „Cron je Minute". Bis zur Umstellung endet die Wartung um 08:55 UTC; eine vollständige

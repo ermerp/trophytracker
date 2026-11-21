@@ -378,3 +378,6 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 15.11.2026 | **Das Suchfeld bleibt nach dem Leeren per Kreuz offen** | [13.3](spec/13-3-bedienung.md) |
 | 15.11.2026 | **Die Platin-Zahl der Plattformtabelle im Dashboard bleibt golden** – nur das Platin-Zeichen der Sammlung ist platinblau | [16.4](spec/16-4-finale-stufen.md) |
 | 15.11.2026 | **Fehlende PS+-Berechtigungen (Befund GTA V) gehören zu Stufe 1**, nicht vor die Nacht zum 22.11.; bis dahin von Hand im Spieldetail | [16.4](spec/16-4-finale-stufen.md) |
+| 21.11.2026 | **Die Disc-Prüfung wird gebündelt** (Nachtrag 18p-b), die Portion bleibt 50; gemessen wird in der Nacht zum 16.12., **nicht vorab im Messworker** | [16.2](spec/16-2-bewertung-02-11.md) |
+| 21.11.2026 | **Die Grenze 05:00 UTC gilt nur für den Cron des Workers**, nicht für die Actions; ihr leerer Rückfall darf später enden | [16.2](spec/16-2-betriebswarnungen.md) |
+| 21.11.2026 | **Die rote Warnung `zugang_endet` wird erst nach dem 28.11. umgebaut**, wenn feststeht, ob Sonys Datum für die ganze Kette gilt; NPSSO weiter nicht vorsorglich erneuern | [7.1](spec/07-1-psn-trophaeen.md) |

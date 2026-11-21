@@ -50,7 +50,14 @@ lief und wie er endete. **Zwei Ausgänge, und nur einer ist eine Messung:** `ges
 abgelehnt) zählt, `ersetzt_am` (der Nutzer hat früher erneuert) nicht — wie lange dieser Zugang
 gehalten hätte, erfährt niemand. Deshalb lässt der Nutzer den Zugang vom 29.09.2026 bewusst auslaufen
 (Entscheidung vom 20.10.2026): Gemessen wird die echte Lebensdauer, und die Warnung „Zugang
-abgelaufen" erscheint einmal echt; erneuert wird, sobald sie steht. Die Tabelle enthält ausschließlich Zeitpunkte und steht deshalb in
+abgelaufen" erscheint einmal echt; erneuert wird, sobald sie steht. **Offen bis zum 28.11.2026 (Sonys
+Datum, 17:58 UTC):** Der Zugang lief am 21.11. seit 53 Tagen, doppelt so lange wie der erste – das
+Modell „kürzeste Lebensdauer" ist für ihn widerlegt, die Warnung steht seit dem 21.10. auf rot.
+**Vermutung, nicht belegt:** Sonys Datum gilt für die ganze Kette, auch bei nächtlich rollendem
+Refresh-Token, und beim ersten Zugang endete etwas anderes vorzeitig (etwa die Web-Sitzung); der
+Nutzer erinnert sich an keinen Anlass. Scheitert der Sync in der Nacht zum 29.11., trägt sie;
+läuft er weiter, ist sie widerlegt. Die Warnung wird erst danach umgebaut (Entscheidung des
+Nutzers vom 21.11.2026). Die Tabelle enthält ausschließlich Zeitpunkte und steht deshalb in
 `EXPORT_TABELLEN`; die Zeitreihe ist ihr ganzer Zweck und nach einem Verlust nicht
 wiederherstellbar.
 
