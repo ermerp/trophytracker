@@ -5,6 +5,7 @@ import { createApp } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
 import { igdbPhysischSchritt } from "../src/sync/igdb";
 import { fakeIgdb } from "./igdb-fake";
+import { zaehlendeDb } from "./d1-zaehler";
 import { fakeFetch } from "./psn-fake";
 
 /**
@@ -60,7 +61,7 @@ const releases = async (gameId: number) =>
 
 beforeEach(async () => {
 	await env.DB.batch(
-		["plan_entry", "play_status", "trophy_progress", "physical_copy", "release", "game"].map((t) =>
+		["game_event", "plan_entry", "play_status", "trophy_progress", "physical_copy", "release", "game"].map((t) =>
 			env.DB.prepare(`DELETE FROM ${t}`),
 		),
 	);
@@ -153,6 +154,112 @@ describe("igdbPhysischSchritt", () => {
 		expect(a).toEqual({ status: 200, body: { status: "erfolg", angefragt: 1, gesetzt: 1, nochOffen: 0, weiter: false } });
 		const status = await json(await mit.request("/api/igdb/status", {}, env));
 		expect(status.body).toMatchObject({ discBelegt: 1, discOffen: 0 });
+	});
+});
+
+describe("igdbPhysischSchritt in einem Batch (Nachtrag 18p-b)", () => {
+	const physisch = (id: number, ...plattformen: number[]) =>
+		({ id, external_games: plattformen.map((platform) => ({ media: 2, platform })) }) as any;
+	const ereignisse = async () =>
+		(
+			await env.DB.prepare(
+				"SELECT source, game_id, release_id IS NOT NULL AS mit_release, label, kind, field, old_value, new_value " +
+					"FROM game_event ORDER BY id",
+			).all()
+		).results;
+
+	it("setzt die genannte Plattform und stempelt die andere, die 'unbekannt' bleibt", async () => {
+		await spiel(1, 101, [
+			["PS4", "unbekannt"],
+			["PS5", "unbekannt"],
+		]);
+		const e = await igdbPhysischSchritt(repos(), fakeIgdb([[physisch(101, 48)]]).client);
+		expect(e).toMatchObject({ status: "erfolg", gesetzt: 1 });
+		expect(await releases(1)).toEqual([
+			{ platform: "PS4", status: "ja", quelle: "igdb", geprueft: 1 },
+			{ platform: "PS5", status: "unbekannt", quelle: null, geprueft: 1 },
+		]);
+	});
+
+	it("laesst 'nein' des Nutzers und ein bestehendes 'ja' auf einer genannten Plattform stehen - ohne Ereignis", async () => {
+		await spiel(1, 101, [
+			["PS4", "nein", "manuell"],
+			["PS5", "ja", "manuell"],
+			["PS3", "unbekannt"], // nur damit das Spiel ausgewaehlt wird
+		]);
+		const e = await igdbPhysischSchritt(repos(), fakeIgdb([[physisch(101, 48, 167)]]).client);
+		expect(e).toMatchObject({ status: "erfolg", angefragt: 1, gesetzt: 0 });
+		expect(await releases(1)).toEqual([
+			{ platform: "PS3", status: "unbekannt", quelle: null, geprueft: 1 },
+			{ platform: "PS4", status: "nein", quelle: "manuell", geprueft: 0 },
+			{ platform: "PS5", status: "ja", quelle: "manuell", geprueft: 0 },
+		]);
+		expect(await ereignisse()).toEqual([]);
+	});
+
+	it("schreibt genau ein Ereignis je gesetztem Release und keines fuers Stempeln", async () => {
+		await spiel(1, 101, [
+			["PS4", "unbekannt"],
+			["PS5", "unbekannt"],
+		]);
+		await spiel(2, 102, [["PSVITA", "unbekannt"]]);
+		await spiel(3, 103, [["PS3", "unbekannt"]]); // IGDB nennt nichts Physisches
+		await igdbPhysischSchritt(repos(), fakeIgdb([[physisch(101, 48), physisch(102, 46), physisch(103)]]).client);
+		expect(await ereignisse()).toEqual([
+			{ source: "igdb", game_id: 1, mit_release: 1, label: "Spiel 1 (PS4)", kind: "disc_fassung_belegt", field: "physical_release_status", old_value: "unbekannt", new_value: "ja" },
+			{ source: "igdb", game_id: 2, mit_release: 1, label: "Spiel 2 (PSVITA)", kind: "disc_fassung_belegt", field: "physical_release_status", old_value: "unbekannt", new_value: "ja" },
+		]);
+	});
+
+	it("stempelt ein Spiel, das IGDB nicht zurueckgibt, und waehlt es danach nicht wieder", async () => {
+		await spiel(1, 101, [["PS4", "unbekannt"]]);
+		await spiel(2, 102, [["PS4", "unbekannt"]]);
+		const r = repos();
+		const e = await igdbPhysischSchritt(r, fakeIgdb([[physisch(101, 48)]]).client);
+		expect(e).toEqual({ status: "erfolg", angefragt: 2, gesetzt: 1, nochOffen: 0, weiter: false });
+		expect(await releases(2)).toEqual([{ platform: "PS4", status: "unbekannt", quelle: null, geprueft: 1 }]);
+		expect(await r.igdb.zurDiscPruefung(50)).toEqual([]);
+	});
+
+	it("zaehlt in 'gesetzt' nur die Releases, nicht die Protokollzeilen", async () => {
+		await spiel(1, 101, [
+			["PS4", "unbekannt"],
+			["PS5", "unbekannt"],
+		]);
+		const e = await igdbPhysischSchritt(repos(), fakeIgdb([[physisch(101, 48, 167)]]).client);
+		expect(e.gesetzt).toBe(2);
+		expect(await ereignisse()).toHaveLength(2);
+	});
+
+	it("liefert nochOffen und weiter aus dem Stand nach dem Schritt", async () => {
+		for (let i = 1; i <= 3; i++) await spiel(i, 100 + i, [["PS4", "unbekannt"]]);
+		const r = repos();
+		const client = fakeIgdb([[physisch(101, 48)]]).client;
+		expect(await igdbPhysischSchritt(r, client, 2)).toEqual({ status: "erfolg", angefragt: 2, gesetzt: 1, nochOffen: 1, weiter: true });
+		expect(await r.igdb.discZaehlung()).toEqual({ discBelegt: 1, discOffen: 1 });
+		expect(await igdbPhysischSchritt(r, client, 2)).toEqual({ status: "erfolg", angefragt: 1, gesetzt: 0, nochOffen: 0, weiter: false });
+	});
+
+	it("braucht mit vorgelesener Portion genau einen D1-Aufruf, gleich wie viele Spiele", async () => {
+		for (let i = 1; i <= 20; i++) await spiel(i, 100 + i, [["PS4", "unbekannt"], ["PS5", "unbekannt"]]);
+		for (const anzahl of [3, 20]) {
+			await env.DB.prepare(
+				"UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, physical_checked_at = NULL",
+			).run();
+			const portion = await repos().igdb.zurDiscPruefung(anzahl);
+			expect(portion).toHaveLength(anzahl);
+			const antwort = portion.map((s) => physisch(s.igdb_id, 48));
+			const zaehler = zaehlendeDb(env.DB);
+			const e = await igdbPhysischSchritt(
+				createRepositories(zaehler.db, env.NPSSO_KEY),
+				fakeIgdb([antwort]).client,
+				anzahl,
+				portion,
+			);
+			expect(e).toMatchObject({ status: "erfolg", angefragt: anzahl, gesetzt: anzahl });
+			expect(zaehler.aufrufe(), `${anzahl} Spiele`).toBe(1);
+			expect(zaehler.anweisungen(), `${anzahl} Spiele`).toBe(4);
+		}
 	});
 });
 

@@ -410,57 +410,86 @@ export class IgdbRepository {
 	}
 
 	/**
-	 * Setzt `ja` mit Quelle 'igdb' fuer die Releases des Spiels, deren
-	 * Plattform IGDB als physisch nennt - und nur von `unbekannt` aus: Ein
-	 * `nein` des Nutzers und ein bereits gesetztes `ja` (manuell, Exemplar,
-	 * spaeter Feed) bleiben unangetastet (Abschnitt 3). Alle uebrigen
-	 * `unbekannt`-Releases des Spiels bekommen den Pruefstempel, sonst
-	 * fragte der naechste Aufruf dasselbe Spiel erneut an.
+	 * Disc-Fassung aus IGDB fuer eine ganze Portion in EINEM Batch (Nachtrag
+	 * 18p-b). Bis dahin ein Batch je Spiel und danach die Zaehlung als eigene
+	 * Abfrage: rund 51 D1-Aufrufe und 100-150 Anweisungen je Cron-Aufruf, in
+	 * der Nacht zum 16.11.2026 33-38 ms CPU bei 50 Spielen (10.1).
+	 *
+	 * `spielIds` sind alle Spiele der Portion, `paare` die (Spiel, Plattform),
+	 * die IGDB als physisch nennt. `ja` mit Quelle 'igdb' entsteht nur von
+	 * `unbekannt` aus: Ein `nein` des Nutzers und ein bereits gesetztes `ja`
+	 * (manuell, Exemplar, Feed) bleiben unangetastet (Abschnitt 3). Alle
+	 * uebrigen `unbekannt`-Releases der Portion bekommen den Pruefstempel,
+	 * sonst fragte der naechste Aufruf dieselben Spiele erneut an - auch die,
+	 * die IGDB gar nicht zurueckgab.
+	 *
+	 * Reihenfolge im Batch, je eine Anweisung mit einem gebundenen JSON-Wert
+	 * (json_each statt IN (?,...) - hoechstens 100 Binds je Statement):
+	 *   1. Ereignis `disc_fassung_belegt` per insertSelect, dieselbe Bedingung
+	 *      wie 2. (DISC_SETZEN) - davor, sonst laese es schon `ja` (8.5);
+	 *   2. UPDATE `unbekannt` -> `ja`, Quelle 'igdb', mit Stempel;
+	 *   3. Pruefstempel fuer die uebrigen `unbekannt`-Releases der Portion;
+	 *   4. die Zaehlung aus discZaehlung (DISC_ZAEHLUNG), damit `nochOffen`
+	 *      und `weiter` ohne eigenen Aufruf entstehen - nach 2. und 3., sie
+	 *      sieht also den neuen Stand.
+	 * Der Batch ist eine Transaktion: Scheitert eine Anweisung, ist kein
+	 * Release der Portion gesetzt oder gestempelt und kein Ereignis
+	 * geschrieben. Der Schritt meldet `fehler` mit der Meldung in der
+	 * Logzeile, der naechste Aufruf waehlt dieselben Spiele wieder. Scheitert
+	 * es dauerhaft, steht die Disc-Pruefung still und fragt IGDB in jedem
+	 * Aufruf erneut an - wie heute bei einem IGDB-Fehler.
+	 *
+	 * `gesetzt` kommt allein aus 2. - nie als Summe ueber den Batch, sonst
+	 * zaehlten Protokoll und Stempel mit.
 	 */
-	async discFassungAusIgdb(gameId: number, plattformen: readonly Plattform[]): Promise<number> {
-		const anweisungen: D1PreparedStatement[] = [];
-		if (plattformen.length > 0) {
-			const platzhalter = plattformen.map(() => "?").join(",");
-			anweisungen.push(
-				// Protokoll (8.5) vor dem UPDATE, dieselbe Bedingung.
-				this.events.insertSelect(
-					"SELECT 'igdb', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'disc_fassung_belegt', " +
-						"'physical_release_status', 'unbekannt', 'ja', NULL " +
-						"FROM release r JOIN game g ON g.id = r.game_id " +
-						`WHERE r.game_id = ? AND r.physical_release_status = 'unbekannt' AND r.platform IN (${platzhalter})`,
-					gameId,
-					...plattformen,
-				),
-				this.db
-					.prepare(
-						"UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb', " +
-							"physical_checked_at = datetime('now') " +
-							"WHERE game_id = ? AND physical_release_status = 'unbekannt' " +
-							`AND platform IN (${platzhalter})`,
-					)
-					.bind(gameId, ...plattformen),
-			);
-		}
-		anweisungen.push(
+	async discFassungenAlle(
+		spielIds: readonly number[],
+		paare: ReadonlyArray<{ gameId: number; plattform: Plattform }>,
+	): Promise<{ gesetzt: number; discBelegt: number; discOffen: number }> {
+		const paareJson = JSON.stringify(paare.map(({ gameId, plattform }) => ({ g: gameId, p: plattform })));
+		const [, gesetzt, , zaehlung] = await this.db.batch([
+			this.events.insertSelect(
+				"SELECT 'igdb', r.game_id, r.id, g.title || ' (' || r.platform || ')', 'disc_fassung_belegt', " +
+					"'physical_release_status', 'unbekannt', 'ja', NULL " +
+					`FROM release r JOIN game g ON g.id = r.game_id WHERE r.id IN (${IgdbRepository.DISC_SETZEN})`,
+				paareJson,
+			),
+			this.db
+				.prepare(
+					"UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb', " +
+						`physical_checked_at = datetime('now') WHERE id IN (${IgdbRepository.DISC_SETZEN})`,
+				)
+				.bind(paareJson),
 			this.db
 				.prepare(
 					"UPDATE release SET physical_checked_at = datetime('now') " +
-						"WHERE game_id = ? AND physical_release_status = 'unbekannt'",
+						"WHERE physical_release_status = 'unbekannt' AND game_id IN (SELECT value FROM json_each(?))",
 				)
-				.bind(gameId),
-		);
-		const ergebnisse = await this.db.batch(anweisungen);
-		return plattformen.length > 0 ? (ergebnisse[1]?.meta.changes ?? 0) : 0;
+				.bind(JSON.stringify(spielIds)),
+			this.db.prepare(IgdbRepository.DISC_ZAEHLUNG),
+		]);
+		const z = ersteZeile<{ discBelegt: number; discOffen: number }>(zaehlung!);
+		return { gesetzt: gesetzt?.meta.changes ?? 0, discBelegt: z?.discBelegt ?? 0, discOffen: z?.discOffen ?? 0 };
 	}
+
+	/**
+	 * Die Releases, die discFassungenAlle auf `ja` setzt: je Paar aus dem
+	 * gebundenen JSON ein Lookup ueber (game_id, platform), nur von
+	 * `unbekannt` aus. Ereignis und UPDATE teilen diesen Text (8.5).
+	 */
+	private static readonly DISC_SETZEN =
+		"SELECT t.id FROM json_each(?) AS p JOIN release t " +
+		"ON t.game_id = p.value ->> 'g' AND t.platform = p.value ->> 'p' " +
+		"WHERE t.physical_release_status = 'unbekannt'";
+
+	/** Aus IGDB belegte Releases und Spiele, die der Schritt noch anfragt - Einstellungen und Schritt teilen den Text. */
+	private static readonly DISC_ZAEHLUNG =
+		"SELECT (SELECT COUNT(*) FROM release WHERE physical_source = 'igdb') AS discBelegt, " +
+		`(SELECT COUNT(*) FROM game g WHERE ${IgdbRepository.DISC_OFFEN}) AS discOffen`;
 
 	/** Zaehler fuer die Einstellungen: aus IGDB belegte Releases und Spiele, die der Schritt noch anfragt. */
 	async discZaehlung(): Promise<{ discBelegt: number; discOffen: number }> {
-		const z = await this.db
-			.prepare(
-				"SELECT (SELECT COUNT(*) FROM release WHERE physical_source = 'igdb') AS discBelegt, " +
-					`(SELECT COUNT(*) FROM game g WHERE ${IgdbRepository.DISC_OFFEN}) AS discOffen`,
-			)
-			.first<{ discBelegt: number; discOffen: number }>();
+		const z = await this.db.prepare(IgdbRepository.DISC_ZAEHLUNG).first<{ discBelegt: number; discOffen: number }>();
 		return { discBelegt: z?.discBelegt ?? 0, discOffen: z?.discOffen ?? 0 };
 	}
 

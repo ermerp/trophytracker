@@ -11,7 +11,7 @@ import { createApp, createScheduled } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
 import { zaehlendeDb } from "./d1-zaehler";
 import { fakeIgdb, spielRoh } from "./igdb-fake";
-import { AUFFRISCHEN_JE_AUFRUF, igdbAuffrischSchritt } from "../src/sync/igdb";
+import { AUFFRISCHEN_JE_AUFRUF, igdbAuffrischSchritt, igdbPhysischSchritt } from "../src/sync/igdb";
 import { fakeFetch, jsonAntwort } from "./psn-fake";
 import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt, SPITZE_JE_SEITE } from "../src/sync/besitz";
 import { MARKT_JE_POST } from "../src/sync/markt";
@@ -886,6 +886,41 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM plan_entry"),
 			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL"),
+			env.DB.prepare("UPDATE game SET igdb_id = NULL"),
+		]);
+	});
+
+	it("misst den Schreibschritt der Disc-Pruefung mit einer vollen Portion (Nachtrag 18p-b)", async () => {
+		// Alle Spiele verknuepft, alle Releases 'unbekannt' und ungeprueft. Die
+		// Portion kommt wie nachts aus der Lage (hier ungezaehlt), IGDB nennt 49
+		// der 50 physisch auf ihrer Plattform, eines gibt es nicht zurueck.
+		// Bis 18p-b ein Batch je Spiel und die Zaehlung als eigene Abfrage: rund
+		// 51 D1-Aufrufe und 100-150 Anweisungen je Aufruf (Nacht zum 16.11.2026).
+		await env.DB.batch([
+			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, physical_checked_at = NULL"),
+			env.DB.prepare("UPDATE game SET igdb_id = id + 1000"),
+		]);
+		const portion = await createRepositories(env.DB, env.NPSSO_KEY).igdb.zurDiscPruefung(AUFFRISCHEN_JE_AUFRUF);
+		const igdbPlattform: Record<number, number> = { 0: 9, 1: 48, 2: 167, 3: 46 };
+		const { client } = fakeIgdb([
+			portion.slice(0, -1).map((s) => ({ id: s.igdb_id, external_games: [{ media: 2, platform: igdbPlattform[s.id % 4] }] }) as any),
+		]);
+		const zaehler = zaehlendeDb(env.DB);
+		const e = await igdbPhysischSchritt(createRepositories(zaehler.db, env.NPSSO_KEY), client, AUFFRISCHEN_JE_AUFRUF, portion);
+		const messung = { aufrufe: zaehler.aufrufe(), anweisungen: zaehler.anweisungen(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
+		console.info({ discSchreibschritt: messung });
+
+		expect(portion).toHaveLength(AUFFRISCHEN_JE_AUFRUF);
+		expect(e).toEqual({ status: "erfolg", angefragt: 50, gesetzt: 49, nochOffen: ANZAHL - 50, weiter: true });
+		// Ein Schreib-Batch mit vier Anweisungen, gleich wie viele Spiele.
+		expect(messung.aufrufe).toBe(1);
+		expect(messung.anweisungen).toBe(4);
+		// Je Paar und je Spiel Index-Lookups; die Zaehlung liest game und release einmal.
+		expect(messung.gelesen).toBeLessThan(3_000);
+
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM game_event WHERE kind = 'disc_fassung_belegt'"),
+			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, physical_checked_at = NULL"),
 			env.DB.prepare("UPDATE game SET igdb_id = NULL"),
 		]);
 	});
