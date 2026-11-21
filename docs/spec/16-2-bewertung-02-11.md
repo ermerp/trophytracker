@@ -125,7 +125,9 @@ deren Leerlauf allein bis 17 ms liegt.
   Zeilen, davon rund 1 340 die Zählung, die vorher als eigener Aufruf lief. **Die CPU-Wirkung ist eine
   Erwartung, keine Messung** – fällig ist der Schritt erst wieder um den 16.12.; liegt ein voller
   Aufruf dann über 10 ms, bekommt er eine eigene, kleinere Portion (heute 50, geteilt mit dem
-  Auffrischen; ein eigener Nachtrag, nicht zugleich). **Offen, klein:** Die Messung der Disc-Auswahl in
+  Auffrischen; ein eigener Nachtrag, nicht zugleich). **Verworfen:** eine Vorabmessung im eigenen
+  Messworker mit nachgebauter IGDB-Antwort (Entscheidung des Nutzers vom 21.11.2026) – sie hätte nur
+  das Verhältnis alt zu neu gezeigt, nicht den Produktionswert. **Offen, klein:** Die Messung der Disc-Auswahl in
   `test/lesekosten.spec.ts` (Stufe 14) misst eine Abschrift der SQL statt der Abfrage aus dem Code.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 12.11.2026): 18q zuerst – die Spitze, der teuerste Aufruf,

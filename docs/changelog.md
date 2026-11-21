@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 181 | 21.11.2026 | **Abschluss 21.11.:** 05:00-Grenze nur für den Cron des Workers, Fensterzeiten der Actions gemessen, Vorschlag PSN 00–03 / Wartung 03–05 UTC (16.2); NPSSO-Vermutung „Sonys Datum gilt für die Kette" offen bis 28.11., Warnung erst danach umbauen (7.1); Messworker für 18p-b verworfen (16.2) |
 | 180 | 21.11.2026 | **Nachtrag 18p-b: Disc-Prüfung bündeln.** Eine Portion von 50 Spielen schreibt in einem Batch (Ereignis, `ja`, Stempel, Zählung) statt in einem je Spiel: 1 D1-Aufruf mit 4 Anweisungen statt rund 51 mit 100–150; CPU-Wirkung erst um den 16.12. messbar (7.6, 10.1, 16.2) |
 | 179 | 21.11.2026 | **Nachtrag: Nächte zum 16. bis 21.11.** Erste Nächte mit 18p: 431 Cron-Aufrufe `ok`, Sync jede Nacht `erfolg`; Normalisierung Median 9 (bis 18 statt 31), Abruf unverändert 10, Sync je Nacht 8–11; Budget weiter nicht erreicht (0–5 Aufrufe über 15 ms); Disc-Prüfung 33–38 ms, weil je Spiel ein Batch; Abendläufe bis 6 h 38 verspätet, zweite Läufe wieder im PSN-Fenster (16.2) |
 | 178 | 15.11.2026 | **Nachtrag f2b-c: Zurück schließt das Sortiermenü** wie Suche und Filtertafel; Zurück aus der Suche nimmt nur den Begriff weg, Filter und Sortierung bleiben (vorher kam der alte Stand zurück, auch über die Tafel) (13.3, 16.4) |
