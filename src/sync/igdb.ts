@@ -252,13 +252,17 @@ export async function igdbPhysischSchritt(
 
 	try {
 		const nachId = physischePlattformenListe(await igdb.physischNachIds(spiele.map((s) => s.igdb_id)));
-		let gesetzt = 0;
-		for (const spiel of spiele) {
-			// Ein Spiel, das IGDB nicht zurueckgibt, wird trotzdem gestempelt:
-			// leere Antwort ist ein Ergebnis, kein Grund fuer eine Endlosschleife.
-			gesetzt += await repos.igdb.discFassungAusIgdb(spiel.id, nachId.get(spiel.igdb_id) ?? []);
-		}
-		const { discOffen } = await repos.igdb.discZaehlung();
+		// Ein Schreibaufruf fuer die ganze Portion, die Zaehlung im selben Batch
+		// (Nachtrag 18p-b). Ein Spiel, das IGDB nicht zurueckgibt, wird trotzdem
+		// gestempelt: leere Antwort ist ein Ergebnis, kein Grund fuer eine
+		// Endlosschleife.
+		const paare = spiele.flatMap((spiel) =>
+			(nachId.get(spiel.igdb_id) ?? []).map((plattform) => ({ gameId: spiel.id, plattform })),
+		);
+		const { gesetzt, discOffen } = await repos.igdb.discFassungenAlle(
+			spiele.map((s) => s.id),
+			paare,
+		);
 		return { status: "erfolg", angefragt: spiele.length, gesetzt, nochOffen: discOffen, weiter: discOffen > 0 };
 	} catch (fehler) {
 		return {

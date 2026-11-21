@@ -116,6 +116,17 @@ deren Leerlauf allein bis 17 ms liegt.
   Halbzustände unmöglich – eine Seite abgelegt, aber nicht weitergezählt (beim nächsten Mal doppelt
   abgelegt), eine Seite geschrieben, aber nicht markiert (zweimal normalisiert), ein Lauf vorbelegt,
   aber nicht abgeschlossen.
+- **18p-b – Disc-Prüfung bündeln** (gebaut am 21.11.2026, Entscheidung des Nutzers vom selben Tag):
+  Die Disc-Prüfung war in der Nacht zum 16.11. der teuerste Aufruf (35 / 38 / 33 ms bei 50 Spielen,
+  [16-2-naechte-3.md](16-2-naechte-3.md)), weil sie je Spiel einen Batch schickte und danach eigens
+  zählte – rund 51 D1-Aufrufe und 100–150 Anweisungen. Jetzt **1 D1-Aufruf mit 4 Anweisungen**
+  (Ereignis, `ja`, Stempel, Zählung; [7.6](07-6-igdb.md)), gezählt in `test/luecken.spec.ts`, der Test
+  gegen den alten Stand rot. Lesekosten einer vollen Portion gegen den Bestand von 430 Spielen: 2 375
+  Zeilen, davon rund 1 340 die Zählung, die vorher als eigener Aufruf lief. **Die CPU-Wirkung ist eine
+  Erwartung, keine Messung** – fällig ist der Schritt erst wieder um den 16.12.; liegt ein voller
+  Aufruf dann über 10 ms, bekommt er eine eigene, kleinere Portion (heute 50, geteilt mit dem
+  Auffrischen; ein eigener Nachtrag, nicht zugleich). **Offen, klein:** Die Messung der Disc-Auswahl in
+  `test/lesekosten.spec.ts` (Stufe 14) misst eine Abschrift der SQL statt der Abfrage aus dem Code.
 
 **Reihenfolge** (Entscheidung des Nutzers vom 12.11.2026): 18q zuerst – die Spitze, der teuerste Aufruf,
 fragt in sich nur zweimal und gewinnt allein durch 18q. 18p wird **nach der Kaufliste-Nacht zum
