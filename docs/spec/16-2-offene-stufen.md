@@ -136,12 +136,12 @@ erklärt die Million also nicht; näher liegt die Messsitzung des 09.10. selbst,
 Tage Preisverlauf und alle Releases gelesen hat. Gehört einmal eigens angesehen, blockiert
 aber keine Teilstufe.
 
-#### Offen: die CPU-Grenze, Betriebswarnungen, Nachtläufe bis 05:00 UTC
+#### Offen: die CPU-Grenze, Betriebswarnungen, Actions am Nachmittag (18r-b)
 
 Stehen in [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) (die Nachträge 18i bis 20i, Budget und
 Wege je Schritt), [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md) (die Messungen je Schritt) und
-[16-2-betriebswarnungen.md](16-2-betriebswarnungen.md) (Stufe 18m mit dem Nachtrag 18m-b und der
-offene Punkt nach 20i).
+[16-2-betriebswarnungen.md](16-2-betriebswarnungen.md) (Stufe 18m mit dem Nachtrag 18m-b, Stufe 18r –
+Nachtläufe bis 05:00 UTC, deployt am 22.11.2026 – und der vorgemerkte Nachtrag 18r-b für den 23.11.).
 
 **Die fünf finalen Stufen** – die Sammlung finalisieren, Oberfläche, Refactoring
 (abgetragen), Wiederherstellungsprobe, Außendarstellung – stehen in
