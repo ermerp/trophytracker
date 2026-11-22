@@ -1,6 +1,7 @@
 import type { Repositories } from "../db";
 import type { CronLage } from "../db/cron-lage";
 import type { CronFakt, SyncLauf } from "../db/sync";
+import { CRON_PSN, CRON_WARTUNG, cronFenster } from "../domain/cron-fenster";
 import { heuteIso } from "../domain/igdb";
 import type { IgdbClient } from "../igdb/client";
 import type { PsnClient } from "../psn/client";
@@ -36,10 +37,11 @@ import {
  * Seit Stufe 18e sind es ZWEI Cron-Eintraege (wrangler.jsonc), und der
  * Bereich sagt, welcher gerufen hat:
  *
- * - `psn` (alle fuenf Minuten 03:00-05:59 UTC, 36 Aufrufe): Haenger
+ * - `psn` (alle fuenf Minuten 00:00-02:59 UTC, 36 Aufrufe): Haenger
  *   aufraeumen, Sync-Schritt, Spielzeit, Kaufliste. Alles, was Sony anfasst,
  *   und damit alles, was viele Aufrufe braucht.
- * - `wartung` (alle fuenf Minuten 06:00-08:59 UTC, 36 Aufrufe): erschienene
+ * - `wartung` (alle fuenf Minuten 03:00-04:59 UTC, 24 Aufrufe; seit 18r
+ *   vorgezogen, vorher 06:00-08:59 mit 36): erschienene
  *   Titel freigeben, Trophaeen je Jahr, alte Rohantworten, IGDB-Auffrischen,
  *   Disc-Fassungen, Gebrauchtpreise. Nichts davon fasst PSN an.
  *
@@ -58,42 +60,10 @@ import {
 /** Welcher Cron-Eintrag ruft - `alles` ist der Rueckfall und die Testbarkeit. */
 export type CronBereich = "psn" | "wartung" | "alles";
 
-/**
- * Die beiden Cron-Ausdruecke, genau wie sie in `wrangler.jsonc` stehen.
- *
- * Sie stehen hier, weil der Einstieg den Bereich aus `event.cron` ableitet -
- * Cloudflare liefert den Ausdruck mit, der gefeuert hat. Wer einen Ausdruck
- * in wrangler.jsonc aendert, aendert ihn hier mit; `test/cron.spec.ts` haelt
- * fest, dass beide Seiten dasselbe sagen.
- */
-export const CRON_PSN = "*/5 3-5 * * *";
-export const CRON_WARTUNG = "*/5 6-8 * * *";
-
-/**
- * Startstunde, Takt und Anzahl der Aufrufe eines Cron-Ausdrucks.
- *
- * Die Zahl stand bis Stufe "Refactoring" als Literal in zwei Tests und lief
- * damit auseinander: Als 20e das Wartungsfenster von den Stunden 6-7 auf 6-8
- * erweiterte, rechneten `test/cron.spec.ts` und `test/lesekosten.spec.ts`
- * weiter mit 24 statt 36 Aufrufen und prueften zwoelf Aufrufe zu wenig
- * (10.1). Jetzt steht sie nur noch im Ausdruck selbst.
- *
- * Erkannt wird allein die Form, die hier vorkommt - alle N Minuten zwischen
- * zwei Stunden; alles andere wirft, statt eine Zahl zu raten. (Die Form als
- * Muster steht in der Regex darunter: Ein Cron-Ausdruck mit Stern-Schrägstrich
- * laesst sich in einem Blockkommentar nicht schreiben, er beendet ihn.)
- */
-export function cronFenster(ausdruck: string): { startStunde: number; takt: number; aufrufe: number } {
-	const treffer = /^\*\/(\d+) (\d+)-(\d+) \* \* \*$/.exec(ausdruck);
-	if (!treffer) throw new Error(`Cron-Ausdruck nicht auswertbar: ${ausdruck}`);
-	const takt = Number(treffer[1]);
-	const startStunde = Number(treffer[2]);
-	const endStunde = Number(treffer[3]);
-	if (takt < 1 || takt > 60 || startStunde > endStunde || endStunde > 23) {
-		throw new Error(`Cron-Ausdruck nicht auswertbar: ${ausdruck}`);
-	}
-	return { startStunde, takt, aufrufe: Math.ceil(60 / takt) * (endStunde - startStunde + 1) };
-}
+// Die Ausdruecke und `cronFenster` stehen seit 18r in src/domain/cron-fenster.ts,
+// damit die Betriebsurteile (src/domain/betrieb.ts) das Fensterende daraus
+// ableiten koennen, ohne den Worker-Teil zu importieren. Hier nur durchgereicht.
+export { CRON_PSN, CRON_WARTUNG, cronFenster };
 
 /**
  * Bereich zu einem Cron-Ausdruck. Ein unbekannter Ausdruck bekommt `alles`:
@@ -108,7 +78,7 @@ export function bereichFuerAusdruck(ausdruck: string | undefined): CronBereich {
 
 /**
  * Nach so vielen Stunden ohne Fortschritt gilt ein Lauf als haengengeblieben
- * - die Laenge des Cron-Fensters. Ein juengerer Lauf, etwa ein am Abend vom
+ * - die Laenge des PSN-Fensters; die Wartung ist kuerzer. Ein juengerer Lauf, etwa ein am Abend vom
  * Nutzer abgebrochener, wird fortgesetzt statt verworfen.
  */
 export const HAENGT_NACH_STUNDEN = 3;

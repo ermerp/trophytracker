@@ -104,7 +104,7 @@ und hält fest, dass die Sync-Zeilen darin stehen bleiben:
 
 Das Beispiel stammt aus der Nacht zum 28.09.2026, als die Wartung noch `*/5 6-7` lief – daher
 `×24`. Heute sind es 36 Aufrufe je Fenster, und **die Zahl steht nur noch im Cron-Ausdruck
-selbst**: `cronFenster(ausdruck)` in `src/sync/cron.ts` liest Startstunde, Takt und Anzahl heraus,
+selbst**: `cronFenster(ausdruck)` in `src/domain/cron-fenster.ts` liest Startstunde, Takt und Anzahl heraus,
 beide Tests leiten sie daraus ab. Der Anlass war ein Befund – als Stufe 20e das Fenster auf
 `*/5 6-8` erweiterte, rechneten `test/cron.spec.ts` und `test/lesekosten.spec.ts` als Literal
 weiter mit 24 und prüften zwölf Aufrufe zu wenig. Seit der Umstellung (09.10.2026) simuliert die
@@ -126,6 +126,6 @@ Einstellungen zeigen unter „Automatik" Fenster und letzten Nachtlauf, die Sync
 Hand" oder „automatisch". Ob daraus eine Warnung wird – rot oder zur Kenntnis –, urteilen seit
 Stufe 18m die Betriebswarnungen beim Lesen ([16.2](16-2-betriebswarnungen.md), Darstellung 13.2).
 
-Lokal: `npx wrangler dev --test-scheduled`, dann `curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"`
-für das PSN-Fenster, `?cron=*/5+6-8+*+*+*` für die Wartung, ohne Parameter für beides
+Lokal: `npx wrangler dev --test-scheduled`, dann `curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+0-2+*+*+*"`
+für das PSN-Fenster, `?cron=*/5+3-4+*+*+*` für die Wartung, ohne Parameter für beides
 – der Pfad `/cdn-cgi/` läuft am Asset-Fallback vorbei, `/__scheduled` nicht.

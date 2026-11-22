@@ -15,9 +15,12 @@
  *   Abbrueche (`exceededResources`), laesst aber einzelne Minuten aus.
  * - `d1AnalyticsAdaptiveGroups`: gelesene Zeilen je Stunde.
  *
- * Telemetry haelt rund sieben Tage. Gezaehlt werden die Fenster 03-09 UTC
- * des Datums und die Abendlaeufe ab 20 UTC des Vortags. Der Median gerader
- * Stichproben ist der Mittelwert der beiden mittleren Werte.
+ * Telemetry haelt rund sieben Tage. Gezaehlt werden die Fenster 00-05 UTC
+ * des Datums (seit 18r: PSN 00-03, Wartung 03-05) und bei den gelesenen
+ * Zeilen die Abendlaeufe ab 18 UTC des Vortags. Bis zur Verlegung der Markt-
+ * und Store-Action am 23.11.2026 (vorher 20:17/20:47 UTC) koennen verspaetete
+ * Abendlaeufe in die Stunden 00-03 fallen und dort mitgezaehlt werden. Der
+ * Median gerader Stichproben ist der Mittelwert der beiden mittleren Werte.
  *
  * Aufruf (Token mit Lesezugriff auf Analytics und Observability in der
  * Umgebung, nicht in `.dev.vars`):
@@ -44,8 +47,8 @@ const konto = konfiguration.match(/"account_id":\s*"([^"]+)"/)[1];
 const datenbank = konfiguration.match(/"database_id":\s*"([^"]+)"/)[1];
 const skript = konfiguration.match(/"name":\s*"([^"]+)"/)[1];
 
-const beginn = `${datum}T03:00:00Z`;
-const ende = `${datum}T09:00:00Z`;
+const beginn = `${datum}T00:00:00Z`;
+const ende = `${datum}T05:00:00Z`;
 const vortag = new Date(Date.parse(beginn) - 86_400_000).toISOString().slice(0, 10);
 
 async function cloudflare(pfad, body) {
@@ -103,7 +106,7 @@ const zeilen = await graphql(
 	`query($a:String!,$f:Time!,$t:Time!){viewer{accounts(filter:{accountTag:$a}){
 	 d1AnalyticsAdaptiveGroups(limit:100,filter:{datetimeHour_geq:$f,datetimeHour_lt:$t,databaseId:"${datenbank}"}){
 	  dimensions{datetimeHour} sum{rowsRead rowsWritten}}}}}`,
-	{ a: konto, f: `${vortag}T20:00:00Z`, t: ende },
+	{ a: konto, f: `${vortag}T18:00:00Z`, t: ende },
 );
 const zeilenJeStunde = new Map(
 	zeilen.d1AnalyticsAdaptiveGroups.map((r) => [r.dimensions.datetimeHour.slice(0, 13), r.sum.rowsRead]),
@@ -116,7 +119,7 @@ const liste = [...jeAnfrage.values()]
 	.filter((x) => x.aufruf?.$workers.eventType === "scheduled")
 	.map((x) => {
 		const w = x.aufruf.$workers;
-		// Die Minute des Plans, nicht des Endes: Ein Aufruf um 06:10 kann 06:11 enden.
+		// Die Minute des Plans, nicht des Endes: Ein Aufruf um 03:10 kann 03:11 enden.
 		const minute = new Date(w.event.scheduledTime * 1000).toISOString().slice(11, 16);
 		const log = x.logs.find((l) => l.startsWith("cron: ")) ?? "";
 		const [schritt, bereich] = log.replace("cron: ", "").split(" ");
@@ -145,7 +148,7 @@ if (schalter.includes("--liste")) {
 }
 
 const nichtOk = liste.filter((x) => x.ausgang !== "ok");
-console.log(`Nacht zum ${datum} (03-09 UTC)`);
+console.log(`Nacht zum ${datum} (00-05 UTC)`);
 console.log(`  Cron-Aufrufe in der Telemetry: ${liste.length}, davon nicht ok: ${nichtOk.length}`);
 for (const x of nichtOk) console.log(`    ${x.minute} ${x.ausgang} ${x.cpu} ms ${x.colo}`);
 console.log(`  workersInvocationsAdaptive: ${Object.entries(ausgang).map(([s, n]) => `${s} ${n}`).join(", ")}`);
@@ -171,7 +174,7 @@ console.log(`  Leerlauf ueber 10 ms: ${leerlaufUeber10.map((x) => `${x.colo} ${x
 console.log();
 
 console.log("  Gelesene Zeilen (d1AnalyticsAdaptiveGroups):");
-console.log(`    PSN-Fenster 03-06 UTC: ${summeStunden(`${datum}T03`, `${datum}T06`)}`);
-console.log(`    Wartung 06-09 UTC:     ${summeStunden(`${datum}T06`, `${datum}T09`)}`);
-console.log(`    Abend ${vortag} 20 UTC bis 03 UTC: ${summeStunden(`${vortag}T20`, `${datum}T03`)}`);
+console.log(`    PSN-Fenster 00-03 UTC: ${summeStunden(`${datum}T00`, `${datum}T03`)}`);
+console.log(`    Wartung 03-05 UTC:     ${summeStunden(`${datum}T03`, `${datum}T05`)}`);
+console.log(`    Abend ${vortag} 18 UTC bis 00 UTC: ${summeStunden(`${vortag}T18`, `${datum}T00`)}`);
 console.log(`    je Stunde: ${[...zeilenJeStunde].sort().map(([h, n]) => `${h.slice(5)} ${n}`).join("  ")}`);

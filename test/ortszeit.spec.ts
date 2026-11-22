@@ -13,12 +13,20 @@ const winter = new Date("2026-12-01T12:00:00Z");
 
 describe("Ortszeit der Automatik", () => {
 	it("verschiebt die Fenster mit der Zeitumstellung", () => {
-		expect([3, 6, 9].map((h) => ortsstunde(h, sommer, BERLIN))).toEqual(["5", "8", "11"]);
-		expect([3, 6, 9].map((h) => ortsstunde(h, winter, BERLIN))).toEqual(["4", "7", "10"]);
+		// Seit 18r: PSN 0-3 UTC, Wartung 3-5 UTC.
+		expect([0, 3, 5].map((h) => ortsstunde(h, sommer, BERLIN))).toEqual(["2", "5", "7"]);
+		expect([0, 3, 5].map((h) => ortsstunde(h, winter, BERLIN))).toEqual(["1", "4", "6"]);
 	});
 
-	it("rechnet am Tag der Umstellung schon in Winterzeit (25.10.2026, 01:00 UTC)", () => {
+	it("nennt Mitternacht UTC als 0 und nicht als 24", () => {
+		// `hourCycle: 'h23'` - mit h24 stuende hier "24".
+		expect(ortsstunde(0, winter, "UTC")).toBe("0");
+	});
+
+	it("rechnet am Tag der Umstellung je Stunde richtig (25.10.2026, 01:00 UTC)", () => {
 		expect(ortsstunde(3, new Date("2026-10-25T12:00:00Z"), BERLIN)).toBe("4");
+		// Der Fensterbeginn um 00:00 UTC liegt an diesem Tag noch in der Sommerzeit.
+		expect(ortsstunde(0, new Date("2026-10-25T12:00:00Z"), BERLIN)).toBe("2");
 	});
 
 	it("nennt die Abendlaeufe mit Minuten", () => {

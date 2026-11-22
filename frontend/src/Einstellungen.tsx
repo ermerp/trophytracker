@@ -789,9 +789,9 @@ export function Einstellungen() {
       <h2>Automatik</h2>
       <p>
         Der Worker arbeitet nachts in zwei Fenstern, alle fünf Minuten je ein kleiner Schritt. Zwischen{' '}
-        {ortsstunde(3)} und {ortsstunde(6)} Uhr (03:00–05:59 UTC) alles, was PlayStation anspricht: Trophäen,
-        Spielzeiten und einmal wöchentlich die Kaufliste. Zwischen {ortsstunde(6)} und {ortsstunde(9)} Uhr
-        (06:00–08:59 UTC) die Wartung – erschienene Titel freigeben, IGDB-Metadaten und Disc-Fassungen
+        {ortsstunde(0)} und {ortsstunde(3)} Uhr (00:00–02:59 UTC) alles, was PlayStation anspricht: Trophäen,
+        Spielzeiten und einmal wöchentlich die Kaufliste. Zwischen {ortsstunde(3)} und {ortsstunde(5)} Uhr
+        (03:00–04:59 UTC) die Wartung – erschienene Titel freigeben, IGDB-Metadaten und Disc-Fassungen
         auffrischen, alte PSN-Rohantworten wegräumen. Gebraucht- und Store-Preise holen abends zwei GitHub
         Actions, unten bei ihren Abschnitten.
       </p>

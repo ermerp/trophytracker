@@ -61,37 +61,29 @@ eines neuen UTC-Tags, im selben `json_set` und ohne den Stand vorher zu lesen �
 D1-Aufruf. Ein Abbruch durch die Laufzeit erreicht den Zähler nicht; den zeigt weiter die Kette
 ohne Ausgang.
 
-#### Offen nach 20i: Nachtläufe bis 05:00 UTC
+#### Stufe 18r: Nachtläufe bis 05:00 UTC (gebaut am 22.11.2026)
 
-Vorgabe des Nutzers vom 17.10.2026: Die Nachtläufe sollen spätestens um **05:00 UTC** fertig sein,
-damit sie in Sommer- wie Winterzeit vor 7 Uhr abgeschlossen sind (7 Uhr Sommerzeit ist 05:00 UTC).
-**Eigener Nachtrag nach 20i**, damit die Messungen von 18j bis 20i nicht mit einem Zeitwechsel
-zusammenfallen. Zwei Prüffragen:
+Vorgabe des Nutzers vom 17.10.2026: Die Nachtläufe sind spätestens um **05:00 UTC** fertig, damit sie
+in Sommer- wie Winterzeit vor 7 Uhr abgeschlossen sind. **Die Grenze gilt nur für den Cron des
+Workers, nicht für die Actions** (Entscheidung vom 21.11.2026). Gebaut: PSN `*/5 0-2` (00:00–02:55,
+36 Aufrufe), Wartung `*/5 3-4` (03:00–04:55, 24) – Aufteilung entschieden am 22.11.2026; Fenster
+und Gründe in [10.1](10-1-cron.md).
 
-1. **Welche Schritte hängen am UTC-Datum („heute")?** Bekannt: `syncFaellig` (ein Versuch je Nacht),
-   der Spielzeit-Stand, Level- und Jahre-Stand, die Tagesfristen. Ginge ein Fenster über Mitternacht
-   UTC, oder bleibt nur 00:00–05:00 UTC? Über Mitternacht verteilte sich die PSN-Kette auf zwei
-   „heute".
-2. **Reicht die Kapazität – 60 statt 72 Aufrufe, Kaufliste-Nächte eingerechnet?** **Gemessen in den
-   Nächten 31.10.–02.11.2026: ja, ohne Cron je Minute.** Seit Markt und Store als Action laufen, hat das
-   PSN-Fenster 14 Aufrufe mit Arbeit (Sync 11, Spielzeit 2, Level 1), in einer Kaufliste-Nacht 29, die
-   Wartung 1 bis 4 (Jahre, bis zu drei Auffrisch-Aufrufe) – zusammen höchstens rund 33 von 60. Am
-   18.10.2026 belegte eine Kaufliste-Nacht das PSN-Fenster noch voll (36 von 36); der Lage-Batch liest
-   je Wartungsaufruf rund 2 590 Zeilen – mit Cron je Minute rund 466 000 je Nacht (oben). **Noch nicht
-   gemessen:** die Aufteilung (zwei Stunden geben 24 Aufrufe, die Kaufliste-Nacht braucht 29), der
-   schlimmste Fall der Wartung (Auffrischen und Disc-Prüfung zugleich) und die Überschneidung mit den
-   Abendläufen: bis zum 01.11. rund drei Stunden verspätet, bis gegen 02:00 UTC; am 02.11. **4 h 55 bis
-   6 h 00**, die zweiten Läufe um 03:29 und 03:42 UTC erstmals im PSN-Fenster ([16-2-naechte.md](16-2-naechte.md)).
-   Sie rufen Routen des Workers, keinen Cron-Schritt. **Entschieden am 21.11.2026: Die Grenze 05:00 UTC
-   gilt nur für den Cron des Workers, nicht für die Actions.** In den Nächten 16.–21.11. starteten die
-   Hauptläufe (geplant 20:17 / 20:47) zwischen 23:57 und 02:55 und waren nach 8–10 (Markt) und 1–2 Minuten
-   (Store) fertig, die Rückfälle (22:17 / 22:47) endeten 02:14–04:48, leer, nach 20–40 s
-   ([16-2-naechte-3.md](16-2-naechte-3.md)). Nur ein Rückfall mit über rund 6 h 40 Verspätung endet nach
-   05:00. Mit einem PSN-Fenster ab 00:00 ist der Sync gegen 00:50 fertig und der Markt sieht ihn meist
-   schon in derselben Nacht (heute läuft er vor dem Sync, ein neues Spiel wird einen Tag später Lücke).
-   **Vorschlag, noch nicht entschieden:** PSN 00:00–02:55, Wartung 03:00–04:55 UTC – alles am selben
-   UTC-Tag; Plan und Deploy nach der Kaufliste-Nacht zum 22.11.
+- **UTC-Datum:** Alle Schritte, die an „heute" hängen (`heuteIso`: ein Sync je Nacht, Level, Jahre,
+  Kaufliste nach sieben Tagen, Auffrischen), liegen weiter an einem Datum. Der Übergang verliert
+  und verdoppelt keine Nacht; der Stillstand (26 h) schlägt beim kürzeren Abstand nicht an.
+- **Kapazität:** PSN 29 von 36 in der Kaufliste-Nacht zum 22.11.2026 (gemessen). Wartung 1 bis 4
+  Arbeitsaufrufe, mit fälliger Disc-Prüfung rund 8 von 24 – gerechnet, **zusammen nicht gemessen**;
+  erste Gelegenheit um den 16.12. (18p-b).
+- **Fensterende:** `fenster_offen` leitet das Ende seit 18r aus den Cron-Ausdrücken ab
+  (`src/domain/cron-fenster.ts`), vorher feste Stunden 6 und 9.
+- **Auswertung:** `scripts/nacht.mjs` zählt 00–05 UTC, Abend ab 18 UTC des Vortags; vollständig ab
+  05:00 UTC. **Der Index-Nachtrag** ist keine Bedingung: Er gehört vor „Cron je Minute"
+  ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), und 18r braucht keinen schnelleren Takt.
 
-**Offen, vom Nutzer zu entscheiden:** ob der Index-Nachtrag davor kommen muss – laut 16.2 ist er nur
-Bedingung für „Cron je Minute". Bis zur Umstellung endet die Wartung um 08:55 UTC; eine vollständige
-Nachtauswertung geht erst ab 09:00 UTC.
+**Vorgemerkt als Nachtrag 18r-b (23.11.2026, eigener Tag):** Die Actions starten seit 20i-c um
+20:17 / 20:47 (Rückfall 22:17 / 22:47), von GitHub 3 bis 6 h 38 verspätet – also im neuen PSN-Fenster.
+Vom Nutzer am 22.11.2026 angenommen: Markt **13:17 / 15:17**, Store **13:47 / 15:47 UTC**. Dann trennt
+`d1AnalyticsAdaptiveGroups` je Stunde Abend und Nacht wieder, und der Markt sieht den Sync desselben
+Tages. Fristen (12 h) und Stillstand (30 h) vertragen den einmal kürzeren Abstand. **Offen:** die
+Verspätung um diese Uhrzeit ist nicht gemessen – erst ab rund 8 h 40 berührte ein Rückfall den Sync.

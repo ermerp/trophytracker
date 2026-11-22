@@ -8,7 +8,7 @@
 | Datenbank | Cloudflare D1 (SQLite) |
 | Frontend | React + Vite + TypeScript, als PWA |
 | Hosting Frontend | Static Assets im selben Worker |
-| Geplanter Sync | Cloudflare Cron Trigger – `*/5 3-5 * * *`, ein Schritt je Aufruf (10.1) |
+| Geplanter Sync | Cloudflare Cron Trigger – `*/5 0-2 * * *` (PSN) und `*/5 3-4 * * *` (Wartung), ein Schritt je Aufruf (10.1) |
 | Feed-Import | GitHub Action (siehe 7.3) |
 | Deployment/CLI | Wrangler |
 | PSN-Trophäen | `psn-api` (npm) oder direkte fetch-Aufrufe |
