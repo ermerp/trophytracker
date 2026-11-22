@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 184 | 22.11.2026 | **Abschluss 22.11.:** Verweis in 16.2 auf den Stand nach 18r (gebaut, deployt) und 18r-b (vorgemerkt für den 23.11.) (16.2) |
 | 183 | 22.11.2026 | **Stufe 18r: Nachtläufe bis 05:00 UTC.** PSN `*/5 0-2` (36 Aufrufe), Wartung `*/5 3-4` (24) statt 03–09 UTC; Fensterende von `fenster_offen` aus den Ausdrücken abgeleitet (`src/domain/cron-fenster.ts`); `nacht.mjs` zählt 00–05 UTC; Actions-Verlegung als 18r-b am 23.11. vorgemerkt (10.1, 16.2) |
 | 182 | 22.11.2026 | **Nachtrag: Nacht zum 22.11.** Erste Kaufliste mit 18p: Median 11 (8–20) statt 13 (9–25), einer statt vier Aufrufe über 15 ms, Budget weiter nicht erreicht; 72 Aufrufe `ok`, Sync `erfolg`, Kaufliste-Nacht belegt 29 PSN-Aufrufe (16.2) |
 | 181 | 21.11.2026 | **Abschluss 21.11.:** 05:00-Grenze nur für den Cron des Workers, Fensterzeiten der Actions gemessen, Vorschlag PSN 00–03 / Wartung 03–05 UTC (16.2); NPSSO-Vermutung „Sonys Datum gilt für die Kette" offen bis 28.11., Warnung erst danach umbauen (7.1); Messworker für 18p-b verworfen (16.2) |
