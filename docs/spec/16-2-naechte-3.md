@@ -125,3 +125,26 @@ mit **60 478** (Stunde 22 UTC am 18.11.: 47 501, App-Nutzung nach Uhrzeit, nicht
 las die Stunde 06 UTC 52 601 (Disc-Prüfung), am 21.11. die Stunde 08 UTC 40 665 statt 23 964 (nicht
 zerlegt). `rows_read_24h` am 21.11. gegen 09:00 UTC **159 431**, `rows_written_24h` 3 075. Die
 wöchentliche Sicherung vom 15.11. lief um 11:04 UTC grün – die erste mit der Dump-Prüfung aus 18q-b.
+
+#### Nacht zum 22.11.2026 – die erste Kaufliste mit 18p
+
+**Alle 72 Cron-Aufrufe `ok`**, 23 Standorte, Leerlauf über 10 ms keiner. Sync `erfolg` um 03:50
+(432 Titel), Zugang lebt. Ausgewertet am 22.11.2026 gegen 14:30 UTC.
+
+| Nacht | Sync Median (min–max), über 15 | Spitze | Level | Kaufliste | Auffrischen | Leerlauf PSN / Wartung, Median |
+|---|---|---|---|---|---|---|
+| 22.11. | 7 (5–14), 0 | 12 (EWR) | 5 | 11 (8–20), 15 Aufrufe | 8 / 8 / 11 | 4 / 4 |
+
+**Kaufliste mit 18p** (5 → 4 D1-Aufrufe je Seite): Median **11** (8–20) statt 13 (9–25), 9 von 15
+Aufrufen über 10 ms statt 13, **einer** über 15 (LAX 20) statt vier; 735 Einträge geholt (14 × 50,
+1 × 35), keine Änderung. Eine Nacht – die Richtung stimmt zur Erwartung, ein Urteil trägt sie nicht.
+**Budget arbeitender Aufrufe weiter nicht erreicht:** Median 11 liegt über 8, P90 über 10. Die Kaufliste
+belegt 15 Aufrufe (04:00–05:10), das PSN-Fenster endet in der Kaufliste-Nacht nach
+29 Arbeitsaufrufen (03:00–05:20) – dieselbe Zahl, die 16.2 für die Aufteilung der 05:00-Grenze nennt.
+
+**Abendläufe:** alle vier grün. Markt 00:19 (8 min 36 s) und Rückfall 02:19 (25 s), Store 00:40
+(1 min 38 s) und Rückfall 02:39 (19 s) – gut vier Stunden zu spät, die Rückfälle vor dem PSN-Fenster.
+
+**Gelesene Zeilen:** PSN 19 310, Wartung 96 886, Abend 14 881. `rows_read_24h` am 22.11. gegen
+14:30 UTC **282 539**, `rows_written_24h` 3 352 – das Fenster enthält die wöchentliche Sicherung
+(11:34 UTC, grün).
