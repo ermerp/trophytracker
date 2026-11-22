@@ -8,8 +8,15 @@ bis dahin einen). Der Free Tier erlaubt fünf je Konto – gegen Cloudflares Dok
 
 | Eintrag | Ausdruck | Aufrufe | Arbeit |
 |---|---|---|---|
-| PSN | `*/5 3-5 * * *` | 36 (04–07 Uhr MEZ, 05–08 MESZ) | Hänger abbrechen, Sync-Schritt, Spielzeit, Kaufliste, Einzeltrophäen, Level (Store-Preise seit 20j als Action, 7.4) |
-| Wartung | `*/5 6-8 * * *` | 36 (07–10 Uhr MEZ, 08–11 MESZ) | erschienene Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, Trophäen je Jahr, alte Rohantworten – die **Gebrauchtpreise** laufen seit Stufe 20i als GitHub Action um 20:17 UTC (7.3) |
+| PSN | `*/5 0-2 * * *` | 36 (01–04 Uhr MEZ, 02–05 MESZ) | Hänger abbrechen, Sync-Schritt, Spielzeit, Kaufliste, Einzeltrophäen, Level (Store-Preise seit 20j als Action, 7.4) |
+| Wartung | `*/5 3-4 * * *` | 24 (04–06 Uhr MEZ, 05–07 MESZ) | erschienene Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, Trophäen je Jahr, alte Rohantworten – die **Gebrauchtpreise** laufen seit Stufe 20i als GitHub Action um 20:17 UTC (7.3) |
+
+**Seit Stufe 18r (22.11.2026) enden beide Fenster um 05:00 UTC** – Vorgabe des Nutzers vom 17.10.2026,
+damit die Nacht auch in der Sommerzeit vor 7 Uhr fertig ist; die Grenze gilt nur für den Cron, nicht
+für die Actions (Entscheidung vom 21.11.2026). Bis dahin PSN `*/5 3-5`, Wartung `*/5 6-8` mit je 36
+Aufrufen. Die Aufteilung 36 / 24 trägt die gemessenen Höchstwerte: 29 Arbeitsaufrufe im PSN-Fenster
+der Kaufliste-Nacht zum 22.11.2026, in der Wartung 1 bis 4, mit fälliger Disc-Prüfung rund 8
+(gerechnet, nicht zusammen gemessen). Alle Schritte bleiben am selben UTC-Datum ([16.2](16-2-betriebswarnungen.md)).
 
 **Warum aufgeteilt.** Ein Fenster trug die Arbeit nicht mehr: elf Aufrufe Sync, zwei Spielzeit,
 fünfzehn Kaufliste und – nach einem IGDB-Rückstand – acht Auffrischen sind **37 von 36**
@@ -23,7 +30,7 @@ war seine Entscheidung vom 19.09.2026 und bleibt es für alles, was PSN anfasst.
 
 Welcher Eintrag gefeuert hat, steht in `event.cron`; `bereichFuerAusdruck` bildet es auf
 `psn` / `wartung` ab. Die Ausdrücke stehen als Konstanten `CRON_PSN` und `CRON_WARTUNG` in
-`src/sync/cron.ts` – ein **unbekannter** Ausdruck bekommt `alles` und tut beides, damit eine
+`src/domain/cron-fenster.ts` (seit 18r; `src/sync/cron.ts` reicht sie durch, `src/domain/betrieb.ts` leitet daraus das Fensterende ab) – ein **unbekannter** Ausdruck bekommt `alles` und tut beides, damit eine
 Änderung an `wrangler.jsonc` nicht die halbe Automatik still abschaltet. Lokal (`--test-scheduled`)
 und im Test ist `alles` der Normalfall.
 

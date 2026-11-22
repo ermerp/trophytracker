@@ -145,8 +145,8 @@ mit einem Testeinstieg für den Cron; ein Aufruf entspricht einem nächtlichen
 Schritt:
 
 ```bash
-curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"   # PSN-Fenster
-curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+6-8+*+*+*"   # Wartungsfenster
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+0-2+*+*+*"   # PSN-Fenster
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-4+*+*+*"   # Wartungsfenster
 curl "http://localhost:8787/cdn-cgi/handler/scheduled"                      # ohne Ausdruck: beides
 ```
 
@@ -354,8 +354,10 @@ und mit welchen Fristen, steht in [Abschnitt 10.1](docs/spec/10-1-cron.md).
 
 | Fenster | Ausdruck | Aufrufe | Was dort läuft |
 |---|---|---|---|
-| PSN | `*/5 3-5 * * *` | 36 | hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht), Spielzeit, Kaufliste, Einzeltrophäen, Trophäen-Level, Store-Preise |
-| Wartung | `*/5 6-8 * * *` | 36 | erschienene Titel freigeben, IGDB auffrischen, Disc-Fassungen, Gebrauchtpreise, Trophäen je Jahr, Rohantworten aufräumen |
+| PSN | `*/5 0-2 * * *` (00:00–02:55 UTC) | 36 | hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht), Spielzeit, Kaufliste, Einzeltrophäen, Trophäen-Level |
+| Wartung | `*/5 3-4 * * *` (03:00–04:55 UTC) | 24 | erschienene Titel freigeben, IGDB auffrischen, Disc-Fassungen, Trophäen je Jahr, Rohantworten aufräumen |
+
+Gebraucht- und Store-Preise holen zwei GitHub Actions am Abend, nicht der Cron.
 
 **Nachsehen, ob die Nacht gelaufen ist:** Einstellungen → „Automatik". Dort
 stehen beide Fenster, der letzte automatische Abruf und der **Verlauf der letzten
@@ -376,8 +378,8 @@ die Portionierung.
 
 ```bash
 npx wrangler dev --test-scheduled
-curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-5+*+*+*"   # PSN-Fenster
-curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+6-8+*+*+*"   # Wartung
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+0-2+*+*+*"   # PSN-Fenster
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+3-4+*+*+*"   # Wartung
 curl "http://localhost:8787/cdn-cgi/handler/scheduled"                      # beides
 ```
 
@@ -584,7 +586,7 @@ Service Worker die Seite selbst Network-First und aktualisiert sich still
 ausgeliefert wird, lässt sich am Asset-Hash prüfen – der Name von
 `/assets/index-*.js` in der ausgelieferten Seite muss dem in `frontend/dist`
 entsprechen. Die Ausgabe von `wrangler deploy` nennt außerdem den Cron
-(`schedule: */5 3-5 * * *`); ob er läuft, zeigt am Folgemorgen
+(`schedule: */5 0-2 * * *` und `*/5 3-4 * * *`); ob er läuft, zeigt am Folgemorgen
 `GET /api/sync/status` → `letzterAutomatischerLauf`.
 
 ## Als App installieren
