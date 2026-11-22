@@ -900,13 +900,13 @@ describe("cronSchritt", () => {
 		});
 
 		it("die Anzahl der Aufrufe kommt aus dem Ausdruck, nicht aus einer Zahl im Test", () => {
-			// `*/5 6-8` deckt die Stunden 6, 7 und 8 ab: zwoelf Aufrufe je
-			// Stunde, also 36. Genau diese Rechnung stand bis zur Stufe
+			// `*/5 0-2` deckt die Stunden 0, 1 und 2 ab: zwoelf Aufrufe je
+			// Stunde, also 36. Eine solche Rechnung stand bis zur Stufe
 			// "Refactoring" als Literal `24` in zwei Tests (10.1).
-			expect(cronFenster(CRON_PSN)).toEqual({ startStunde: 3, takt: 5, aufrufe: 36 });
-			expect(cronFenster(CRON_WARTUNG)).toEqual({ startStunde: 6, takt: 5, aufrufe: 36 });
-			expect(cronFenster("*/5 6-7 * * *").aufrufe).toBe(24);
-			expect(cronFenster("*/15 0-23 * * *").aufrufe).toBe(96);
+			expect(cronFenster(CRON_PSN)).toEqual({ startStunde: 0, endStunde: 2, takt: 5, aufrufe: 36 });
+			expect(cronFenster(CRON_WARTUNG)).toEqual({ startStunde: 3, endStunde: 4, takt: 5, aufrufe: 24 });
+			expect(cronFenster("*/5 6-7 * * *")).toEqual({ startStunde: 6, endStunde: 7, takt: 5, aufrufe: 24 });
+			expect(cronFenster("*/15 0-23 * * *")).toEqual({ startStunde: 0, endStunde: 23, takt: 15, aufrufe: 96 });
 			// Raten waere schlimmer als werfen: Eine falsche Zahl haelt sich
 			// jahrelang, ein Fehler faellt beim ersten Lauf auf.
 			expect(() => cronFenster("*/5 * * * *")).toThrow();

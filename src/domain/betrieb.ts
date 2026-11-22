@@ -15,6 +15,8 @@
  * (26 Stunden, 14 und 3 Tage) im Test genau zu treffen sind.
  */
 
+import { CRON_PSN, CRON_WARTUNG, cronFenster } from "./cron-fenster";
+
 /**
  * Was die Regeln vom Zugang brauchen - strukturell dasselbe wie
  * `CredentialAnzeige` (src/db/credentials.ts), ohne dass die Domain die
@@ -175,10 +177,15 @@ const HINWEIS_STUNDEN = 24;
 export const FENSTERREGEL_SCHARF = true;
 
 /**
- * Ende der beiden Cron-Fenster in UTC-Stunden (wrangler.jsonc: 3-5 und 6-8).
- * Markt- und Store-Action haben kein Fenster: Ihr Rest zaehlt ab ihrem Ausgang.
+ * Ende der beiden Cron-Fenster in UTC-Stunden: die Stunde nach der letzten
+ * des Ausdrucks, abgeleitet aus denselben Konstanten, mit denen der Worker
+ * seinen Bereich erkennt (seit 18r PSN bis 03:00, Wartung bis 05:00). Markt-
+ * und Store-Action haben kein Fenster: Ihr Rest zaehlt ab ihrem Ausgang.
  */
-const FENSTERENDE_STUNDE: Record<string, number> = { psn: 6, wartung: 9 };
+const FENSTERENDE_STUNDE: Record<"psn" | "wartung", number> = {
+	psn: cronFenster(CRON_PSN).endStunde + 1,
+	wartung: cronFenster(CRON_WARTUNG).endStunde + 1,
+};
 
 /**
  * Ein begonnener Lauf der Markt-Action ohne Ausgang, nach so vielen Stunden.

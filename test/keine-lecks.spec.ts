@@ -10,7 +10,7 @@ import { Geheimnis } from "../src/domain/secret";
 import { erstelleEbayClient } from "../src/ebay/client";
 import { erstelleIgdbClient } from "../src/igdb/client";
 import { erstellePsnClient } from "../src/psn/client";
-import { CRON_WARTUNG } from "../src/sync/cron";
+import { CRON_PSN, CRON_WARTUNG } from "../src/sync/cron";
 import { spielRoh } from "./igdb-fake";
 import { TOKEN_ANTWORT, fakeFetch, jsonAntwort, redirectAntwort, trophySeite } from "./psn-fake";
 
@@ -479,7 +479,7 @@ describe("Dichtheitsprüfung", () => {
 		// Token, dann PSN und IGDB, die Markierungen im Fehlertext zurueckwerfen.
 		await createRepositories(env.DB, env.NPSSO_KEY).credentials.npssoSpeichern(new Geheimnis(MARKIERUNGEN.npsso));
 		const ctx = createExecutionContext();
-		const ereignis = { scheduledTime: Date.now(), cron: "*/5 3-5 * * *", noRetry() {} };
+		const ereignis = { scheduledTime: Date.now(), cron: CRON_PSN, noRetry() {} };
 
 		const gut = createScheduled(psnMarkiert, () => igdbMarkiert());
 		for (let i = 0; i < 6; i++) await gut(ereignis, env, ctx);

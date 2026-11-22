@@ -24,21 +24,22 @@
 	 *
 	 * Seit Stufe 18e sind es zwei Fenster von fuenf erlaubten Eintraegen:
 	 *
-	 * 1. 03:00-05:59 UTC (05-08 Uhr MESZ), 36 Aufrufe - alles, was PSN
+	 * 1. 00:00-02:59 UTC (01-04 Uhr MEZ, 02-05 Uhr MESZ), 36 Aufrufe - alles, was PSN
 	 *    anfasst: Sync (rund elf Aufrufe), Spielzeit (zwei), Kaufliste
 	 *    (fuenfzehn, woechentlich). Zusammen 28 an einer Kaufliste-Nacht.
-	 * 2. 06:00-08:59 UTC (08-11 Uhr MESZ), 36 Aufrufe - die Wartung:
+	 * 2. 03:00-04:59 UTC (04-06 Uhr MEZ, 05-07 Uhr MESZ), 24 Aufrufe - die Wartung:
 	 *    erschienene Titel freigeben, IGDB-Auffrischen (nach einem Rueckstand
 	 *    bis zu acht Aufrufe), Disc-Fassungen, alte Rohantworten loeschen.
 	 *
 	 * Vorher lag beides in einem Fenster, und die Rechnung ging nicht mehr
 	 * auf: 37 Aufrufe Bedarf gegen 36 Slots (Messung vom 24.09.2026, 10.1).
-	 * Die Ausdruecke stehen zusaetzlich als Konstanten in src/sync/cron.ts -
+	 * Seit 18r (Entscheidung vom 22.11.2026) ist die Nacht um 05:00 UTC zu Ende.
+	 * Die Ausdruecke stehen zusaetzlich als Konstanten in src/domain/cron-fenster.ts -
 	 * der Worker leitet daraus ab, welche Haelfte er tun soll; ein Test haelt
 	 * beide Seiten zusammen.
 	 */
 	"triggers": {
-		"crons": ["*/5 3-5 * * *", "*/5 6-8 * * *"]
+		"crons": ["*/5 0-2 * * *", "*/5 3-4 * * *"]
 	},
 	"upload_source_maps": true,
 	/**

@@ -261,11 +261,24 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 			expect(urteile(ruhig())).toEqual([]);
 		});
 
-		it("meldet einen Rest im Fenster erst nach Fensterschluss", () => {
-			const stand = { ...ruhig().stand, psn: { am: "2026-10-18 05:55", getan: "store", meldung: false, offen: 7 } };
-			expect(fensterOffen(stand, new Date("2026-10-18T05:58:00Z"))).toEqual([]);
-			const w = fensterOffen(stand, JETZT);
-			expect(w.map((x) => x.text)).toEqual(["Store-Preise: 7 Einträge blieben bei Fensterschluss offen."]);
+		// Seit 18r schliesst das PSN-Fenster um 03:00 UTC und die Wartung um
+		// 05:00 UTC; beide Grenzen kommen aus den Cron-Ausdruecken. Je Fenster
+		// ein Rest, geprueft eine Minute vor und genau zum Schluss - vorher
+		// lagen die Grenzen bei 06:00 und 09:00, beide Zeitpunkte schwiegen.
+		it("meldet einen Rest im PSN-Fenster ab 03:00 UTC, nicht vorher", () => {
+			const stand = { ...ruhig().stand, psn: { am: "2026-10-18 02:55", getan: "besitz", meldung: false, offen: 7 } };
+			expect(fensterOffen(stand, new Date("2026-10-18T02:59:00Z"))).toEqual([]);
+			expect(fensterOffen(stand, new Date("2026-10-18T03:00:00Z")).map((x) => x.text)).toEqual([
+				"Kaufliste: 7 Einträge blieben bei Fensterschluss offen.",
+			]);
+		});
+
+		it("meldet einen Rest im Wartungsfenster ab 05:00 UTC, nicht vorher", () => {
+			const stand = { ...ruhig().stand, wartung: { am: "2026-10-18 04:55", getan: "igdb_auffrischen", meldung: false, offen: 3 } };
+			expect(fensterOffen(stand, new Date("2026-10-18T04:59:00Z"))).toEqual([]);
+			expect(fensterOffen(stand, new Date("2026-10-18T05:00:00Z")).map((x) => x.text)).toEqual([
+				"IGDB-Auffrischen: 3 Einträge blieben bei Fensterschluss offen.",
+			]);
 		});
 
 		it("meldet einen Rest der Markt-Action gleich nach ihrem Ausgang", () => {
