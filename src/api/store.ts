@@ -171,8 +171,8 @@ export const storeRoutes = new Hono<AppEnv>()
 	 * `store_geprueft` haelt den letzten Lauf fest, nach dem der Store auf dem
 	 * Stand war: einer, der etwas geprueft hat, ODER einer ohne Meldung, nach
 	 * dem nichts faellig ist. Das zweite liest die Route selbst. Ohne es
-	 * meldete die Warnung jeden Abend nach einem Probelauf am Nachmittag: Er
-	 * stempelt alles, die Laeufe am Abend finden nichts, und der naechste
+	 * meldete die Warnung nach jedem Probelauf am Vormittag: Er
+	 * stempelt alles, die geplanten Laeufe finden nichts, und der naechste
 	 * pruefende kommt erst nach ueber 30 Stunden (Entscheidung vom 22.10.2026).
 	 */
 	.post("/store/ausgang", async (c) => {

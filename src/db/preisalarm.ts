@@ -275,7 +275,7 @@ export class PreisalarmRepository {
 	 * Den Haken zuruecknehmen. Nur, wenn zu Release und Kanal inzwischen keine
 	 * andere offen ist - der eindeutige Teilindex liesse das UPDATE sonst
 	 * scheitern, und die neuere Meldung traegt ohnehin den aktuelleren Preis.
-	 * Ist der Preis inzwischen ein anderer, korrigiert das der naechste Abendlauf.
+	 * Ist der Preis inzwischen ein anderer, korrigiert das der naechste Preislauf.
 	 */
 	async zuruecknehmen(id: number): Promise<boolean> {
 		const r = await this.db

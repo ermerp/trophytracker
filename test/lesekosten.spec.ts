@@ -1230,7 +1230,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	});
 
 	it("misst die Routen der Store-Action als Route, mit Arbeit und im Leerlauf (Stufe 20j)", async () => {
-		// Die Lage holt die Action zweimal je Abend (Lauf und Rueckfall), den
+		// Die Lage holt die Action zweimal je Tag (Lauf und Rueckfall), den
 		// Ausgang ebenso; die Schreibroute laeuft je Portion - bei 79 Faelligen
 		// acht Mal. Der Rueckfall findet nichts: Er ist der Leerlauf.
 		await env.DB.batch([
@@ -1818,7 +1818,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Der Stand in einem Jahr, grosszuegig: 60 offene Wuensche (heute 60)
 		// mit je drei Reihen zu 120 Punkten, dazu 200 quittierte Meldungen und
 		// fuenf offene. Die Schreibrouten laufen je Portion - bei 431 Faelligen
-		// rund 87-mal je Abend; die Glocke bei jedem Oeffnen des Dashboards.
+		// rund 87-mal je Tag; die Glocke bei jedem Oeffnen des Dashboards.
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM plan_entry"),
 			env.DB.prepare("DELETE FROM price_snapshot"),

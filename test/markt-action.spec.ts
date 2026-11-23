@@ -20,8 +20,8 @@ describe("Markt-Action (Stufe 20i)", () => {
 		expect(workflow).not.toMatch(/pull_request/);
 	});
 
-	it("laeuft um 20:17 mit Rueckfall um 22:17 UTC (Nachtrag 20i-c, Entscheidung vom 22.10.2026)", () => {
-		expect([...workflow.matchAll(/cron: "([^"]+)"/g)].map((m) => m[1])).toEqual(["17 20 * * *", "17 22 * * *"]);
+	it("laeuft um 13:17 mit Rueckfall um 15:17 UTC (Nachtrag 18r-b, Entscheidung vom 22.11.2026)", () => {
+		expect([...workflow.matchAll(/cron: "([^"]+)"/g)].map((m) => m[1])).toEqual(["17 13 * * *", "17 15 * * *"]);
 	});
 
 	it("gibt dem Token nur Leserechte am Repository", () => {

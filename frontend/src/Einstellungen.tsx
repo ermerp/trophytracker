@@ -792,7 +792,7 @@ export function Einstellungen() {
         {ortsstunde(0)} und {ortsstunde(3)} Uhr (00:00–02:59 UTC) alles, was PlayStation anspricht: Trophäen,
         Spielzeiten und einmal wöchentlich die Kaufliste. Zwischen {ortsstunde(3)} und {ortsstunde(5)} Uhr
         (03:00–04:59 UTC) die Wartung – erschienene Titel freigeben, IGDB-Metadaten und Disc-Fassungen
-        auffrischen, alte PSN-Rohantworten wegräumen. Gebraucht- und Store-Preise holen abends zwei GitHub
+        auffrischen, alte PSN-Rohantworten wegräumen. Gebraucht- und Store-Preise holen nachmittags zwei GitHub
         Actions, unten bei ihren Abschnitten.
       </p>
       <p>
@@ -832,7 +832,7 @@ export function Einstellungen() {
         entscheidest weiter nur du.
       </p>
       <p className="zeile">
-        Die Preise holt jeden Abend um {ortszeit(20, 17)} Uhr (20:17 UTC) eine GitHub Action, alle fälligen Releases in einem Lauf.
+        Die Preise holt jeden Nachmittag um {ortszeit(13, 17)} Uhr (13:17 UTC) eine GitHub Action, alle fälligen Releases in einem Lauf.
         Von Hand starten:{' '}
         <a href="https://github.com/ermerp/trophytracker/actions/workflows/markt.yml" target="_blank" rel="noreferrer noopener">
           Gebrauchtpreise in GitHub Actions
@@ -853,7 +853,7 @@ export function Einstellungen() {
         braucht es nicht.
       </p>
       <p className="zeile">
-        Die Preise holt jeden Abend um {ortszeit(20, 47)} Uhr (20:47 UTC) eine GitHub Action, alle fälligen Releases in einem Lauf.
+        Die Preise holt jeden Nachmittag um {ortszeit(13, 47)} Uhr (13:47 UTC) eine GitHub Action, alle fälligen Releases in einem Lauf.
         Von Hand starten:{' '}
         <a href="https://github.com/ermerp/trophytracker/actions/workflows/store.yml" target="_blank" rel="noreferrer noopener">
           Store-Preise in GitHub Actions
@@ -944,7 +944,7 @@ export function Einstellungen() {
  * einem Cross-Gen-Titel also für beide Fassungen auf einmal.
  *
  * Gespeichert wird und der Preis kommt im selben Aufruf: Ohne das stünde die
- * Zeile bis zum nächsten Abendlauf stumm da, weil die Tagesfrist greift.
+ * Zeile bis zum nächsten Preislauf stumm da, weil die Tagesfrist greift.
  */
 function StoreNachpflege({
   eintraege,

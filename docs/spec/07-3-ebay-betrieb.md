@@ -3,17 +3,20 @@
 ### 7.3 Umfang, Takt und Betrieb der Gebrauchtpreise
 
 **Der Schritt läuft als GitHub Action** (`.github/workflows/markt.yml`, Stufe 20i), seit Nachtrag
-20i-c (23.10.2026) täglich um **20:17 UTC** mit **Rückfall um 22:17 UTC** (Entscheidung vom
-22.10.2026, [16.2](16-2-cpu-und-betrieb.md)), dazu von Hand über `workflow_dispatch`; der Knopf in den
-Einstellungen ist entfallen. Bis dahin lief er um 02:17 mit Rückfall 08:17 (20i, 20i-b). **GitHub
+18r-b (23.11.2026) täglich um **13:17 UTC** mit **Rückfall um 15:17 UTC** (Entscheidung vom
+22.11.2026, [Betriebswarnungen](16-2-betriebswarnungen.md)), dazu von Hand über `workflow_dispatch`;
+der Knopf in den Einstellungen ist entfallen. Der Lauf sieht damit den Sync desselben Tages. Vorher
+lief er um 02:17 mit Rückfall 08:17 (20i, 20i-b) und seit 20i-c (23.10.2026) um 20:17 / 22:17 –
+verspätet fiel das ins PSN-Fenster. **GitHub
 verschiebt den Start regelmäßig, und Haupt- und Rückfalllauf um denselben Betrag:** 02:17 kam am
 20.10.2026 um 07:31 (5 h 14 min), am 21.10. um 07:37 (5 h 20 min), am 22.10. um 07:33 (5 h 16 min),
 am 23.10. um 07:30 (5 h 13 min), der Rückfall 08:17 am 21.10. und am 22.10. jeweils um 13:47
-(5 h 30 min); die Store-Action am Abend des 22.10. 2 h 49 und 2 h 11 (7.4). Der Rückfall fängt also
+(5 h 30 min); die Store-Action am Abend des 22.10. 2 h 49 und 2 h 11 (7.4); die Abendläufe 20:17 bis
+**6 h 38** ([16-2-naechte-3.md](16-2-naechte-3.md)). Am Nachmittag ist die Verspätung nicht gemessen. Der Rückfall fängt also
 keine Verspätung auf, nur einen ausgefallenen Lauf; wer einen Zeitplan setzt, rechnet mit dem
 verspäteten Start. Der Rückfall prüft dank der Frist nur, was der erste nicht geschafft hat; zwei
 Läufe zugleich stellt die `concurrency`-Gruppe hintereinander. Still gilt die Action wie der Store
-erst nach **30 h** (24 h plus 5 h 30, aufgerundet; [Betriebswarnungen](16-2-betriebswarnungen.md)).
+erst nach **30 h** (24 h plus 5 h 30, aufgerundet; nachgerechnet in den [Betriebswarnungen](16-2-betriebswarnungen.md)).
 Bis 20i lief er im Wartungsfenster des Cron, zwanzig Releases je Aufruf; dort blieb **kein einzelnes
 Release unter 10 ms CPU**, und 431 Aufrufe passten in keinen Takt (Gesamtrechnung in
 [16.2](16-2-cpu-und-betrieb.md)).

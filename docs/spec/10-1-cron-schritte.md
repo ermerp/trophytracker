@@ -73,7 +73,7 @@ Schreib-Batch").
    PSN-Leerlauf erneuerte das Token bei Sony und schrieb es zurück – rund zwanzigmal je Nacht, drei
    D1-Aufrufe und eine Anfrage an eine inoffizielle Schnittstelle, die nichts holte (gefunden in der
    Messung 18h).
-8. **Entfallen seit Stufe 20j:** Die Store-Preise laufen als GitHub Action am Vorabend (7.4); das
+8. **Entfallen seit Stufe 20j:** Die Store-Preise laufen als GitHub Action am Nachmittag (7.4); das
    PSN-Fenster liest ihre Auswahl nicht mehr. Bis dahin stand der Schritt hier, außerhalb der
    Zugangsprüfung, zehn Releases je Aufruf, und kostete 29–103 ms CPU je Aufruf (16.2); die Auswahl
    las im Leerlauf in der Produktion 192 Zeilen, 36-mal je Nacht.

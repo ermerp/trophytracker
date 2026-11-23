@@ -38,12 +38,12 @@ function ruhig(ueber: Partial<BetriebFakten> = {}): BetriebFakten {
 			psn: { am: "2026-10-18 05:55", getan: "store", meldung: false, offen: 0 },
 			wartung: { am: "2026-10-18 08:56", getan: "nichts", meldung: false },
 			// Seit 20i laeuft der Markt als Action, mit eigenem Bereich.
-			markt_begonnen: { am: "2026-10-18 02:20", getan: "markt", meldung: false },
-			markt: { am: "2026-10-18 02:26", getan: "markt", meldung: false, offen: 0 },
-			// Seit 20j auch der Store, am Vorabend.
-			store_begonnen: { am: "2026-10-17 20:50", getan: "store", meldung: false },
-			store: { am: "2026-10-17 20:52", getan: "store", meldung: false, offen: 0, geprueft: 79 },
-			store_geprueft: { am: "2026-10-17 20:52", getan: "store", meldung: false, offen: 0, geprueft: 79 },
+			markt_begonnen: { am: "2026-10-17 13:20", getan: "markt", meldung: false },
+			markt: { am: "2026-10-17 13:26", getan: "markt", meldung: false, offen: 0 },
+			// Seit 20j auch der Store; beide seit 18r-b am Nachmittag davor.
+			store_begonnen: { am: "2026-10-17 13:50", getan: "store", meldung: false },
+			store: { am: "2026-10-17 13:52", getan: "store", meldung: false, offen: 0, geprueft: 79 },
+			store_geprueft: { am: "2026-10-17 13:52", getan: "store", meldung: false, offen: 0, geprueft: 79 },
 		},
 		zugang: { ...ZUGANG, npssoHinterlegtAm: "2026-10-17 10:00:00" },
 		lebensdauerTage: 25,
@@ -66,7 +66,7 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 	describe("Automatik still", () => {
 		it("ist rot nach mehr als 26 Stunden ohne Ausgang, nicht schon bei 26", () => {
 			const stand = ruhig().stand;
-			const store = { ...stand.store!, am: "2026-10-18 20:52" };
+			const store = { ...stand.store!, am: "2026-10-18 13:52" };
 			const genau = ruhig({ jetzt: new Date("2026-10-19T10:56:00Z"), stand: { ...stand, psn: { ...stand.psn!, am: "2026-10-19 05:55" }, markt: { ...stand.markt!, am: "2026-10-19 02:26" }, store, store_geprueft: store } });
 			expect(arten(genau)).not.toContain("automatik_still:rot");
 			const drueber = ruhig({ jetzt: new Date("2026-10-19T10:57:00Z"), stand: { ...stand, psn: { ...stand.psn!, am: "2026-10-19 05:55" }, markt: { ...stand.markt!, am: "2026-10-19 02:26" }, store, store_geprueft: store } });
@@ -76,28 +76,28 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 		});
 
 		it("laesst der Store-Action 30 Stunden statt 26 - ihr Rueckfall liegt nur zwei Stunden nach dem Hauptlauf (20j)", () => {
-			// Puenktlicher Rueckfall um 22:47, der naechste Hauptlauf maximal
-			// verspaetet: 27 h 30 dazwischen - mit 26 waere das rot.
+			// Puenktlicher Rueckfall um 15:47, der naechste Hauptlauf maximal
+			// verspaetet (6 h 38, also 20:25): 28 h 38 dazwischen - mit 26 waere das rot.
 			const stand = ruhig().stand;
 			// PSN und Wartung sind am 19.10. in der Fixtur selbst alt - gezaehlt wird nur der Satz zum Store.
 			const store = (jetzt: string) =>
-				urteile(ruhig({ jetzt: new Date(jetzt), stand: { ...stand, store: { ...stand.store!, am: "2026-10-17 22:47" } } }))
+				urteile(ruhig({ jetzt: new Date(jetzt), stand: { ...stand, store: { ...stand.store!, am: "2026-10-17 15:47" } } }))
 					.filter((w) => w.art === "automatik_still" && w.text.startsWith("Die Store-Preis-Action"))
 					.map((w) => w.text);
-			expect(store("2026-10-19T02:17:00Z")).toEqual([]);
-			expect(store("2026-10-19T04:47:00Z")).toEqual([]);
-			expect(store("2026-10-19T04:48:00Z")).toEqual(["Die Store-Preis-Action ist seit 30 Stunden nicht gelaufen, zuletzt am 18.10. um 00:47."]);
+			expect(store("2026-10-18T20:25:00Z")).toEqual([]);
+			expect(store("2026-10-18T21:47:00Z")).toEqual([]);
+			expect(store("2026-10-18T21:48:00Z")).toEqual(["Die Store-Preis-Action ist seit 30 Stunden nicht gelaufen, zuletzt am 17.10. um 17:47."]);
 		});
 
 		it("laesst der Markt-Action ebenso 30 Stunden statt 26 (Nachtrag 20i-c)", () => {
 			const stand = ruhig().stand;
 			const markt = (jetzt: string) =>
-				urteile(ruhig({ jetzt: new Date(jetzt), stand: { ...stand, markt: { ...stand.markt!, am: "2026-10-17 22:17" } } }))
+				urteile(ruhig({ jetzt: new Date(jetzt), stand: { ...stand, markt: { ...stand.markt!, am: "2026-10-17 15:17" } } }))
 					.filter((w) => w.art === "automatik_still" && w.text.startsWith("Die Gebrauchtpreis-Action"))
 					.map((w) => w.text);
-			expect(markt("2026-10-19T01:47:00Z")).toEqual([]);
-			expect(markt("2026-10-19T04:17:00Z")).toEqual([]);
-			expect(markt("2026-10-19T04:18:00Z")).toEqual(["Die Gebrauchtpreis-Action ist seit 30 Stunden nicht gelaufen, zuletzt am 18.10. um 00:17."]);
+			expect(markt("2026-10-18T19:55:00Z")).toEqual([]);
+			expect(markt("2026-10-18T21:17:00Z")).toEqual([]);
+			expect(markt("2026-10-18T21:18:00Z")).toEqual(["Die Gebrauchtpreis-Action ist seit 30 Stunden nicht gelaufen, zuletzt am 17.10. um 17:17."]);
 		});
 
 		it("meldet einen fehlenden Bereich, und einen ganz fehlenden Stand nur einmal", () => {
@@ -338,8 +338,8 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 				]);
 			});
 
-			it("schweigt bei genau 30 Stunden - auch bei 27 h 30 zwischen puenktlichem Rueckfall und verspaetetem Hauptlauf", () => {
-				expect(arten(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 06:10", geprueft: 3 } }))).toEqual([]);
+			it("schweigt bei genau 30 Stunden - auch bei 28 h 38 zwischen puenktlichem Rueckfall und verspaetetem Hauptlauf", () => {
+				expect(arten(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 05:00", geprueft: 3 } }))).toEqual([]);
 				expect(arten(mit({ markt: leer, markt_geprueft: { ...leer, am: "2026-10-17 03:38", geprueft: 3 } }))).toEqual([]);
 			});
 
@@ -373,13 +373,13 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 	describe("Store-Action (Stufe 20j)", () => {
 		const mitStore = (stand: Partial<StandFakt>, jetzt = "2026-10-18T09:38:00Z") =>
 			ruhig({ jetzt: new Date(jetzt), stand: { ...ruhig().stand, ...stand } });
-		const leer = { am: "2026-10-17 22:50", getan: "store", meldung: false, offen: 0, geprueft: 0 };
+		const leer = { am: "2026-10-17 15:50", getan: "store", meldung: false, offen: 0, geprueft: 0 };
 
-		it("schweigt nach einem Probelauf am Nachmittag: die leeren Laeufe am Abend stempeln den Stand", () => {
-			// Probe 16:45, Abendlaeufe ohne Arbeit - die Route setzt store_geprueft,
-			// weil danach nichts faellig ist. Am naechsten Abend um 23:00 (gut 30 h
-			// nach der Probe) waere es sonst eine Warnung.
-			expect(arten(mitStore({ store: leer, store_geprueft: leer }, "2026-10-19T02:00:00Z"))).toEqual([]);
+		it("schweigt nach einem Probelauf am Vormittag: die leeren geplanten Laeufe stempeln den Stand", () => {
+			// Probe 09:45, geplante Laeufe ohne Arbeit - die Route setzt
+			// store_geprueft, weil danach nichts faellig ist. Am naechsten Tag ab
+			// 15:45 (30 h nach der Probe) waere es sonst eine Warnung.
+			expect(arten(mitStore({ store: leer, store_geprueft: leer }, "2026-10-18T19:00:00Z"))).toEqual([]);
 		});
 
 		it("meldet zur Kenntnis, wenn sie seit ueber 30 Stunden nicht auf dem Stand ist - nicht schon bei 30", () => {
@@ -408,10 +408,11 @@ describe("Betriebswarnungen (Stufe 18m)", () => {
 				expect(w[0].text).toBe("Die Store-Preis-Action läuft, aber ein Release wurde seit 42 Stunden nicht geprüft, zuletzt am 16.10. um 17:37.");
 			});
 
-			it("schweigt nach einem Probelauf am Nachmittag - auch wenn der naechste Lauf spaet kommt", () => {
-				// Probe 16:47, beide Abendlaeufe leer, naechster pruefender Lauf
-				// verspaetet um 02:17 uebermorgen: 33,5 Stunden.
-				expect(arten(kaputt("2026-10-16 16:47", "2026-10-18T02:16:00Z"))).toEqual([]);
+			it("schweigt nach einem Probelauf am Vormittag - auch wenn der naechste Lauf spaet kommt", () => {
+				// Probe 03:48, beide geplanten Laeufe leer (Frist 12 h), naechster
+				// pruefender Lauf verspaetet um 20:25 am Folgetag: gut 40,5 Stunden.
+				// Der Markt der Fixtur ist dann selbst alt - hier zaehlt der Store.
+				expect(arten(kaputt("2026-10-17 03:48", "2026-10-18T20:25:00Z"))).not.toContain("store_leer:kenntnis");
 			});
 
 			it("ueberlaesst einen gescheiterten Lauf der Meldung", () => {

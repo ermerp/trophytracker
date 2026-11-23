@@ -21,7 +21,7 @@ Die CPU der Route wird nach dem Deploy an `workersInvocationsAdaptive` gemessen.
 
 | Regel | Stufe |
 |---|---|
-| Ein Bereich – PSN oder Wartung – seit über **26 h** ohne vermerkten Ausgang, die Store-Action (20j) und die Markt-Action (seit 20i-c) seit über **30 h** (Normalabstand 24 h plus größte beobachtete Verspätung 5 h 30, Entscheidungen vom 22. und 23.10.2026 – ihr Rückfall liegt nur zwei Stunden nach dem Hauptlauf, 26 reichten nicht); fehlt der Stand ganz, eine Warnung | rot |
+| Ein Bereich – PSN oder Wartung – seit über **26 h** ohne vermerkten Ausgang, die Store-Action (20j) und die Markt-Action (seit 20i-c) seit über **30 h** (Normalabstand 24 h plus größte beobachtete Verspätung 5 h 30, Entscheidungen vom 22. und 23.10.2026 – ihr Rückfall liegt nur zwei Stunden nach dem Hauptlauf, 26 reichten nicht; nachgerechnet bei 18r-b, unten); fehlt der Stand ganz, eine Warnung | rot |
 | Zugang abgelaufen – **sofort**, unabhängig von der Zahl der Nächte; ein Sync, der daran scheitert, wird nicht zusätzlich gemeldet | rot |
 | Zugang endet in ≤ **3** / ≤ **14** Kalendertagen (Ortszeit) – das frühere von Sonys Ankündigung und „eingetragen + kürzeste gemessene Lebensdauer" (7.1) | rot / zur Kenntnis |
 | Nacht-Sync gescheitert, jünger als 24 h: **zwei aufeinanderfolgende UTC-Nächte** / eine | rot / zur Kenntnis |
@@ -29,8 +29,8 @@ Die CPU der Route wird nach dem Deploy an `workersInvocationsAdaptive` gemessen.
 | Kette ohne Ausgang, gemeldet in den letzten 24 h – und ein Lauf der Markt- oder Store-Action, der seit über einer Stunde begonnen ist und keinen Ausgang hat (20i, 20j) | zur Kenntnis |
 | Letzter Ausgang eines Bereichs mit Meldung, jünger als 24 h (außer dem schon gemeldeten Sync) | zur Kenntnis |
 | Kaufliste mit `fehlerAm` von heute oder gestern | zur Kenntnis |
-| Markt-Action: jüngster Ausgang ohne Meldung mit `geprueft = 0` **und** seit über **30 h** kein Lauf mit `geprueft > 0` (`markt_geprueft`, 20i-b; 26 h bis 20i-c) – ein einzelner leerer Lauf ist der normale Rückfall um 22:17; nach einem Tag müsste bei zwölf Stunden Frist alles fällig sein. Ein Ausgang ohne `geprueft` (vor 20i-b) schweigt | zur Kenntnis |
-| Store-Action (`store_leer`, 20j): dasselbe mit **30 h**; `store_geprueft` setzt **auch ein leerer Lauf ohne Meldung, nach dem nichts fällig ist** – das liest die Ausgangs-Route selbst. Sonst meldete die Warnung nach einem Probelauf am Nachmittag sicher: Er stempelt alles, beide Abendläufe finden nichts, der nächste prüfende kommt nach gut 33 h. **Sicherheitsnetz** (Rückfrage des Nutzers vom 22.10.2026): „nichts fällig" kommt aus derselben Auswahl wie die Lage – liefert sie durch einen Fehler immer 0, gälte jeder leere Lauf als auf dem Stand. Deshalb meldet `store_leer` auch, wenn der **älteste Prüfstempel** der Ziele älter als **42 h** ist (12 h Frist + 30 h: seit über 30 h fällig und nicht geprüft) – aus einer eigenen Abfrage ohne gemeinsamen Text mit der Auswahl (`AELTESTER_STEMPEL`: offene Absichten ohne gekaufte Berechtigung, ohne Stempel ab dem Anlegen der Absicht; die `nein`-Releases ohne Absicht deckt sie nicht ab). 30 h auf den Stempel selbst hätten nach dem Probelauf angeschlagen (33,5 h). Defektprobe am 22.10.2026: Auswahl auf 0 gesetzt – die Warnung kommt; ohne das Netz bleibt sie aus | zur Kenntnis |
+| Markt-Action: jüngster Ausgang ohne Meldung mit `geprueft = 0` **und** seit über **30 h** kein Lauf mit `geprueft > 0` (`markt_geprueft`, 20i-b; 26 h bis 20i-c) – ein einzelner leerer Lauf ist der normale Rückfall um 15:17; nach einem Tag müsste bei zwölf Stunden Frist alles fällig sein. Ein Ausgang ohne `geprueft` (vor 20i-b) schweigt | zur Kenntnis |
+| Store-Action (`store_leer`, 20j): dasselbe mit **30 h**; `store_geprueft` setzt **auch ein leerer Lauf ohne Meldung, nach dem nichts fällig ist** – das liest die Ausgangs-Route selbst. Sonst meldete die Warnung nach einem Probelauf am Vormittag sicher: Er stempelt alles, beide geplanten Läufe finden nichts, der nächste prüfende kommt nach bis zu 40 h 38 (bis 18r-b, Probelauf am Nachmittag: gut 33 h). **Sicherheitsnetz** (Rückfrage des Nutzers vom 22.10.2026): „nichts fällig" kommt aus derselben Auswahl wie die Lage – liefert sie durch einen Fehler immer 0, gälte jeder leere Lauf als auf dem Stand. Deshalb meldet `store_leer` auch, wenn der **älteste Prüfstempel** der Ziele älter als **42 h** ist (12 h Frist + 30 h: seit über 30 h fällig und nicht geprüft) – aus einer eigenen Abfrage ohne gemeinsamen Text mit der Auswahl (`AELTESTER_STEMPEL`: offene Absichten ohne gekaufte Berechtigung, ohne Stempel ab dem Anlegen der Absicht; die `nein`-Releases ohne Absicht deckt sie nicht ab). 30 h auf den Stempel selbst hätten nach dem Probelauf angeschlagen (33,5 h). Defektprobe am 22.10.2026: Auswahl auf 0 gesetzt – die Warnung kommt; ohne das Netz bleibt sie aus | zur Kenntnis |
 | IGDB-Auffrischen hängt hinterher (`auffrischen_stau`, 18n): der älteste Auffrischstempel der verknüpften Spiele ist älter als **11 Tage** (Entscheidung des Nutzers vom 24.10.2026). Im Normalbetrieb ist er 7–8 Tage alt; ein voller Stau ist mit der Grenze ([10.1](10-1-cron-schritte.md) Schritt 12) knapp unter 10 Tagen abgebaut, mit einer ausgefallenen Nacht knapp unter 11 – erst zwei Ausfälle oder eine kaputte Grenze reichen darüber (ein Test hält die Summe für jede Bestandsgröße bis 3 000). Eigene Abfrage über den Teilindex aus Migration 0036 (`AELTESTER_AUFFRISCH_STEMPEL`), nicht die Auswahl des Schritts; Defektprobe am 24.10.2026: ohne den Index liest die Route 440 statt 11 Zeilen | zur Kenntnis |
 | Schritt nach Fensterschluss nicht fertig (`offen > 0`), bei Markt- und Store-Action nach ihrem Ausgang | zur Kenntnis, **scharf seit 20i** – bis dahin ruhte die Regel, weil die Wartung jede Nacht mit Rest schloss (`offen=18` am 18.10.) |
 
@@ -77,13 +77,28 @@ und Gründe in [10.1](10-1-cron.md).
   erste Gelegenheit um den 16.12. (18p-b).
 - **Fensterende:** `fenster_offen` leitet das Ende seit 18r aus den Cron-Ausdrücken ab
   (`src/domain/cron-fenster.ts`), vorher feste Stunden 6 und 9.
-- **Auswertung:** `scripts/nacht.mjs` zählt 00–05 UTC, Abend ab 18 UTC des Vortags; vollständig ab
+- **Auswertung:** `scripts/nacht.mjs` zählt 00–05 UTC, die Preisläufe seit 18r-b ab 13 UTC des Vortags (vorher Abend ab 18 UTC); vollständig ab
   05:00 UTC. **Der Index-Nachtrag** ist keine Bedingung: Er gehört vor „Cron je Minute"
   ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), und 18r braucht keinen schnelleren Takt.
 
-**Vorgemerkt als Nachtrag 18r-b (23.11.2026, eigener Tag):** Die Actions starten seit 20i-c um
-20:17 / 20:47 (Rückfall 22:17 / 22:47), von GitHub 3 bis 6 h 38 verspätet – also im neuen PSN-Fenster.
-Vom Nutzer am 22.11.2026 angenommen: Markt **13:17 / 15:17**, Store **13:47 / 15:47 UTC**. Dann trennt
-`d1AnalyticsAdaptiveGroups` je Stunde Abend und Nacht wieder, und der Markt sieht den Sync desselben
-Tages. Fristen (12 h) und Stillstand (30 h) vertragen den einmal kürzeren Abstand. **Offen:** die
-Verspätung um diese Uhrzeit ist nicht gemessen – erst ab rund 8 h 40 berührte ein Rückfall den Sync.
+#### Nachtrag 18r-b: die Actions am Nachmittag (gebaut und deployt am 23.11.2026)
+
+Vom Nutzer am 22.11.2026 angenommen: Markt **13:17 / 15:17**, Store **13:47 / 15:47 UTC**. Bis dahin
+(seit 20i-c) 20:17 / 20:47 mit Rückfall 22:17 / 22:47, von GitHub 3 bis 6 h 38 verspätet – also im
+neuen PSN-Fenster. Jetzt trennt `d1AnalyticsAdaptiveGroups` je Stunde Preisläufe und Nacht wieder, und
+der Markt sieht den Sync desselben Tages. Frist (12 h), Stillstand (30 h) und Alter des Store-Ziels
+(42 h) bleiben.
+
+- **Offen:** Die Verspätung um diese Uhrzeit ist nicht gemessen. Den Sync ab 00:00 UTC berührte der
+  Rückfall erst ab 8 h 43 (Markt) und 8 h 13 (Store).
+- **Nachgerechnet mit 6 h 38**, der größten gemessenen Verspätung: vom pünktlichen Rückfall zum
+  maximal verspäteten Hauptlauf 28 h 38 (unter 30 h); vom Probelauf um 03:47 zum nächsten prüfenden
+  Store-Lauf um 20:25 des Folgetags 40 h 38 (unter 42 h). **Nicht gedeckt, wie schon bei 20:17:** vom
+  pünktlichen Hauptlauf zum nächsten, maximal verspäteten sind es 30 h 38 – `markt_leer` schlüge bis
+  zu dessen Ende an, der Stillstand nur, wenn auch der Rückfall ausfiel. Dafür müsste die Verspätung
+  von Tag zu Tag um mehr als sechs Stunden schwanken; an den Abenden vom 15. bis 20.11.2026 waren es höchstens 2 h 58.
+  **Nicht gedeckt ist auch `markt_leer` nach einem Markt-Lauf von Hand** zwischen rund 03:17 und
+  13:17: Beide Läufe des Tages können leer bleiben, anders als beim Store zählt ein leerer nicht.
+- **Übergang:** Umgestellt am 23.11. vor den Abendläufen, beide Actions danach einmal von Hand gestartet
+  (Entscheidung des Nutzers vom 23.11.2026). Ohne den Handlauf lägen rund 37 h zwischen den Läufen, und
+  die 30 h Stillstand rissen. Startet GitHub am selben Abend doch noch einen alten Lauf, ist er leer (12 h Frist).

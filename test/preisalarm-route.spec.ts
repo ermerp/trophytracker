@@ -12,7 +12,7 @@ import { zaehlendeDb } from "./d1-zaehler";
 
 /**
  * Preisalarm (Stufe 20g) gegen die lokale D1: die Meldungen aus den Preis-
- * Routen der Abendlaeufe, Verwerfen und Ruecknahme, die Glocke und die
+ * Routen der Preislaeufe, Verwerfen und Ruecknahme, die Glocke und die
  * Grenze am Release. Die Regeln selbst prueft `preisalarm.spec.ts` ohne D1.
  */
 
@@ -110,7 +110,7 @@ describe("Preisalarm in der Markt-Route", () => {
 		expect(await (await hole("/api/preisalarme")).json()).toEqual({ alarme: [] });
 	});
 
-	it("kommt der Preis einen Abend spaeter wieder, steht die Meldung wieder da", async () => {
+	it("kommt der Preis einen Lauf spaeter wieder, steht die Meldung wieder da", async () => {
 		await release(1);
 		await punkte(1, "markt", [[40, 1000], [20, 1000]]);
 		await sende("/api/sync/markt/ergebnisse", { ergebnisse: [ergebnis(1, 850)] });

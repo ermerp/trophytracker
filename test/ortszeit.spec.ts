@@ -29,13 +29,13 @@ describe("Ortszeit der Automatik", () => {
 		expect(ortsstunde(0, new Date("2026-10-25T12:00:00Z"), BERLIN)).toBe("2");
 	});
 
-	it("nennt die Abendlaeufe mit Minuten", () => {
-		expect(ortszeit(20, 17, sommer, BERLIN)).toBe("22:17");
-		expect(ortszeit(20, 47, winter, BERLIN)).toBe("21:47");
+	it("nennt die Preislaeufe mit Minuten", () => {
+		expect(ortszeit(13, 17, sommer, BERLIN)).toBe("15:17");
+		expect(ortszeit(13, 47, winter, BERLIN)).toBe("14:47");
 	});
 
 	it("folgt der Zeitzone des Geraets, nicht Berlin", () => {
 		expect(ortsstunde(3, winter, "UTC")).toBe("3");
-		expect(ortszeit(20, 17, winter, "America/New_York")).toBe("15:17");
+		expect(ortszeit(13, 17, winter, "America/New_York")).toBe("08:17");
 	});
 });

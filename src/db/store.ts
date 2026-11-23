@@ -66,7 +66,7 @@ const FAELLIG_VON =
  * dem Stand". Diese Abfrage teilt keinen Text mit der Auswahl; sie nimmt
  * die offenen Absichten ohne gekaufte Berechtigung, also den Kern des
  * Zuschnitts. Ein Ziel ohne Stempel zaehlt ab dem Anlegen der Absicht,
- * sonst warnte jeder neue Wunsch bis zum naechsten Abend. Die
+ * sonst warnte jeder neue Wunsch bis zum naechsten Lauf. Die
  * `nein`-Releases ohne Absicht deckt das Netz nicht ab (heute keine, 7.4).
  */
 const AELTESTER_STEMPEL =
