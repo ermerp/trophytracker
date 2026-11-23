@@ -102,3 +102,5 @@ der Markt sieht den Sync desselben Tages. Frist (12 h), Stillstand (30 h) und Al
 - **Übergang:** Umgestellt am 23.11. vor den Abendläufen, beide Actions danach einmal von Hand gestartet
   (Entscheidung des Nutzers vom 23.11.2026). Ohne den Handlauf lägen rund 37 h zwischen den Läufen, und
   die 30 h Stillstand rissen. Startet GitHub am selben Abend doch noch einen alten Lauf, ist er leer (12 h Frist).
+  Handläufe am 23.11.: Markt 15:44–15:53 UTC (431 geprüft in 87 Portionen, 507 s, 0 offen), Store
+  15:44–15:45 (79 geprüft, 62 s, 0 offen).

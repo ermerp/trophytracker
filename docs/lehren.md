@@ -152,7 +152,7 @@ Refresh-Token vor seiner Frist fiel, ist es nicht. Naheliegend, aber unbelegt:
 ein Hängen an der NPSSO-Sitzung, aus der er stammt. Der Cron hat sich dabei genau
 wie entworfen verhalten – ein Versuch, dann 35 stille Aufrufe.
 
-**09.10.2026 – die Fixpunkt-Vermutung zum Refresh-Token ist widerlegt.** Am 01.10.2026 stand
+**09.10.2026 – die Fixpunkt-Vermutung zum Refresh-Token galt als widerlegt (am 23.11. zurückgenommen, unten).** Am 01.10.2026 stand
 `refresh_expires_at` auf dem 09.10., exakt zehn Tage nach der NPSSO-Eintragung, und zwei Nachtläufe
 schienen den Zeitpunkt nicht zu bewegen. Daraus entstand die Vermutung, Sonys
 `refresh_token_expires_in` zähle auf einen **festen Punkt** herunter – mit der prüfbaren Vorhersage,
@@ -163,6 +163,16 @@ ab der Eintragung. Kein Rückfall, keine neue Kette, `ausgang = 'offen'` unverä
 Dass die Vermutung sich überhaupt prüfen ließ, liegt daran, dass sie **als Vermutung mit Datum und
 Vorhersage** aufgeschrieben war. Wäre sie als Tatsache in den Abschnitt gewandert, stünde dort heute
 eine falsche Erklärung – und niemand hätte am 09.10. nachgesehen.
+
+**23.11.2026 – die Widerlegung stützte sich auf eine Spalte, die den Gegenfall nicht zeigen kann.**
+„Kein Rückfall, `ausgang = 'offen'` unverändert" belegt nichts: Der Rückfall auf das NPSSO schreibt nicht
+nach `psn_zugang`. Das Ablaufdatum steht auf dem 30.11. 03:00:40, zehn Tage nach dem Lauf vom 20.11.,
+obwohl danach drei Nächte liefen. Die Fixpunkt-Vermutung ist wieder offen (7.1).
+
+**23.11.2026 – „nicht heute mergen" war zu vorsichtig.** Empfohlen war, 18r-b bis zum 24.11. liegen zu
+lassen, weil sonst die 30 h Stillstand rissen. Auf Nachfrage des Nutzers zeigte sich: Es drohte nur
+ein Fehlalarm, kein Datenverlust, und je ein Handlauf der Actions vermied ihn. Die Folge einer Verletzung
+gehört vor der Empfehlung benannt, nicht erst auf Rückfrage.
 
 **27.09.2026 – die Egress-Vermutung ist widerlegt.** Der Ausfall der Kaufliste
 in 18c war mit „Cloudflares Egress gegen `web.np.playstation.com`" erklärt
