@@ -33,7 +33,7 @@ finalen Stufe 1 tragen 113 der 157 offenen Releases den Befund „eBay kennt kei
    09.10. unter 15 €, eine globale Vorbelegung löste sofort 29 Meldungen aus. Gemessen wird am
    tiefsten aktuellen Preis des Kanals. **Sie meldet beim Unterschreiten** und wird erst wieder
    scharf, wenn der Preis über die Grenze zurückgeht – oder die Grenze neu gesetzt wird
-   (`preis_grenze_am`). **Eine neue Grenze über dem aktuellen Preis meldet beim nächsten Abendlauf**
+   (`preis_grenze_am`). **Eine neue Grenze über dem aktuellen Preis meldet beim nächsten Preislauf**
    (Entscheidung vom 30.10.2026); das Feld sagt dann gleich „liegt schon darunter".
 2. **Allzeittief**, je Reihe gerechnet – Händler und Markt werden nie verrechnet (Abschnitt 6):
    **Mindesthistorie 30 Tage** seit dem ersten Punkt der Reihe, **mindestens 3 Punkte** mit dem
@@ -69,7 +69,7 @@ sind Nutzerdaten und steht nicht hier.
 
 **Im Preisschritt selbst**, nicht als eigener Cron-Schritt: Er ist der einzige Zeitpunkt, an dem
 sich etwas ändern kann, und „die Nebenwirkung gehört an den Schritt". Seit 20i und 20j sind das die
-Portionsrouten der Abendläufe (`POST /api/sync/markt/ergebnisse`, `/store/ergebnisse`), nicht die
+Portionsrouten der Preisläufe (`POST /api/sync/markt/ergebnisse`, `/store/ergebnisse`), nicht die
 Nachtfenster. Der Lese-Batch liest dazu die Lage der Releases mit offener Absicht (drei Anweisungen,
 `PreisalarmRepository.lageAnweisungen`), `alarmPruefen` entscheidet, und höchstens eine Anweisung je
 Release kommt **ans Ende** desselben Schreib-Batches. Sie scheitert nicht (`INSERT OR IGNORE`, UPDATE
@@ -77,7 +77,7 @@ mit Bedingung); täte sie es doch, bleibt die Portion fällig wie bei jedem ande
 
 **Portion:** Mit der Meldung sind es beim Markt bis zu acht Anweisungen je Release, sechs Releases
 wären 52 gewesen. **`MARKT_JE_POST` ist seit 20g 5** (5 × 8 + 4 = 44), rund 87 statt 72 Portionen je
-Abend. Beim Store bleiben es 10 (10 × 4 + 4 = 44).
+Tag. Beim Store bleiben es 10 (10 × 4 + 4 = 44).
 
 **Lesekosten** (`test/lesekosten.spec.ts`, Bestand von einem Jahr: 60 Absichten mit je drei Reihen zu
 120 Punkten, gemessen am 30.10.2026, Ausgang gegen `main` im eigenen Worktree): Markt-Portion mit
@@ -102,12 +102,12 @@ tiefsten Preis des Kanals** (Entscheidung vom 06.11.2026, „wenn weg, dann weg"
 - **Gleicher Preis, anderes Angebot:** Die Meldung bleibt und bekommt die Angebots-Id, denn das
   Verwerfen (20h) trifft sie darüber.
 - **Kommt der Preis wieder, meldet er neu** (Entscheidung vom 06.11.2026): Das Entfallen hat keine
-  Karenz, ein Angebot, das eBay einen Abend nicht liefert, nimmt die Meldung mit. Sieht ein späterer
+  Karenz, ein Angebot, das eBay in einem Lauf nicht liefert, nimmt die Meldung mit. Sieht ein späterer
   Lauf denselben oder einen tieferen Preis – eine Grenz-Meldung: wieder unter der Grenze –, entsteht
   eine neue mit Art und Vergleichswert der alten; der Auslöser allein sähe das nie, der Punkt steht
   schon in der Reihe. **Nicht** nach einem Haken und **nicht** nach dem Verwerfen: Maßgeblich ist die
   jüngste Meldung des Kanals, ist sie quittiert oder ihr Angebot gesperrt, gibt es kein Wiederkommen; ein anderes Angebot zum selben Preis ist nach dem Verwerfen trotzdem ein neues Tief, weil das verworfene nicht zur Reihe zählt. Ein Angebot,
-  das jeden zweiten Abend fehlt, meldet deshalb jedes Mal neu; die Meldungen von vor dem 06.11. folgen
+  das jeden zweiten Lauf fehlt, meldet deshalb jedes Mal neu; die Meldungen von vor dem 06.11. folgen
   ab dem ersten Abendlauf danach.
 
 - **Quittiert wird über den Haken** (Entscheidung vom 30.10.2026). Der Titel führt ins Spieldetail,
@@ -120,7 +120,7 @@ tiefsten Preis des Kanals** (Entscheidung vom 06.11.2026, „wenn weg, dann weg"
   Länge eines Store-Sales: 31 von 31 abgeschlossenen am 06.11.2026 lagen bei 14 oder 15 Tagen, alle
   aus den ersten fünf Wochen der Reihen, Sales wie um Weihnachten sind nicht dabei. Die Zeile zählt
   nicht an der Glocke und geht von selbst. Gibt es eine neuere offene Meldung, antwortet die Route
-  `409`. Den Preis korrigiert der nächste Abendlauf: Ist der Sale vorbei, entfällt die Meldung wieder.
+  `409`. Den Preis korrigiert der nächste Preislauf: Ist der Sale vorbei, entfällt die Meldung wieder.
 - **Stammt die Meldung aus einem später verworfenen Angebot (20h), entfällt sie** (`entfallen_am`).
   Der danach tiefste Punkt löst keine neue aus – er stand schon da. **Die Rücknahme des Verwerfens
   stellt sie wieder her**, wenn zu Release und Kanal inzwischen keine andere offen ist.

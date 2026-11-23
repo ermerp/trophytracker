@@ -9,7 +9,7 @@ bis dahin einen). Der Free Tier erlaubt fünf je Konto – gegen Cloudflares Dok
 | Eintrag | Ausdruck | Aufrufe | Arbeit |
 |---|---|---|---|
 | PSN | `*/5 0-2 * * *` | 36 (01–04 Uhr MEZ, 02–05 MESZ) | Hänger abbrechen, Sync-Schritt, Spielzeit, Kaufliste, Einzeltrophäen, Level (Store-Preise seit 20j als Action, 7.4) |
-| Wartung | `*/5 3-4 * * *` | 24 (04–06 Uhr MEZ, 05–07 MESZ) | erschienene Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, Trophäen je Jahr, alte Rohantworten – die **Gebrauchtpreise** laufen seit Stufe 20i als GitHub Action um 20:17 UTC (7.3) |
+| Wartung | `*/5 3-4 * * *` | 24 (04–06 Uhr MEZ, 05–07 MESZ) | erschienene Titel freigeben, IGDB-Auffrischen, Disc-Fassungen, Trophäen je Jahr, alte Rohantworten – die **Gebrauchtpreise** laufen seit Stufe 20i als GitHub Action um 13:17 UTC (7.3) |
 
 **Seit Stufe 18r (22.11.2026) enden beide Fenster um 05:00 UTC** – Vorgabe des Nutzers vom 17.10.2026,
 damit die Nacht auch in der Sommerzeit vor 7 Uhr fertig ist; die Grenze gilt nur für den Cron, nicht

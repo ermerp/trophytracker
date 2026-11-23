@@ -15,7 +15,7 @@ unten ausdrücklich als offen.
 **Reihenfolge** (Entscheidung des Nutzers vom 20.10.2026): **20j – Store in eine GitHub Action**
 nach dem Muster von 20i (gebaut am 22.10.2026, [7.4](07-4-store-preise.md); der Store-Schritt im Worker geht erst nach einem fehlerfreien Probelauf über `workflow_dispatch` und spätestens um 20:30 UTC desselben Tages vom Netz, sonst eine Nacht später; [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)) →
 **der Markt auf 20:17 / 22:17** mit Schwelle 30 h für `markt_geprueft` und Stillstand (Nachtrag
-**20i-c**, gebaut am 23.10.2026, erste Abende 23.10.; Entscheidung vom 22.10.2026, eine Änderung je Nacht) →
+**20i-c**, gebaut am 23.10.2026, erste Abende 23.10., abgelöst durch 18r-b; Entscheidung vom 22.10.2026, eine Änderung je Nacht) →
 **20k – Spielerwertung** (gebaut am 22.10.2026, deployt am 24.10. nach der Nachtauswertung, weil sie das
 Auffrischen ändert, das das Wartungsfenster jede Nacht ruft; [5.2](05-1-favorit-und-sortierung.md),
 [7.5](07-5-kritikerwertungen.md); den Altbestand füllt „Auffrischen") → **18n – Obergrenze fürs
@@ -31,7 +31,7 @@ gegen die Zeilen entfällt vorerst → **18m-b** → **neu bewerten: Nachtläufe
 bis 05:00 UTC und Cron je Minute** – ohne Markt und Store werden beide Fenster fast leer.
 
 **20g vorgezogen** (Entscheidung des Nutzers vom 30.10.2026): 20g kommt **vor** Index-Nachtrag, 18m-b
-und die Neubewertung. Keiner davon ist Bedingung für 20g, und 20g rechnet in den Abendläufen
+und die Neubewertung. Keiner davon ist Bedingung für 20g, und 20g rechnet in den Preisläufen
 (Preisschritte als Action), nicht in den Nachtfenstern. Gebaut am 30.10.2026, deployt am 03.11.2026
 nach der Nachtauswertung ([16-2-preisalarm.md](16-2-preisalarm.md)).
 Gebaut sind 18k-b (Kaufliste gebündelt, CPU gemessen am 25.10.: Median 19 statt 35–108 ms), 20i (Markt als Action, erste
@@ -136,12 +136,12 @@ erklärt die Million also nicht; näher liegt die Messsitzung des 09.10. selbst,
 Tage Preisverlauf und alle Releases gelesen hat. Gehört einmal eigens angesehen, blockiert
 aber keine Teilstufe.
 
-#### Offen: die CPU-Grenze, Betriebswarnungen, Actions am Nachmittag (18r-b)
+#### Offen: die CPU-Grenze, Betriebswarnungen, Verspätung der Actions am Nachmittag (18r-b)
 
 Stehen in [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) (die Nachträge 18i bis 20i, Budget und
 Wege je Schritt), [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md) (die Messungen je Schritt) und
 [16-2-betriebswarnungen.md](16-2-betriebswarnungen.md) (Stufe 18m mit dem Nachtrag 18m-b, Stufe 18r –
-Nachtläufe bis 05:00 UTC, deployt am 22.11.2026 – und der vorgemerkte Nachtrag 18r-b für den 23.11.).
+Nachtläufe bis 05:00 UTC, deployt am 22.11.2026 – und der Nachtrag 18r-b, gebaut am 23.11.2026, Merge am 24.11. vormittags).
 
 **Die fünf finalen Stufen** – die Sammlung finalisieren, Oberfläche, Refactoring
 (abgetragen), Wiederherstellungsprobe, Außendarstellung – stehen in

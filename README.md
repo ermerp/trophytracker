@@ -240,7 +240,7 @@ will, braucht ein eigenes Cloudflare-Konto und ein eigenes NPSSO.
    `workflow_dispatch`, nie über `pull_request` oder `pull_request_target`** –
    die Secrets dürfen keinem fremden Code begegnen
    (`test/markt-action.spec.ts` hält das fest). Dasselbe gilt für `github-store`
-   und `.github/workflows/store.yml`, die Store-Preis-Action (20:47 / 22:47 UTC,
+   und `.github/workflows/store.yml`, die Store-Preis-Action (13:47 / 15:47 UTC,
    `test/store-action.spec.ts`).
 
    Die drei ablaufenden Werte sind der wahrscheinlichste Grund, aus dem die
@@ -357,7 +357,7 @@ und mit welchen Fristen, steht in [Abschnitt 10.1](docs/spec/10-1-cron.md).
 | PSN | `*/5 0-2 * * *` (00:00–02:55 UTC) | 36 | hängende Läufe abbrechen, Trophäen-Sync (ein Lauf je Nacht), Spielzeit, Kaufliste, Einzeltrophäen, Trophäen-Level |
 | Wartung | `*/5 3-4 * * *` (03:00–04:55 UTC) | 24 | erschienene Titel freigeben, IGDB auffrischen, Disc-Fassungen, Trophäen je Jahr, Rohantworten aufräumen |
 
-Gebraucht- und Store-Preise holen zwei GitHub Actions am Abend, nicht der Cron.
+Gebraucht- und Store-Preise holen zwei GitHub Actions am Nachmittag, nicht der Cron.
 
 **Nachsehen, ob die Nacht gelaufen ist:** Einstellungen → „Automatik". Dort
 stehen beide Fenster, der letzte automatische Abruf und der **Verlauf der letzten

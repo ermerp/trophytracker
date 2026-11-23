@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 186 | 24.11.2026 | **Nachtrag 18r-b: Preis-Actions am Nachmittag.** Markt 13:17 / 15:17, Store 13:47 / 15:47 UTC statt 20:17 / 22:17 und 20:47 / 22:47; Schwellen unverändert und mit 6 h 38 nachgerechnet, `nacht.mjs` zählt die Preisläufe ab 13 UTC des Vortags (7.3, 7.4, 16.2) |
 | 185 | 23.11.2026 | **Nachtrag: Nacht zum 23.11.** Erste mit 18r: 60 Aufrufe `ok`, Sync `erfolg` 00:50, Wartung fertig 03:00, Spielzeit-Spitze 28 ms (16.2); „Refresh-Token rollt“ zurückgenommen und als offen markiert, weil das Ablaufdatum seit dem 20.11. auf dem 30.11. steht – Urteil über das NPSSO-Ende erst nach der Nacht zum 01.12. (7.1) |
 | 184 | 22.11.2026 | **Abschluss 22.11.:** Verweis in 16.2 auf den Stand nach 18r (gebaut, deployt) und 18r-b (vorgemerkt für den 23.11.) (16.2) |
 | 183 | 22.11.2026 | **Stufe 18r: Nachtläufe bis 05:00 UTC.** PSN `*/5 0-2` (36 Aufrufe), Wartung `*/5 3-4` (24) statt 03–09 UTC; Fensterende von `fenster_offen` aus den Ausdrücken abgeleitet (`src/domain/cron-fenster.ts`); `nacht.mjs` zählt 00–05 UTC; Actions-Verlegung als 18r-b am 23.11. vorgemerkt (10.1, 16.2) |
