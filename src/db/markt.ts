@@ -33,7 +33,7 @@ import type { PreisalarmRepository } from "./preisalarm";
  * gestartet; mit den 20 Stunden aus 20i waere am naechsten Morgen um 02:17
  * nichts faellig gewesen, und ein Tag Preispunkte waere still ausgefallen.
  * Zwoelf Stunden machen nach jedem Lauf des Vortags alles faellig, und der
- * Rueckfall (seit 20i-c um 22:17, .github/workflows/markt.yml) findet nach einem
+ * Rueckfall (seit 18r-b um 15:17, .github/workflows/markt.yml) findet nach einem
  * puenktlichen Lauf nichts - er prueft nur, was der erste nicht geschafft hat.
  * Vorher (20i, 17.10.2026): 24 statt 20 Stunden liessen jedes Release zur
  * Uhrzeit seiner letzten Pruefung wandern (`offen=16` am 17.10.).
@@ -230,7 +230,7 @@ export class MarktRepository {
 	 * eine je Release - nach den Preisen, auf denen sie beruhen. Sie sind so
 	 * gebaut, dass sie nicht scheitern (`INSERT OR IGNORE`, UPDATE mit
 	 * Bedingung); taeten sie es doch, gilt dasselbe wie oben: Die Portion
-	 * bleibt faellig und wird am naechsten Abend neu gefragt. Mit ihnen
+	 * bleibt faellig und wird beim naechsten Lauf neu gefragt. Mit ihnen
 	 * hoechstens 8 Anweisungen je Release, deshalb MARKT_JE_POST = 5.
 	 */
 	async ergebnisseSchreiben(

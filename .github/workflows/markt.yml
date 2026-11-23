@@ -16,17 +16,18 @@ name: Gebrauchtpreise
 
 on:
   schedule:
-    # 20:17 UTC am Vorabend (Nachtrag 20i-c, Entscheidung vom 22.10.2026):
-    # GitHub startete den Lauf von 02:17 regelmaessig rund fuenf Stunden zu
-    # spaet (07:31 am 20.10.2026); auch so verspaetet ist er vor 05:00 fertig.
+    # 13:17 UTC (Nachtrag 18r-b, Entscheidung vom 22.11.2026): GitHub startete
+    # die Abendlaeufe (20:17 / 22:17, 20i-c) 3 bis 6 h 38 zu spaet, also im
+    # PSN-Fenster 00-03 UTC. Am Nachmittag sieht der Lauf den Sync desselben
+    # Tages. Wie spaet GitHub um diese Uhrzeit startet, ist nicht gemessen.
     # Bewusst nicht zur vollen Stunde (dort stauen sich die Cron-Jobs).
-    - cron: "17 20 * * *"
-    # 22:17 UTC: Rueckfall (seit 20i-b). Er faengt einen ausgefallenen Lauf
+    - cron: "17 13 * * *"
+    # 15:17 UTC: Rueckfall (seit 20i-b). Er faengt einen ausgefallenen Lauf
     # auf, keine Verspaetung - GitHub verschiebt beide um denselben Betrag.
     # Dank der Frist von 12 Stunden (MARKT_FRIST_STUNDEN) prueft er nur, was
     # der erste nicht geschafft hat; laufen beide zugleich, stellt die
     # concurrency-Gruppe unten den zweiten an.
-    - cron: "17 22 * * *"
+    - cron: "17 15 * * *"
   workflow_dispatch:
 
 permissions:

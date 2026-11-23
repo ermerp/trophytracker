@@ -17,9 +17,10 @@
  *
  * Telemetry haelt rund sieben Tage. Gezaehlt werden die Fenster 00-05 UTC
  * des Datums (seit 18r: PSN 00-03, Wartung 03-05) und bei den gelesenen
- * Zeilen die Abendlaeufe ab 18 UTC des Vortags. Bis zur Verlegung der Markt-
- * und Store-Action am 23.11.2026 (vorher 20:17/20:47 UTC) koennen verspaetete
- * Abendlaeufe in die Stunden 00-03 fallen und dort mitgezaehlt werden. Der
+ * Zeilen die Preislaeufe (Markt- und Store-Action, seit 18r-b 13:17/13:47
+ * UTC) ab 13 UTC des Vortags. Nur bis zu den Abendlaeufen vom 23.11.2026
+ * (20:17/20:47 UTC, verspaetet) koennen sie in die Stunden 00-03 fallen und
+ * dort mitgezaehlt werden. Der
  * Median gerader Stichproben ist der Mittelwert der beiden mittleren Werte.
  *
  * Aufruf (Token mit Lesezugriff auf Analytics und Observability in der
@@ -106,7 +107,7 @@ const zeilen = await graphql(
 	`query($a:String!,$f:Time!,$t:Time!){viewer{accounts(filter:{accountTag:$a}){
 	 d1AnalyticsAdaptiveGroups(limit:100,filter:{datetimeHour_geq:$f,datetimeHour_lt:$t,databaseId:"${datenbank}"}){
 	  dimensions{datetimeHour} sum{rowsRead rowsWritten}}}}}`,
-	{ a: konto, f: `${vortag}T18:00:00Z`, t: ende },
+	{ a: konto, f: `${vortag}T13:00:00Z`, t: ende },
 );
 const zeilenJeStunde = new Map(
 	zeilen.d1AnalyticsAdaptiveGroups.map((r) => [r.dimensions.datetimeHour.slice(0, 13), r.sum.rowsRead]),
@@ -176,5 +177,5 @@ console.log();
 console.log("  Gelesene Zeilen (d1AnalyticsAdaptiveGroups):");
 console.log(`    PSN-Fenster 00-03 UTC: ${summeStunden(`${datum}T00`, `${datum}T03`)}`);
 console.log(`    Wartung 03-05 UTC:     ${summeStunden(`${datum}T03`, `${datum}T05`)}`);
-console.log(`    Abend ${vortag} 18 UTC bis 00 UTC: ${summeStunden(`${vortag}T18`, `${datum}T00`)}`);
+console.log(`    Preislaeufe ${vortag} 13 UTC bis 00 UTC: ${summeStunden(`${vortag}T13`, `${datum}T00`)}`);
 console.log(`    je Stunde: ${[...zeilenJeStunde].sort().map(([h, n]) => `${h.slice(5)} ${n}`).join("  ")}`);

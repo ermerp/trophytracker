@@ -4,7 +4,7 @@ import type { AppEnv } from "../types";
 /**
  * Preisalarm (Stufe 20g, Abschnitt 16.2): die Meldungen hinter der Glocke.
  *
- * Geschrieben werden sie in den Preis-Routen der Abendlaeufe, hier nur
+ * Geschrieben werden sie in den Preis-Routen der Preislaeufe, hier nur
  * gelesen und quittiert. Quittiert wird ueber den Haken, nicht durch den
  * Sprung ins Spieldetail (Entscheidung des Nutzers vom 30.10.2026).
  */

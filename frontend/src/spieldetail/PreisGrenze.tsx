@@ -13,7 +13,7 @@ import type { Release } from './typen'
  *
  * Darunter steht, für welchen Kanal die Grenze gerade gilt – der wechselt
  * von selbst, wenn eBay später doch eine Disc findet –, und ob der Preis
- * schon darunter liegt: Dann meldet der nächste Abendlauf (Entscheidung des
+ * schon darunter liegt: Dann meldet der nächste Preislauf (Entscheidung des
  * Nutzers vom 30.10.2026).
  */
 export function PreisGrenze({
@@ -77,7 +77,7 @@ export function PreisGrenze({
           : gespeichert === null
             ? `Leer heißt: nur Allzeittiefs melden. Gilt für ${kanal}.`
             : darunter
-              ? `Liegt schon darunter (${euro(alarm.aktuellCents)}) – der nächste Abendlauf meldet. Gilt für ${kanal}.`
+              ? `Liegt schon darunter (${euro(alarm.aktuellCents)}) – der nächste Preislauf meldet. Gilt für ${kanal}.`
               : `Gilt für ${kanal}.`}
       </p>
       {alarm.gesehen && (

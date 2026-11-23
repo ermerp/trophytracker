@@ -3,7 +3,7 @@
  * hinter der Glocke ausloest.
  *
  * Reine Logik ohne Datenbank, damit sie ohne D1 getestet wird. Die Preis-
- * Routen der Abendlaeufe lesen die Lage (src/db/preisalarm.ts), rufen
+ * Routen der Preislaeufe lesen die Lage (src/db/preisalarm.ts), rufen
  * `alarmPruefen` je Release und haengen das Ergebnis in DENSELBEN Schreib-
  * Batch wie den Preis - die Nebenwirkung gehoert an den Schritt (CLAUDE.md).
  *

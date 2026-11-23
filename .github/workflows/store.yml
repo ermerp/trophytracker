@@ -17,14 +17,14 @@ name: Store-Preise
 
 on:
   schedule:
-    # 20:47 UTC am Vorabend (Entscheidung des Nutzers vom 22.10.2026): GitHub
-    # verschiebt den Start um rund fuenf Stunden (7.3), und auch dann soll der
-    # Lauf vor 05:00 UTC fertig sein. Nicht zur vollen Stunde.
-    - cron: "47 20 * * *"
-    # 22:47 UTC: Rueckfall. Dank der Frist von 12 Stunden (STORE_FRIST_STUNDEN)
+    # 13:47 UTC (Nachtrag 18r-b, Entscheidung vom 22.11.2026): GitHub startete
+    # die Abendlaeufe (20:47 / 22:47) 3 bis 6 h 38 zu spaet (7.3), also im
+    # PSN-Fenster 00-03 UTC. Nicht zur vollen Stunde.
+    - cron: "47 13 * * *"
+    # 15:47 UTC: Rueckfall. Dank der Frist von 12 Stunden (STORE_FRIST_STUNDEN)
     # prueft er nur, was der erste nicht geschafft hat; laufen beide zugleich,
     # stellt die concurrency-Gruppe unten den zweiten an.
-    - cron: "47 22 * * *"
+    - cron: "47 15 * * *"
   workflow_dispatch:
 
 permissions:

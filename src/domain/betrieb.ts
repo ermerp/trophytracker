@@ -50,7 +50,7 @@ export type StandFakt = {
 	/**
 	 * Der letzte Lauf der Markt-Action, der etwas geprueft hat (Nachtrag
 	 * 20i-b). Eigener Bereich, weil der letzte Ausgang an einem normalen Tag
-	 * der Rueckfall um 22:17 ist - und der prueft dann nichts.
+	 * der Rueckfall um 15:17 ist - und der prueft dann nichts.
 	 */
 	markt_geprueft?: AusgangFakt;
 	/** Die Store-Action (Stufe 20j), wie die Markt-Action. */
@@ -124,12 +124,15 @@ export type BetriebFakten = {
 export const STILL_NACH_STUNDEN = 26;
 /**
  * Dasselbe fuer Store- und Markt-Action (Entscheidungen des Nutzers vom
- * 22.10. und 23.10.2026): Normalabstand plus groesste beobachtete
- * Verspaetung, 24 h + 5 h 30 (7.3), aufgerundet. 26 reichten nicht: Der
- * Rueckfall liegt nur zwei Stunden nach dem Hauptlauf, und zwischen einem
- * puenktlichen Rueckfall um 22:47 (Markt 22:17) und dem maximal verspaeteten
- * Hauptlauf am naechsten Abend liegen 27 h 30. Die kleinere Verspaetung am
- * Abend (2 h 11 bis 2 h 49 am 22.10.2026) aendert daran nichts.
+ * 22.10. und 23.10.2026): Normalabstand plus die damals groesste
+ * beobachtete Verspaetung, 24 h + 5 h 30 (7.3), aufgerundet. 26 reichten
+ * nicht: Der Rueckfall liegt nur zwei Stunden nach dem Hauptlauf. Seit 18r-b,
+ * mit der groessten Verspaetung von 6 h 38: Zwischen einem puenktlichen
+ * Rueckfall um 15:47 (Markt 15:17) und dem maximal verspaeteten Hauptlauf am
+ * naechsten Tag (20:25 / 19:55) liegen 28 h 38. Nicht gedeckt sind 30 h 38
+ * zwischen zwei Hauptlaeufen, der erste puenktlich (`markt_leer`, oder wenn
+ * der Rueckfall ausfaellt) - die Schwelle haelt, solange die Verspaetung von
+ * Tag zu Tag um hoechstens sechs Stunden schwankt.
  */
 export const ACTION_STILL_NACH_STUNDEN = 30;
 
@@ -137,9 +140,10 @@ export const ACTION_STILL_NACH_STUNDEN = 30;
  * Ab diesem Alter des aeltesten Prueftstempels ist ein Store-Ziel seit ueber
  * 30 Stunden FAELLIG und nicht geprueft: 12 Stunden Frist
  * (`STORE_FRIST_STUNDEN`, src/db/store.ts) plus die 30 von oben. Nicht 30 auf
- * den Stempel selbst - ein Probelauf um 16:47 stempelt alles, und der naechste
- * pruefende Lauf kommt verspaetet erst nach rund 33,5 Stunden. Ein Test haelt
- * die Summe fest.
+ * den Stempel selbst - ein Probelauf kurz nach 03:47 stempelt alles, beide
+ * Laeufe des Tages finden nichts, und der naechste pruefende kommt verspaetet
+ * erst um 20:25 des Folgetags, nach rund 40 h 38 (bis 18r-b 33,5). Ein Test
+ * haelt die Summe fest.
  */
 export const STORE_ZIEL_ALT_NACH_STUNDEN = 42;
 /**
@@ -469,7 +473,7 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 	}
 
 	// Die Markt-Action laeuft, prueft aber nichts (Nachtrag 20i-b). Ein
-	// einzelner leerer Lauf ist normal - der Rueckfall um 22:17 findet nach
+	// einzelner leerer Lauf ist normal - der Rueckfall um 15:17 findet nach
 	// einem puenktlichen Lauf nichts. Erst wenn seit ueber 30 Stunden kein
 	// Lauf etwas geprueft hat, muesste die Auswahl etwas enthalten haben:
 	// Bei zwoelf Stunden Frist ist nach einem Tag jedes Release faellig.
@@ -495,7 +499,7 @@ export function urteile(f: BetriebFakten): Betriebswarnung[] {
 	// Die Store-Action laeuft, ist aber nicht auf dem Stand (Stufe 20j) -
 	// wie oben, mit ihrer eigenen Schwelle. `store_geprueft` setzt auch ein
 	// leerer Lauf, nach dem nichts faellig ist: Nach einem Probelauf am
-	// Nachmittag finden die Laeufe am Abend nichts, und das ist kein Befund.
+	// Vormittag finden die geplanten Laeufe nichts, und das ist kein Befund.
 	const storeAusgang = f.stand.store;
 	// Das Sicherheitsnetz (Rueckfrage des Nutzers vom 22.10.2026): Ob etwas
 	// faellig ist, sagt die Auswahl - ist sie kaputt und sagt immer "nichts",

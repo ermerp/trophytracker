@@ -23,7 +23,7 @@ export function ortsstunde(utcStunde: number, heute = new Date(), zeitzone?: str
   return String(Number(teile.find((t) => t.type === 'hour')?.value))
 }
 
-/** Stunde und Minute in Ortszeit: `ortszeit(20, 17)` ist im Winter in Berlin „21:17". */
+/** Stunde und Minute in Ortszeit: `ortszeit(13, 17)` ist im Winter in Berlin „14:17". */
 export function ortszeit(utcStunde: number, utcMinute: number, heute = new Date(), zeitzone?: string): string {
   return new Intl.DateTimeFormat('de-DE', {
     hour: '2-digit',

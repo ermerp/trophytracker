@@ -32,8 +32,8 @@ describe("Workflow der Store-Action (Stufe 20j)", () => {
 		expect(workflow).not.toMatch(/pull_request/);
 	});
 
-	it("laeuft um 20:47 mit Rueckfall um 22:47 UTC (Entscheidung vom 22.10.2026)", () => {
-		expect([...workflow.matchAll(/cron: "([^"]+)"/g)].map((m) => m[1])).toEqual(["47 20 * * *", "47 22 * * *"]);
+	it("laeuft um 13:47 mit Rueckfall um 15:47 UTC (Nachtrag 18r-b, Entscheidung vom 22.11.2026)", () => {
+		expect([...workflow.matchAll(/cron: "([^"]+)"/g)].map((m) => m[1])).toEqual(["47 13 * * *", "47 15 * * *"]);
 	});
 
 	it("gibt dem Token nur Leserechte am Repository und kennt nur das Service Token als Secret", () => {
@@ -258,7 +258,7 @@ describe("Routen der Store-Action (Stufe 20j)", () => {
 				...(fehler ? { fehler } : {}),
 			});
 
-		it("setzt ihn bei einem leeren Lauf, nach dem nichts faellig ist - die Abendlaeufe nach einem Probelauf", async () => {
+		it("setzt ihn bei einem leeren Lauf, nach dem nichts faellig ist - die geplanten Laeufe nach einem Probelauf", async () => {
 			await spiel(1, "Ghost of Tsushima");
 			await env.DB.prepare("UPDATE release SET store_geprueft_am = datetime('now', '-1 hours')").run();
 			await ende(0);
