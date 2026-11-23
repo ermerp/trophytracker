@@ -18,7 +18,7 @@
  * Telemetry haelt rund sieben Tage. Gezaehlt werden die Fenster 00-05 UTC
  * des Datums (seit 18r: PSN 00-03, Wartung 03-05) und bei den gelesenen
  * Zeilen die Preislaeufe (Markt- und Store-Action, seit 18r-b 13:17/13:47
- * UTC) ab 13 UTC des Vortags. Nur bis zu den Abendlaeufen vom 23.11.2026
+ * UTC) ab 13 UTC des Vortags. Nur bis zu den Abendlaeufen vom 22.11.2026
  * (20:17/20:47 UTC, verspaetet) koennen sie in die Stunden 00-03 fallen und
  * dort mitgezaehlt werden. Der
  * Median gerader Stichproben ist der Mittelwert der beiden mittleren Werte.

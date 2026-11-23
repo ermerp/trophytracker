@@ -383,3 +383,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 21.11.2026 | **Die rote Warnung `zugang_endet` wird erst nach dem 28.11. umgebaut**, wenn feststeht, ob Sonys Datum für die ganze Kette gilt; NPSSO weiter nicht vorsorglich erneuern | [7.1](spec/07-1-psn-trophaeen.md) |
 | 22.11.2026 | **Nachtfenster: PSN 00:00–02:55 (36 Aufrufe), Wartung 03:00–04:55 UTC (24)**; der Index-Nachtrag ist keine Bedingung dafür | [10.1](spec/10-1-cron.md), [16.2](spec/16-2-betriebswarnungen.md) |
 | 22.11.2026 | **Die Actions rücken auf 13:17 / 15:17 (Markt) und 13:47 / 15:47 UTC (Store)**, als eigener Nachtrag 18r-b einen Tag nach 18r | [16.2](spec/16-2-betriebswarnungen.md) |
+| 23.11.2026 | **18r-b wird noch am 23.11. gemergt, beide Preis-Actions danach einmal von Hand gestartet**, statt bis zum 24.11. zu warten | [16.2](spec/16-2-betriebswarnungen.md) |

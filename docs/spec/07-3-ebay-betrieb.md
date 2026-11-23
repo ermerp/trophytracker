@@ -3,7 +3,7 @@
 ### 7.3 Umfang, Takt und Betrieb der Gebrauchtpreise
 
 **Der Schritt läuft als GitHub Action** (`.github/workflows/markt.yml`, Stufe 20i), seit Nachtrag
-18r-b (24.11.2026) täglich um **13:17 UTC** mit **Rückfall um 15:17 UTC** (Entscheidung vom
+18r-b (23.11.2026) täglich um **13:17 UTC** mit **Rückfall um 15:17 UTC** (Entscheidung vom
 22.11.2026, [Betriebswarnungen](16-2-betriebswarnungen.md)), dazu von Hand über `workflow_dispatch`;
 der Knopf in den Einstellungen ist entfallen. Der Lauf sieht damit den Sync desselben Tages. Vorher
 lief er um 02:17 mit Rückfall 08:17 (20i, 20i-b) und seit 20i-c (23.10.2026) um 20:17 / 22:17 –

@@ -81,7 +81,7 @@ und Gründe in [10.1](10-1-cron.md).
   05:00 UTC. **Der Index-Nachtrag** ist keine Bedingung: Er gehört vor „Cron je Minute"
   ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), und 18r braucht keinen schnelleren Takt.
 
-#### Nachtrag 18r-b: die Actions am Nachmittag (gebaut am 23.11.2026, Merge am 24.11. vormittags)
+#### Nachtrag 18r-b: die Actions am Nachmittag (gebaut und deployt am 23.11.2026)
 
 Vom Nutzer am 22.11.2026 angenommen: Markt **13:17 / 15:17**, Store **13:47 / 15:47 UTC**. Bis dahin
 (seit 20i-c) 20:17 / 20:47 mit Rückfall 22:17 / 22:47, von GitHub 3 bis 6 h 38 verspätet – also im
@@ -99,7 +99,6 @@ der Markt sieht den Sync desselben Tages. Frist (12 h), Stillstand (30 h) und Al
   von Tag zu Tag um mehr als sechs Stunden schwanken; an den Abenden vom 15. bis 20.11.2026 waren es höchstens 2 h 58.
   **Nicht gedeckt ist auch `markt_leer` nach einem Markt-Lauf von Hand** zwischen rund 03:17 und
   13:17: Beide Läufe des Tages können leer bleiben, anders als beim Store zählt ein leerer nicht.
-- **Übergang:** Merge nicht vor Ende der Abendläufe vom 23.11.; werden sie davor umgestellt, liegen
-  rund 37 h zwischen den Läufen, und die 30 h Stillstand reißen. Beim Merge am 24.11. vormittags
-  liegen rund 12 bis 13 h dazwischen; ist nach der 12-h-Frist um 13:17 noch nichts fällig, holt der
-  Rückfall um 15:17 es nach.
+- **Übergang:** Umgestellt am 23.11. vor den Abendläufen, beide Actions danach einmal von Hand gestartet
+  (Entscheidung des Nutzers vom 23.11.2026). Ohne den Handlauf lägen rund 37 h zwischen den Läufen, und
+  die 30 h Stillstand rissen. Startet GitHub am selben Abend doch noch einen alten Lauf, ist er leer (12 h Frist).

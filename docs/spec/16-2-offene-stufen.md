@@ -141,7 +141,7 @@ aber keine Teilstufe.
 Stehen in [16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md) (die Nachträge 18i bis 20i, Budget und
 Wege je Schritt), [16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md) (die Messungen je Schritt) und
 [16-2-betriebswarnungen.md](16-2-betriebswarnungen.md) (Stufe 18m mit dem Nachtrag 18m-b, Stufe 18r –
-Nachtläufe bis 05:00 UTC, deployt am 22.11.2026 – und der Nachtrag 18r-b, gebaut am 23.11.2026, Merge am 24.11. vormittags).
+Nachtläufe bis 05:00 UTC, deployt am 22.11.2026 – und der Nachtrag 18r-b, gebaut und deployt am 23.11.2026).
 
 **Die fünf finalen Stufen** – die Sammlung finalisieren, Oberfläche, Refactoring
 (abgetragen), Wiederherstellungsprobe, Außendarstellung – stehen in
