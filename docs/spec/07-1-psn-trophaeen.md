@@ -50,13 +50,14 @@ lief und wie er endete. **Zwei Ausgänge, und nur einer ist eine Messung:** `ges
 abgelehnt) zählt, `ersetzt_am` (der Nutzer hat früher erneuert) nicht — wie lange dieser Zugang
 gehalten hätte, erfährt niemand. Deshalb lässt der Nutzer den Zugang vom 29.09.2026 bewusst auslaufen
 (Entscheidung vom 20.10.2026): Gemessen wird die echte Lebensdauer, und die Warnung „Zugang
-abgelaufen" erscheint einmal echt; erneuert wird, sobald sie steht. **Offen bis zum 28.11.2026 (Sonys
-Datum, 17:58 UTC):** Der Zugang lief am 21.11. seit 53 Tagen, doppelt so lange wie der erste – das
+abgelaufen" erscheint einmal echt; erneuert wird, sobald sie steht. **Offen, Sonys Datum ist der
+28.11.2026, 17:58 UTC:** Der Zugang lief am 21.11. seit 53 Tagen, doppelt so lange wie der erste – das
 Modell „kürzeste Lebensdauer" ist für ihn widerlegt, die Warnung steht seit dem 21.10. auf rot.
 **Vermutung, nicht belegt:** Sonys Datum gilt für die ganze Kette, auch bei nächtlich rollendem
 Refresh-Token, und beim ersten Zugang endete etwas anderes vorzeitig (etwa die Web-Sitzung); der
-Nutzer erinnert sich an keinen Anlass. Scheitert der Sync in der Nacht zum 29.11., trägt sie;
-läuft er weiter, ist sie widerlegt. Die Warnung wird erst danach umgebaut (Entscheidung des
+Nutzer erinnert sich an keinen Anlass. Scheitert der Sync in der Nacht zum 29.11., trägt sie. Läuft er
+weiter, ist sie **erst nach der Nacht zum 01.12.** widerlegt: Der Refresh-Token gilt bis 30.11. 03:00 UTC
+(unten). Die Warnung wird erst danach umgebaut (Entscheidung des
 Nutzers vom 21.11.2026). Die Tabelle enthält ausschließlich Zeitpunkte und steht deshalb in
 `EXPORT_TABELLEN`; die Zeitreihe ist ihr ganzer Zweck und nach einem Verlust nicht
 wiederherstellbar.
@@ -117,21 +118,20 @@ war: `abgelaufen`. Ein Refresh-Token, das allein abgelegt wird, verwirft das ges
 Der normale Sync fasst das NPSSO damit gar nicht an – schonend gegenüber einer inoffiziellen
 Schnittstelle.
 
-**Der Refresh-Token hält zehn Tage, und die Frist rollt mit jeder Erneuerung weiter** – gemessen am
-09.10.2026 gegen die Produktion. Am 01.10.2026 stand `refresh_expires_at` auf dem 09.10.2026, exakt
-zehn Tage nach der NPSSO-Eintragung vom 29.09., und zwei Nachtläufe hatten den Zeitpunkt scheinbar
-nicht bewegt; daraus war die Vermutung entstanden, Sonys `refresh_token_expires_in` zähle auf einen
-**festen Punkt** herunter, sodass der Lauf am 09.10. auf Schritt 2 zurückfallen müsste.
+**Der Refresh-Token hält zehn Tage. Ob die Frist mit jeder Erneuerung weiterrollt, ist offen** (Befund
+vom 23.11.2026). Am 09.10.2026 sprang `refresh_expires_at` vom 09.10. (zehn Tage nach der
+NPSSO-Eintragung vom 29.09.) auf den **19.10. 03:05**, und daraus wurde „rollt" geschlossen – weil
+`psn_zugang` weiter `offen` zeigte. **Dieser Schluss trägt nicht:** Der Rückfall auf das NPSSO
+(Schritt 2) schreibt nichts nach `psn_zugang` (`sitzungHolen`, `src/sync/run.ts`), eine neue Kette
+wäre dort unsichtbar. Dagegen spricht heute: Nach den erfolgreichen Nächten zum 21., 22. und 23.11.
+steht der Wert auf dem **30.11.2026 03:00:40**, zehn Tage nach dem Nachtlauf vom 20.11.; die Nächte
+danach haben ihn nicht bewegt. **Vermutung, nicht belegt:** Sonys `refresh_token_expires_in` zählt auf einen
+festen Punkt herunter, und alle rund zehn Tage leitet der Cron aus dem NPSSO neu ab.
 
-**Diese Vermutung ist widerlegt.** Am 09.10.2026 um 03:05 hat der Nachtlauf den Token erneuert, und
-`refresh_expires_at` steht seither auf dem **19.10.2026 03:05** – zehn Tage ab der Erneuerung, nicht
-ab der NPSSO-Eintragung. Der Zugang vom 29.09. trägt in `psn_zugang` weiterhin `ausgang = 'offen'`,
-es gibt also keine neue Kette und keinen Rückfall auf das NPSSO. Der Sync hat an diesem Morgen
-regulär 431 Titel geholt.
-
-Praktische Folge: Solange der Nachtlauf läuft, läuft der Refresh-Token mit und das NPSSO wird gar
-nicht angefasst. Bleibt der Lauf länger als zehn Tage aus, fällt der nächste auf Schritt 2 zurück –
-dafür muss das NPSSO noch gültig sein (hier bis 28.11.2026).
+Praktische Folge für das NPSSO-Ende (28.11. 17:58 UTC): Trifft die Vermutung zu, trägt der
+Refresh-Token noch die Nächte zum 29. und 30.11. (Sync ab 00:00 UTC); **die erste Nacht, die das tote
+NPSSO bräuchte, ist die zum 01.12.** Bleibt der Lauf länger als zehn Tage aus, fällt der nächste in
+jedem Fall auf Schritt 2 zurück.
 
 **Weder NPSSO noch Refresh- oder Access Token dürfen jemals in einer API-Antwort oder im Log
 erscheinen, auch nicht gekürzt.** Durchgesetzt wird das über eine Hülle `Geheimnis`, deren

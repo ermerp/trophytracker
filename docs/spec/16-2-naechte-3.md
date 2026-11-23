@@ -148,3 +148,25 @@ belegt 15 Aufrufe (04:00–05:10), das PSN-Fenster endet in der Kaufliste-Nacht 
 **Gelesene Zeilen:** PSN 19 310, Wartung 96 886, Abend 14 881. `rows_read_24h` am 22.11. gegen
 14:30 UTC **282 539**, `rows_written_24h` 3 352 – das Fenster enthält die wöchentliche Sicherung
 (11:34 UTC, grün).
+
+#### Nacht zum 23.11.2026 – die erste mit 18r
+
+**Alle 60 Cron-Aufrufe `ok`** (36 PSN 00:00–02:55, 24 Wartung 03:00–04:55), 24 Standorte, Leerlauf über
+10 ms keiner. Sync `erfolg` um 00:50 (432 Titel), PSN-Arbeit nach 14 Aufrufen fertig (01:05), Wartung nach
+einem (03:00). Warnungen nur `zugang_endet`. Keine Kaufliste-Nacht; das Auffrischen fand nichts Fälliges.
+Ausgewertet am 23.11.2026 gegen 15:45 UTC.
+
+| Nacht | Sync Median (min–max), über 15 | Spitze | Level | Auffrischen | Leerlauf PSN / Wartung, Median |
+|---|---|---|---|---|---|
+| 23.11. | 7 (5–13), 0 | 28 (LAX oder SJC) | 7 | – | 4 / 4 |
+
+**Budget:** Der Sync hält Median und P90 sinngemäß ein, die Spielzeit-Spitze lag mit 28 ms über 15 – im
+bisherigen Streubereich (bis 38, LAX). Ihr Standort ist nicht eindeutig: In derselben Minute lief die
+Markt-Action gegen den Worker.
+
+**Abendläufe im PSN-Fenster, wie erwartet:** Markt 00:51 (431 geprüft in 87 Portionen, 452 s, 0 offen,
+2 Preisalarme), Store 01:07 (79 geprüft, 66 s, 0 offen), Rückfälle 02:53 und 03:08 leer. Alle grün, der
+Sync lief daneben fehlerfrei. Verspätung 4 h 20 bis 4 h 37.
+
+**Gelesene Zeilen:** PSN 30 212 (mit den Abendläufen vermischt), Wartung 70 866 (24 statt 36 Aufrufe).
+`rows_read_24h` gegen 15:45 UTC **101 078**, `rows_written_24h` 2 937 (Vortag 282 539 und 3 352, mit Sicherung).
