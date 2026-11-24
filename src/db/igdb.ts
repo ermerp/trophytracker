@@ -4,8 +4,33 @@ import { anzeigeTitel, titelSchluessel, type Plattform } from "../domain/titel";
 import { eins, einzeln, ersteZeile, zeilen, type Baustein } from "./baustein";
 import type { EventRepository } from "./events";
 
-/** Nicht aufgefrischt seit einem Zeitpunkt (Nachtrag 18n-b) - Auswahl und Rest teilen den Text. */
-const AUFFRISCHEN_VOR = "(igdb_synced_at IS NULL OR igdb_synced_at < ?) ";
+/**
+ * Faellig zum Auffrischen: nie gestempelt, oder vor der Grenze. ZWEI
+ * Bedingungen statt eines `OR` (Stufe 18s) - jede ein Lookup im Teilindex
+ * aus 0036, dessen Praedikat (`igdb_id IS NOT NULL`) hier stehen muss.
+ * Auswahl und Rest teilen den Text.
+ */
+const NIE_AUFGEFRISCHT = "igdb_id IS NOT NULL AND igdb_synced_at IS NULL";
+const aufgefrischtVor = (grenze: string) => `igdb_id IS NOT NULL AND igdb_synced_at < ${grenze}`;
+
+/**
+ * Die `?1` am laengsten nicht aufgefrischten Spiele vor einer Grenze - ein
+ * SQL-Ausdruck aus dem Code, nie eine Eingabe. Jeder Zweig liest hoechstens
+ * `?1` Indexeintraege; aussen sortiert SQLite NULL aufsteigend nach vorn,
+ * und `id` ist der Rowid am Ende des Index - beides dieselbe Ordnung wie
+ * innen. Deshalb kein `ORDER BY igdb_synced_at IS NOT NULL`: Das las den
+ * ganzen Bestand, auch wenn nichts faellig war (479 Zeilen je Aufruf).
+ */
+const auffrischAuswahl = (grenze: string) =>
+	"SELECT id, igdb_id FROM (" +
+	`SELECT id, igdb_id, igdb_synced_at FROM (SELECT id, igdb_id, igdb_synced_at FROM game WHERE ${NIE_AUFGEFRISCHT} ORDER BY id LIMIT ?1) ` +
+	"UNION ALL " +
+	`SELECT id, igdb_id, igdb_synced_at FROM (SELECT id, igdb_id, igdb_synced_at FROM game WHERE ${aufgefrischtVor(grenze)} ORDER BY igdb_synced_at, id LIMIT ?1)` +
+	") ORDER BY igdb_synced_at, id LIMIT ?1";
+
+/** Dieselbe Auswahl ohne Grenze: der Teilindex in seiner eigenen Reihenfolge. */
+const AUFFRISCH_AUSWAHL_OHNE_FRIST =
+	"SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL ORDER BY igdb_synced_at, id LIMIT ?1";
 
 /** Exportiert, damit die Lesekosten-Messung die Abfrage aus dem Code nimmt (CLAUDE.md). */
 export const AELTESTER_AUFFRISCH_STEMPEL =
@@ -278,8 +303,8 @@ export class IgdbRepository {
 	 * Mit `mindestAlterTage > 0` nur solche, deren Stand aelter ist (oder
 	 * fehlt) - der Cron (Stufe 18) frischt so jedes Spiel etwa woechentlich
 	 * auf und laesst den Rest der Nacht in Ruhe; die Handschaltflaeche nimmt
-	 * ohne Frist die 50 aeltesten. Zwei SQL-Texte statt eines `IS NULL OR`-
-	 * Binds (Zeilenlese-Regel).
+	 * ohne Frist die 50 aeltesten. Beide laufen seit Stufe 18s ueber den
+	 * Teilindex aus 0036.
 	 */
 	async zumAuffrischen(n: number, mindestAlterTage = 0): Promise<Array<{ id: number; igdb_id: number }>> {
 		return einzeln(this.db, this.zumAuffrischenBaustein(n, mindestAlterTage));
@@ -293,17 +318,11 @@ export class IgdbRepository {
 		// umgesetzt; die auswaehlende Abfrage band weiter (Befund vom
 		// 23.09.2026). Sie tat es nachweislich richtig - die Regel gilt
 		// trotzdem, und Code und Regel sollen uebereinstimmen.
-		const frist =
+		const sql =
 			mindestAlterTage > 0
-				? `AND (igdb_synced_at IS NULL OR igdb_synced_at < datetime('now', '-${Math.trunc(mindestAlterTage)} days')) `
-				: "";
-		const statement = this.db
-			.prepare(
-				"SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL " +
-					frist +
-					"ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT ?",
-			)
-			.bind(n);
+				? auffrischAuswahl(`datetime('now', '-${Math.trunc(mindestAlterTage)} days')`)
+				: AUFFRISCH_AUSWAHL_OHNE_FRIST;
+		const statement = this.db.prepare(sql).bind(n);
 		return eins(statement, (e) => zeilen<{ id: number; igdb_id: number }>(e));
 	}
 
@@ -353,12 +372,8 @@ export class IgdbRepository {
 	 */
 	async zumAuffrischenVor(seit: string, n: number): Promise<Array<{ id: number; igdb_id: number }>> {
 		const z = await this.db
-			.prepare(
-				"SELECT id, igdb_id FROM game WHERE igdb_id IS NOT NULL AND " +
-					AUFFRISCHEN_VOR +
-					"ORDER BY igdb_synced_at IS NOT NULL, igdb_synced_at, id LIMIT ?",
-			)
-			.bind(seit, n)
+			.prepare(auffrischAuswahl("?2"))
+			.bind(n, seit)
 			.all<{ id: number; igdb_id: number }>();
 		return z.results ?? [];
 	}
@@ -366,7 +381,10 @@ export class IgdbRepository {
 	/** Der Rest dieses Durchgangs - dieselbe Bedingung (Nachtrag 18n-b). */
 	async auffrischOffen(seit: string): Promise<number> {
 		const z = await this.db
-			.prepare("SELECT COUNT(*) AS n FROM game WHERE igdb_id IS NOT NULL AND " + AUFFRISCHEN_VOR)
+			.prepare(
+				`SELECT (SELECT COUNT(*) FROM game WHERE ${NIE_AUFGEFRISCHT}) + ` +
+					`(SELECT COUNT(*) FROM game WHERE ${aufgefrischtVor("?1")}) AS n`,
+			)
 			.bind(seit)
 			.first<{ n: number }>();
 		return z?.n ?? 0;
@@ -389,11 +407,19 @@ export class IgdbRepository {
 	 * nie oder vor mehr als 30 Tagen geprueft wurde. Die Frist macht den
 	 * Schritt wiederholbar - IGDB traegt Haendlereintraege nach -, ohne
 	 * dass jeder Aufruf dieselben Spiele wieder anfragt.
+	 *
+	 * Seit Stufe 18s von den faelligen Releases aus, nicht von `game`: zwei
+	 * Lookups im Teilindex aus 0039 statt eines Scans ueber alle Spiele mit
+	 * einem Lookup je Spiel (1 445 Zeilen je Leerlauf). `UNION ALL`, nicht
+	 * `UNION`: Fuer das Entdoppeln mischt SQLite zwei nach `game_id` sortierte
+	 * Laeufe und nimmt dafuer `idx_release_game` - ein Scan ueber alle 490
+	 * Releases. Ein Spiel mit zwei faelligen zaehlt `IN` auch so nur einmal.
 	 */
 	private static readonly DISC_OFFEN =
-		"g.igdb_id IS NOT NULL AND EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id " +
-		"AND r.physical_release_status = 'unbekannt' " +
-		"AND (r.physical_checked_at IS NULL OR r.physical_checked_at < datetime('now', '-30 days')))";
+		"g.igdb_id IS NOT NULL AND g.id IN (" +
+		"SELECT game_id FROM release WHERE physical_release_status = 'unbekannt' AND physical_checked_at IS NULL " +
+		"UNION ALL SELECT game_id FROM release WHERE physical_release_status = 'unbekannt' " +
+		"AND physical_checked_at < datetime('now', '-30 days'))";
 
 	async zurDiscPruefung(n: number): Promise<Array<{ id: number; igdb_id: number }>> {
 		return einzeln(this.db, this.zurDiscPruefungBaustein(n));

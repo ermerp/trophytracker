@@ -1,0 +1,16 @@
+-- Migration 0039: Teilindex fuer die Auswahl der Disc-Pruefung (Stufe 18s)
+--
+-- Die Auswahl (`zurDiscPruefungBaustein`) laeuft in jedem Aufruf des
+-- Wartungsfensters und ging von `game` aus: ein Scan ueber 479 Spiele, je
+-- Spiel ein Lookup in `release` - 1 445 gelesene Zeilen im Leerlauf, um
+-- festzustellen, dass nichts faellig ist. Sie geht jetzt von den Releases
+-- aus, die `unbekannt` sind (165 von 490), und sucht darunter die faelligen:
+-- nie geprueft (NULL) oder vor der Frist.
+--
+-- Teilindex, weil nur `unbekannt` je gefragt wird; `game_id` steht mit darin,
+-- damit die Auswahl die Tabelle nicht anfassen muss. Der Preis sind die
+-- Index-Schreibungen beim Pruefstempel und beim Wechsel `unbekannt` -> `ja`
+-- (test/lesekosten.spec.ts).
+--
+-- Rein additiv: keine Daten, keine View; der alte Worker merkt nichts davon.
+CREATE INDEX idx_release_disc_offen ON release(physical_checked_at, game_id) WHERE physical_release_status = 'unbekannt';

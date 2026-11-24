@@ -562,8 +562,9 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		expect(messung.anweisungen).toBeLessThanOrEqual(5);
 		// Je Spiel Index-Lookups, kein Scan ueber game. Vor 18s las der Test 450,
 		// weil nur die 50 Spiele der Portion verknuepft waren; mit allen 478
-		// verknuepft, wie in der Produktion, liest die Auswahl den Bestand: 1 306.
-		expect(messung.gelesen).toBeLessThan(1_400);
+		// verknuepft, wie in der Produktion, 1 306, seit die Auswahl ueber den
+		// Teilindex aus 0036 laeuft 400.
+		expect(messung.gelesen).toBeLessThan(500);
 
 		await env.DB.batch([
 			env.DB.prepare("UPDATE game SET igdb_slug = NULL, cover_url = NULL, release_date = NULL, release_status = 'unbekannt', critic_score = NULL, critic_score_count = NULL, critic_source = NULL, critic_updated_at = NULL, user_score = NULL, user_score_count = NULL"),
@@ -950,7 +951,7 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		console.info({ luecken, auswahl, kaufkandidaten });
 
 		expect(luecken).toBeLessThan(4_000);
-		expect(auswahl).toBeLessThan(1_000);
+		expect(auswahl).toBeLessThan(320);
 		expect(kaufkandidaten).toBeLessThan(4_000);
 
 		const antwort = await SELF.fetch(`${B}/api/gaps?verworfene=1&unbekannte=1`);
@@ -989,8 +990,27 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		// Ein Schreib-Batch mit vier Anweisungen, gleich wie viele Spiele.
 		expect(messung.aufrufe).toBe(1);
 		expect(messung.anweisungen).toBe(4);
-		// Je Paar und je Spiel Index-Lookups; die Zaehlung liest game und release einmal.
-		expect(messung.gelesen).toBeLessThan(3_000);
+		// Je Paar und je Spiel Index-Lookups; die Zaehlung liest release einmal
+		// (discBelegt) und die offenen ueber den Teilindex aus 0039 - 1 912 statt 2 901.
+		expect(messung.gelesen).toBeLessThan(2_200);
+		expect(messung.geschrieben).toBeLessThan(270);
+
+		// Der Normalfall nach der ersten Runde: IGDB nennt nichts Neues, die
+		// Portion wird nur gestempelt. Der Stempel steht seit 0039 im Teilindex,
+		// das kostet je Release eine Index-Schreibung.
+		await env.DB.batch(grundzustand());
+		await env.DB.prepare("UPDATE release SET physical_checked_at = NULL").run();
+		const stempelZaehler = zaehlendeDb(env.DB);
+		const nurGestempelt = await igdbPhysischSchritt(
+			createRepositories(stempelZaehler.db, env.NPSSO_KEY),
+			fakeIgdb([portion.map((s) => ({ id: s.igdb_id, external_games: [] }) as any)]).client,
+			AUFFRISCHEN_JE_AUFRUF,
+			portion,
+		);
+		const nurStempel = { gelesen: stempelZaehler.gelesen(), geschrieben: stempelZaehler.geschrieben() };
+		console.info({ discNurStempel: nurStempel });
+		expect(nurGestempelt).toMatchObject({ gesetzt: 0, nochOffen: discOffen - 50 });
+		expect(nurStempel.geschrieben).toBeLessThan(130);
 
 		await env.DB.batch([env.DB.prepare("DELETE FROM game_event WHERE kind = 'disc_fassung_belegt'"), ...grundzustand()]);
 	});
@@ -1752,10 +1772,14 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		};
 		console.info({ auswahlenArbeit: arbeit, leer });
 
-		expect(arbeit.auffrischen).toBeLessThan(1_000);
-		expect(arbeit.auffrischenOhneFrist).toBeLessThan(1_500);
-		expect(arbeit.disc).toBeLessThan(1_000);
-		expect(leer.discZaehlung).toBeLessThan(3_000);
+		// Vor 18s: 628, 956, 956, 399 und im Leerlauf der Zaehlung 1 935. Was an
+		// der Zaehlung bleibt, ist `discBelegt` - ein Scan ueber 490 Releases.
+		expect(arbeit.auffrischen).toBeLessThan(200);
+		expect(arbeit.auffrischenOhneFrist).toBeLessThan(80);
+		expect(arbeit.auffrischenVonHand).toBeLessThan(200);
+		expect(arbeit.disc).toBeLessThan(320);
+		expect(arbeit.discZaehlung).toBeLessThan(1_100);
+		expect(leer.discZaehlung).toBeLessThan(550);
 
 		await env.DB.batch(grundzustand());
 	});
@@ -1816,7 +1840,7 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		);
 
 		// Die beiden Auswahlen einzeln, aus dem Code. Die Produktion las vor 18s
-		// im Leerlauf 479 (Auffrischen) und 1 445 (Disc).
+		// im Leerlauf 479 (Auffrischen) und 1 445 (Disc), dieser Test 479 und 1 446.
 		const igdbRepo = createRepositories(env.DB, env.NPSSO_KEY).igdb;
 		const auffrischen = igdbRepo.zumAuffrischenBaustein(AUFFRISCHEN_JE_AUFRUF, AUFFRISCH_FRIST_TAGE);
 		const disc = igdbRepo.zurDiscPruefungBaustein(AUFFRISCHEN_JE_AUFRUF);
@@ -1824,8 +1848,8 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		expect(await einzeln(env.DB, disc)).toEqual([]);
 		const auswahlen = { auffrischen: await bausteinGelesen(auffrischen), disc: await bausteinGelesen(disc) };
 		console.info({ auswahlenLeerlauf: auswahlen });
-		expect(auswahlen.auffrischen).toBe(SPIELE);
-		expect(Math.abs(auswahlen.disc - 1_445)).toBeLessThan(10);
+		expect(auswahlen.auffrischen).toBeLessThan(10);
+		expect(auswahlen.disc).toBeLessThan(10);
 
 		// Mit Zugang, sonst kaeme der PSN-Leerlauf nicht bis Spielzeit, Kaufliste,
 		// Einzeltrophaeen und Level.
@@ -1873,10 +1897,13 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		// Seit 18g zaehlt die Summe die Marktauswahl mit (430 Zeilen, obwohl
 		// nichts faellig ist - ein Fall fuer den Markt-Nachtrag 20i), seit 18j
 		// den PSN-Leerlauf mit Zugang, und die Einzeltrophaeen-Auswahl liest
-		// ueber die Teilindizes aus Migration 0034 nichts mehr.
+		// ueber die Teilindizes aus Migration 0034 nichts mehr. Seit 18s tun es
+		// Auffrischen und Disc ebenso (0036, 0039): 74 statt 1 995 Zeilen je
+		// Wartungsaufruf, 3 288 statt 49 392 je Nacht. Die Grenzen reissen, wenn
+		// eine der beiden auf die alte Abfrage zurueckfaellt.
 		expect(leerlaufPsn).toBeLessThan(100);
-		expect(leerlaufWartung).toBeLessThan(2_800);
-		expect(nacht).toBeLessThan(100_000);
+		expect(leerlaufWartung).toBeLessThan(100);
+		expect(nacht).toBeLessThan(4_000);
 		expect(geschriebenJeNacht).toBeLessThan(1_000);
 
 		// Die Betriebswarnungen (Stufe 18m) laufen bei JEDEM Oeffnen des
