@@ -89,6 +89,11 @@ neuen PSN-Fenster. Jetzt trennt `d1AnalyticsAdaptiveGroups` je Stunde Preisläuf
 der Markt sieht den Sync desselben Tages. Frist (12 h), Stillstand (30 h) und Alter des Store-Ziels
 (42 h) bleiben.
 
+- **Offen (24.11.2026, 18:28 UTC):** Von den vier ersten Nachmittagsterminen war noch keiner gestartet, der Markt
+  um 13:17 also 5 h 11 überfällig; seit der Umstellung gibt es keinen geplanten Markt-Lauf. Der leere Store-Lauf
+  vom 24.11. 02:36 ist entweder der neue Termin 15:47 vom Vortag (10 h 49 zu spät) oder der alte um 22:47 (3 h 49).
+  Kein Handlauf, auch nicht bei einer Stillstand-Warnung ab 21:53 UTC (Entscheidung des Nutzers vom 24.11.2026);
+  nachgesehen wird am 25.11.
 - **Offen:** Die Verspätung um diese Uhrzeit ist nicht gemessen. Den Sync ab 00:00 UTC berührte der
   Rückfall erst ab 8 h 43 (Markt) und 8 h 13 (Store).
 - **Nachgerechnet mit 6 h 38**, der größten gemessenen Verspätung: vom pünktlichen Rückfall zum
