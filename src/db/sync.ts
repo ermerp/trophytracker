@@ -302,6 +302,11 @@ export function verdichte(vorherige: string, neue: string): string | null {
 	// Fenster, ob es gelaufen ist.
 	if (wert(a, "bereich") !== wert(b, "bereich")) return null;
 
+	// Ebenso die Anmeldung (Nachtrag 18q-c): Ein Aufruf mit und einer ohne das
+	// Feld trennt schon die Feldfolge; verschiedene Wege oder Gruende duerfen
+	// nicht zur Spanne werden - "grund=ohne→403" unterschlaegt die Mitte.
+	if (["anmeldung", "grund"].some((k) => wert(a, k) !== wert(b, k))) return null;
+
 	// Zwei Aufrufe in derselben Minute gibt es nur von Hand; "15:28–15:28"
 	// waere dann Rauschen statt Zeitraum.
 	const bis = b.von.slice(11);

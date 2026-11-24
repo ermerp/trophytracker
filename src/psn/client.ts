@@ -42,7 +42,19 @@ const REDIRECT_URI = "com.scee.psxandroid.scecompcall://redirect";
 const SCOPE = "psn:mobile.v2.core psn:clientapp";
 
 /** Der Aufrufer entscheidet, wie darauf reagiert wird - siehe src/sync. */
-export class PsnAuthError extends Error {}
+export class PsnAuthError extends Error {
+	constructor(
+		meldung?: string,
+		/**
+		 * Der HTTP-Status des TOKEN-Endpunkts (Nachtrag 18q-c), sonst nichts:
+		 * weder bei 2xx ohne Token noch am Authorize-Schritt oder an einem 401
+		 * der Datenabrufe. Als Feld, damit niemand die Meldung parst.
+		 */
+		readonly status?: number,
+	) {
+		super(meldung);
+	}
+}
 export class PsnAbrufError extends Error {}
 
 export type Sitzung = {
@@ -66,7 +78,7 @@ function inZukunft(sekunden: number): string {
  */
 async function alsSitzung(antwort: Response): Promise<Sitzung> {
 	if (!antwort.ok) {
-		throw new PsnAuthError(`Token-Endpunkt antwortete mit ${antwort.status}.`);
+		throw new PsnAuthError(`Token-Endpunkt antwortete mit ${antwort.status}.`, antwort.status);
 	}
 	const daten = (await antwort.json()) as {
 		access_token?: string;

@@ -52,6 +52,28 @@ export class KeinNpssoError extends Error {}
 export const FEHLVERSUCHE_HOECHSTENS = 3;
 
 /**
+ * Wie sich ein Aufruf bei Sony angemeldet hat (Nachtrag 18q-c, Abschnitt 7.1) -
+ * fuer die Logzeile des Crons, deshalb nur feste Texte und eine Zahl.
+ *
+ * `grund` sagt immer, warum die ERNEUERUNG nicht ging - auch bei
+ * 'gescheitert'. Warum danach das NPSSO nicht ging, steht nicht da: Dessen
+ * Ablehnung kommt meist vom Authorize-Schritt, der keinen Token-Status hat.
+ *
+ * - Zahl: HTTP-Status, mit dem der Token-Endpunkt den Refresh-Token ablehnte
+ * - 'ohne': es gab keinen gueltigen Refresh-Token, Sony wurde nicht gefragt
+ * - 'leer': 2xx, aber ohne Token
+ * - 'fehler': keine Ablehnung, sondern Netz oder unlesbare Antwort. Dann wird
+ *   das NPSSO nicht versucht; den Grund gibt es nur bei 'gescheitert'.
+ */
+export type Anmeldung =
+	| { weg: "refresh" }
+	| { weg: "npsso"; grund: number | "ohne" | "leer" }
+	| { weg: "gescheitert"; grund: number | "ohne" | "leer" | "fehler" };
+
+/** Je Cron-Aufruf einer - nie Zustand des Moduls, Worker-Instanzen werden geteilt. */
+export type AnmeldungMelder = (anmeldung: Anmeldung) => void;
+
+/**
  * Eine PSN-Sitzung fuer EINEN Aufruf (Nachtrag 18q, Abschnitt 7.1).
  *
  * Reihenfolge: ein gespeichertes Access Token, das noch mindestens
@@ -71,11 +93,16 @@ export const FEHLVERSUCHE_HOECHSTENS = 3;
  * 'abgelaufen' - die ganze PSN-Automatik stuende still, obwohl der
  * Refresh-Token lebt. Ein FRISCH geholtes Token wird nicht wiederholt: Dessen
  * Ablehnung ist eine Antwort, kein Ueberbleibsel.
+ *
+ * `melder` erfaehrt jede Anmeldung bei Sony, auch die Erneuerung nach einem
+ * 401; eine Wiederverwendung meldet nichts. Ohne ihn (Knopf, Routen) aendert
+ * sich nichts.
  */
 export function psnSitzung(
 	repos: Repositories,
 	psn: PsnClient,
 	zeile?: ZugangsZeile | null,
+	melder?: AnmeldungMelder,
 ): { token: () => Promise<Geheimnis>; psn: PsnClient } {
 	let aktuell: Promise<{ token: Geheimnis; wiederverwendet: boolean }> | null = null;
 	// Nach einer Erneuerung: das abgelehnte Token und sein Ersatz. Ein Schritt,
@@ -83,7 +110,7 @@ export function psnSitzung(
 	// das alte herein - es wird bei jedem Abruf getauscht.
 	let ersetzt: { alt: Geheimnis; neu: Geheimnis } | null = null;
 
-	const besorgen = () => (aktuell ??= sitzungHolen(repos, psn, zeile, true));
+	const besorgen = () => (aktuell ??= sitzungHolen(repos, psn, zeile, true, melder));
 	const token = async () => (await besorgen()).token;
 
 	const client = new Proxy(psn, {
@@ -104,7 +131,7 @@ export function psnSitzung(
 					) {
 						throw fehler;
 					}
-					aktuell = sitzungHolen(repos, psn, zeile, false);
+					aktuell = sitzungHolen(repos, psn, zeile, false, melder);
 					ersetzt = { alt: stand.token, neu: (await aktuell).token };
 					return wert.apply(ziel, [ersetzt.neu, ...argumente.slice(1)]);
 				}
@@ -119,6 +146,7 @@ async function sitzungHolen(
 	psn: PsnClient,
 	gelesen: ZugangsZeile | null | undefined,
 	wiederverwenden: boolean,
+	melder?: AnmeldungMelder,
 ): Promise<{ token: Geheimnis; wiederverwendet: boolean }> {
 	const zeile = gelesen === undefined ? await repos.credentials.zeileLesen() : gelesen;
 	if (wiederverwenden) {
@@ -127,20 +155,40 @@ async function sitzungHolen(
 	}
 
 	const refresh = await repos.credentials.gueltigerRefreshToken(new Date(), zeile);
+	let grund: number | "ohne" | "leer" = "ohne";
 	if (refresh) {
+		let sitzung: Sitzung | null = null;
 		try {
-			return { token: await sitzungMerken(repos, await psn.tokenAusRefresh(refresh)), wiederverwendet: false };
+			sitzung = await psn.tokenAusRefresh(refresh);
 		} catch (fehler) {
-			if (!(fehler instanceof PsnAuthError)) throw fehler;
+			if (!(fehler instanceof PsnAuthError)) {
+				melder?.({ weg: "gescheitert", grund: "fehler" });
+				throw fehler;
+			}
 			// Refresh abgelehnt - unten ueber das NPSSO versuchen.
+			grund = fehler.status ?? "leer";
+		}
+		if (sitzung) {
+			// Vor dem Speichern: Die Anmeldung bei Sony ist hier geschehen, auch
+			// wenn D1 gleich scheitert.
+			melder?.({ weg: "refresh" });
+			return { token: await sitzungMerken(repos, sitzung), wiederverwendet: false };
 		}
 	}
 
-	const npsso = await repos.credentials.npsso(zeile);
-	if (!npsso) {
-		throw new KeinNpssoError("Es ist kein NPSSO hinterlegt.");
+	let sitzung: Sitzung;
+	try {
+		const npsso = await repos.credentials.npsso(zeile);
+		if (!npsso) {
+			throw new KeinNpssoError("Es ist kein NPSSO hinterlegt.");
+		}
+		sitzung = await psn.tokenAusNpsso(npsso);
+	} catch (fehler) {
+		melder?.({ weg: "gescheitert", grund });
+		throw fehler;
 	}
-	return { token: await sitzungMerken(repos, await psn.tokenAusNpsso(npsso)), wiederverwendet: false };
+	melder?.({ weg: "npsso", grund });
+	return { token: await sitzungMerken(repos, sitzung), wiederverwendet: false };
 }
 
 /** Nur das Token, ohne Wiederholung - fuer Tests und Aufrufer ohne eigenen Client. */
@@ -168,7 +216,7 @@ export async function syncSchritt(
 	// Aus dem Lage-Batch des Crons: die Zugangszeile (Nachtrag 18q) und der
 	// laufende Lauf (Stufe 18p) - `null` heisst "keiner", fehlt der Schluessel,
 	// wird gelesen (Knopf).
-	optionen: { ausloeser?: SyncAusloeser; zeile?: ZugangsZeile | null; laufend?: SyncLauf | null } = {},
+	optionen: { ausloeser?: SyncAusloeser; zeile?: ZugangsZeile | null; laufend?: SyncLauf | null; melder?: AnmeldungMelder } = {},
 ): Promise<SyncErgebnis> {
 	// Ein laufender Lauf wird fortgesetzt, egal wer ihn startete; nur ein
 	// neuer traegt den Ausloeser (Stufe 18: der Cron nimmt dieselben Pfade).
@@ -183,7 +231,7 @@ export async function syncSchritt(
 	let seitenGeholt = 0;
 
 	try {
-		const sitzung = psnSitzung(repos, psn, optionen.zeile);
+		const sitzung = psnSitzung(repos, psn, optionen.zeile, optionen.melder);
 		const accessToken = await sitzung.token();
 		let gesamt: number | null = null;
 

@@ -14,7 +14,7 @@ import {
 	type PhysischErgebnis,
 } from "./igdb";
 import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis, type SpielzeitLauf } from "./besitz";
-import { FEHLVERSUCHE_HOECHSTENS, psnSitzung, syncSchritt, type SyncErgebnis } from "./run";
+import { FEHLVERSUCHE_HOECHSTENS, psnSitzung, syncSchritt, type Anmeldung, type AnmeldungMelder, type SyncErgebnis } from "./run";
 import type { ZugangsZeile } from "../db/credentials";
 import {
 	eineListe,
@@ -176,6 +176,8 @@ export type CronErgebnis = {
 	meldung?: string;
 	/** Welcher Bereich lief (Stufe 18e) - steht in der Verlaufszeile. */
 	bereich?: CronBereich;
+	/** Nur wenn dieser Aufruf sich bei Sony angemeldet hat (Nachtrag 18q-c). */
+	anmeldung?: Anmeldung;
 	sync?: SyncErgebnis;
 	spielzeit?: SpielzeitErgebnis;
 	besitz?: BesitzErgebnis;
@@ -282,6 +284,23 @@ export async function cronSchritt(
 	igdb: IgdbClient,
 	optionen: { heute?: string; bereich?: CronBereich; lage?: CronLage } = {},
 ): Promise<CronErgebnis> {
+	// Die Anmeldung kommt HIER ans Ergebnis, an einer Stelle: Jeder Ausgang der
+	// Kette erbt sie, auch der nach einem Schritt, der seinen Fehler selbst
+	// faengt oder leer ausgeht (Nachtrag 18q-c).
+	const gemeldet: Pick<CronErgebnis, "anmeldung"> = {};
+	const ergebnis = await cronArbeit(repos, psn, igdb, optionen, (anmeldung) => {
+		gemeldet.anmeldung = anmeldung;
+	});
+	return { ...ergebnis, ...gemeldet };
+}
+
+async function cronArbeit(
+	repos: Repositories,
+	psn: PsnClient,
+	igdb: IgdbClient,
+	optionen: { heute?: string; bereich?: CronBereich; lage?: CronLage },
+	melder: AnmeldungMelder,
+): Promise<CronErgebnis> {
 	const heute = optionen.heute ?? heuteIso();
 	const bereich = optionen.bereich ?? "alles";
 	const lage = optionen.lage ?? (await lageLesen(repos, bereich, heute));
@@ -314,9 +333,9 @@ export async function cronSchritt(
 	})) {
 		switch (kandidat) {
 			case "sync":
-				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { zeile, laufend: lage.psn?.laufend }) };
+				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { zeile, melder, laufend: lage.psn?.laufend }) };
 			case "sync_starten":
-				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron", zeile, laufend: lage.psn?.laufend }) };
+				return { ...basis, getan: "sync", sync: await syncSchritt(repos, psn, { ausloeser: "cron", zeile, melder, laufend: lage.psn?.laufend }) };
 
 			// 4.-7. Spielzeit, Kaufliste, Einzeltrophaeen, Level (7.7). Erst nach
 			//       dem Sync: Die Zuordnung laeuft ueber die Titel der Sammlung.
@@ -333,12 +352,14 @@ export async function cronSchritt(
 							runde: spielzeitRundeAus(stand(SCHLUESSEL_SPIELZEIT_RUNDE)),
 							neuestesRelease: lage.psn?.neuestesRelease ?? 0,
 							zeile,
+							melder,
 						});
 						if (spielzeit) return { ...basis, getan: "spielzeit", spielzeit };
 					} else if (kandidat === "besitz") {
 						const besitz = await besitzLauf(repos, psn, heute, {
 							gespeichert: besitzStandAus(stand(SCHLUESSEL_BESITZ)),
 							zeile,
+							melder,
 						});
 						if (besitz) return { ...basis, getan: "besitz", besitz };
 					} else if (kandidat === "trophaeen") {
@@ -347,7 +368,7 @@ export async function cronSchritt(
 						// (Stufe 19b). Dieselbe Auswahl wie der Knopf.
 						const liste = lage.psn?.naechsteListe;
 						if (liste) {
-							const sitzung = psnSitzung(repos, psn, zeile);
+							const sitzung = psnSitzung(repos, psn, zeile, melder);
 							const trophaeen = await eineListe(repos, sitzung.psn, await sitzung.token(), liste);
 							await zugangGeglueckt(repos);
 							return { ...basis, getan: "trophaeen", trophaeen };
@@ -355,7 +376,7 @@ export async function cronSchritt(
 					} else {
 						// Die Sitzung holt der Schritt erst, wenn das Level faellig
 						// ist (Stufe 18i) - vorher erneuerte jeder Leerlauf das Token.
-						const sitzung = psnSitzung(repos, psn, zeile);
+						const sitzung = psnSitzung(repos, psn, zeile, melder);
 						const level = await levelSchritt(repos, sitzung.psn, sitzung.token, heute, levelStandAus(stand(SCHLUESSEL_LEVEL)));
 						if (level) return { ...basis, getan: "level", level: level.level };
 					}
@@ -502,7 +523,7 @@ async function spielzeitLauf(
 	repos: Repositories,
 	psn: PsnClient,
 	heute: string,
-	lage: { stand: string | null; runde: SpielzeitRunde | null; neuestesRelease: number; zeile?: ZugangsZeile | null },
+	lage: { stand: string | null; runde: SpielzeitRunde | null; neuestesRelease: number; zeile?: ZugangsZeile | null; melder?: AnmeldungMelder },
 ): Promise<SpielzeitErgebnis | null> {
 	const { offset, bisher, faellig, lauf: gemerkt } = spielzeitStand(lage.stand, heute);
 	if (!faellig) return null;
@@ -510,7 +531,7 @@ async function spielzeitLauf(
 	const lauf: SpielzeitLauf = gemerkt ?? spielzeitAnlass(runde, neuestesRelease, heute) ?? "spitze";
 	const voll = lauf !== "spitze";
 
-	const sitzung = psnSitzung(repos, psn, lage.zeile);
+	const sitzung = psnSitzung(repos, psn, lage.zeile, lage.melder);
 	const accessToken = await sitzung.token();
 	// Ein Tag Spielraum: Bis zum Abend der letzten fertigen Nacht kann Sony
 	// noch nachgezogen haben. Die Runde fehlt nur ohne Vorgeschichte, und dann
@@ -612,13 +633,13 @@ export async function besitzLauf(
 	// `gespeichert` hat der Cron im Lage-Batch gelesen (Stufe 18j); der Knopf
 	// liest selbst.
 	// `zeile`: die Zugangszeile aus dem Lage-Batch (Nachtrag 18q).
-	optionen: { erzwingen?: boolean; gespeichert?: BesitzStand; zeile?: ZugangsZeile | null } = {},
+	optionen: { erzwingen?: boolean; gespeichert?: BesitzStand; zeile?: ZugangsZeile | null; melder?: AnmeldungMelder } = {},
 ): Promise<BesitzErgebnis | null> {
 	const gespeichert = optionen.gespeichert ?? (await besitzStand(repos));
 	const laeuft = typeof gespeichert.start === "number";
 	if (!besitzFaellig(gespeichert, heute, optionen.erzwingen)) return null;
 
-	const sitzung = psnSitzung(repos, psn, optionen.zeile);
+	const sitzung = psnSitzung(repos, psn, optionen.zeile, optionen.melder);
 	const accessToken = await sitzung.token();
 	const gesehen = laeuft ? (gespeichert.gesehen ?? []) : [];
 	const start = laeuft ? (gespeichert.start ?? 0) : 0;
@@ -714,6 +735,13 @@ export function cronLogzeile(e: CronErgebnis): string {
 	if (e.erschienen) teile.push(`erschienen=${e.erschienen}`);
 	if (e.abgebrochen) teile.push(`abgebrochen=${e.abgebrochen}`);
 	if (e.geloescht) teile.push(`geloescht=${e.geloescht}`);
+	// Hinter dem Bereich (scripts/nacht.mjs liest die ersten beiden Stellen) und
+	// vor jeder Meldung. Ob das Access Token wiederverwendet wurde, steht nicht
+	// da: kein Feld heisst "nicht angemeldet".
+	if (e.anmeldung) {
+		teile.push(`anmeldung=${e.anmeldung.weg}`);
+		if (e.anmeldung.weg !== "refresh") teile.push(`grund=${e.anmeldung.grund}`);
+	}
 	if (e.sync) {
 		teile.push(`sync=${e.sync.status}/${e.sync.phase}`);
 		// In der Normalisierung bewegt sich der Offset nicht - er ist dort fest

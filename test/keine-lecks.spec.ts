@@ -236,6 +236,31 @@ function psnFehlertextMarkiert() {
 	);
 }
 
+/**
+ * PSN, das die Erneuerung mit MARKIERTEM Koerper ablehnt (Nachtrag 18q-c) und
+ * dann ueber das NPSSO anmeldet - oder auch das ablehnt.
+ */
+function psnRueckfallMarkiert(npssoGeht: boolean) {
+	const { fetch, aufrufe } = fakeFetch([
+		[
+			/oauth\/authorize/,
+			() =>
+				npssoGeht
+					? redirectAntwort("v3.code-markierung")
+					: new Response(`Fehler: ${MARKIERUNGEN.psnFehlerkoerper}`, { status: 403 }),
+		],
+		[
+			/oauth\/token/,
+			() =>
+				String(aufrufe[aufrufe.length - 1].init?.body).includes("grant_type=refresh_token")
+					? new Response(`Fehler: ${MARKIERUNGEN.psnFehlerkoerper}`, { status: 400 })
+					: jsonAntwort(markiertesToken),
+		],
+		[/trophyTitles/, () => new Response(trophySeite(0, 5))],
+	]);
+	return erstellePsnClient(fetch);
+}
+
 let ausgabe: string[] = [];
 
 beforeEach(async () => {
@@ -524,6 +549,36 @@ describe("Dichtheitsprüfung", () => {
 		expect(ausgabe.length).toBeGreaterThan(6);
 		const alles = [...ausgabe, ...verlauf].join("\n");
 		expect(istDicht(alles), alles).toMatchObject({ dicht: true });
+	});
+
+	it("nennt den Anmeldeweg im Cron ohne Geheimnis - Rueckfall und Scheitern (Nachtrag 18q-c)", async () => {
+		const repos = createRepositories(env.DB, env.NPSSO_KEY);
+		const ereignis = { scheduledTime: Date.now(), cron: CRON_PSN, noRetry() {} };
+		const lauf = async (npssoGeht: boolean) => {
+			// NPSSO neu (Status 'ok'), Refresh-Token markiert und gueltig, kein
+			// Access Token: Der Aufruf muss anmelden.
+			await env.DB.prepare("DELETE FROM psn_sync_run").run();
+			await env.DB.prepare("DELETE FROM psn_credentials").run();
+			await repos.credentials.npssoSpeichern(new Geheimnis(MARKIERUNGEN.npsso));
+			await repos.credentials.refreshTokenSpeichern(
+				new Geheimnis(MARKIERUNGEN.refresh),
+				new Date(Date.now() + 86_400_000).toISOString(),
+			);
+			await createScheduled(() => psnRueckfallMarkiert(npssoGeht), () => igdbMarkiert())(
+				ereignis,
+				env,
+				createExecutionContext(),
+			);
+		};
+		await lauf(true);
+		await lauf(false);
+
+		const alles = [...ausgabe, ...(await repos.sync.cronVerlauf())].join("\n");
+		// Sonst bewiese der Lauf nichts: Beide Wege muessen gelaufen sein.
+		expect(alles).toContain("anmeldung=npsso grund=400");
+		expect(alles).toContain("anmeldung=gescheitert grund=400");
+		expect(istDicht(alles), alles).toMatchObject({ dicht: true });
+		expect(alles).not.toContain("code-markierung");
 	});
 
 	/** Ein Lauf der Action mit einem faelligen Release, damit eBay wirklich gefragt wird. */
