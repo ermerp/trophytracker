@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 191 | 24.11.2026 | **Abschluss 24.11.:** Nachmittagsläufe der Actions bis 18:28 UTC ausgeblieben, kein Handlauf, Prüfung am 25.11. (16.2) |
 | 190 | 24.11.2026 | **Stufe 18s: Index-Nachtrag.** Auffrisch- und Disc-Auswahl über Teilindizes (Migration 0039), Testbestand der Lesekosten in Produktionsgröße; Wartungs-Leerlauf im Test 1 995 → 74 Zeilen (16.2, 10.1) |
 | 189 | 24.11.2026 | **Nachtrag 18q-c: Anmeldeweg in der Cron-Zeile.** `anmeldung=refresh`, `npsso` oder `gescheitert` mit Grund, gemeldet in `sitzungHolen`; der Verlauf zieht verschiedene Wege nicht zusammen (7.1) |
 | 188 | 24.11.2026 | **Nachtrag: Nacht zum 24.11.** 60 Aufrufe `ok`, Sync `erfolg` 00:50, kein arbeitender Aufruf über 15 ms (16.2); Refresh-Token: Frist rollt innerhalb der Nacht nicht, sprang aber am 24.11. auf den 04.12. – NPSSO-Urteil bei weiterlaufendem Sync erst nach der Nacht zum 05.12. (7.1) |

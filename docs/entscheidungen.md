@@ -388,3 +388,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 24.11.2026 | **Der Anmeldeweg (Refresh-Token oder NPSSO) steht in der Cron-Zeile**, vor dem NPSSO-Ende am 28.11. deployt (Nachtrag 18q-c) | [7.1](spec/07-1-psn-trophaeen.md) |
 | 24.11.2026 | **Index-Nachtrag 18s in einem Rutsch**, Testbestand der Lesekosten im selben Branch (zwei Commits), noch am 24.11. deployt | [16.2](spec/16-2-cpu-und-betrieb.md) |
 | 24.11.2026 | **Die Spielzeit-Spitze wird erst geplant, wenn sie auch gebaut und deployt wird** | [16.2](spec/16-2-offene-stufen.md) |
+| 24.11.2026 | **Kein Handlauf der Preis-Actions am 24.11.**, auch nicht bei einer Stillstand-Warnung: Erst die Nacht zum 25.11. zeigt, ob der neue Zeitplan von selbst läuft | [16.2](spec/16-2-betriebswarnungen.md) |

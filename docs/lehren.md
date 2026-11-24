@@ -174,6 +174,11 @@ lassen, weil sonst die 30 h Stillstand rissen. Auf Nachfrage des Nutzers zeigte 
 ein Fehlalarm, kein Datenverlust, und je ein Handlauf der Actions vermied ihn. Die Folge einer Verletzung
 gehört vor der Empfehlung benannt, nicht erst auf Rückfrage.
 
+**24.11.2026 – dreimal an einem Tag ohne Vorteil aufgeschoben oder geteilt.** Die Spielzeit-Spitze sollte bis zum
+NPSSO-Urteil am 05.12. warten, 18s „frühestens am 25.11." kommen und sein Testbestand ein eigener Schritt sein.
+Auf die Frage des Nutzers nach dem Vorteil blieb jedes Mal keiner; 18s ging am selben Tag in einem Rutsch hinaus.
+Wer Warten oder Teilen empfiehlt, nennt vorher, was sonst konkret verloren ginge.
+
 **27.09.2026 – die Egress-Vermutung ist widerlegt.** Der Ausfall der Kaufliste
 in 18c war mit „Cloudflares Egress gegen `web.np.playstation.com`" erklärt
 worden. Derselbe Worker erreicht den Host; die Kaufliste antwortet einwandfrei
