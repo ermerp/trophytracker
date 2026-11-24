@@ -131,7 +131,12 @@ aus dem NPSSO" (Vermutung vom 23.11.) trifft also nicht zu. Zwei Erklärungen, k
 Token-Endpunkt lehnte den Refresh-Token ab, und der Cron leitete aus dem NPSSO neu ab (Schritt 2; jede
 Antwort außer 2xx führt dorthin, auch eine vorübergehende Störung), oder Sony gab bei der Erneuerung
 eine neue Frist. Beides sieht in der Datenbank gleich aus: Der Rückfall schreibt nichts nach
-`psn_zugang` und nichts ins Log (`sitzungHolen`, `src/sync/run.ts`).
+`psn_zugang`. **Seit Nachtrag 18q-c (24.11.2026) steht der Weg in der Cron-Zeile**, nur wenn sich der
+Aufruf bei Sony angemeldet hat: `anmeldung=refresh`, `anmeldung=npsso grund=…` oder
+`anmeldung=gescheitert grund=…`. Der Grund sagt, warum die Erneuerung nicht ging: HTTP-Status des
+Token-Endpunkts, `ohne` (kein gültiger Refresh-Token), `leer` (2xx ohne Token) oder `fehler` (Netz,
+nur bei `gescheitert`). Gemeldet wird in `sitzungHolen` (`src/sync/run.ts`), alle Cron-Schritte erben es;
+Knopfläufe schreiben keine Cron-Zeile. Stirbt der Aufruf vor der Zeile, fehlt die Angabe.
 
 Praktische Folge für das NPSSO-Ende (28.11. 17:58 UTC): Bleibt der Punkt stehen, trägt der
 Refresh-Token bis zur Nacht zum 03.12.; am 04.12. läuft er fast auf die Sekunde mit dem ersten Aufruf ab.

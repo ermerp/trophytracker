@@ -250,7 +250,8 @@ describe("cronSchritt", () => {
 		// Normalisierungsaufrufe beide "offset=0".
 		const zeilen = schritte.map(cronLogzeile);
 		expect(zeilen.slice(0, 5)).toEqual([
-			"cron: sync sync=laufend/abruf offset=100",
+			// Der erste Aufruf meldet sich an, hier ohne Refresh-Token (18q-c).
+			"cron: sync anmeldung=npsso grund=ohne sync=laufend/abruf offset=100",
 			"cron: sync sync=laufend/normalisierung offset=100",
 			"cron: sync sync=laufend/normalisierung offen=1",
 			"cron: sync sync=laufend/normalisierung offen=0",
@@ -997,8 +998,10 @@ describe("cronSchritt", () => {
 		expect(aufrufe).toBe(psnFenster.aufrufe + wartungFenster.aufrufe);
 		expect(verlauf.length).toBeLessThanOrEqual(10);
 		expect(verlauf.join("\n")).toContain("cron: sync ×");
-		// Der erste geloggte Aufruf hat Seite 0 schon geholt und meldet 100.
-		expect(verlauf.join("\n")).toContain("offset=100→400");
+		// Der erste geloggte Aufruf hat Seite 0 schon geholt und meldet 100. Er
+		// meldet sich an und steht deshalb allein (18q-c), der Rest als Spanne.
+		expect(verlauf.join("\n")).toContain("anmeldung=npsso grund=ohne sync=laufend/abruf offset=100");
+		expect(verlauf.join("\n")).toContain("offset=200→400");
 		expect(await repos().trophies.anzahl()).toBe(431);
 	});
 

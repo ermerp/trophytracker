@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 189 | 24.11.2026 | **Nachtrag 18q-c: Anmeldeweg in der Cron-Zeile.** `anmeldung=refresh`, `npsso` oder `gescheitert` mit Grund, gemeldet in `sitzungHolen`; der Verlauf zieht verschiedene Wege nicht zusammen (7.1) |
 | 188 | 24.11.2026 | **Nachtrag: Nacht zum 24.11.** 60 Aufrufe `ok`, Sync `erfolg` 00:50, kein arbeitender Aufruf über 15 ms (16.2); Refresh-Token: Frist rollt innerhalb der Nacht nicht, sprang aber am 24.11. auf den 04.12. – NPSSO-Urteil bei weiterlaufendem Sync erst nach der Nacht zum 05.12. (7.1) |
 | 187 | 23.11.2026 | **Abschluss 23.11.:** 18r-b deployt, Handläufe beider Actions grün; Reihenfolge der CPU-Arbeit (Index-Nachtrag planen am 24.11., Spielzeit nach dem 01.12.); Lehren zum Refresh-Token und zur Merge-Empfehlung (16.2) |
 | 186 | 23.11.2026 | **Nachtrag 18r-b: Preis-Actions am Nachmittag.** Markt 13:17 / 15:17, Store 13:47 / 15:47 UTC statt 20:17 / 22:17 und 20:47 / 22:47; Schwellen unverändert und mit 6 h 38 nachgerechnet, `nacht.mjs` zählt die Preisläufe ab 13 UTC des Vortags (7.3, 7.4, 16.2) |
