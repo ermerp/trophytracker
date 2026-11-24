@@ -113,7 +113,7 @@ Schritt 7) → **18j** Ablauf: ein Lese- und ein Schreib-Batch je Cron-Aufruf, g
 Seite teurer; die Portion bleibt bis „Cron je Minute" bei zehn) – beide in derselben Nacht, aber
 eine Nacht nach 18j, damit ihre Wirkung nicht mit der Grundlast vermischt → nachmessen → **20i** Markt. Erst mit den
 Zahlen aus 20i entscheidet der Nutzer zwischen Wortindex-Zeile, Cron je Minute und GitHub Actions –
-und erst nach dem Index-Nachtrag für die Auswahlen des Lage-Batches (unten).
+und erst nach dem Index-Nachtrag (18s, unten).
 
 **Die Fristen von Markt und Store** (`MARKT_FRIST_STUNDEN`, `STORE_FRIST_STUNDEN`): in 20i je 20
 Stunden (Vorgabe des Nutzers vom 17.10.2026, für den Store vom 19.10.2026); **der Markt seit 20i-b
@@ -131,42 +131,37 @@ fällig; vorgeschlagen sind 20. Die Rechnung hängt an der Fensterlage und gehö
 **Für die Action übernommen, nicht mehr als eigener Nachtrag: der Marktschritt** – an der Regel „Abgleiche bereiten den Bestand
 einmal vor" ausgerichtet: Titel einmal zerlegen statt je Prüfung, ein Wortindex je Aufruf statt
 jedes Angebot gegen alle Spiele (Vorgabe des Nutzers vom 16.10.2026). Dazu gehört die **Auswahl,
-die im Leerlauf 596 Zeilen liest** (10.1, Schritt 14; Tabelle unten). Derselbe Fehler wie bei `offen` steckt in
+die im Leerlauf 596 Zeilen liest** (10.1, Schritt 14). Derselbe Fehler wie bei `offen` steckt in
 der Store-Zeile: `offen` zählt dort Releases ohne Stempel mit Produkt-Id im ganzen Bestand, nicht
 das Fällige – nicht angefasst, notiert. Dazu gehört auch, dass diese Zählung (`offeneAnzahl`) in der
 Produktion 412 Zeilen je Aufruf liest, obwohl ihr Kommentar `idx_release_store` nennt (D1-Analytics,
 17.10.2026).
 
-**Der Bestand der Lesekosten-Messung kommt in den Index-Nachtrag** (Entscheidung des Nutzers vom
-20.10.2026; Vorgabe vom 18.10.2026, „spätestens mit 20i"; dort nicht umgesetzt, weil
-der Testbestand an rund 15 Stellen Release-Id = Spiel-Id und genau 430 Releases voraussetzt, und weil
-die Marktauswahl mit ihren 59 nie geprüften Releases seit 20i nicht mehr im Lage-Batch steht). **Der Nachtrag soll auch den
-Wartungs-Leerlauf senken** (rund 1 800 Zeilen je Aufruf); seine CPU blieb am 20.10. ohne die
-Marktauswahl bei Median 7 ms ([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)). **Die Lage der
-Markt-Action** brauchte am 21. und 22.10. 19 und 18 ms (SEA, MSP) gegen 7 ms (IAD) am 20.10.; untersucht
-am 22.10. als Teil der Planung von 20j (Vorgabe des Nutzers), Ergebnis in
-[16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md). Der Test liest im Wartungsleerlauf seit 20i
-**1 788 Zeilen** (seit 18n 1 789: ein Schlüssel mehr) – die 2 218 der Tabelle ohne die Zeile Gebrauchtpreise, die nicht mehr im Lage-Batch
-steht. **Die Tabelle ist der Stand vom 18.10.2026, vor 20i:** Test 2 218, Produktion rund 2 590, die drei
-Auswahlen des Lage-Batches, exakt gemessen über `meta.rows_read`, dieselben Anweisungen
-aus dem Code (die Marktauswahl mit verschobener Frist, damit nichts fällig ist wie im Leerlauf):
+**Der Index-Nachtrag, Stufe 18s (gebaut am 24.11.2026).** Die beiden Auswahlen des Wartungs-Lage-Batches
+lasen im Leerlauf den ganzen Bestand. Auffrischen: zwei Lookups im Teilindex aus 0036 (NULL und `<` per
+`UNION ALL`) statt `OR`; Disc: von den unbekannten Releases aus, Teilindex `idx_release_disc_offen`
+(Migration 0039). Fristen, Auswahl und Reihenfolge sind unverändert (Test alt gegen neu). `UNION ALL`,
+nicht `UNION`: Sonst liest SQLite für das Entdoppeln `idx_release_game` ganz (491 Zeilen).
 
-| Auswahl | Test | Produktion | Plan | Woran der Abstand liegt |
-|---|---|---|---|---|
-| IGDB-Auffrischen | 431 | 480 | `SCAN game`, Sortierung über temporären Baum | **Menge** (430 gegen 479 Spiele) |
-| Disc-Prüfung | 1 289 | 1 445 | `SCAN g`, je Spiel `idx_release_game` | **Menge** (430 gegen 490 Releases) |
-| Gebrauchtpreise | 430 | 596 | ganzer `idx_release_markt` | **Verteilung**: 59 nie geprüfte Releases außerhalb der Auswahl (im Test 0) |
+| im Test, Bestand in Produktionsgröße | alt | neu |
+|---|---|---|
+| Auffrischen, Leerlauf (Produktion alt 479) | 479 | 2 |
+| Disc, Leerlauf (Produktion alt 1 445) | 1 446 | 2 |
+| **Wartungs-Leerlauf gesamt** | 1 995 | 74 |
+| Leerlauf-Nacht, 36 PSN + 24 Wartung | 49 392 | 3 288 |
+| Disc-Stempel, 51 Releases: geschriebene Zeilen | 51 | 102 |
 
-Die Schätzung „~2 870" aus der Stichprobe der D1-Analytics lag rund 10 % zu hoch; die Lücke zum Test
-sind **17 %, nicht 30 %**. Der Test braucht also 479 Spiele, 490 Releases (manche Spiele mit zwei)
-und 59 ungeprüfte Releases, die nie in die Auswahl kommen. **Die Ursache der Kosten selbst ist eine
-andere:** Alle drei lesen im Leerlauf den ganzen Bestand, in Test und Produktion. Die IGDB-Auswahl
-kann keinen Index nutzen (keiner auf `igdb_synced_at`, und `ORDER BY igdb_synced_at IS NOT NULL`
-verhinderte ihn auch), die Disc-Auswahl geht von `game` statt vom kleinen Teil der Releases aus (171
-`unbekannt`, davon 170 in der 30-Tage-Frist) – das ist Arbeit für einen Index-Nachtrag, nicht für
-den Testbestand. **Dieser Index-Nachtrag für die drei Auswahlen kommt vor die Entscheidung „Cron je
-Minute", spätestens mit 20i** (Vorgabe des Nutzers vom 18.10.2026): Bei 180 Aufrufen je Fenster
-multipliziert sich gerade der Lage-Batch, und die Entscheidung soll mit den Zahlen danach fallen.
+Schreibkosten: rund +165 Zeilen je 30 Tage. **Offen: die CPU** – der Wartungs-Leerlauf lag vorher bei
+Median 4 ms; gemessen wird ab der Nacht zum 25.11. Die Entscheidung „Cron je Minute" fällt mit den
+Zahlen danach (Vorgabe des Nutzers vom 18.10.2026). **Nicht ausgeweitet:** `discBelegt` in der Zählung
+scannt weiter `release` (rund 490 Zeilen).
+
+**Der Testbestand** (Vorgaben des Nutzers vom 18. und 20.10.2026) hat jetzt 479 Spiele (478
+verknüpft), 490 Releases (11 Spiele mit zwei), 165 `unbekannt` und 59 nie geprüfte außerhalb der Marktauswahl; seine Release-Id
+ist nicht die Spiel-Id. Die Marktauswahl liest damit im Test 490 statt 596 Zeilen (Produktion, 18.10.):
+warum die 59 draußen sind, ist nicht nachgebildet; im Cron läuft sie seit 20i nicht mehr. **Die Lage der
+Markt-Action** brauchte am 21. und 22.10. 19 und 18 ms (SEA, MSP) gegen 7 ms (IAD) am 20.10.
+([16-2-cpu-je-schritt.md](16-2-cpu-je-schritt.md)).
 
 #### Betriebswarnungen (18m, 18m-b) und Nachtläufe bis 05:00 UTC
 
