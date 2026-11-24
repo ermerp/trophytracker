@@ -3,9 +3,10 @@ import { BACKLOG_KANDIDATEN, KAUF_KANDIDATEN, PLAN_AUSWAHL } from "../src/db/pla
 import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
 import { FEED_HOECHSTENS } from "../src/api/feed";
-import { CRON_PSN, CRON_WARTUNG, cronFenster, SCHLUESSEL_AUFFRISCHEN } from "../src/sync/cron";
+import { AUFFRISCH_FRIST_TAGE, CRON_PSN, CRON_WARTUNG, cronFenster, SCHLUESSEL_AUFFRISCHEN } from "../src/sync/cron";
 import { createExecutionContext } from "cloudflare:test";
 import { createRepositories } from "../src/db";
+import { einzeln, type Baustein } from "../src/db/baustein";
 import { Geheimnis } from "../src/domain/secret";
 import { createApp, createScheduled } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
@@ -39,11 +40,58 @@ import {
  * Am 13.09.2026 hat die Sammlungsansicht mit korrelierten Unterabfragen
  * ohne Indizes 11,7 Millionen Zeilen an einem Vormittag gelesen und die
  * Anwendung fuer den Rest des Tages lahmgelegt. Dieser Test misst die
- * Kosten gegen einen Bestand in Produktionsgroesse (rund 430 Listen) ueber
- * meta.rows_read der lokalen D1 und haelt sie unter einer Grenze.
+ * Kosten gegen einen Bestand in Produktionsgroesse ueber meta.rows_read der
+ * lokalen D1 und haelt sie unter einer Grenze.
+ *
+ * Der Bestand (seit Stufe 18s) hat die Zahlen der Produktion (16.2) -
+ * nachgebaut, nichts kopiert: 479 Spiele, davon 478 mit IGDB
+ * verknuepft, 431 Trophaeenlisten, 490 Releases. Elf Spiele haben zwei
+ * Releases, 48 keine Liste; diese 59 Releases ohne Liste kommen nie in die
+ * Marktauswahl und bleiben ungestempelt. 165 Releases sind `unbekannt`.
+ * Release-Ids sind absichtlich nicht die Spiel-Ids (`releaseVon`).
  */
 
-const ANZAHL = 430;
+const SPIELE = 479;
+const LISTEN = 431;
+/** Spiele mit einem zweiten Release (PS3 neben PS Vita) - alle tragen eine Liste am ersten. */
+const ZWEITE = Array.from({ length: 11 }, (_, k) => 36 * (k + 1) - 1);
+const RELEASES = SPIELE + ZWEITE.length;
+/** Releases ohne Trophaeenliste: nie in der Marktauswahl (FAELLIG_IN_AUSWAHL). */
+const OHNE_LISTE = RELEASES - LISTEN;
+const UNBEKANNT = 165;
+/** Das eine Spiel ohne IGDB-Verknuepfung. */
+const OHNE_IGDB = SPIELE;
+const RELEASE_BASIS = 2_000;
+/** Das (erste) Release eines Spiels; die zweiten stehen dahinter. */
+const releaseVon = (spiel: number) => RELEASE_BASIS + spiel;
+const RELEASE_IDS = Array.from({ length: RELEASES }, (_, k) => RELEASE_BASIS + k + 1);
+/** Gleichmaessig verteilt, genau UNBEKANNT von RELEASES - die Regel gibt es in JS und SQL. */
+const istUnbekannt = (release: number) => ((release - RELEASE_BASIS) * UNBEKANNT) % RELEASES < UNBEKANNT;
+
+/**
+ * IGDB- und Disc-Stand der Produktion im Leerlauf: verknuepft, vor hoechstens
+ * sechs Tagen aufgefrischt (Frist sieben), `unbekannt` vor hoechstens 27
+ * Tagen geprueft (Frist dreissig). Tests, die ihn aendern, stellen ihn damit
+ * wieder her.
+ */
+const grundzustand = () => [
+	env.DB.prepare(
+		`UPDATE game SET igdb_id = CASE WHEN id = ${OHNE_IGDB} THEN NULL ELSE id + 1000 END, ` +
+			`igdb_synced_at = CASE WHEN id = ${OHNE_IGDB} THEN NULL ELSE datetime('now', '-' || (id % 6) || ' days') END`,
+	),
+	env.DB.prepare(
+		`UPDATE release SET physical_release_status = CASE WHEN (id - ${RELEASE_BASIS}) * ${UNBEKANNT} % ${RELEASES} < ${UNBEKANNT} THEN 'unbekannt' ELSE 'ja' END, ` +
+			`physical_source = CASE WHEN (id - ${RELEASE_BASIS}) * ${UNBEKANNT} % ${RELEASES} < ${UNBEKANNT} THEN NULL ELSE 'igdb' END, ` +
+			"physical_checked_at = datetime('now', '-' || (id % 28) || ' days')",
+	),
+];
+
+/** Der Stand nach dem Lauf der Markt-Action: alles in der Auswahl heute gestempelt, der Rest nie. */
+const marktGestempelt = () =>
+	env.DB.prepare(
+		"UPDATE release SET markt_geprueft_am = CASE WHEN EXISTS (SELECT 1 FROM trophy_progress t WHERE t.release_id = release.id) " +
+			"THEN datetime('now') ELSE NULL END",
+	);
 const B = "https://example.com";
 
 beforeAll(async () => {
@@ -62,16 +110,19 @@ beforeAll(async () => {
 	const status = env.DB.prepare("INSERT INTO play_status (release_id, status) VALUES (?, 'am_spielen')");
 	const queue = env.DB.prepare("INSERT INTO review_queue (release_id, reason) VALUES (?, 'erstimport')");
 	const anweisungen: D1PreparedStatement[] = [];
-	for (let i = 1; i <= ANZAHL; i++) {
+	for (let i = 1; i <= SPIELE; i++) {
 		const plattform = ["PS3", "PS4", "PS5", "PSVITA"][i % 4];
 		anweisungen.push(spiele.bind(i, `Spiel ${i}`, `spiel ${String(i).padStart(4, "0")}`));
-		anweisungen.push(releases.bind(i, i, plattform));
+		anweisungen.push(releases.bind(releaseVon(i), i, plattform));
+		if (i > LISTEN) continue;
 		anweisungen.push(
-			listen.bind(`NPWR${i}`, `Spiel ${i}`, plattform, `https://x.invalid/${i}.png`, i % 101, i % 5 === 0 ? 1 : 0, `2025-01-${String((i % 28) + 1).padStart(2, "0")}T00:00:00Z`, i),
+			listen.bind(`NPWR${i}`, `Spiel ${i}`, plattform, `https://x.invalid/${i}.png`, 1 + (i % 100), i % 5 === 0 ? 1 : 0, `2025-01-${String((i % 28) + 1).padStart(2, "0")}T00:00:00Z`, releaseVon(i)),
 		);
-		anweisungen.push(status.bind(i));
-		anweisungen.push(queue.bind(i));
+		anweisungen.push(status.bind(releaseVon(i)));
+		anweisungen.push(queue.bind(releaseVon(i)));
 	}
+	ZWEITE.forEach((spiel, k) => anweisungen.push(releases.bind(RELEASE_BASIS + SPIELE + k + 1, spiel, "PS3")));
+	anweisungen.push(...grundzustand());
 	for (let i = 0; i < anweisungen.length; i += 200) {
 		await env.DB.batch(anweisungen.slice(i, i + 200));
 	}
@@ -81,6 +132,12 @@ beforeAll(async () => {
 async function zeilenGelesen(sql: string, ...werte: unknown[]): Promise<number> {
 	const r = await env.DB.prepare(sql).bind(...werte).all();
 	return r.meta.rows_read ?? -1;
+}
+
+/** Gelesene Zeilen eines Bausteins - die Abfrage aus dem Code, keine Abschrift. */
+async function bausteinGelesen(b: Baustein<unknown>): Promise<number> {
+	const ergebnisse = await env.DB.batch(b.anweisungen);
+	return ergebnisse.reduce((n, e) => n + (e.meta.rows_read ?? 0), 0);
 }
 
 /**
@@ -99,6 +156,22 @@ async function routeGelesen(pfad: string): Promise<number> {
 	expect(antwort.status, pfad).toBe(200);
 	return zaehler.gelesen();
 }
+
+describe("Der Testbestand selbst (Stufe 18s)", () => {
+	it("hat die Zahlen der Produktion", async () => {
+		await marktGestempelt().run();
+		const z = await env.DB.prepare(
+			"SELECT (SELECT COUNT(*) FROM game) AS spiele, (SELECT COUNT(*) FROM game WHERE igdb_id IS NOT NULL) AS verknuepft, " +
+				"(SELECT COUNT(*) FROM trophy_progress) AS listen, (SELECT COUNT(*) FROM release) AS releases, " +
+				"(SELECT COUNT(*) FROM release WHERE physical_release_status = 'unbekannt') AS unbekannt, " +
+				"(SELECT COUNT(*) FROM release WHERE markt_geprueft_am IS NULL) AS nieGeprueft, " +
+				`(SELECT COUNT(*) FROM release r ${FAELLIG_IN_AUSWAHL}) AS faellig`,
+		).first();
+		await env.DB.prepare("UPDATE release SET markt_geprueft_am = NULL").run();
+		expect(z).toEqual({ spiele: SPIELE, verknuepft: SPIELE - 1, listen: LISTEN, releases: RELEASES, unbekannt: UNBEKANNT, nieGeprueft: OHNE_LISTE, faellig: 0 });
+		expect([RELEASES, OHNE_LISTE]).toEqual([490, 59]);
+	});
+});
 
 describe("Grenzen der Sammlungsabfrage", () => {
 	/**
@@ -122,7 +195,7 @@ describe("Live-Aufloesung beim Scannen (Stufe 17c/17d)", () => {
 	 * Die Route zerlegt die Sammlung einmal (nicht je Angebot) und holt die
 	 * Releases nur fuer die Treffer. Gemessen wird beides einzeln.
 	 */
-	it("liest die Sammlung einmal, nicht 430 Unterabfragen", async () => {
+	it(`liest die Sammlung einmal, nicht ${SPIELE} Unterabfragen`, async () => {
 		const sammlung = await zeilenGelesen("SELECT id AS spielId, title AS titel FROM game");
 		// Der Sperrlisten-Lookup des Schritts (Stufe 20h): EINMAL je Portion
 		// ueber den Primaerschluessel, nicht je Release. Er laeuft 24-mal je
@@ -130,28 +203,28 @@ describe("Live-Aufloesung beim Scannen (Stufe 17c/17d)", () => {
 		// nur im Schreibpfad.
 		const sperrliste = await zeilenGelesen(
 			`SELECT release_id, ebay_item_id FROM market_offer_verworfen WHERE release_id IN (${Array.from({ length: 20 }, () => "?").join(",")})`,
-			...Array.from({ length: 20 }, (_, i) => i + 1),
+			...Array.from({ length: 20 }, (_, i) => releaseVon(i + 1)),
 		);
 		// Die Tafel am Preis holt die Titel erst beim Aufklappen - ein
 		// Index-Lookup auf eine kleine Tabelle.
 		const tafel = await zeilenGelesen(
 			"SELECT ebay_item_id AS itemId, titel, preis_cents AS preisCents, verworfen_am AS verworfenAm " +
 				"FROM market_offer_verworfen WHERE release_id = ? ORDER BY verworfen_am DESC, ebay_item_id",
-			1,
+			releaseVon(1),
 		);
 		// Die Pruefung der Route vor dem Verwerfen: Liegt dieses Angebot
 		// ueberhaupt noch vor (sonst 409)? Ueber idx_market_offer_kanal.
 		const kennungspruefung = await zeilenGelesen(
 			"SELECT title_raw AS titel, price_cents AS preisCents FROM market_offer " +
 				"WHERE release_id = ? AND ebay_item_id = ? AND source = 'ebay' AND in_stock = 1 ORDER BY kanal LIMIT 1",
-			1,
+			releaseVon(1),
 			`12${1_000_001}`,
 		);
 		// Und das Ziel des Einzelabrufs - eine Zeile ueber den Primaerschluessel.
 		const eines = await zeilenGelesen(
 			"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
 				"r.physical_release_status AS discFassung FROM release r JOIN game g ON g.id = r.game_id WHERE r.id = ?",
-			1,
+			releaseVon(1),
 		);
 		const jeTreffer = await zeilenGelesen(
 			"SELECT r.id, r.platform, g.cover_url, (SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare " +
@@ -165,7 +238,7 @@ describe("Live-Aufloesung beim Scannen (Stufe 17c/17d)", () => {
 	});
 });
 
-describe("Zeilenlese-Kosten bei 430 Listen", () => {
+describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 	it("Sammlung, eine Seite nach Titel", async () => {
 		const antwort = await SELF.fetch(`${B}/api/games?limit=50`);
 		expect(antwort.status).toBe(200);
@@ -227,8 +300,9 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Gemessen am 24.10.2026: 24 315 nach Titel, 54 908 nach Wertung - der
 		// Grundpreis jedes Blocks (Zaehlung, Sortierung ueber den Bestand),
 		// nicht das OFFSET. Bei 5 Mio. am Tag rund 1 % je ganzem Durchlauf.
+		// Mit 479 statt 430 Spielen (18s) zehn Bloecke: 28 563 und 66 171.
 		expect(durchlauf.titel.gelesen).toBeLessThan(30_000);
-		expect(durchlauf.wertung.gelesen).toBeLessThan(65_000);
+		expect(durchlauf.wertung.gelesen).toBeLessThan(72_000);
 	});
 
 	/**
@@ -263,7 +337,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				"VALUES (?, ?, 'PS4', ?, ?, datetime('now'))",
 		);
 		const anweisungen: D1PreparedStatement[] = [];
-		for (let i = 1; i <= ANZAHL; i += 2) anweisungen.push(einfuegen.bind(`CUSA${i}`, `Spiel ${i}`, i * 60, i));
+		for (let i = 1; i <= LISTEN; i += 2) anweisungen.push(einfuegen.bind(`CUSA${i}`, `Spiel ${i}`, i * 60, releaseVon(i)));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 
 		const spielzeit =
@@ -486,11 +560,15 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Ein Lese- und ein Schreibaufruf, gleich wie viele Spiele.
 		expect(messung.aufrufe).toBe(2);
 		expect(messung.anweisungen).toBeLessThanOrEqual(5);
-		// Je Spiel Index-Lookups, kein Scan ueber game.
-		expect(messung.gelesen).toBeLessThan(1_000);
+		// Je Spiel Index-Lookups, kein Scan ueber game. Vor 18s las der Test 450,
+		// weil nur die 50 Spiele der Portion verknuepft waren; mit allen 478
+		// verknuepft, wie in der Produktion, 1 306, seit die Auswahl ueber den
+		// Teilindex aus 0036 laeuft 400.
+		expect(messung.gelesen).toBeLessThan(500);
 
 		await env.DB.batch([
-			env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_slug = NULL, cover_url = NULL, release_date = NULL, release_status = 'unbekannt', critic_score = NULL, critic_score_count = NULL, critic_source = NULL, critic_updated_at = NULL, user_score = NULL, user_score_count = NULL, igdb_synced_at = NULL"),
+			env.DB.prepare("UPDATE game SET igdb_slug = NULL, cover_url = NULL, release_date = NULL, release_status = 'unbekannt', critic_score = NULL, critic_score_count = NULL, critic_source = NULL, critic_updated_at = NULL, user_score = NULL, user_score_count = NULL"),
+			...grundzustand(),
 			env.DB.prepare("DELETE FROM game_event WHERE source = 'igdb' AND kind = 'erschienen'"),
 		]);
 	});
@@ -529,7 +607,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		});
 		console.info({ marktLage: { ...lage, antwort: undefined, ziele: ziele.length }, marktPortion: { ...portion, antwort: undefined } });
 
-		expect(ziele.length).toBeGreaterThan(300);
+		expect(ziele.length).toBe(LISTEN);
 		expect(lage.aufrufe).toBe(1);
 		expect(portion.antwort).toMatchObject({ geprueft: MARKT_JE_POST });
 		expect(portion.aufrufe).toBe(2);
@@ -541,7 +619,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("DELETE FROM price_snapshot"),
 			env.DB.prepare("DELETE FROM market_offer"),
 			env.DB.prepare("DELETE FROM game_event"),
-			env.DB.prepare("UPDATE release SET markt_geprueft_am = NULL, markt_rohangebote = NULL, physical_release_status = 'unbekannt', physical_source = NULL"),
+			env.DB.prepare("UPDATE release SET markt_geprueft_am = NULL, markt_rohangebote = NULL"),
+			...grundzustand(),
 		]);
 	});
 
@@ -646,12 +725,12 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	 */
 	it("misst den IGDB-Abgleich und die Pruefansicht", async () => {
 		// Haelfte der Spiele wartet auf die Pruefung, mit je drei Kandidaten.
-		await env.DB.prepare("UPDATE game SET igdb_checked_at = datetime('now') WHERE id % 2 = 0").run();
+		await env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_synced_at = NULL, igdb_checked_at = CASE WHEN id % 2 = 0 THEN datetime('now') END").run();
 		const einfuegen = env.DB.prepare(
 			"INSERT INTO igdb_candidate (game_id, igdb_id, name, position, fetched_at) VALUES (?, ?, ?, ?, datetime('now'))",
 		);
 		const anweisungen: D1PreparedStatement[] = [];
-		for (let i = 2; i <= ANZAHL; i += 2) {
+		for (let i = 2; i <= SPIELE; i += 2) {
 			for (let k = 0; k < 3; k++) anweisungen.push(einfuegen.bind(i, i * 10 + k, `Kandidat ${i}-${k}`, k));
 		}
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
@@ -688,6 +767,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM igdb_candidate"),
 			env.DB.prepare("UPDATE game SET igdb_checked_at = NULL"),
+			...grundzustand(),
 		]);
 	});
 
@@ -698,7 +778,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const amSpiel = env.DB.prepare("INSERT INTO plan_entry (kind, game_id, origin) VALUES ('wunsch', ?, 'import')");
 		const amRelease = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('wunsch', ?, 'import')");
 		const anweisungen: D1PreparedStatement[] = [];
-		for (let i = 1; i <= 300; i++) anweisungen.push(i % 3 === 0 ? amRelease.bind(i) : amSpiel.bind(i));
+		for (let i = 1; i <= 300; i++) anweisungen.push(i % 3 === 0 ? amRelease.bind(releaseVon(i)) : amSpiel.bind(i));
 		anweisungen.push(env.DB.prepare("INSERT INTO plan_entry (kind, title_raw, origin) VALUES ('wunsch', 'Freitext', 'manuell')"));
 		anweisungen.push(env.DB.prepare("UPDATE plan_entry SET status = 'erledigt' WHERE id % 10 = 0"));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
@@ -719,7 +799,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const duplikat = await zeilenGelesen(
 			"SELECT id FROM plan_entry WHERE kind = ? AND status = 'offen' AND release_id = ?",
 			"wunsch",
-			3,
+			releaseVon(3),
 		);
 		const nachIgdb = await zeilenGelesen("SELECT id FROM game WHERE igdb_id = ?", 1001);
 
@@ -775,8 +855,9 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(naechste).toBeLessThan(400);
 		expect(unklarSeite).toBeLessThan(500);
 		expect(kandidatenSeite).toBeLessThan(600);
-		// v_ohne_igdb scannt game (430) und plan_entry einmal.
-		expect(ohneZuordnung).toBeLessThan(1_000);
+		// v_ohne_igdb sucht die Spiele ohne Verknuepfung ueber idx_game_igdb - im
+		// Grundzustand eines (18s; vorher war keines verknuepft: 861 Zeilen).
+		expect(ohneZuordnung).toBeLessThan(100);
 
 		for (const pfad of ["/api/imports/wishlist/1?gruppe=unklar", "/api/imports/wishlist/1?gruppe=klar", "/api/unmatched"]) {
 			expect((await SELF.fetch(`${B}${pfad}`)).status, pfad).toBe(200);
@@ -787,19 +868,20 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	it("misst Backlog-Kandidaten, To-Do-Liste und Umsortieren (Stufe 12)", async () => {
 		// Regal-Erfassung in Produktionsgroesse: jedes Release im Besitz, dazu
 		// 50 To-Do- und 100 Backlog-Eintraege. Der Grundbestand hat ueberall
-		// Trophaeenfortschritt und 'am_spielen', die Kandidaten kommen aus 40
-		// zusaetzlichen Releases ohne Liste.
+		// Trophaeenfortschritt und 'am_spielen'; Kandidaten sind die Releases ohne
+		// Liste und 40 zusaetzliche.
 		await env.DB.prepare("DELETE FROM plan_entry").run();
 		const disc = env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)");
 		const digital = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, 'kauf')");
 		const release = env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (?, ?, 'PS5')");
 		const todo = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin, position) VALUES ('todo', ?, 'triage', ?)");
 		const backlog = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('backlog', ?, 'triage')");
+		const zusaetzlich = RELEASE_BASIS + RELEASES;
 		const anweisungen: D1PreparedStatement[] = [];
-		for (let i = 1; i <= ANZAHL; i++) anweisungen.push(i % 2 === 0 ? disc.bind(i) : digital.bind(i));
-		for (let i = 1; i <= 40; i++) anweisungen.push(release.bind(ANZAHL + i, i), disc.bind(ANZAHL + i));
-		for (let i = 1; i <= 50; i++) anweisungen.push(todo.bind(i, i));
-		for (let i = 51; i <= 150; i++) anweisungen.push(backlog.bind(i));
+		RELEASE_IDS.forEach((id) => anweisungen.push(id % 2 === 0 ? disc.bind(id) : digital.bind(id)));
+		for (let i = 1; i <= 40; i++) anweisungen.push(release.bind(zusaetzlich + i, i), disc.bind(zusaetzlich + i));
+		for (let i = 1; i <= 50; i++) anweisungen.push(todo.bind(releaseVon(i), i));
+		for (let i = 51; i <= 150; i++) anweisungen.push(backlog.bind(releaseVon(i)));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 
 		const kandidaten = await zeilenGelesen(BACKLOG_KANDIDATEN);
@@ -839,71 +921,64 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			expect(antwort.status, pfad).toBe(200);
 		}
 		const antwort = await SELF.fetch(`${B}/api/backlog-candidates`);
-		expect(((await antwort.json()) as { anzahl: number }).anzahl).toBe(40);
+		expect(((await antwort.json()) as { anzahl: number }).anzahl).toBe(40 + OHNE_LISTE);
 
 		await env.DB.batch(
 			["plan_entry", "physical_copy", "digital_entitlement"].map((t) => env.DB.prepare(`DELETE FROM ${t}`)),
 		);
-		await env.DB.prepare("DELETE FROM release WHERE id > ?").bind(ANZAHL).run();
+		await env.DB.prepare("DELETE FROM release WHERE id > ?").bind(zusaetzlich).run();
 	});
 
 	it("misst die Lueckenliste und die Auswahl des Disc-Schritts (Stufe 14)", async () => {
-		// Nach dem IGDB-Lauf: 200 Releases mit 'ja', der Rest 'unbekannt', 30
-		// verworfene Kaufeintraege, alle Spiele verknuepft. Die View laeuft
-		// einmal ueber trophy_progress; je Zeile drei Index-Lookups
-		// (physical_copy, plan_entry zweimal, market_offer).
+		// Nach dem IGDB-Lauf: der Grundzustand, dazu 30 verworfene
+		// Kaufeintraege. Die View laeuft einmal ueber trophy_progress; je Zeile
+		// drei Index-Lookups (physical_copy, plan_entry zweimal, market_offer).
+		const belegt = RELEASE_IDS.slice(0, LISTEN).filter((id) => !istUnbekannt(id));
 		await env.DB.prepare("DELETE FROM plan_entry").run();
-		await env.DB.batch([
-			env.DB.prepare("UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb' WHERE id % 2 = 0"),
-			env.DB.prepare("UPDATE game SET igdb_id = id + 1000"),
-		]);
 		const verworfen = env.DB.prepare(
 			"INSERT INTO plan_entry (kind, release_id, origin, status, resolved_at) VALUES ('kauf', ?, 'luecke', 'verworfen', '2026-09-16')",
 		);
-		await env.DB.batch(Array.from({ length: 30 }, (_, i) => verworfen.bind((i + 1) * 2)));
+		await env.DB.batch(belegt.slice(0, 30).map((id) => verworfen.bind(id)));
 
 		// Die ganze Route, nicht eine Abschrift ihrer Abfrage (seit 20e-b).
 		const luecken = await routeGelesen("/api/gaps?verworfene=1&unbekannte=1");
-		const auswahl = await zeilenGelesen(
-			`SELECT g.id, g.igdb_id FROM game g WHERE g.igdb_id IS NOT NULL AND EXISTS (SELECT 1 FROM release r WHERE r.game_id = g.id
-			 AND r.physical_release_status = 'unbekannt'
-			 AND (r.physical_checked_at IS NULL OR r.physical_checked_at < datetime('now', '-30 days'))) ORDER BY g.id LIMIT 50`,
+		// Die Auswahl aus dem Code (seit 18s), mit Arbeit: alles `unbekannt` faellig.
+		await env.DB.prepare("UPDATE release SET physical_checked_at = NULL").run();
+		const auswahl = await bausteinGelesen(
+			createRepositories(env.DB, env.NPSSO_KEY).igdb.zurDiscPruefungBaustein(AUFFRISCHEN_JE_AUFRUF),
 		);
 		const kaufkandidaten = await zeilenGelesen("SELECT quelle, release_id, title FROM v_kaufkandidaten");
 		console.info({ luecken, auswahl, kaufkandidaten });
 
 		expect(luecken).toBeLessThan(4_000);
-		expect(auswahl).toBeLessThan(1_000);
+		expect(auswahl).toBeLessThan(320);
 		expect(kaufkandidaten).toBeLessThan(4_000);
 
 		const antwort = await SELF.fetch(`${B}/api/gaps?verworfene=1&unbekannte=1`);
 		expect(antwort.status).toBe(200);
 		const daten = (await antwort.json()) as { anzahl: number; verworfen: number; unbekannt: number };
-		// 215 gerade Ids mit 'ja', zwei davon (202, 404) ohne Fortschritt, 30 verworfen
-		expect(daten).toMatchObject({ anzahl: 183, verworfen: 30 });
-		expect(daten.unbekannt).toBeGreaterThan(200);
+		expect(daten).toMatchObject({ anzahl: belegt.length - 30, verworfen: 30, unbekannt: LISTEN - belegt.length });
 
-		await env.DB.batch([
-			env.DB.prepare("DELETE FROM plan_entry"),
-			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL"),
-			env.DB.prepare("UPDATE game SET igdb_id = NULL"),
-		]);
+		await env.DB.batch([env.DB.prepare("DELETE FROM plan_entry"), ...grundzustand()]);
 	});
 
 	it("misst den Schreibschritt der Disc-Pruefung mit einer vollen Portion (Nachtrag 18p-b)", async () => {
-		// Alle Spiele verknuepft, alle Releases 'unbekannt' und ungeprueft. Die
+		// Der Grundzustand, alle 'unbekannt' ungeprueft - nach Ablauf der Frist. Die
 		// Portion kommt wie nachts aus der Lage (hier ungezaehlt), IGDB nennt 49
-		// der 50 physisch auf ihrer Plattform, eines gibt es nicht zurueck.
+		// der 50 physisch auf ihren Plattformen, eines gibt es nicht zurueck.
 		// Bis 18p-b ein Batch je Spiel und die Zaehlung als eigene Abfrage: rund
 		// 51 D1-Aufrufe und 100-150 Anweisungen je Aufruf (Nacht zum 16.11.2026).
-		await env.DB.batch([
-			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, physical_checked_at = NULL"),
-			env.DB.prepare("UPDATE game SET igdb_id = id + 1000"),
-		]);
+		await env.DB.prepare("UPDATE release SET physical_checked_at = NULL").run();
 		const portion = await createRepositories(env.DB, env.NPSSO_KEY).igdb.zurDiscPruefung(AUFFRISCHEN_JE_AUFRUF);
-		const igdbPlattform: Record<number, number> = { 0: 9, 1: 48, 2: 167, 3: 46 };
+		const { discOffen } = await createRepositories(env.DB, env.NPSSO_KEY).igdb.discZaehlung();
+		// PS3 und Vita zusammen: Die Spiele mit zwei Releases haben beide.
+		const igdbPlattformen: Record<number, number[]> = { 0: [9], 1: [48], 2: [167], 3: [46, 9] };
+		const inPortion = new Set(portion.slice(0, -1).map((s) => s.id));
+		const zuSetzen = RELEASE_IDS.filter(
+			(id, k) => istUnbekannt(id) && inPortion.has(k < SPIELE ? k + 1 : ZWEITE[k - SPIELE]!),
+		).length;
 		const { client } = fakeIgdb([
-			portion.slice(0, -1).map((s) => ({ id: s.igdb_id, external_games: [{ media: 2, platform: igdbPlattform[s.id % 4] }] }) as any),
+			portion.slice(0, -1).map((s) => ({ id: s.igdb_id, external_games: igdbPlattformen[s.id % 4]!.map((platform) => ({ media: 2, platform })) }) as any),
 		]);
 		const zaehler = zaehlendeDb(env.DB);
 		const e = await igdbPhysischSchritt(createRepositories(zaehler.db, env.NPSSO_KEY), client, AUFFRISCHEN_JE_AUFRUF, portion);
@@ -911,18 +986,33 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		console.info({ discSchreibschritt: messung });
 
 		expect(portion).toHaveLength(AUFFRISCHEN_JE_AUFRUF);
-		expect(e).toEqual({ status: "erfolg", angefragt: 50, gesetzt: 49, nochOffen: ANZAHL - 50, weiter: true });
+		expect(e).toEqual({ status: "erfolg", angefragt: 50, gesetzt: zuSetzen, nochOffen: discOffen - 50, weiter: true });
 		// Ein Schreib-Batch mit vier Anweisungen, gleich wie viele Spiele.
 		expect(messung.aufrufe).toBe(1);
 		expect(messung.anweisungen).toBe(4);
-		// Je Paar und je Spiel Index-Lookups; die Zaehlung liest game und release einmal.
-		expect(messung.gelesen).toBeLessThan(3_000);
+		// Je Paar und je Spiel Index-Lookups; die Zaehlung liest release einmal
+		// (discBelegt) und die offenen ueber den Teilindex aus 0039 - 1 912 statt 2 901.
+		expect(messung.gelesen).toBeLessThan(2_200);
+		expect(messung.geschrieben).toBeLessThan(270);
 
-		await env.DB.batch([
-			env.DB.prepare("DELETE FROM game_event WHERE kind = 'disc_fassung_belegt'"),
-			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, physical_checked_at = NULL"),
-			env.DB.prepare("UPDATE game SET igdb_id = NULL"),
-		]);
+		// Der Normalfall nach der ersten Runde: IGDB nennt nichts Neues, die
+		// Portion wird nur gestempelt. Der Stempel steht seit 0039 im Teilindex,
+		// das kostet je Release eine Index-Schreibung.
+		await env.DB.batch(grundzustand());
+		await env.DB.prepare("UPDATE release SET physical_checked_at = NULL").run();
+		const stempelZaehler = zaehlendeDb(env.DB);
+		const nurGestempelt = await igdbPhysischSchritt(
+			createRepositories(stempelZaehler.db, env.NPSSO_KEY),
+			fakeIgdb([portion.map((s) => ({ id: s.igdb_id, external_games: [] }) as any)]).client,
+			AUFFRISCHEN_JE_AUFRUF,
+			portion,
+		);
+		const nurStempel = { gelesen: stempelZaehler.gelesen(), geschrieben: stempelZaehler.geschrieben() };
+		console.info({ discNurStempel: nurStempel });
+		expect(nurGestempelt).toMatchObject({ gesetzt: 0, nochOffen: discOffen - 50 });
+		expect(nurStempel.geschrieben).toBeLessThan(130);
+
+		await env.DB.batch([env.DB.prepare("DELETE FROM game_event WHERE kind = 'disc_fassung_belegt'"), ...grundzustand()]);
 	});
 
 	/**
@@ -938,7 +1028,6 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		await env.DB.prepare("DELETE FROM plan_entry").run();
 		await env.DB.prepare("DELETE FROM market_offer").run();
 		await env.DB.batch([
-			env.DB.prepare("UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb' WHERE id % 2 = 0"),
 			env.DB.prepare("UPDATE release SET markt_geprueft_am = NULL, markt_rohangebote = NULL"),
 		]);
 		// Zwei Zeilen je Release fuer vier Fuenftel des Bestands - so sieht es
@@ -949,9 +1038,9 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				"VALUES ('ebay', ?, ?, ?, ?, 'PS4', 'Gut', ?, 'EUR', 1, ?, datetime('now'), ?)",
 		);
 		const zeilen: D1PreparedStatement[] = [];
-		for (let i = 1; i <= Math.floor(ANZAHL * 0.8); i++) {
-			zeilen.push(angebot.bind(`haendler:${i}`, "rebuy", "haendler", `Spiel ${i}`, 1200 + i, `11${1_000_000 + i}`, i));
-			zeilen.push(angebot.bind(`markt:${i}`, "eBay", "markt", `Spiel ${i}`, 900 + i, `12${1_000_000 + i}`, i));
+		for (let i = 1; i <= Math.floor(LISTEN * 0.8); i++) {
+			zeilen.push(angebot.bind(`haendler:${i}`, "rebuy", "haendler", `Spiel ${i}`, 1200 + i, `11${1_000_000 + i}`, releaseVon(i)));
+			zeilen.push(angebot.bind(`markt:${i}`, "eBay", "markt", `Spiel ${i}`, 900 + i, `12${1_000_000 + i}`, releaseVon(i)));
 		}
 		await env.DB.batch(zeilen);
 		// Die Sperrliste in der Groesse, die sie realistisch erreicht: 13 % der
@@ -962,7 +1051,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			"INSERT INTO market_offer_verworfen (release_id, ebay_item_id, titel, preis_cents, verworfen_am) " +
 				"VALUES (?, ?, ?, ?, datetime('now'))",
 		);
-		await env.DB.batch(Array.from({ length: 40 }, (_, i) => verworfen.bind(i + 1, `12${1_000_000 + i + 1}`, `Spiel ${i + 1}`, 500)));
+		await env.DB.batch(Array.from({ length: 40 }, (_, i) => verworfen.bind(releaseVon(i + 1), `12${1_000_000 + i + 1}`, `Spiel ${i + 1}`, 500)));
 
 		// Die ganze Route, nicht eine Abschrift ihrer Abfrage (seit 20e-b).
 		const luecken = await routeGelesen("/api/gaps?verworfene=1&unbekannte=1");
@@ -987,16 +1076,16 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare(
 				"INSERT INTO market_offer (source, source_product_id, anbieter, kanal, title_raw, platform_raw, condition, " +
 					"price_cents, currency, in_stock, imported_at, release_id) " +
-					"VALUES ('ebay', 'markt:1', 'eBay', 'markt', 'Spiel 1', 'PS4', 'Gut', 777, 'EUR', 1, datetime('now'), 1) " +
+					`VALUES ('ebay', 'markt:1', 'eBay', 'markt', 'Spiel 1', 'PS4', 'Gut', 777, 'EUR', 1, datetime('now'), ${releaseVon(1)}) ` +
 					"ON CONFLICT (source, source_product_id) DO UPDATE SET price_cents = excluded.price_cents",
 			),
 			env.DB.prepare(
 				"INSERT INTO price_snapshot (release_id, channel, source, condition, price_cents, currency, captured_at) " +
-					"SELECT 1, 'gebraucht', 'ebay', 'Gut', 777, 'EUR', datetime('now') WHERE NOT EXISTS " +
-					"(SELECT 1 FROM price_snapshot p WHERE p.release_id = 1 AND p.channel = 'gebraucht' AND p.price_cents = 777 " +
-					"AND p.captured_at = (SELECT MAX(q.captured_at) FROM price_snapshot q WHERE q.release_id = 1 AND q.channel = 'gebraucht'))",
+					`SELECT ${releaseVon(1)}, 'gebraucht', 'ebay', 'Gut', 777, 'EUR', datetime('now') WHERE NOT EXISTS ` +
+					`(SELECT 1 FROM price_snapshot p WHERE p.release_id = ${releaseVon(1)} AND p.channel = 'gebraucht' AND p.price_cents = 777 ` +
+					`AND p.captured_at = (SELECT MAX(q.captured_at) FROM price_snapshot q WHERE q.release_id = ${releaseVon(1)} AND q.channel = 'gebraucht'))`,
 			),
-			env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now'), markt_rohangebote = 7 WHERE id = 1"),
+			env.DB.prepare(`UPDATE release SET markt_geprueft_am = datetime('now'), markt_rohangebote = 7 WHERE id = ${releaseVon(1)}`),
 		]);
 		const schreibkosten = schreiben.reduce((n, r) => n + (r.meta.rows_read ?? 0), 0);
 
@@ -1011,28 +1100,28 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// nur im Schreibpfad.
 		const sperrliste = await zeilenGelesen(
 			`SELECT release_id, ebay_item_id FROM market_offer_verworfen WHERE release_id IN (${Array.from({ length: 20 }, () => "?").join(",")})`,
-			...Array.from({ length: 20 }, (_, i) => i + 1),
+			...Array.from({ length: 20 }, (_, i) => releaseVon(i + 1)),
 		);
 		// Die Tafel am Preis holt die Titel erst beim Aufklappen - ein
 		// Index-Lookup auf eine kleine Tabelle.
 		const tafel = await zeilenGelesen(
 			"SELECT ebay_item_id AS itemId, titel, preis_cents AS preisCents, verworfen_am AS verworfenAm " +
 				"FROM market_offer_verworfen WHERE release_id = ? ORDER BY verworfen_am DESC, ebay_item_id",
-			1,
+			releaseVon(1),
 		);
 		// Die Pruefung der Route vor dem Verwerfen: Liegt dieses Angebot
 		// ueberhaupt noch vor (sonst 409)? Ueber idx_market_offer_kanal.
 		const kennungspruefung = await zeilenGelesen(
 			"SELECT title_raw AS titel, price_cents AS preisCents FROM market_offer " +
 				"WHERE release_id = ? AND ebay_item_id = ? AND source = 'ebay' AND in_stock = 1 ORDER BY kanal LIMIT 1",
-			1,
+			releaseVon(1),
 			`12${1_000_001}`,
 		);
 		// Und das Ziel des Einzelabrufs - eine Zeile ueber den Primaerschluessel.
 		const eines = await zeilenGelesen(
 			"SELECT r.id AS releaseId, r.game_id AS gameId, g.title AS titel, r.platform AS plattform, " +
 				"r.physical_release_status AS discFassung FROM release r JOIN game g ON g.id = r.game_id WHERE r.id = ?",
-			1,
+			releaseVon(1),
 		);
 		// Der Schritt fragt nur noch den einen Zaehler, den die Verlaufszeile
 		// braucht. Die vier Zaehler von `stand()` kosteten 1 549 Zeilen - drei
@@ -1055,13 +1144,15 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const kauf = env.DB.prepare(
 			"INSERT INTO plan_entry (kind, release_id, origin, status) VALUES ('kauf', ?, 'luecke', 'offen')",
 		);
-		await env.DB.batch(Array.from({ length: 60 }, (_, i) => kauf.bind(i + 1)));
+		await env.DB.batch(Array.from({ length: 60 }, (_, i) => kauf.bind(releaseVon(i + 1))));
 		const absichtenMitPreis = await zeilenGelesen(`${PLAN_AUSWAHL}WHERE pe.kind = ? AND pe.status = ?`, "kauf", "offen");
 		await env.DB.prepare("DELETE FROM plan_entry").run();
 
 		// Der Leerlauf des Schritts: alles gestempelt, nichts faellig. So laeuft
-		// jeder Wartungsaufruf nach getaner Arbeit - bis zu 36-mal je Nacht.
-		await env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now')").run();
+		// jeder Wartungsaufruf nach getaner Arbeit - bis zu 36-mal je Nacht. Die
+		// 59 Releases ausserhalb der Auswahl bleiben ungestempelt (Stufe 18s) und
+		// kosten in jeder Abfrage ihre Lookups.
+		await marktGestempelt().run();
 		const auswahlLeer = await zeilenGelesen(
 			"SELECT r.id FROM release r JOIN game g ON g.id = r.game_id " + FAELLIG_IN_AUSWAHL + "ORDER BY r.markt_geprueft_am, r.id LIMIT 20",
 		);
@@ -1102,8 +1193,13 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// "nie gestempelt". Ueber die Nacht gleicht sich das aus: Das Faellige
 		// sinkt von 431 auf 0, im Mittel sind es rund 430 Zeilen je Aufruf -
 		// dieselbe Summe wie vorher, nur eine Zahl, die sich bewegt.
-		expect(jeAufruf).toBeLessThan(1_600);
-		expect(faelligLeer).toBeLessThan(10);
+		//
+		// Mit dem Bestand aus 18s 1 620: 479 statt 430 Spiele in der Sammlung und
+		// 59 nie geprueften Releases ausserhalb der Auswahl, die jeder Zaehler
+		// mitliest - deshalb auch im Leerlauf 61 statt einer Zeile.
+		expect(jeAufruf).toBeLessThan(1_700);
+		expect(faelligLeer).toBeLessThan(80);
+		expect(zuschnitt).toBe(LISTEN);
 		// Der Lookup selbst: 20 Index-Treffer auf eine Sperrliste von 40
 		// Zeilen, kein Scan. In der Produktion steht dort heute nichts, die
 		// 40 sind das Mehrfache des Erwarteten.
@@ -1123,7 +1219,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("DELETE FROM price_snapshot"),
 			env.DB.prepare("DELETE FROM market_offer_verworfen"),
 			env.DB.prepare("DELETE FROM market_offer"),
-			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, markt_geprueft_am = NULL, markt_rohangebote = NULL"),
+			env.DB.prepare("UPDATE release SET markt_geprueft_am = NULL, markt_rohangebote = NULL"),
+			...grundzustand(),
 		]);
 	});
 
@@ -1144,8 +1241,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		);
 		const gekauft = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source, herkunft) VALUES (?, 'kauf', 'psn')");
 		const vorbereitung: D1PreparedStatement[] = [];
-		for (let i = 1; i <= 90; i++) vorbereitung.push(wunsch.bind(i));
-		for (let i = 1; i <= 20; i++) vorbereitung.push(gekauft.bind(i));
+		for (let i = 1; i <= 90; i++) vorbereitung.push(wunsch.bind(releaseVon(i)));
+		for (let i = 1; i <= 20; i++) vorbereitung.push(gekauft.bind(releaseVon(i)));
 		await env.DB.batch(vorbereitung);
 
 		const auswahl = await zeilenGelesen(
@@ -1165,7 +1262,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				"FROM release r JOIN game g ON g.id = r.game_id " +
 				"WHERE r.id = ? AND (r.psn_product_id IS NULL OR r.psn_product_id <> ?)",
 			"EP9000-X",
-			21,
+			releaseVon(21),
 			"EP9000-X",
 		);
 		const verlaufsschreiben = await zeilenGelesen(
@@ -1173,11 +1270,11 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				"WHERE NOT EXISTS (SELECT 1 FROM price_snapshot p WHERE p.release_id = ? AND p.channel = 'psn_store' " +
 				"AND p.price_cents = ? AND p.captured_at = " +
 				"(SELECT MAX(q.captured_at) FROM price_snapshot q WHERE q.release_id = ? AND q.channel = 'psn_store'))",
-			21,
+			releaseVon(21),
 			1999,
-			21,
+			releaseVon(21),
 			1999,
-			21,
+			releaseVon(21),
 		);
 		const offen = await zeilenGelesen(
 			"SELECT COUNT(*) AS n FROM release WHERE store_geprueft_am IS NULL AND psn_product_id IS NOT NULL",
@@ -1241,8 +1338,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const wunsch = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin, status) VALUES ('wunsch', ?, 'manuell', 'offen')");
 		const gekauft = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source, herkunft) VALUES (?, 'kauf', 'psn')");
 		await env.DB.batch([
-			...Array.from({ length: 90 }, (_, i) => wunsch.bind(i + 1)),
-			...Array.from({ length: 20 }, (_, i) => gekauft.bind(i + 1)),
+			...Array.from({ length: 90 }, (_, i) => wunsch.bind(releaseVon(i + 1))),
+			...Array.from({ length: 20 }, (_, i) => gekauft.bind(releaseVon(i + 1))),
 		]);
 		const app = createApp(
 			() => erstellePsnClient(fakeFetch([]).fetch),
@@ -1308,19 +1405,18 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	});
 
 	it("misst Kaufkandidaten, Kaufliste, Erscheint bald und das Erledigen beim Erfassen (Stufe 15)", async () => {
-		// 215 belegte Luecken (gerade Ids), dazu 300 Wuensche wie nach dem
+		// Die belegten Luecken des Grundzustands, dazu 300 Wuensche wie nach dem
 		// Import, 30 davon schon als Kopie auf der Kaufliste, 20 angekuendigt.
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM plan_entry"),
-			env.DB.prepare("UPDATE release SET physical_release_status = 'ja' WHERE id % 2 = 0"),
-			env.DB.prepare("UPDATE game SET release_status = 'angekuendigt', release_date = '2099-01-01' WHERE id > 410"),
+			env.DB.prepare(`UPDATE game SET release_status = 'angekuendigt', release_date = '2099-01-01' WHERE id > ${SPIELE - 20}`),
 		]);
 		const amSpiel = env.DB.prepare("INSERT INTO plan_entry (kind, game_id, origin) VALUES ('wunsch', ?, 'import')");
 		const amRelease = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('wunsch', ?, 'import')");
 		const kauf = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('kauf', ?, 'wunsch')");
 		const anweisungen: D1PreparedStatement[] = [];
-		for (let i = 1; i <= 300; i++) anweisungen.push(i % 3 === 0 ? amRelease.bind(i) : amSpiel.bind(i));
-		for (let i = 3; i <= 90; i += 3) anweisungen.push(kauf.bind(i));
+		for (let i = 1; i <= 300; i++) anweisungen.push(i % 3 === 0 ? amRelease.bind(releaseVon(i)) : amSpiel.bind(i));
+		for (let i = 3; i <= 90; i += 3) anweisungen.push(kauf.bind(releaseVon(i)));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 
 		const kandidaten = await zeilenGelesen(KAUF_KANDIDATEN);
@@ -1336,12 +1432,13 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			PLAN_AUSWAHL +
 				"WHERE pe.id IN (SELECT id FROM plan_entry WHERE release_id = ? AND status = 'offen' AND kind IN (?, ?) " +
 				"UNION SELECT id FROM plan_entry WHERE game_id = ? AND status = 'offen' AND kind IN (?, ?)) ORDER BY pe.id",
-			6, "kauf", "wunsch", 6, "kauf", "wunsch",
+			releaseVon(6), "kauf", "wunsch", 6, "kauf", "wunsch",
 		);
 		console.info({ kandidaten, kaufliste, bald, amZiel });
 
 		// Kandidaten: v_luecken (rund 430 trophy_progress mit Index-Lookups) plus 300 Wuensche mit je zwei Lookups.
-		expect(kandidaten).toBeLessThan(4_000);
+		// 3 502 mit 215 belegten Luecken, 4 192 mit den 285 des Grundzustands (18s).
+		expect(kandidaten).toBeLessThan(4_500);
 		expect(kaufliste).toBeLessThan(500);
 		expect(bald).toBeLessThan(2_000);
 		expect(amZiel).toBeLessThan(50);
@@ -1349,13 +1446,12 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const antwort = await SELF.fetch(`${B}/api/purchase-candidates`);
 		expect(antwort.status).toBe(200);
 		const daten = (await antwort.json()) as { luecken: number; wuensche: number };
-		// 300 Wuensche minus 30 kopierte minus die angekuendigten am Spiel (id > 410 hat keinen Wunsch) → 270
+		// 300 Wuensche minus 30 kopierte minus die angekuendigten am Spiel (die letzten 20 haben keinen Wunsch) → 270
 		expect(daten.wuensche).toBe(270);
 		expect(daten.luecken).toBeGreaterThan(100);
 
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM plan_entry"),
-			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt'"),
 			env.DB.prepare("UPDATE game SET release_status = 'erschienen', release_date = NULL"),
 		]);
 	});
@@ -1370,8 +1466,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		);
 		const anweisungen: D1PreparedStatement[] = [];
 		for (let i = 1; i <= 4_000; i++) {
-			const spiel = (i % ANZAHL) + 1;
-			anweisungen.push(ereignis.bind(i % 4 === 0 ? "sync" : "nutzer", spiel, spiel, `Spiel ${spiel} (PS4)`));
+			const spiel = (i % SPIELE) + 1;
+			anweisungen.push(ereignis.bind(i % 4 === 0 ? "sync" : "nutzer", spiel, releaseVon(spiel), `Spiel ${spiel} (PS4)`));
 		}
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 
@@ -1408,8 +1504,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				"AND NOT EXISTS (SELECT 1 FROM review_queue q WHERE q.release_id = t.release_id)",
 		);
 		console.info({ vorbelegt, eingereiht });
-		expect(vorbelegt).toBeLessThan(4 * ANZAHL + 100);
-		expect(eingereiht).toBeLessThan(4 * ANZAHL + 100);
+		expect(vorbelegt).toBeLessThan(4 * LISTEN + 100);
+		expect(eingereiht).toBeLessThan(4 * LISTEN + 100);
 
 		const antwort = await SELF.fetch(`${B}/api/events?limit=5`);
 		expect(antwort.status).toBe(200);
@@ -1429,19 +1525,19 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		const anweisungen: D1PreparedStatement[] = [];
 		const disc = env.DB.prepare("INSERT INTO physical_copy (release_id, condition) VALUES (?, 'gut')");
 		const dl = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, 'kauf')");
-		for (let i = 1; i <= ANZAHL; i += 3) anweisungen.push(disc.bind(i));
-		for (let i = 2; i <= ANZAHL; i += 7) anweisungen.push(dl.bind(i));
+		for (let i = 0; i < RELEASES; i += 3) anweisungen.push(disc.bind(RELEASE_IDS[i]));
+		for (let i = 1; i < RELEASES; i += 7) anweisungen.push(dl.bind(RELEASE_IDS[i]));
 		// Stufe 24: PS Plus wie in der Produktion (159 von 215 digital nur im
 		// Abo, 07.11.2026) - sonst messen die beiden Plus-Unterabfragen nichts.
 		const plus = env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, 'plus')");
-		for (let i = 3; i <= ANZAHL; i += 3) anweisungen.push(plus.bind(i));
+		for (let i = 2; i < RELEASES; i += 3) anweisungen.push(plus.bind(RELEASE_IDS[i]));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
 		await env.DB.batch([
 			env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (9001, 'Wunschspiel', 'wunschspiel')"),
 			env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (9001, 9001, 'PS5')"),
 			env.DB.prepare("INSERT INTO plan_entry (kind, release_id, status, origin) VALUES ('wunsch', 9001, 'offen', 'manuell')"),
-			env.DB.prepare("INSERT INTO plan_entry (kind, release_id, status, origin) VALUES ('backlog', 1, 'offen', 'manuell')"),
-			env.DB.prepare("INSERT INTO plan_entry (kind, release_id, status, origin, position) VALUES ('todo', 2, 'offen', 'manuell', 1)"),
+			env.DB.prepare(`INSERT INTO plan_entry (kind, release_id, status, origin) VALUES ('backlog', ${releaseVon(1)}, 'offen', 'manuell')`),
+			env.DB.prepare(`INSERT INTO plan_entry (kind, release_id, status, origin, position) VALUES ('todo', ${releaseVon(2)}, 'offen', 'manuell', 1)`),
 		]);
 
 		const plattform = await zeilenGelesen(PLATTFORM_SQL);
@@ -1461,24 +1557,24 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// lesen eine Tabelle einmal. Nichts davon skaliert quadratisch - das
 		// waere der Fehler vom 13.09.2026. Zum Vergleich: ein Leerlauf-Aufruf
 		// des Crons liegt bei 2 241, und den gibt es 36-mal je Nacht.
-		expect(plattform).toBeLessThan(12 * ANZAHL);
-		expect(status).toBeLessThan(6 * ANZAHL);
-		expect(trophaeen).toBeLessThan(ANZAHL + 100);
+		expect(plattform).toBeLessThan(12 * LISTEN);
+		expect(status).toBeLessThan(6 * LISTEN);
+		expect(trophaeen).toBeLessThan(LISTEN + 100);
 		expect(listen).toBeLessThan(500);
-		expect(letztesPlatin).toBeLessThan(2 * ANZAHL);
-		expect(letzteTrophaee).toBeLessThan(2 * ANZAHL);
-		expect(summe).toBeLessThan(25 * ANZAHL);
+		expect(letztesPlatin).toBeLessThan(2 * LISTEN);
+		expect(letzteTrophaee).toBeLessThan(2 * LISTEN);
+		expect(summe).toBeLessThan(25 * LISTEN);
 
 		const antwort = await SELF.fetch(`${B}/api/stats`);
 		expect(antwort.status).toBe(200);
 		const d = (await antwort.json()) as any;
-		// 430 Releases rotieren ueber vier Plattformen; das Wunschrelease
+		// Die Releases rotieren ueber vier Plattformen; das Wunschrelease
 		// zaehlt nicht mit, obwohl es in der Tabelle steht.
-		expect(d.releases).toBe(ANZAHL);
-		expect(d.plattformen.reduce((s: number, p: any) => s + p.releases, 0)).toBe(ANZAHL);
+		expect(d.releases).toBe(RELEASES);
+		expect(d.plattformen.reduce((s: number, p: any) => s + p.releases, 0)).toBe(RELEASES);
 		// Jede fuenfte Liste traegt ein erspieltes Platin, alle kennen eines.
-		expect(d.trophaeen.platinErspielt).toBe(Math.floor(ANZAHL / 5));
-		expect(d.trophaeen.platinMoeglich).toBe(ANZAHL);
+		expect(d.trophaeen.platinErspielt).toBe(Math.floor(LISTEN / 5));
+		expect(d.trophaeen.platinMoeglich).toBe(LISTEN);
 		expect(d.listen).toEqual({ backlog: 1, todo: 1 });
 
 		await env.DB.batch([
@@ -1497,7 +1593,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 	 * deshalb acht Tage lang ungemessen (Abschnitt 2).
 	 */
 	it("misst die Trophaeen eines Spiels und die Auswahl des Fuellschritts (Stufe 19b)", async () => {
-		// Ein Bestand in Produktionsgroesse: 430 Listen mit je 43 Trophaeen
+		// Ein Bestand in Produktionsgroesse: 431 Listen mit je 43 Trophaeen
 		// sind rund 18 500 Zeilen - die Sammlung des Nutzers hat 18 355.
 		const listen = (
 			await env.DB.prepare("SELECT np_communication_id FROM trophy_progress ORDER BY np_communication_id").all<{
@@ -1609,7 +1705,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			"INSERT INTO game_event (source, game_id, release_id, label, kind, field, old_value, new_value) " +
 				"VALUES ('nutzer', ?, ?, 'Spiel', 'status_geaendert', 'status', 'am_spielen', 'pausiert')",
 		);
-		const ereignisse = Array.from({ length: 4_000 }, (_, i) => ereignis.bind((i % listen.length) + 1, (i % listen.length) + 1));
+		const ereignisse = Array.from({ length: 4_000 }, (_, i) => ereignis.bind((i % listen.length) + 1, releaseVon((i % listen.length) + 1)));
 		for (let i = 0; i < ereignisse.length; i += 200) await env.DB.batch(ereignisse.slice(i, i + 200));
 		const feedGanz = await routeGelesen("/api/feed");
 		// Der Desktop fragt nach der Obergrenze (Stufe f2d), und mehr als die
@@ -1651,15 +1747,54 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		expect(jahrLaufend).toBeLessThan(jahre / 4);
 	});
 
+	it("misst Auffrisch- und Disc-Auswahl mit Arbeit und ihre Zaehlungen (Stufe 18s)", async () => {
+		// 150 Spiele faellig: drei Portionen Auffrischen, darunter nie gestempelte.
+		const repos = createRepositories(env.DB, env.NPSSO_KEY).igdb;
+		const mitZaehler = async (f: (r: typeof repos) => Promise<unknown>) => {
+			const zaehler = zaehlendeDb(env.DB);
+			await f(createRepositories(zaehler.db, env.NPSSO_KEY).igdb);
+			return zaehler.gelesen();
+		};
+		const leer = { discZaehlung: await mitZaehler((r) => r.discZaehlung()) };
+		await env.DB.batch([
+			env.DB.prepare("UPDATE game SET igdb_synced_at = CASE WHEN id % 10 = 0 THEN NULL ELSE datetime('now', '-9 days') END WHERE id <= 150"),
+			env.DB.prepare("UPDATE release SET physical_checked_at = NULL"),
+		]);
+		const auffrischen = repos.zumAuffrischenBaustein(AUFFRISCHEN_JE_AUFRUF, AUFFRISCH_FRIST_TAGE);
+		expect(await einzeln(env.DB, auffrischen)).toHaveLength(AUFFRISCHEN_JE_AUFRUF);
+		const arbeit = {
+			auffrischen: await bausteinGelesen(auffrischen),
+			auffrischenOhneFrist: await bausteinGelesen(repos.zumAuffrischenBaustein(AUFFRISCHEN_JE_AUFRUF)),
+			auffrischenVonHand: await mitZaehler((r) => r.zumAuffrischenVor("2099-01-01 00:00:00", AUFFRISCHEN_JE_AUFRUF)),
+			auffrischOffen: await mitZaehler((r) => r.auffrischOffen("2099-01-01 00:00:00")),
+			disc: await bausteinGelesen(repos.zurDiscPruefungBaustein(AUFFRISCHEN_JE_AUFRUF)),
+			discZaehlung: await mitZaehler((r) => r.discZaehlung()),
+		};
+		console.info({ auswahlenArbeit: arbeit, leer });
+
+		// Vor 18s: 628, 956, 956, 399 und im Leerlauf der Zaehlung 1 935. Was an
+		// der Zaehlung bleibt, ist `discBelegt` - ein Scan ueber 490 Releases.
+		expect(arbeit.auffrischen).toBeLessThan(200);
+		expect(arbeit.auffrischenOhneFrist).toBeLessThan(80);
+		expect(arbeit.auffrischenVonHand).toBeLessThan(200);
+		expect(arbeit.disc).toBeLessThan(320);
+		expect(arbeit.discZaehlung).toBeLessThan(1_100);
+		expect(leer.discZaehlung).toBeLessThan(550);
+
+		await env.DB.batch(grundzustand());
+	});
+
 	it("misst einen Leerlauf-Aufruf der Automatik (Stufe 18)", async () => {
 		// Alles verknuepft und frisch, fuenf Laeufe in der Historie: Der Cron
 		// findet nichts zu tun. 36 Aufrufe je Nacht - die Summe der Abfragen
 		// eines Leerlaufs mal 36 muss weit unter dem Tagesbudget bleiben.
 		await env.DB.batch([
-			env.DB.prepare("UPDATE game SET igdb_id = id + 1000, igdb_synced_at = datetime('now')"),
-			env.DB.prepare("UPDATE release SET physical_release_status = 'ja', physical_source = 'igdb'"),
+			// Seit 18s mit dem Grundzustand statt lauter 'ja' und Stempeln von
+			// heute: 165 'unbekannt', alle Stempel jung - nichts faellig, aber die
+			// Auswahlen sehen, was sie in der Produktion sehen.
+			...grundzustand(),
 			// Auch der Marktschritt hat nichts zu tun: alles heute gestempelt.
-			env.DB.prepare("UPDATE release SET markt_geprueft_am = datetime('now')"),
+			marktGestempelt(),
 			// Store, Einzeltrophaeen: alles gestempelt, nichts offen (Stufe 18j -
 			// bis dahin lief die Messung ohne Zugang und kam gar nicht bis zu den
 			// Einzeltrophaeen; die lasen in der Produktion 430 Zeilen je Aufruf).
@@ -1703,6 +1838,18 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				),
 			),
 		);
+
+		// Die beiden Auswahlen einzeln, aus dem Code. Die Produktion las vor 18s
+		// im Leerlauf 479 (Auffrischen) und 1 445 (Disc), dieser Test 479 und 1 446.
+		const igdbRepo = createRepositories(env.DB, env.NPSSO_KEY).igdb;
+		const auffrischen = igdbRepo.zumAuffrischenBaustein(AUFFRISCHEN_JE_AUFRUF, AUFFRISCH_FRIST_TAGE);
+		const disc = igdbRepo.zurDiscPruefungBaustein(AUFFRISCHEN_JE_AUFRUF);
+		expect(await einzeln(env.DB, auffrischen)).toEqual([]);
+		expect(await einzeln(env.DB, disc)).toEqual([]);
+		const auswahlen = { auffrischen: await bausteinGelesen(auffrischen), disc: await bausteinGelesen(disc) };
+		console.info({ auswahlenLeerlauf: auswahlen });
+		expect(auswahlen.auffrischen).toBeLessThan(10);
+		expect(auswahlen.disc).toBeLessThan(10);
 
 		// Mit Zugang, sonst kaeme der PSN-Leerlauf nicht bis Spielzeit, Kaufliste,
 		// Einzeltrophaeen und Level.
@@ -1750,10 +1897,13 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		// Seit 18g zaehlt die Summe die Marktauswahl mit (430 Zeilen, obwohl
 		// nichts faellig ist - ein Fall fuer den Markt-Nachtrag 20i), seit 18j
 		// den PSN-Leerlauf mit Zugang, und die Einzeltrophaeen-Auswahl liest
-		// ueber die Teilindizes aus Migration 0034 nichts mehr.
+		// ueber die Teilindizes aus Migration 0034 nichts mehr. Seit 18s tun es
+		// Auffrischen und Disc ebenso (0036, 0039): 74 statt 1 995 Zeilen je
+		// Wartungsaufruf, 3 288 statt 49 392 je Nacht. Die Grenzen reissen, wenn
+		// eine der beiden auf die alte Abfrage zurueckfaellt.
 		expect(leerlaufPsn).toBeLessThan(100);
-		expect(leerlaufWartung).toBeLessThan(2_800);
-		expect(nacht).toBeLessThan(100_000);
+		expect(leerlaufWartung).toBeLessThan(100);
+		expect(nacht).toBeLessThan(4_000);
 		expect(geschriebenJeNacht).toBeLessThan(1_000);
 
 		// Die Betriebswarnungen (Stufe 18m) laufen bei JEDEM Oeffnen des
@@ -1791,8 +1941,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 
 		await env.DB.batch([
 			env.DB.prepare("DELETE FROM psn_zugang"),
-			env.DB.prepare("UPDATE game SET igdb_id = NULL, igdb_synced_at = NULL"),
-			env.DB.prepare("UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, markt_geprueft_am = NULL"),
+			env.DB.prepare("UPDATE release SET markt_geprueft_am = NULL"),
+			...grundzustand(),
 			env.DB.prepare("DELETE FROM psn_raw_response"),
 			env.DB.prepare("DELETE FROM psn_sync_run"),
 			env.DB.prepare(
@@ -1834,7 +1984,8 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				"VALUES (?, 'gebraucht', 'tief', 'markt', 900, 1000, datetime('now'), datetime('now'), ?)",
 		);
 		const anweisungen: D1PreparedStatement[] = [];
-		for (let r = 1; r <= 60; r++) {
+		for (let spiel = 1; spiel <= 60; spiel++) {
+			const r = releaseVon(spiel);
 			anweisungen.push(wunsch.bind(r));
 			for (let t = 0; t < 120; t++) {
 				anweisungen.push(punkt.bind(r, "gebraucht", "haendler", 3_000 - t, `22${r}${t}`, t * 3));
@@ -1842,11 +1993,11 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				anweisungen.push(punkt.bind(r, "psn_store", null, 6_000 - t, null, t * 3));
 			}
 		}
-		for (let i = 0; i < 200; i++) anweisungen.push(alarm.bind((i % 60) + 1, "2026-01-01 00:00:00"));
-		for (let r = 1; r <= 5; r++) anweisungen.push(alarm.bind(r, null));
+		for (let i = 0; i < 200; i++) anweisungen.push(alarm.bind(releaseVon((i % 60) + 1), "2026-01-01 00:00:00"));
+		for (let r = 1; r <= 5; r++) anweisungen.push(alarm.bind(releaseVon(r), null));
 		for (let i = 0; i < anweisungen.length; i += 200) await env.DB.batch(anweisungen.slice(i, i + 200));
-		await env.DB.prepare("UPDATE release SET physical_release_status = 'ja' WHERE id <= 30").run();
-		await env.DB.prepare("UPDATE release SET physical_release_status = 'nein' WHERE id > 30 AND id <= 60").run();
+		await env.DB.prepare("UPDATE release SET physical_release_status = 'ja' WHERE game_id <= 30").run();
+		await env.DB.prepare("UPDATE release SET physical_release_status = 'nein' WHERE game_id > 30 AND game_id <= 60").run();
 
 		const app = createApp(
 			() => erstellePsnClient(fakeFetch([]).fetch),
@@ -1879,12 +2030,12 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				})),
 			});
 		// Mit Absicht und Geschichte, jede meldet (Allzeittief): der teuerste Fall.
-		const mitAlarm = await markt([6, 7, 8, 9, 10], 1_000);
+		const mitAlarm = await markt([6, 7, 8, 9, 10].map(releaseVon), 1_000);
 		// Ohne Absicht: der haeufige Fall, 371 von 431 - die Lage darf nichts kosten.
-		const ohneAbsicht = await markt([101, 102, 103, 104, 105], 1_000);
+		const ohneAbsicht = await markt([101, 102, 103, 104, 105].map(releaseVon), 1_000);
 		const store = await route("/api/sync/store/ergebnisse", {
 			ergebnisse: [31, 32, 33, 34, 35, 36, 37, 38, 39, 40].map((id) => ({
-				releaseId: id,
+				releaseId: releaseVon(id),
 				preis: { produktId: "EP9000-CUSA13323_00-GHOSTSHIP0000000", produktName: "Spiel", preisCents: 1999, grundpreisCents: 1999, waehrung: "EUR", istSale: false, imPlusKatalog: false },
 			})),
 		});
@@ -1927,9 +2078,10 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			env.DB.prepare("DELETE FROM market_offer"),
 			env.DB.prepare("DELETE FROM game_event"),
 			env.DB.prepare(
-				"UPDATE release SET physical_release_status = 'unbekannt', physical_source = NULL, markt_geprueft_am = NULL, markt_rohangebote = NULL, " +
+				"UPDATE release SET markt_geprueft_am = NULL, markt_rohangebote = NULL, " +
 					"store_geprueft_am = NULL, psn_product_id = NULL, store_price_cents = NULL, store_base_price_cents = NULL, store_befund = NULL, store_produkt_name = NULL",
 			),
+			...grundzustand(),
 		]);
 	});
 
@@ -1945,7 +2097,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				punkte.push(
 					env.DB.prepare(
 						"INSERT INTO price_snapshot (release_id, channel, kanal, source, price_cents, ebay_item_id, captured_at) " +
-							"VALUES (1, ?, ?, 'ebay', ?, ?, datetime('now', '-' || ? || ' days'))",
+							`VALUES (${releaseVon(1)}, ?, ?, 'ebay', ?, ?, datetime('now', '-' || ? || ' days'))`,
 					).bind(channel, kanal, 1_000 + t, kanal === null ? null : `11${1_000_000 + t}`, t * 2),
 				);
 			}
@@ -1955,7 +2107,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 				env.DB.prepare(
 					"INSERT INTO price_snapshot (release_id, channel, kanal, source, price_cents, captured_at) " +
 						"VALUES (?, 'gebraucht', 'markt', 'ebay', 999, datetime('now', '-1 days'))",
-				).bind(i),
+				).bind(releaseVon(i)),
 			);
 		}
 		for (let i = 0; i < punkte.length; i += 200) await env.DB.batch(punkte.slice(i, i + 200));
@@ -1966,13 +2118,13 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 			sperren.push(
 				env.DB.prepare(
 					"INSERT INTO market_offer_verworfen (release_id, ebay_item_id, titel, preis_cents, verworfen_am) " +
-						"VALUES (1, ?, 'Nur Disc', ?, datetime('now'))",
+						`VALUES (${releaseVon(1)}, ?, 'Nur Disc', ?, datetime('now'))`,
 				).bind(`99${1_000_000 + i}`, 500 + i),
 			);
 		}
 		await env.DB.batch(sperren);
 
-		const verlauf = await zeilenGelesen(VERLAUF_SQL, 1);
+		const verlauf = await zeilenGelesen(VERLAUF_SQL, releaseVon(1));
 		const verlaufLeer = await zeilenGelesen(VERLAUF_SQL, 4711);
 		console.info({ verlauf, verlaufLeer });
 
@@ -1991,7 +2143,7 @@ describe("Zeilenlese-Kosten bei 430 Listen", () => {
 		]);
 	});
 
-	it("beantwortet die Exportrouten bei 430 Listen", async () => {
+	it(`beantwortet die Exportrouten bei ${LISTEN} Listen`, async () => {
 		for (const pfad of ["/api/export/backup.json", "/api/export/sammlung.csv", "/api/export/trophaeen.csv"]) {
 			const antwort = await SELF.fetch(`${B}${pfad}`);
 			expect(antwort.status, pfad).toBe(200);
