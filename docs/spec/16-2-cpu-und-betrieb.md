@@ -151,6 +151,9 @@ nicht `UNION`: Sonst liest SQLite für das Entdoppeln `idx_release_game` ganz (4
 | Leerlauf-Nacht, 36 PSN + 24 Wartung | 49 392 | 3 288 |
 | Disc-Stempel, 51 Releases: geschriebene Zeilen | 51 | 102 |
 
+**In der Produktion nach dem Deploy (24.11.2026, 16:40 UTC):** Auffrischen 2 Zeilen im Leerlauf und 100
+statt 628 bei rund 150 fälligen, Disc 5; beide Pläne nutzen die Teilindizes.
+
 Schreibkosten: rund +165 Zeilen je 30 Tage. **Offen: die CPU** – der Wartungs-Leerlauf lag vorher bei
 Median 4 ms; gemessen wird ab der Nacht zum 25.11. Die Entscheidung „Cron je Minute" fällt mit den
 Zahlen danach (Vorgabe des Nutzers vom 18.10.2026). **Nicht ausgeweitet:** `discBelegt` in der Zählung
