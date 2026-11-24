@@ -56,7 +56,7 @@ Modell „kürzeste Lebensdauer" ist für ihn widerlegt, die Warnung steht seit 
 **Vermutung, nicht belegt:** Sonys Datum gilt für die ganze Kette, auch bei nächtlich rollendem
 Refresh-Token, und beim ersten Zugang endete etwas anderes vorzeitig (etwa die Web-Sitzung); der
 Nutzer erinnert sich an keinen Anlass. Scheitert der Sync in der Nacht zum 29.11., trägt sie. Läuft er
-weiter, ist sie **erst nach der Nacht zum 01.12.** widerlegt: Der Refresh-Token gilt bis 30.11. 03:00 UTC
+weiter, ist sie **erst nach der Nacht zum 05.12.** widerlegt: Der Refresh-Token gilt bis 04.12. 00:00 UTC
 (unten). Die Warnung wird erst danach umgebaut (Entscheidung des
 Nutzers vom 21.11.2026). Die Tabelle enthält ausschließlich Zeitpunkte und steht deshalb in
 `EXPORT_TABELLEN`; die Zeitreihe ist ihr ganzer Zweck und nach einem Verlust nicht
@@ -118,20 +118,27 @@ war: `abgelaufen`. Ein Refresh-Token, das allein abgelegt wird, verwirft das ges
 Der normale Sync fasst das NPSSO damit gar nicht an – schonend gegenüber einer inoffiziellen
 Schnittstelle.
 
-**Der Refresh-Token hält zehn Tage. Ob die Frist mit jeder Erneuerung weiterrollt, ist offen** (Befund
-vom 23.11.2026). Am 09.10.2026 sprang `refresh_expires_at` vom 09.10. (zehn Tage nach der
-NPSSO-Eintragung vom 29.09.) auf den **19.10. 03:05**, und daraus wurde „rollt" geschlossen – weil
-`psn_zugang` weiter `offen` zeigte. **Dieser Schluss trägt nicht:** Der Rückfall auf das NPSSO
-(Schritt 2) schreibt nichts nach `psn_zugang` (`sitzungHolen`, `src/sync/run.ts`), eine neue Kette
-wäre dort unsichtbar. Dagegen spricht heute: Nach den erfolgreichen Nächten zum 21., 22. und 23.11.
-steht der Wert auf dem **30.11.2026 03:00:40**, zehn Tage nach dem Nachtlauf vom 20.11.; die Nächte
-danach haben ihn nicht bewegt. **Vermutung, nicht belegt:** Sonys `refresh_token_expires_in` zählt auf einen
-festen Punkt herunter, und alle rund zehn Tage leitet der Cron aus dem NPSSO neu ab.
+**Der Refresh-Token hält zehn Tage, und eine Erneuerung in derselben Nacht verlängert ihn nicht** (Befund vom
+24.11.2026). In der Nacht zum 24.11. steht `access_expires_at` auf 01:55:46.419, erneuert wurde also
+zuletzt gegen 00:55:46; `refresh_expires_at` aus derselben Anweisung ist der **04.12. 00:00:47.419**, zehn
+Tage nach dem **ersten** Aufruf der Nacht. Sonys `refresh_token_expires_in` zählte dort auf einen festen
+Punkt herunter.
 
-Praktische Folge für das NPSSO-Ende (28.11. 17:58 UTC): Trifft die Vermutung zu, trägt der
-Refresh-Token noch die Nächte zum 29. und 30.11. (Sync ab 00:00 UTC); **die erste Nacht, die das tote
-NPSSO bräuchte, ist die zum 01.12.** Bleibt der Lauf länger als zehn Tage aus, fällt der nächste in
-jedem Fall auf Schritt 2 zurück.
+**Offen: wann und wodurch der feste Punkt springt.** Zehn Tage ab Lauf sind für den 09.10. (auf den
+19.10. 03:05), den 20.11. (auf den 30.11. 03:00:40) und den 24.11. belegt. Nach den Nächten zum 21., 22.
+und 23.11. stand der Wert unbewegt; am 24.11. sprang er **sechs Tage vor Ablauf**. „Alle rund zehn Tage
+aus dem NPSSO" (Vermutung vom 23.11.) trifft also nicht zu. Zwei Erklärungen, keine belegt: Der
+Token-Endpunkt lehnte den Refresh-Token ab, und der Cron leitete aus dem NPSSO neu ab (Schritt 2; jede
+Antwort außer 2xx führt dorthin, auch eine vorübergehende Störung), oder Sony gab bei der Erneuerung
+eine neue Frist. Beides sieht in der Datenbank gleich aus: Der Rückfall schreibt nichts nach
+`psn_zugang` und nichts ins Log (`sitzungHolen`, `src/sync/run.ts`).
+
+Praktische Folge für das NPSSO-Ende (28.11. 17:58 UTC): Bleibt der Punkt stehen, trägt der
+Refresh-Token bis zur Nacht zum 03.12.; am 04.12. läuft er fast auf die Sekunde mit dem ersten Aufruf ab.
+**Läuft der Sync weiter, entscheidet erst die Nacht zum 05.12.**, und jeder weitere Sprung vor dem 28.11.
+schiebt das hinaus. Ein Sprung nach dem 28.11. spräche gegen die NPSSO-Erklärung.
+Bleibt der Lauf länger als zehn Tage aus, fällt der nächste in jedem Fall auf
+Schritt 2 zurück.
 
 **Weder NPSSO noch Refresh- oder Access Token dürfen jemals in einer API-Antwort oder im Log
 erscheinen, auch nicht gekürzt.** Durchgesetzt wird das über eine Hülle `Geheimnis`, deren
