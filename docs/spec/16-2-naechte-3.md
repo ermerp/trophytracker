@@ -170,3 +170,28 @@ Sync lief daneben fehlerfrei. Verspätung 4 h 20 bis 4 h 37.
 
 **Gelesene Zeilen:** PSN 30 212 (mit den Abendläufen vermischt), Wartung 70 866 (24 statt 36 Aufrufe).
 `rows_read_24h` gegen 15:45 UTC **101 078**, `rows_written_24h` 2 937 (Vortag 282 539 und 3 352, mit Sicherung).
+
+#### Nacht zum 24.11.2026 – die erste ohne Preisprüfung im PSN-Fenster
+
+**Alle 60 Cron-Aufrufe `ok`**, 24 Standorte. Sync `erfolg` um 00:50 (432 Titel), PSN-Arbeit nach 13
+Aufrufen fertig (01:00), Wartung nach vier (03:15). Warnungen nur `zugang_endet`. Ausgewertet am
+24.11.2026 gegen 16:10 UTC.
+
+| Nacht | Sync Median (min–max), über 15 | Spitze | Level | Auffrischen | Leerlauf PSN / Wartung, Median |
+|---|---|---|---|---|---|
+| 24.11. | 9 (7–14), 0 | 14 (MAD) | 6 | 13 / 11 / 12 | 6 / 4 |
+
+**Budget:** Kein arbeitender Aufruf lag über 15 ms, Median **9** und P90 **13** (16 Aufrufe) verfehlen 8
+und 10. **Leerlauf über 10 ms: drei** von 43 – ORD 17 (02:55), SEA 12 (02:25), LAX 13 (04:00);
+in diesen Minuten lief keine Action.
+
+**Preisläufe:** Vom alten Zeitplan blieb höchstens ein Lauf: Store um 02:36 (Zeitplan), leer, 1 s. Ob er der alte
+von 22:47 oder der neue von 15:47 war, zeigt die API nicht; ein Markt-Lauf startete nach dem Handlauf
+nicht mehr. **Die ersten planmäßigen Nachmittagsläufe am 24.11. (13:17 / 13:47) waren um 16:09 UTC noch nicht
+gestartet**, also mindestens 2 h 52 und 2 h 22 verspätet; auch die Rückfälle (15:17 / 15:47) standen aus.
+
+**Gelesene Zeilen:** PSN 16 480, Wartung 73 223. `rows_read_24h` um 16:10 UTC **89 703** – genau die Summe
+der Stunden 00–04, also eine Nacht ohne Deploy, Sicherung und Preisprüfung (Vortag 101 078);
+`rows_written_24h` 1 113 (Vortag 2 937).
+
+**Der Refresh-Token sprang** vom 30.11. 03:00:40 auf den 04.12. 00:00:47 ([7.1](07-1-psn-trophaeen.md)).
