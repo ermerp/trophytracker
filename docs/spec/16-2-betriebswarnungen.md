@@ -78,7 +78,8 @@ und Gründe in [10.1](10-1-cron.md).
 - **Fensterende:** `fenster_offen` leitet das Ende seit 18r aus den Cron-Ausdrücken ab
   (`src/domain/cron-fenster.ts`), vorher feste Stunden 6 und 9.
 - **Auswertung:** `scripts/nacht.mjs` zählt 00–05 UTC, die Preisläufe seit 18r-b ab 13 UTC des Vortags (vorher Abend ab 18 UTC); vollständig ab
-  05:00 UTC. **Der Index-Nachtrag** ist keine Bedingung: Er gehört vor „Cron je Minute"
+  05:00 UTC. Seit 18r-c (25.11.2026) nennt es je Preislauf Termin, Start und Verspätung (GitHub-API, der Reihenfolge nach
+  zugeordnet, sonst „unbekannt"); ändert sich ein Zeitplan, wandert `ZEITPLAN_AB` in `scripts/preislaeufe.mjs` mit. **Der Index-Nachtrag** ist keine Bedingung: Er gehört vor „Cron je Minute"
   ([16-2-cpu-und-betrieb.md](16-2-cpu-und-betrieb.md)), und 18r braucht keinen schnelleren Takt.
 
 #### Nachtrag 18r-b: die Actions am Nachmittag (gebaut und deployt am 23.11.2026)

@@ -2,11 +2,12 @@
  * Nachtauswertung der Cron-Fenster (16.2, `docs/spec/16-2-naechte.md`).
  *
  * Liest NUR Betriebszahlen von Cloudflare - CPU-Zeit, Standort, Ausgang und
- * Logzeile je Cron-Aufruf, gelesene Zeilen je Stunde -, keine Nutzerdaten.
+ * Logzeile je Cron-Aufruf, gelesene Zeilen je Stunde - und von GitHub die
+ * Startzeiten der Preislaeufe, keine Nutzerdaten.
  * Die Logzeilen des Crons enthalten nur Schrittnamen und Zahlen. Deshalb
  * darf das Skript ins Repository (CLAUDE.md, "Keine echten PSN-Daten").
  *
- * Drei Quellen, weil keine allein reicht (10.1):
+ * Drei Quellen fuer die Cron-Fenster, weil keine allein reicht (10.1):
  * - Telemetry (`view: events`): je Aufruf CPU-Zeit, Ausgang und Logzeile,
  *   die vollstaendige Quelle fuer die ZAHL der Aufrufe - aber ohne Standort
  *   bei Cron-Ereignissen. Aufruf und Logzeile sind zwei Ereignisse mit
@@ -15,12 +16,17 @@
  *   Abbrueche (`exceededResources`), laesst aber einzelne Minuten aus.
  * - `d1AnalyticsAdaptiveGroups`: gelesene Zeilen je Stunde.
  *
+ * Dazu, unabhaengig davon, die GitHub-API (ohne Token, das Repository ist
+ * oeffentlich): Start, Ergebnis und Dauer der geplanten Preislaeufe. Termine
+ * aus den Workflow-Dateien, Zuordnung in `preislaeufe.mjs`. Scheitert der
+ * Abruf, steht der Grund im Block, der Rest bleibt gueltig.
+ *
  * Telemetry haelt rund sieben Tage. Gezaehlt werden die Fenster 00-05 UTC
  * des Datums (seit 18r: PSN 00-03, Wartung 03-05) und bei den gelesenen
  * Zeilen die Preislaeufe (Markt- und Store-Action, seit 18r-b 13:17/13:47
- * UTC) ab 13 UTC des Vortags. Nur bis zu den Abendlaeufen vom 22.11.2026
- * (20:17/20:47 UTC, verspaetet) koennen sie in die Stunden 00-03 fallen und
- * dort mitgezaehlt werden. Der
+ * UTC) ab 13 UTC des Vortags. Startet GitHub sie erst nach Mitternacht,
+ * zaehlen ihre Zeilen im PSN-Fenster mit (25.11.2026: Store-Rueckfall 00:07);
+ * welche das sind, sagt der Block "Preislaeufe" (Spalte Cron-Fenster). Der
  * Median gerader Stichproben ist der Mittelwert der beiden mittleren Werte.
  *
  * Aufruf (Token mit Lesezugriff auf Analytics und Observability in der
@@ -30,6 +36,7 @@
  *   node scripts/nacht.mjs 2026-11-01 --liste    # dazu jeder Aufruf
  */
 import fs from "node:fs";
+import { aktionsZeilen, cronTermine, startFenster, vortagVon } from "./preislaeufe.mjs";
 
 const [datum, ...schalter] = process.argv.slice(2);
 if (!/^\d{4}-\d{2}-\d{2}$/.test(datum ?? "")) {
@@ -50,7 +57,7 @@ const skript = konfiguration.match(/"name":\s*"([^"]+)"/)[1];
 
 const beginn = `${datum}T00:00:00Z`;
 const ende = `${datum}T05:00:00Z`;
-const vortag = new Date(Date.parse(beginn) - 86_400_000).toISOString().slice(0, 10);
+const vortag = vortagVon(datum);
 
 async function cloudflare(pfad, body) {
 	const antwort = await fetch(`https://api.cloudflare.com/client/v4/${pfad}`, {
@@ -179,3 +186,43 @@ console.log(`    PSN-Fenster 00-03 UTC: ${summeStunden(`${datum}T00`, `${datum}T
 console.log(`    Wartung 03-05 UTC:     ${summeStunden(`${datum}T03`, `${datum}T05`)}`);
 console.log(`    Preislaeufe ${vortag} 13 UTC bis 00 UTC: ${summeStunden(`${vortag}T13`, `${datum}T00`)}`);
 console.log(`    je Stunde: ${[...zeilenJeStunde].sort().map(([h, n]) => `${h.slice(5)} ${n}`).join("  ")}`);
+
+// --- Preislaeufe: Start der geplanten Actions gegen ihren Termin ---
+const PROSEITE = 100;
+
+async function geplanteLaeufe(datei, { von, bis }) {
+	const iso = (ms) => new Date(ms).toISOString().slice(0, 19) + "Z";
+	const abfrage = new URLSearchParams({ event: "schedule", created: `${iso(von)}..${iso(bis)}`, per_page: String(PROSEITE) });
+	const antwort = await fetch(
+		`https://api.github.com/repos/ermerp/trophytracker/actions/workflows/${datei}/runs?${abfrage}`,
+		{
+			headers: { Accept: "application/vnd.github+json", "User-Agent": "nachtauswertung" },
+			signal: AbortSignal.timeout(30_000),
+		},
+	);
+	if (!antwort.ok) throw new Error(`GitHub antwortet ${antwort.status}`);
+	const j = await antwort.json();
+	if (!Array.isArray(j.workflow_runs)) throw new Error("Antwort ohne workflow_runs");
+	if (j.total_count > j.workflow_runs.length) throw new Error(`nur ${j.workflow_runs.length} von ${j.total_count} Laeufen geliefert`);
+	return j.workflow_runs;
+}
+
+console.log();
+console.log("  Preislaeufe (GitHub Actions, UTC; GitHub nennt den Termin nicht, zugeordnet wird nur der Reihenfolge nach):");
+for (const [name, datei] of [
+	["Gebrauchtpreise", "markt.yml"],
+	["Store-Preise", "store.yml"],
+]) {
+	console.log(`    ${name} (${datei})`);
+	try {
+		const { termine, unlesbar } = cronTermine(
+			fs.readFileSync(new URL(`../.github/workflows/${datei}`, import.meta.url), "utf8"),
+		);
+		if (unlesbar.length) throw new Error(`cron-Zeile nicht in der Form "M H * * *": ${unlesbar.join(", ")}`);
+		if (!termine.length) throw new Error("keine aktive cron-Zeile in der Workflow-Datei");
+		const laeufe = await geplanteLaeufe(datei, startFenster(datum, termine));
+		for (const z of aktionsZeilen({ datum, termine, laeufe, jetzt: Date.now() })) console.log(`      ${z}`);
+	} catch (e) {
+		console.log(`      Nicht ausgewertet: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ""}`);
+	}
+}
