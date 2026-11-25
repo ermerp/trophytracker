@@ -154,8 +154,8 @@ nicht `UNION`: Sonst liest SQLite für das Entdoppeln `idx_release_game` ganz (4
 **In der Produktion nach dem Deploy (24.11.2026, 16:40 UTC):** Auffrischen 2 Zeilen im Leerlauf und 100
 statt 628 bei rund 150 fälligen, Disc 5; beide Pläne nutzen die Teilindizes.
 
-Schreibkosten: rund +165 Zeilen je 30 Tage. **Offen: die CPU** – der Wartungs-Leerlauf lag vorher bei
-Median 4 ms; gemessen wird ab der Nacht zum 25.11. Die Entscheidung „Cron je Minute" fällt mit den
+Schreibkosten: rund +165 Zeilen je 30 Tage. **Die CPU sank nicht:** Wartungs-Leerlauf in der Nacht zum 25.11.
+Median 5 ms (3–9, n = 20) gegen 4 davor, gelesen 80 statt rund 2 000 Zeilen je Aufruf ([Nächte](16-2-naechte-3.md)). Die Entscheidung „Cron je Minute" fällt mit den
 Zahlen danach (Vorgabe des Nutzers vom 18.10.2026). **Nicht ausgeweitet:** `discBelegt` in der Zählung
 scannt weiter `release` (rund 490 Zeilen).
 

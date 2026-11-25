@@ -138,6 +138,9 @@ Token-Endpunkts, `ohne` (kein gültiger Refresh-Token), `leer` (2xx ohne Token) 
 nur bei `gescheitert`). Gemeldet wird in `sitzungHolen` (`src/sync/run.ts`), alle Cron-Schritte erben es;
 Knopfläufe schreiben keine Cron-Zeile. Stirbt der Aufruf vor der Zeile, fehlt die Angabe.
 
+**Nacht zum 25.11.:** beide Anmeldungen (00:00 und 00:55) `refresh`, kein Rückfall; der Punkt steht auf
+04.12. 00:00:47.918 (eine halbe Sekunde weiter). Wodurch er am 24.11. sprang, bleibt offen – 18q-c lief da noch nicht.
+
 Praktische Folge für das NPSSO-Ende (28.11. 17:58 UTC): Bleibt der Punkt stehen, trägt der
 Refresh-Token bis zur Nacht zum 03.12.; am 04.12. läuft er fast auf die Sekunde mit dem ersten Aufruf ab.
 **Läuft der Sync weiter, entscheidet erst die Nacht zum 05.12.**, und jeder weitere Sprung vor dem 28.11.

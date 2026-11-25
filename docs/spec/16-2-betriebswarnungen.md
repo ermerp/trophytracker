@@ -89,14 +89,17 @@ neuen PSN-Fenster. Jetzt trennt `d1AnalyticsAdaptiveGroups` je Stunde Preisläuf
 der Markt sieht den Sync desselben Tages. Frist (12 h), Stillstand (30 h) und Alter des Store-Ziels
 (42 h) bleiben.
 
-- **Offen (24.11.2026, 18:28 UTC):** Von den vier ersten Nachmittagsterminen war noch keiner gestartet, der Markt
-  um 13:17 also 5 h 11 überfällig; seit der Umstellung gibt es keinen geplanten Markt-Lauf. Der leere Store-Lauf
-  vom 24.11. 02:36 ist entweder der neue Termin 15:47 vom Vortag (10 h 49 zu spät) oder der alte um 22:47 (3 h 49).
-  Kein Handlauf, auch nicht bei einer Stillstand-Warnung ab 21:53 UTC (Entscheidung des Nutzers vom 24.11.2026);
-  nachgesehen wird am 25.11.
-- **Offen:** Die Verspätung um diese Uhrzeit ist nicht gemessen. Den Sync ab 00:00 UTC berührte der
-  Rückfall erst ab 8 h 43 (Markt) und 8 h 13 (Store).
-- **Nachgerechnet mit 6 h 38**, der größten gemessenen Verspätung: vom pünktlichen Rückfall zum
+- **Gemessen am 24.11.2026** (erster Tag): Markt 13:17 kam um 23:01 (**9 h 44**), Store 13:47 um 23:15 (9 h 28), die
+  Rückfälle um 23:55 (8 h 38) und 00:07 (8 h 20). Die Verspätung ist größer als am Abend. Den Sync ab
+  00:00 UTC berührt der Rückfall ab 8 h 43 (Markt) und 8 h 13 (Store): Der leere Store-Rückfall (1 s) lag
+  schon im Fenster, der Hauptlauf des Marktes 59 Minuten davor. Beim leeren Store-Lauf vom 24.11. 02:36 bleibt offen, ob er der neue Termin
+  15:47 vom Vortag (10 h 49) oder der alte um 22:47 (3 h 49) war. Am 25.11. war um 15:49 UTC wieder keiner gestartet.
+- **Offen: die Schwellen reichen mit 9 h 44 nicht** (zu entscheiden, nichts geändert): vom pünktlichen Rückfall zum
+  ebenso verspäteten Hauptlauf 31 h 44 (über 30 h), vom Store-Probelauf um 03:47 zum nächsten um 23:15 des
+  Folgetags 43 h 28 (über 42 h). Zwischen Handlauf (23.11. 15:53) und Markt (24.11. 23:10) lagen 31 h 17 –
+  rechnerisch stand die Stillstand-Warnung gut eine Stunde; am 25.11. um 15:49 UTC steht keine. Kein Handlauf
+  (Entscheidung des Nutzers vom 24.11.2026).
+- **Nachgerechnet mit 6 h 38**, der bis dahin größten gemessenen Verspätung (überholt, oben): vom pünktlichen Rückfall zum
   maximal verspäteten Hauptlauf 28 h 38 (unter 30 h); vom Probelauf um 03:47 zum nächsten prüfenden
   Store-Lauf um 20:25 des Folgetags 40 h 38 (unter 42 h). **Nicht gedeckt, wie schon bei 20:17:** vom
   pünktlichen Hauptlauf zum nächsten, maximal verspäteten sind es 30 h 38 – `markt_leer` schlüge bis

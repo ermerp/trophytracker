@@ -195,3 +195,30 @@ der Stunden 00–04, also eine Nacht ohne Deploy, Sicherung und Preisprüfung (V
 `rows_written_24h` 1 113 (Vortag 2 937).
 
 **Der Refresh-Token sprang** vom 30.11. 03:00:40 auf den 04.12. 00:00:47 ([7.1](07-1-psn-trophaeen.md)).
+
+#### Nacht zum 25.11.2026 – die erste mit 18s und 18q-c
+
+**Alle 60 Cron-Aufrufe `ok`**, 22 Standorte. Sync `erfolg` um 00:50 (432 Titel), PSN-Arbeit nach 13
+Aufrufen fertig (01:00), Wartung nach vier (03:15). Warnungen nur `zugang_endet`. Ausgewertet am
+25.11.2026 um 15:49 UTC.
+
+| Nacht | Sync Median (min–max), über 15 | Spitze | Level | Auffrischen | Leerlauf PSN / Wartung, Median |
+|---|---|---|---|---|---|
+| 25.11. | 9 (6–25), 1 | 20 (NRT) | 6 | 7 / 6 / 8 | 5 / 5 |
+
+**Budget:** Median **8** (17 arbeitende Aufrufe), P90 **20** (nächster Rang); zwei über 15 – Sync 25 (SJC, 00:00)
+und Spielzeit 20 (NRT). Beide trugen eine Anmeldung. Leerlauf über 10 ms: einer von 43, SJC 12 (02:10).
+
+**18s:** Wartung **27 157** gelesene Zeilen statt 73 223 (24.11., ebenfalls drei Auffrisch-Aufrufe); in der
+Stunde 04 sind es 960 für zwölf Leerlauf-Aufrufe, also 80 je Aufruf (Test 74). **Die CPU des Leerlaufs sank nicht:**
+Median 5 (3–9, n = 20) gegen 4 (3–8 und 3–13) am 23. und 24.11. Auffrischen 6–8 statt 11–13 ms – eine
+Nacht, andere Standorte.
+
+**18q-c:** `anmeldung=refresh` um 00:00 und 00:55, kein Rückfall auf das NPSSO ([7.1](07-1-psn-trophaeen.md)).
+
+**Preisläufe:** Markt 23:01 (431 geprüft in 87 Portionen, 508 s, 0 offen, 1 Preisalarm), Store 23:15 (79 geprüft,
+77 s, 0 offen), Rückfälle 23:55 und 00:07 leer; Verspätung **9 h 44 / 9 h 28 / 8 h 38 / 8 h 20**
+([16-2-betriebswarnungen.md](16-2-betriebswarnungen.md)).
+
+**Gelesene Zeilen:** PSN 16 578. `rows_read_24h` um 15:49 UTC **316 801**, davon 184 628 in der Stunde 16 des 24.11.
+(zwei Deploys); `rows_written_24h` 3 381.
