@@ -95,7 +95,7 @@ der Markt sieht den Sync desselben Tages. Frist (12 h), Stillstand (30 h) und Al
   00:00 UTC berührt der Rückfall ab 8 h 43 (Markt) und 8 h 13 (Store): Der leere Store-Rückfall (1 s) lag
   schon im Fenster, der Hauptlauf des Marktes 59 Minuten davor. Beim leeren Store-Lauf vom 24.11. 02:36 bleibt offen, ob er der neue Termin
   15:47 vom Vortag (10 h 49) oder der alte um 22:47 (3 h 49) war. Am 25.11. war um 15:49 UTC wieder keiner gestartet.
-- **Offen: die Schwellen reichen mit 9 h 44 nicht** (zu entscheiden, nichts geändert): vom pünktlichen Rückfall zum
+- **Offen: die Schwellen reichen mit 9 h 44 nicht** (zu entscheiden nach der Nacht zum 26.11., dem zweiten Messtag; Vorschlag 36 h Stillstand und 48 h Store-Ziel, nichts geändert): vom pünktlichen Rückfall zum
   ebenso verspäteten Hauptlauf 31 h 44 (über 30 h), vom Store-Probelauf um 03:47 zum nächsten um 23:15 des
   Folgetags 43 h 28 (über 42 h). Zwischen Handlauf (23.11. 15:53) und Markt (24.11. 23:10) lagen 31 h 17 –
   rechnerisch stand die Stillstand-Warnung gut eine Stunde; am 25.11. um 15:49 UTC steht keine. Kein Handlauf
