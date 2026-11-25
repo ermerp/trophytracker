@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 194 | 25.11.2026 | **Abschluss 25.11.:** Teilindex für `discBelegt` verworfen; Schwellen der Preisläufe und Termin der Spielzeit-Spitze offen (16.2) |
 | 193 | 25.11.2026 | **Nachtrag 18r-c: Verspätung der Preisläufe in der Nachtauswertung.** `scripts/nacht.mjs` nennt je Lauf Termin, Start und Verspätung (16.2) |
 | 192 | 25.11.2026 | **Nachtrag: Nacht zum 25.11.** 60 Aufrufe `ok`; 18s: Wartung 27 157 statt 73 223 Zeilen, CPU im Leerlauf unverändert; 18q-c: zweimal `refresh`; Preisläufe bis 9 h 44 verspätet, Schwellen 30 h / 42 h damit zu knapp – offen (16.2, 7.1) |
 | 191 | 24.11.2026 | **Abschluss 24.11.:** Nachmittagsläufe der Actions bis 18:28 UTC ausgeblieben, kein Handlauf, Prüfung am 25.11. (16.2) |

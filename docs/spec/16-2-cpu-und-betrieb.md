@@ -156,8 +156,9 @@ statt 628 bei rund 150 fälligen, Disc 5; beide Pläne nutzen die Teilindizes.
 
 Schreibkosten: rund +165 Zeilen je 30 Tage. **Die CPU sank nicht:** Wartungs-Leerlauf in der Nacht zum 25.11.
 Median 5 ms (3–9, n = 20) gegen 4 davor, gelesen 80 statt rund 2 000 Zeilen je Aufruf ([Nächte](16-2-naechte-3.md)). Die Entscheidung „Cron je Minute" fällt mit den
-Zahlen danach (Vorgabe des Nutzers vom 18.10.2026). **Nicht ausgeweitet:** `discBelegt` in der Zählung
-scannt weiter `release` (rund 490 Zeilen).
+Zahlen danach (Vorgabe des Nutzers vom 18.10.2026). **Verworfen (Entscheidung des
+Nutzers vom 25.11.2026): ein Teilindex für `discBelegt`.** Die Zählung scannt weiter `release` (490 Zeilen;
+mit Index gerechnet 198). Dafür bräuchte es eine Migration, und der Disc-Schritt änderte sich vor der Messung um den 16.12. (18p-b).
 
 **Der Testbestand** (Vorgaben des Nutzers vom 18. und 20.10.2026) hat jetzt 479 Spiele (478
 verknüpft), 490 Releases (11 Spiele mit zwei), 165 `unbekannt` und 59 nie geprüfte außerhalb der Marktauswahl; seine Release-Id
