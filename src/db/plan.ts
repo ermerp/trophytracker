@@ -227,10 +227,12 @@ export const POSITION_ANS_ENDE =
  * damit `test/lesekosten.spec.ts` genau diese Abfrage misst.
  */
 export const OFFENE_WUNSCHTITEL =
-	"SELECT pe.id, COALESCE(g.title, pe.title_raw) AS titel, r.platform AS plattform FROM plan_entry pe " +
+	"SELECT pe.id, COALESCE(g.title, pe.title_raw) AS titel, r.platform AS plattform, g.igdb_id FROM plan_entry pe " +
 	"LEFT JOIN release r ON r.id = pe.release_id " +
 	"LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id) " +
 	"WHERE pe.kind = 'wunsch' AND pe.status = 'offen'";
+
+export type OffenerWunschtitel = { id: number; titel: string | null; plattform: string | null; igdb_id: number | null };
 
 export class PlanRepository {
 	constructor(
@@ -302,8 +304,8 @@ export class PlanRepository {
 	 * Aussagen. Nur genau dasselbe Ziel derselben Art zaehlt als Duplikat.
 	 * Freitext wird nicht geprueft - er hat kein Ziel, das sich vergleichen liesse.
 	 */
-	async offeneWunschtitel(): Promise<Array<{ id: number; titel: string | null; plattform: string | null }>> {
-		const { results } = await this.db.prepare(OFFENE_WUNSCHTITEL).all<{ id: number; titel: string | null; plattform: string | null }>();
+	async offeneWunschtitel(): Promise<OffenerWunschtitel[]> {
+		const { results } = await this.db.prepare(OFFENE_WUNSCHTITEL).all<OffenerWunschtitel>();
 		return results;
 	}
 

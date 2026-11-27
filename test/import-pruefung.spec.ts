@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { plattformZurListe } from "../src/domain/titel";
-import { aehnlicherTitel, aehnlicheWuensche, jahrWeichtAb } from "../src/domain/wunschliste";
+import { aehnlicherTitel, aehnlicheWuensche, jahrWeichtAb, trefferStand } from "../src/domain/wunschliste";
+import { standText } from "../frontend/src/trefferstand";
 import { suchWoerter } from "../src/domain/igdb";
 import { plattformZurListe as plattformZurListeFrontend } from "../frontend/src/plattformwahl";
 
@@ -120,5 +121,45 @@ describe("aehnlicheWuensche (f1b)", () => {
 
 	it("laesst den eigenen Wunsch weg", () => {
 		expect(aehnlicheWuensche("Marvel's Wolverine", wuensche, 3)).toEqual([{ titel: "Marvel's Wolverine: Digital Deluxe Edition", plattform: "PS5" }]);
+	});
+});
+
+describe("trefferStand (f1d)", () => {
+	const treffer = { igdbId: 7, name: "Marvel's Wolverine" };
+	const leer = { disc: 0, kauf: 0, plus: 0, gespielt: 0 };
+
+	it("nennt genau diesen Eintrag als Wunsch und nicht noch einmal als aehnlich", () => {
+		const s = trefferStand(treffer, [
+			{ id: 1, titel: "Marvel's Wolverine", plattform: "PS5", igdb_id: 7 },
+			{ id: 2, titel: "Marvel's Wolverine: Digital Deluxe Edition", plattform: "PS5", igdb_id: 8 },
+		], []);
+		expect(s.aufWunschliste).toEqual([{ plattform: "PS5" }]);
+		expect(s.aehnlich).toEqual([{ titel: "Marvel's Wolverine: Digital Deluxe Edition", plattform: "PS5" }]);
+	});
+
+	it("nimmt je Plattform das Staerkste: Disc vor Kauf vor PS Plus vor gespielt", () => {
+		const s = trefferStand(treffer, [], [
+			{ igdb_id: 7, platform: "PS4", ...leer, disc: 1, gespielt: 1 },
+			{ igdb_id: 7, platform: "PS5", ...leer, plus: 1, gespielt: 1 },
+			{ igdb_id: 7, platform: "PS3", ...leer, gespielt: 1 },
+		]);
+		expect(s.inSammlung).toEqual([
+			{ plattform: "PS4", art: "Disc" },
+			{ plattform: "PS5", art: "PS Plus" },
+			{ plattform: "PS3", art: "gespielt" },
+		]);
+	});
+
+	it("zaehlt ein Release ohne Besitz und ohne Trophaeen nicht zur Sammlung - etwa das eines Wunsches", () => {
+		expect(trefferStand(treffer, [], [{ igdb_id: 7, platform: "PS5", ...leer }]).inSammlung).toEqual([]);
+		expect(trefferStand(treffer, [], [{ igdb_id: 9, platform: "PS5", ...leer, disc: 1 }]).inSammlung).toEqual([]);
+	});
+
+	it("wird im Frontend zu den Saetzen des Hinweises", () => {
+		expect(standText({ inSammlung: [{ plattform: "PS4", art: "Disc" }, { plattform: "PSVITA", art: "gespielt" }], aufWunschliste: [{ plattform: "PS5" }] })).toEqual([
+			"In der Sammlung: PS4 Disc, Vita gespielt",
+			"Schon auf der Wunschliste: PS5",
+		]);
+		expect(standText({})).toEqual([]);
 	});
 });

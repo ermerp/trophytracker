@@ -254,7 +254,13 @@ export type IgdbKandidat = {
   spieler: { wert: number; anzahl: number | null } | null
   /** Nachtrag f1b: offene Wünsche mit ähnlichem Titel - nur bei `wunsch=1`. */
   aehnlich?: AehnlicherWunsch[]
+  /** Nachtrag f1d: genau dieser Eintrag als offener Wunsch, je Plattform. */
+  aufWunschliste?: Array<{ plattform: string | null }>
+  /** Nachtrag f1d: was die Sammlung je Plattform hat. */
+  inSammlung?: Array<{ plattform: string; art: string }>
 }
+
+export { standText } from './trefferstand'
 
 export type AehnlicherWunsch = { titel: string; plattform: string | null }
 

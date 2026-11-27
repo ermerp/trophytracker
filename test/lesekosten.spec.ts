@@ -6,7 +6,7 @@ import { FEED_HOECHSTENS } from "../src/api/feed";
 import { AUFFRISCH_FRIST_TAGE, CRON_PSN, CRON_WARTUNG, cronFenster, SCHLUESSEL_AUFFRISCHEN } from "../src/sync/cron";
 import { createExecutionContext } from "cloudflare:test";
 import { createRepositories } from "../src/db";
-import { IM_BESITZ_SQL } from "../src/db/ownership";
+import { IM_BESITZ_SQL, bestandNachIgdbSql } from "../src/db/ownership";
 import { einzeln, type Baustein } from "../src/db/baustein";
 import { Geheimnis } from "../src/domain/secret";
 import { createApp, createScheduled } from "../src/index";
@@ -902,6 +902,19 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		expect(besitz).toBeLessThan(10);
 		expect(keiner).toBeLessThan(10);
 		await env.DB.prepare("DELETE FROM game WHERE id = 999999").run();
+	});
+
+	it("misst den Bestand zu den Treffern einer Suche (Nachtrag f1d)", async () => {
+		// Je Suche mit wunsch=1 einmal, mit bis zu 90 IGDB-Ids. Spiele ohne Id
+		// bekommen fuer die Messung eine und verlieren sie danach wieder.
+		const spiele = await env.DB.prepare("SELECT id FROM game ORDER BY id LIMIT 90").all<{ id: number }>();
+		await env.DB.batch(spiele.results.map((g) => env.DB.prepare("UPDATE game SET igdb_id = COALESCE(igdb_id, ?) WHERE id = ?").bind(900000 + g.id, g.id)));
+		const ids = (await env.DB.prepare("SELECT igdb_id FROM game WHERE igdb_id IS NOT NULL ORDER BY id LIMIT 90").all<{ igdb_id: number }>()).results.map((x) => x.igdb_id);
+		const gelesen = await zeilenGelesen(bestandNachIgdbSql(ids.length), ...ids);
+		console.info({ bestandNachIgdb: gelesen, ids: ids.length });
+		// Je Id ein Index-Lookup auf game, je Release vier EXISTS ueber release_id-Indizes.
+		expect(gelesen).toBeLessThan(ids.length * 15);
+		await env.DB.prepare("UPDATE game SET igdb_id = NULL WHERE igdb_id >= 900000").run();
 	});
 
 	it("misst die offenen Wunschtitel fuer den Aehnlichkeits-Hinweis (Nachtrag f1b)", async () => {
