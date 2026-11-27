@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 201 | 27.11.2026 | **Abschluss 27.11. (nachgeholt):** Produktion zu Stufe 18t geprüft (Migration 0040, Asset-Hash, Route), Lehre zu f2e-b (lehren.md) |
 | 200 | 27.11.2026 | **Stufe 18t: Käufe ohne Spiel.** Die Kaufliste merkt PSN-Käufe ohne Release (`psn_purchase_open`, Migration 0040, nicht exportiert) statt sie zu verwerfen, läuft zusätzlich nach einer neuen Trophäenliste ohne Release, Glocke und Einstellungen zeigen die Käufe; Stufe b (Übernehmen per Tipp über die Concept-Id) geplant; Befund der Wunschlistenprüfung in Stufe 1 (7.7, 10.1, 14.2, 16.2, 16.4) |
 | 199 | 27.11.2026 | **Nachtrag f2e-b: Menü der Preiszeilen.** Am Desktop steht die Hauptaktion nur als Knopf in der Zeile, nicht zusätzlich im Menü; „Gebrauchtangebot prüfen …" statt „verwerfen", weil der Eintrag erst die Tafel öffnet (13.1, 13.3) |
 | 198 | 27.11.2026 | **Nachtrag f2e: Wunschliste, Kaufliste und Lücken als Preisliste in Zeilen.** Kacheln dort gestrichen, Preise rechtsbündig mit Zeichen, Menü „⋯" je Zeile, Sortierwert in der Meta-Zeile; Erfassen (Disc, digital) statt „erledigt" mit vollständigem Rückgängig; Lücken mit Umschalter „Disc belegt \| Disc unklar" und „auf die Kaufliste"; Kaufliste ohne Kandidatenblöcke (5, 5.3, 13.1, 13.2, 13.3, 16.4) |

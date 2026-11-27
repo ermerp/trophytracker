@@ -990,3 +990,14 @@ sagte etwas anderes als das Menü, aus dem man sie gewählt hatte. Nachtrag f2b-
 Kurztext-Mechanik wieder entfernt.
 → Eine Beschriftung je Sache; reicht der Platz nicht, wird die Sache umbenannt, nicht nur ihre
 Anzeige an einer Stelle.
+
+## Die Desktop-Fassung, die nicht gerendert war
+
+**27.11.2026 – Nachtrag f2e-b.** Die Preiszeilen der Wunsch- und Kaufliste und der Lücken (f2e)
+bekamen ein Menü „⋯" je Zeile. Angesehen war die Ansicht nur bei 360 px, wo die Hauptaktion
+allein im Menü steht. Am Desktop steht sie zusätzlich als Knopf in der Zeile – und stand
+deshalb dort doppelt, als Knopf und als Menüeintrag. Die Regel, immer alle drei Breiten zu
+rendern und die Desktop-Fassung mitzuprüfen, gab es schon; sie war nicht eingehalten. f2e-b
+nahm den Eintrag am Desktop aus dem Menü und blendet ein dann leeres Menü aus.
+→ Immer drei Breiten, auch wenn die Änderung „nur das Handy" betrifft (CLAUDE.md, „Oberfläche
+wird angesehen").
