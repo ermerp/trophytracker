@@ -113,29 +113,57 @@ export type MenueEintrag = {
   text: string
   zeichen: MenueZeichen
   /**
-   * Die Hauptaktion: am Desktop zusätzlich als Pillen-Knopf in der Zeile
-   * (`knopf` ist dann ihr Text), am Handy nur der oberste Menüeintrag.
+   * Die Hauptaktion: am Desktop als Pillen-Knopf in der Zeile (`knopf` ist
+   * dann ihr Text), am Handy der oberste Menüeintrag.
    */
   haupt?: { knopf: string; ruhend?: boolean }
+  /** Nur am Handy im Menü – am Desktop steht der Eintrag als Knopf in der Zeile. */
+  nurHandy?: boolean
   /** Rot und unten – das, was nicht zurückkommt. */
   gefahr?: boolean
   /** Eine Trennlinie davor. */
   trenner?: boolean
+  /** Die Trennlinie nur am Handy: Am Desktop stünde sie sonst ganz oben, über nichts. */
+  trennerNurHandy?: boolean
 }
 
 /** Aus Gruppen eine Liste: Die erste Zeile jeder weiteren Gruppe trägt die Trennlinie. */
 function gruppiert(gruppen: ReadonlyArray<ReadonlyArray<MenueEintrag | null | false>>): MenueEintrag[] {
   const voll = gruppen.map((g) => g.filter((e): e is MenueEintrag => Boolean(e))).filter((g) => g.length > 0)
-  return voll.flatMap((g, i) => g.map((e, j) => (i > 0 && j === 0 ? { ...e, trenner: true } : e)))
+  return hauptNurAmHandy(voll.flatMap((g, i) => g.map((e, j) => (i > 0 && j === 0 ? { ...e, trenner: true } : e))))
 }
 
 /**
- * Das Gebrauchtangebot: verwerfen, wenn es eines mit Kennung gibt – sonst,
+ * Die Hauptaktion steht am Desktop als Knopf in der Zeile, im Menü stünde sie
+ * doppelt (Entscheidung des Nutzers vom 27.11.2026) – dort also nur am Handy.
+ * Beginnt danach eine neue Gruppe, gilt ihre Trennlinie ebenso nur am Handy.
+ * Ist sie der einzige Eintrag, fällt am Desktop das ganze Menü weg
+ * (`menueNurHandy`).
+ */
+function hauptNurAmHandy(liste: MenueEintrag[]): MenueEintrag[] {
+  if (liste.length === 0 || !liste[0].haupt) return liste
+  const [haupt, naechster, ...rest] = liste
+  if (!naechster) return [{ ...haupt, nurHandy: true }]
+  return [{ ...haupt, nurHandy: true }, naechster.trenner ? { ...naechster, trennerNurHandy: true } : naechster, ...rest]
+}
+
+/**
+ * Ob das Menü am Desktop leer wäre, weil alles darin schon als Knopf in der
+ * Zeile steht (verworfene Lücke). Dann bleibt „⋯" dort unsichtbar – als
+ * Platz, damit die Zeilen ausgerichtet bleiben.
+ */
+export function menueNurHandy(menue: readonly MenueEintrag[]): boolean {
+  return menue.length > 0 && menue.every((e) => e.nurHandy)
+}
+
+/**
+ * Das Gebrauchtangebot: prüfen, wenn es eines mit Kennung gibt – der Eintrag
+ * öffnet die Tafel aus `Preis.tsx`, in der verworfen wird. Sonst,
  * wenn hier schon etwas verworfen ist, der Weg zurück (Stufe 20h: ohne ihn
  * stünde „unbekannt" da, WEIL du entschieden hast, und keine Rücknahme).
  */
 export function angebotEintrag(itemId: string | null, verworfen: number): MenueEintrag | null {
-  if (itemId !== null) return { aktion: 'angebot', text: 'Gebrauchtangebot verwerfen', zeichen: 'disc' }
+  if (itemId !== null) return { aktion: 'angebot', text: 'Gebrauchtangebot prüfen …', zeichen: 'disc' }
   if (verworfen > 0) return { aktion: 'angebot', text: `Verworfene Angebote (${verworfen})`, zeichen: 'disc' }
   return null
 }
@@ -207,7 +235,7 @@ export type LueckeMenueFelder = { verworfen: boolean; angebotItemId: string | nu
  */
 export function lueckeMenue(l: LueckeMenueFelder): MenueEintrag[] {
   if (l.verworfen) {
-    return [{ aktion: 'wiederZeigen', text: 'Wieder als Lücke zeigen', zeichen: 'luecke', haupt: { knopf: 'wieder als Lücke zeigen' } }]
+    return hauptNurAmHandy([{ aktion: 'wiederZeigen', text: 'Wieder als Lücke zeigen', zeichen: 'luecke', haupt: { knopf: 'wieder als Lücke zeigen' } }])
   }
   return gruppiert([
     [

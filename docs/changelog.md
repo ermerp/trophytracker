@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 199 | 27.11.2026 | **Nachtrag f2e-b: Menü der Preiszeilen.** Am Desktop steht die Hauptaktion nur als Knopf in der Zeile, nicht zusätzlich im Menü; „Gebrauchtangebot prüfen …" statt „verwerfen", weil der Eintrag erst die Tafel öffnet (13.1, 13.3) |
 | 198 | 27.11.2026 | **Nachtrag f2e: Wunschliste, Kaufliste und Lücken als Preisliste in Zeilen.** Kacheln dort gestrichen, Preise rechtsbündig mit Zeichen, Menü „⋯" je Zeile, Sortierwert in der Meta-Zeile; Erfassen (Disc, digital) statt „erledigt" mit vollständigem Rückgängig; Lücken mit Umschalter „Disc belegt \| Disc unklar" und „auf die Kaufliste"; Kaufliste ohne Kandidatenblöcke (5, 5.3, 13.1, 13.2, 13.3, 16.4) |
 | 197 | 27.11.2026 | **Abschluss 27.11.:** Sync in einem Rutsch mit der Spitze nach dem Ende der NPSSO-Beobachtung, die schon mit einem Sprung nach dem 28.11. endet (16.2) |
 | 196 | 27.11.2026 | **Nachtrag 24c: Startseite bewertet, nicht umgebaut.** 10 925 Zeilen je Öffnen (0,2 % des Tages), Messtest mit Grenze; Spielzeit-Spitze: teuer ist die Anmeldung um 00:55, Vorschlag Restzeit 3 min, nach dem Ende der NPSSO-Beobachtung (16.2) |

@@ -20,6 +20,7 @@ import {
   digitalVorgesehen,
   erfassenZurueck,
   erfasstText,
+  menueNurHandy,
   planMenue,
   rabattProzent,
   sortierwert,
@@ -42,7 +43,8 @@ import { Zeichen } from './Symbole'
  *
  * Am Handy: Cover | Titel und eine Meta-Zeile | Preise | „⋯". Die
  * Hauptaktion ist dort der oberste Menüeintrag. Ab 48 rem bekommt jeder
- * Preis seine Spalte, und die Hauptaktion steht als Pille in der Zeile.
+ * Preis seine Spalte, und die Hauptaktion steht als Pille in der Zeile –
+ * und nur dort, nicht noch einmal im Menü.
  *
  * Was in Zeile und Menü steht, entscheidet `preisliste.ts` – hier ist nur
  * das Bild davon.
@@ -170,7 +172,7 @@ type ZeileProps = {
   plattform?: { aktuell: string | null; waehlen: (p: string) => void }
   /** „Digital erfassen …": die Quelle aus `QuellenTafel`. */
   onDigital?: (q: Quelle) => void
-  /** „Gebrauchtangebot verwerfen": die Tafel aus `Preis.tsx`. */
+  /** „Gebrauchtangebot prüfen …": die Tafel aus `Preis.tsx`, dort wird verworfen. */
   angebot?: { releaseId: number; itemId: string | null; text: string; ohneAngebot: boolean; onGeaendert: () => void }
 }
 
@@ -281,7 +283,7 @@ export function PreisZeile({
           )}
         </div>
       )}
-      <span className="menueanker" ref={anker}>
+      <span className={menueNurHandy(menue) ? 'menueanker nur-handy-platz' : 'menueanker'} ref={anker}>
         <button
           type="button"
           ref={knopf}
@@ -362,7 +364,7 @@ function ZeilenMenue({
     <div className="tafel menuetafel zeilenmenue" role="menu">
       {menue.map((m) => (
         <Fragment key={m.aktion}>
-          {m.trenner && <hr />}
+          {m.trenner && <hr className={m.trennerNurHandy ? 'nur-handy' : undefined} />}
           {m.aktion === 'plattform' && children ? (
             <div className="menuepunkt">
               <Zeichen name={m.zeichen} groesse={18} />
@@ -372,7 +374,7 @@ function ZeilenMenue({
             <button
               type="button"
               role="menuitem"
-              className={m.gefahr ? 'menuepunkt gefahr' : 'menuepunkt'}
+              className={['menuepunkt', m.gefahr && 'gefahr', m.nurHandy && 'nur-handy'].filter(Boolean).join(' ')}
               disabled={laeuft && m.aktion !== 'kauflisteAnsehen'}
               onClick={() => waehle(m)}
             >

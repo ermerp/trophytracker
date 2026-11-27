@@ -80,7 +80,7 @@
 
    Handy: Cover | Titel und eine Meta-Zeile | Preise | "...". Ab 48 rem hat
    jeder Preis seine Spalte, und die Hauptaktion steht als Pille in der
-   Zeile; am Handy ist sie der oberste Menueeintrag.
+   Zeile statt im Menue; am Handy ist sie der oberste Menueeintrag.
 
    Die Selektoren tragen zwei Klassen, wo sie gegen spaetere Dateien
    antreten (`.menuetafel` in spieldetail.css, `.ikone` und `.deckel` in
@@ -452,6 +452,18 @@
   .hauptaktion .ruhend {
     border-color: transparent;
     color: var(--text-still);
+  }
+
+  /* Die Hauptaktion steht jetzt in der Zeile, im Menue nicht noch einmal.
+     `.nur-handy` allein schlaegt `.zeilenmenue .menuepunkt` nicht. */
+  .zeilenmenue .nur-handy {
+    display: none;
+  }
+
+  /* Steht alles aus dem Menue schon in der Zeile, bleibt "..." als Platz:
+     Die Spalte faellt nicht weg, die Zeilen bleiben ausgerichtet. */
+  .preiszeile > .menueanker.nur-handy-platz {
+    visibility: hidden;
   }
 
   .preisfrage {

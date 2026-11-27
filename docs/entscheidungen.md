@@ -399,3 +399,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 27.11.2026 | **„auf die Kaufliste" liegt am Handy nur im Menü „⋯"**, am Desktop als Knopf in der Zeile | [13.3](spec/13-3-bedienung.md) |
 | 27.11.2026 | **Erledigt wird durch Erfassen, nicht von Hand:** „Disc erfassen" und „digital erfassen" in Wunschliste, Kaufliste (und Disc in Lücken), „erledigt" entfällt dort | [5](spec/05-absichten.md), [13.1](spec/13-1-ansichten.md) |
 | 27.11.2026 | **Der Prüfstempel der Disc-Fassung bleibt nach einem Rückgängig auf „jetzt"**; Lücken-Kaufstatus und Scanner-Rückgängig als eigene Nachträge später | [5](spec/05-absichten.md), [16.4](spec/16-4-finale-stufen.md) |
+| 27.11.2026 | **Am Desktop keine Hauptaktion doppelt im Menü**; der Angebotseintrag heißt „Gebrauchtangebot prüfen …" | [13.3](spec/13-3-bedienung.md) |
