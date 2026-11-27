@@ -337,3 +337,41 @@ export function nachBefund<L extends BefundFelder>(zeilen: readonly L[]): L[] {
   const rang = (l: L) => (l.marktRohangebote === 0 ? 0 : l.marktRohangebote === null ? 1 : 2)
   return [...zeilen].sort((a, b) => rang(a) - rang(b) || a.titel.localeCompare(b.titel, 'de'))
 }
+
+// --- Preisfilter (Nachtrag f2e-c) ------------------------------------------------
+
+/**
+ * „mit Gebrauchtpreis", „mit Digitalpreis", „im Angebot" – Wunsch des Nutzers
+ * vom 27.11.2026. Die Filter grenzen **gemeinsam** ein: Wer zwei setzt, sieht
+ * nur Zeilen, auf die beide zutreffen (anders als die Plattformen, die
+ * einander ergänzen). „im Angebot" heißt nur der Store, nicht eBay
+ * (Entscheidung des Nutzers vom 27.11.2026) – ein Gebrauchtangebot hat keinen
+ * Grundpreis, gegen den es ein Angebot wäre.
+ *
+ * Gefiltert wird im Browser: Die Listen bringen ihre Preise ohnehin mit, so
+ * kostet der Filter keine Abfrage und keine gelesene Zeile.
+ */
+export const PREIS_FILTER = ['gebraucht', 'digital', 'angebot'] as const
+export type PreisFilter = (typeof PREIS_FILTER)[number]
+
+export const PREIS_FILTER_TEXT: Record<PreisFilter, string> = {
+  gebraucht: 'mit Gebrauchtpreis',
+  digital: 'mit Digitalpreis',
+  angebot: 'im Angebot',
+}
+
+/** Der URL-Parameter `preis` (kommagetrennt); Unbekanntes fällt still weg, wie bei den Plattformen. */
+export function preisFilterAusParam(roh: string | null): Set<PreisFilter> {
+  const erlaubt = PREIS_FILTER as readonly string[]
+  return new Set((roh ?? '').split(',').filter((w): w is PreisFilter => erlaubt.includes(w)))
+}
+
+export type PreisFilterFelder = { gebrauchtCents: number | null; store: { imAngebot: boolean } | null }
+
+/** Ob eine Zeile alle gesetzten Preisfilter erfüllt; ohne Filter immer. */
+export function passtZuPreis(f: PreisFilterFelder, filter: ReadonlySet<PreisFilter>): boolean {
+  if (filter.has('gebraucht') && f.gebrauchtCents === null) return false
+  if (filter.has('digital') && f.store === null) return false
+  if (filter.has('angebot') && f.store?.imAngebot !== true) return false
+  return true
+}

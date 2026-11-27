@@ -405,3 +405,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 27.11.2026 | **Übernommen wird nach einem Tipp, nicht automatisch**, auch bei einem Treffer über die Concept-Id – mindestens bis die ersten Fälle gesehen sind | [16.2](spec/16-2-offene-stufen.md) |
 | 27.11.2026 | **Die Kaufliste läuft zusätzlich in der Nacht einer neuen Trophäenliste ohne Release** (Auslöser statt einer nächtlichen ersten Seite, deren Reihenfolge nicht gemessen ist); sonst wöchentlich | [7.7](spec/07-7-psn-weitere-daten.md) |
 | 27.11.2026 | **Stufe 18t wird noch am 27.11. deployt**, nicht erst nach der NPSSO-Beobachtung: Sie berührt die Anmeldung nicht, die Nacht zum 28.11. misst den Leerlauf, die zum 29.11. den ersten Lauf | [16.2](spec/16-2-offene-stufen.md) |
+| 27.11.2026 | **f2e-c vor der finalen Stufe 2.** „im Angebot" heißt im Preisfilter nur der Store, kein Gebrauchtangebot; der Filter gilt auch für die Lücken | [13.1](spec/13-1-ansichten.md) |

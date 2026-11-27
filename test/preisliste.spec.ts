@@ -10,6 +10,8 @@ import {
 	lueckenSortierwert,
 	menueNurHandy,
 	nachBefund,
+	passtZuPreis,
+	preisFilterAusParam,
 	planMenue,
 	rabattProzent,
 	sortierwert,
@@ -293,5 +295,51 @@ describe("nachBefund", () => {
 	it('stellt „eBay kennt nichts" vor das Ungepruefte und das vor die unklaren Angebote', () => {
 		const z = (titel: string, marktRohangebote: number | null) => ({ titel, marktRohangebote });
 		expect(nachBefund([z("A", 3), z("B", null), z("C", 0), z("D", 0)]).map((x) => x.titel)).toEqual(["C", "D", "B", "A"]);
+	});
+});
+
+describe("Preisfilter (f2e-c)", () => {
+	const ohne = { gebrauchtCents: null, store: null };
+	const gebraucht = { gebrauchtCents: 1999, store: null };
+	const digital = { gebrauchtCents: null, store: { imAngebot: false } };
+	const angebot = { gebrauchtCents: null, store: { imAngebot: true } };
+	const beides = { gebrauchtCents: 1999, store: { imAngebot: true } };
+
+	it("ohne Filter passt jede Zeile, auch eine ohne Preise", () => {
+		expect(passtZuPreis(ohne, new Set())).toBe(true);
+	});
+
+	it("mit Gebrauchtpreis verlangt einen Gebrauchtpreis, kein Store-Preis ersetzt ihn", () => {
+		const f = preisFilterAusParam("gebraucht");
+		expect(passtZuPreis(gebraucht, f)).toBe(true);
+		expect(passtZuPreis(angebot, f)).toBe(false);
+	});
+
+	it("mit Digitalpreis verlangt einen Store-Preis, auch ohne Angebot", () => {
+		const f = preisFilterAusParam("digital");
+		expect(passtZuPreis(digital, f)).toBe(true);
+		expect(passtZuPreis(gebraucht, f)).toBe(false);
+	});
+
+	it("im Angebot heisst nur der Store: ein Store-Preis ohne Angebot reicht nicht", () => {
+		const f = preisFilterAusParam("angebot");
+		expect(passtZuPreis(angebot, f)).toBe(true);
+		expect(passtZuPreis(digital, f)).toBe(false);
+	});
+
+	it("im Angebot zaehlt kein Gebrauchtangebot", () => {
+		expect(passtZuPreis(gebraucht, preisFilterAusParam("angebot"))).toBe(false);
+	});
+
+	it("mehrere Filter grenzen gemeinsam ein, nicht wahlweise", () => {
+		const f = preisFilterAusParam("gebraucht,angebot");
+		expect(passtZuPreis(beides, f)).toBe(true);
+		expect(passtZuPreis(gebraucht, f)).toBe(false);
+		expect(passtZuPreis(angebot, f)).toBe(false);
+	});
+
+	it("unbekannte Werte im Parameter fallen weg", () => {
+		expect([...preisFilterAusParam("digital,egal,,")]).toEqual(["digital"]);
+		expect(preisFilterAusParam(null).size).toBe(0);
 	});
 });

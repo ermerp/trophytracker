@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { type IgdbKandidat } from './api'
-import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
+import { ErscheintBaldLink, Meldungen, PREISLISTE_CHIPS, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
 import { Chips } from './Chips'
 import { Sortierleiste } from './Sortierung'
 import { IgdbSuche } from './IgdbSuche'
 import { Kopfzeile } from './Kopfzeile'
-import { wunschKopf } from './preisliste'
+import { passtZuPreis, wunschKopf } from './preisliste'
 import { KopfSatz, PlanPreisZeile, RueckwegZeile, Spaltenkopf, useRueckweg } from './PreisZeile'
 
 /**
@@ -39,6 +39,8 @@ export function Wunschliste() {
 	const { daten, laeuft, sortierung, richtung, setzeSortierung } = liste
 	const weg = useRueckweg(liste.laden, liste.setMeldung)
 	const [hinzufuegen, setHinzufuegen] = useState(false)
+	// Die Preisfilter wirken im Browser (Nachtrag f2e-c); Kopfzeile und Liste zählen nur, was sichtbar ist.
+	const sichtbar = daten?.eintraege.filter((e) => passtZuPreis({ gebrauchtCents: e.preisCents, store: e.store }, liste.preisFilter))
 
 	async function anlegen(koerper: Record<string, unknown>) {
 		weg.setRueckweg(null)
@@ -57,7 +59,7 @@ export function Wunschliste() {
 			/>
 			<Reiter eintraege={WUNSCH_REITER} />
 			<Chips
-				gruppen={PLAN_CHIPS}
+				gruppen={PREISLISTE_CHIPS}
 				rechts={
 					<Sortierleiste
 						texte={SORTIERBAR}
@@ -89,19 +91,19 @@ export function Wunschliste() {
 				<Meldungen liste={liste} />
 				<RueckwegZeile weg={weg} />
 
-				{!daten ? (
+				{!sichtbar ? (
 					<p className="ruhig">wird geladen …</p>
-				) : daten.eintraege.length === 0 ? (
+				) : sichtbar.length === 0 ? (
 					<p className="ruhig">Nichts passt zum Filter.</p>
 				) : (
 					<>
 						<div className="listenkopf">
-							<KopfSatz {...wunschKopf(daten.eintraege)} />
+							<KopfSatz {...wunschKopf(sichtbar)} />
 							<ErscheintBaldLink />
 						</div>
 						<Spaltenkopf />
 						<ul className="preisliste">
-							{daten.eintraege.map((e) => (
+							{sichtbar.map((e) => (
 								<PlanPreisZeile key={e.id} e={e} liste={liste} weg={weg} />
 							))}
 						</ul>

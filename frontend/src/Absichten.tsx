@@ -7,6 +7,7 @@ import type { Ansichtsart } from './Ansicht'
 import type { ChipGruppe } from './Chips'
 import { Cover, PlattformChip, ZustandsZeile } from './SpielTeile'
 import { Zeichen, type ZeichenName } from './Symbole'
+import { PREIS_FILTER, PREIS_FILTER_TEXT, preisFilterAusParam } from './preisliste'
 
 /**
  * Geteilte Bausteine der Listen (Abschnitt 5): Wunschliste (Stufe 10), To-Do
@@ -82,6 +83,8 @@ export function usePlanListe(art: PlanArt) {
   const plattformParam = params.get('plattform') ?? ''
   const plattformen = new Set(plattformParam.split(',').filter((p) => (PLATTFORM_FILTER as readonly string[]).includes(p)))
   const suche = (params.get('suche') ?? '').trim()
+  // Im Browser gefiltert (Nachtrag f2e-c), nicht im Worker - die Ansicht wendet ihn an.
+  const preisFilter = preisFilterAusParam(params.get('preis'))
 
   const laden = useCallback(async () => {
     try {
@@ -229,7 +232,7 @@ export function usePlanListe(art: PlanArt) {
 
   return {
     art, daten, setDaten, meldung, setMeldung, laeuft, setLaeuft, eben, setEben,
-    sortierung, richtung, setzeSortierung, nurFavoriten, alle, plattformen, suche,
+    sortierung, richtung, setzeSortierung, nurFavoriten, alle, plattformen, suche, preisFilter,
     laden, setzeParam, plattformFilterUmschalten, ersetze, aendern, entfernen, anlegen, rueckgaengig, bewerten, aufKaufliste,
   }
 }
@@ -265,6 +268,20 @@ export const PLAN_CHIPS: readonly ChipGruppe[] = [
 	{ param: 'favorit', titel: 'Auswahl', werte: [['1', 'Favoriten']] },
 	{ param: 'status', titel: 'Erledigte', werte: [['alle', 'auch erledigte und verworfene']] },
 ]
+
+/**
+ * Die Preisfilter (Nachtrag f2e-c) – nur auf Wunsch- und Kaufliste, wo die
+ * Zeilen Preise tragen. Die Gruppe grenzt gemeinsam ein (`passtZuPreis`).
+ */
+export const PREIS_GRUPPE: ChipGruppe = {
+  param: 'preis',
+  titel: 'Preis',
+  mehrfach: true,
+  werte: PREIS_FILTER.map((w) => [w, PREIS_FILTER_TEXT[w]] as const),
+}
+
+/** Die Filter von Wunsch- und Kaufliste: die der Absichtslisten und die Preise. */
+export const PREISLISTE_CHIPS: readonly ChipGruppe[] = [...PLAN_CHIPS, PREIS_GRUPPE]
 
 /** Fehlermeldung und die Rückgängig-Zeile nach dem Anlegen. */
 export function Meldungen({ liste }: { liste: PlanListe }) {
