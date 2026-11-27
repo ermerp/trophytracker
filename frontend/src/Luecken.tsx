@@ -4,7 +4,7 @@ import { stateNachFilter } from './filterverlauf'
 import { STATUSTEXT, anfrage, gebrauchtpreisText, marktBefund, type DiscFassung, type PlayStatus } from './api'
 import { Sortierleiste, type Richtung } from './Sortierung'
 import { LUECKEN_NATUERLICH, LUECKEN_SORTIERUNG, lueckenVergleich, type LueckenSortierung } from './vergleich'
-import { lueckeMenue, lueckenSortierwert, nachBefund, type MenueAktion } from './preisliste'
+import { PREIS_FILTER_TEXT, lueckeMenue, lueckenSortierwert, nachBefund, preisFilterAusParam, type MenueAktion } from './preisliste'
 import { Reiter } from './Absichten'
 import { Chips, type ChipGruppe } from './Chips'
 import { Kopfzeile } from './Kopfzeile'
@@ -77,6 +77,18 @@ type Luecke = {
 /** Nur noch „auch verworfene" – „Disc unklar" ist seit f2e der Umschalter oben. */
 const LUECKEN_CHIPS: readonly ChipGruppe[] = [{ param: 'verworfene', titel: 'Verworfene', werte: [['1', 'auch verworfene']] }]
 
+/**
+ * Unter „Disc belegt" dazu der Gebrauchtpreis (Nachtrag f2e-c), mit demselben
+ * Parameter wie auf Wunsch- und Kaufliste. Digitalpreis und Angebot fehlen:
+ * Eine Lücke ist digital schon gespielt, die Zeile trägt keinen Store-Preis.
+ * Unter „Disc unklar" fehlt auch er, weil die Frage-Zeile keinen Preis zeigt –
+ * ein gesetzter Filter bleibt in der URL und wirkt beim Zurückschalten wieder.
+ */
+const LUECKEN_CHIPS_BELEGT: readonly ChipGruppe[] = [
+  ...LUECKEN_CHIPS,
+  { param: 'preis', titel: 'Preis', mehrfach: true, werte: [['gebraucht', PREIS_FILTER_TEXT.gebraucht]] },
+]
+
 type Antwort = { anzahl: number; verworfen: number; unbekannt: number; luecken: Luecke[]; moeglich: Luecke[] }
 
 export function Luecken() {
@@ -84,6 +96,8 @@ export function Luecken() {
   const location = useLocation()
   const mitVerworfenen = params.get('verworfene') === '1'
   const unklar = params.get('unbekannte') === '1'
+  // Nur „mit Gebrauchtpreis" hat hier eine Bedeutung (Nachtrag f2e-c).
+  const nurGebraucht = preisFilterAusParam(params.get('preis')).has('gebraucht')
   const sortierung: LueckenSortierung =
     (params.get('sort') as LueckenSortierung) in LUECKEN_SORTIERUNG ? (params.get('sort') as LueckenSortierung) : 'titel'
   const richtung: Richtung = params.get('richtung') === 'ab' || params.get('richtung') === 'auf'
@@ -133,6 +147,8 @@ export function Luecken() {
     })
   }
 
+  const belegt = daten?.luecken.filter((l) => !nurGebraucht || l.besterGebrauchtpreisCents !== null)
+
   const ebayUnbekannt = daten ? daten.moeglich.filter((l) => !l.verworfen && l.marktRohangebote === 0).length : 0
 
   return (
@@ -140,7 +156,7 @@ export function Luecken() {
       <Kopfzeile titel="Lücken" />
       <Reiter eintraege={WUNSCH_REITER} />
       <Chips
-        gruppen={LUECKEN_CHIPS}
+        gruppen={unklar ? LUECKEN_CHIPS : LUECKEN_CHIPS_BELEGT}
         rechts={
           // Unter „Disc unklar" ordnet der Befund (`nachBefund`), nicht die Sortierung.
           !unklar && (
@@ -205,9 +221,11 @@ export function Luecken() {
               ))}
             </ul>
           )
-        ) : daten.luecken.length === 0 ? (
+        ) : belegt && belegt.length === 0 ? (
           <p className="ruhig">
-            {daten.anzahl === 0 && daten.verworfen === 0
+            {nurGebraucht && daten.luecken.length > 0
+              ? 'Nichts passt zum Filter.'
+              : daten.anzahl === 0 && daten.verworfen === 0
               ? 'Keine Lücken. Lücke ist ein digital gespieltes Release, dessen Disc-Fassung belegt ist und das nicht im Regal steht.'
               : 'Alle Lücken sind verworfen – „auch verworfene" holt sie zurück.'}
           </p>
@@ -215,7 +233,7 @@ export function Luecken() {
           <>
             <Spaltenkopf digital={false} />
             <ul className="preisliste">
-              {[...daten.luecken].sort(lueckenVergleich<Luecke>(sortierung, richtung)).map((l) => (
+              {[...(belegt ?? [])].sort(lueckenVergleich<Luecke>(sortierung, richtung)).map((l) => (
                 <LueckeZeile key={l.releaseId} l={l} sortierung={sortierung} weg={weg} laden={laden} wiederZeigen={wiederZeigen} />
               ))}
             </ul>

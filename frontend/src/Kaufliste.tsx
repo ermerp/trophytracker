@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
-import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
+import { ErscheintBaldLink, Meldungen, PREISLISTE_CHIPS, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
 import { Chips } from './Chips'
 import { Sortierleiste } from './Sortierung'
 import { Kopfzeile } from './Kopfzeile'
-import { eintraegeText } from './preisliste'
+import { eintraegeText, passtZuPreis } from './preisliste'
 import { KopfSatz, PlanPreisZeile, RueckwegZeile, Spaltenkopf, useRueckweg } from './PreisZeile'
 import { WUNSCH_REITER } from './Wunschliste'
 
@@ -27,15 +27,17 @@ import { WUNSCH_REITER } from './Wunschliste'
  */
 export function Kaufliste() {
   const liste = usePlanListe('kauf')
-  const { daten, nurFavoriten, plattformen, suche, sortierung, richtung, setzeSortierung } = liste
+  const { daten, nurFavoriten, plattformen, suche, preisFilter, sortierung, richtung, setzeSortierung } = liste
   const weg = useRueckweg(liste.laden, liste.setMeldung)
+  // Die Preisfilter wirken im Browser (Nachtrag f2e-c); Kopfzeile und Liste zählen nur, was sichtbar ist.
+  const sichtbar = daten?.eintraege.filter((e) => passtZuPreis({ gebrauchtCents: e.preisCents, store: e.store }, preisFilter))
 
   return (
     <>
       <Kopfzeile titel="Kaufliste" sucheParam="suche" />
       <Reiter eintraege={WUNSCH_REITER} />
       <Chips
-        gruppen={PLAN_CHIPS}
+        gruppen={PREISLISTE_CHIPS}
         rechts={
           <Sortierleiste
             texte={SORTIERBAR}
@@ -51,19 +53,19 @@ export function Kaufliste() {
         <Meldungen liste={liste} />
         <RueckwegZeile weg={weg} />
 
-        {!daten ? (
+        {!sichtbar ? (
           <p className="ruhig">wird geladen …</p>
-        ) : daten.eintraege.length === 0 ? (
-          <p className="ruhig">{nurFavoriten || plattformen.size > 0 || suche ? 'Nichts passt zum Filter.' : 'Die Kaufliste ist leer.'}</p>
+        ) : sichtbar.length === 0 ? (
+          <p className="ruhig">{nurFavoriten || plattformen.size > 0 || suche || preisFilter.size > 0 ? 'Nichts passt zum Filter.' : 'Die Kaufliste ist leer.'}</p>
         ) : (
           <>
             <div className="listenkopf">
-              <KopfSatz anzahl={eintraegeText(daten.eintraege.length)} teile={['Erfassen einer Disc oder Berechtigung erledigt sie']} />
+              <KopfSatz anzahl={eintraegeText(sichtbar.length)} teile={['Erfassen einer Disc oder Berechtigung erledigt sie']} />
               <ErscheintBaldLink />
             </div>
             <Spaltenkopf />
             <ul className="preisliste">
-              {daten.eintraege.map((e) => (
+              {sichtbar.map((e) => (
                 <PlanPreisZeile key={e.id} e={e} liste={liste} weg={weg} />
               ))}
             </ul>
