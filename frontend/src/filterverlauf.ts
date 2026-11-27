@@ -75,6 +75,27 @@ export function stateZumMenue(state: unknown): Objekt {
   return { ...rest, ...MENUE_STATE }
 }
 
+/*
+ * Das Menü „⋯" einer Zeile der Preisliste (Nachtrag f2e) folgt dem
+ * Sortiermenü: Öffnen legt einen Eintrag an, markiert mit dem Schlüssel der
+ * Zeile (`state.zeilenmenue`), und Zurück schließt es. Ein Schlüssel statt
+ * `true`, weil es je Zeile ein Menü gibt und nur eines offen sein darf. Ein
+ * Filter oder eine Sortierung bei offenem Menü kommt nicht vor: Der Tipp
+ * daneben schließt es zuerst und wird abgefangen.
+ */
+
+/** Der Schlüssel der Zeile, deren Menü dieser Eintrag offen trägt – sonst `null`. */
+export function zeilenmenueOffen(state: unknown): string | null {
+  return istObjekt(state) && typeof state.zeilenmenue === 'string' ? state.zeilenmenue : null
+}
+
+/** Der `state` des neuen Eintrags beim Öffnen eines Zeilenmenüs: wie beim Sortiermenü, ohne Such-Markierung. */
+export function stateZumZeilenmenue(state: unknown, schluessel: string): Objekt {
+  const rest: Objekt = istObjekt(state) ? { ...state } : {}
+  delete rest.suche
+  return { ...rest, zeilenmenue: schluessel }
+}
+
 type Markierungen = { suche?: true; filtertafel?: true; sortiermenue?: true }
 
 /**

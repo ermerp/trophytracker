@@ -36,10 +36,6 @@
   gap: 0.6rem;
 }
 
-.kandidatenliste li.verworfen {
-  opacity: 0.6;
-}
-
 .kandidatenliste li {
   display: flex;
   gap: 0.7rem;
@@ -77,3 +73,392 @@
   margin: 0;
 }
 
+
+/* ===========================================================================
+   Preisliste (Nachtrag f2e): Wunschliste, Kaufliste und Luecken in Zeilen,
+   ohne Kacheln (Entscheidung des Nutzers vom 27.11.2026, am Prototyp).
+
+   Handy: Cover | Titel und eine Meta-Zeile | Preise | "...". Ab 48 rem hat
+   jeder Preis seine Spalte, und die Hauptaktion steht als Pille in der
+   Zeile; am Handy ist sie der oberste Menueeintrag.
+
+   Die Selektoren tragen zwei Klassen, wo sie gegen spaetere Dateien
+   antreten (`.menuetafel` in spieldetail.css, `.ikone` und `.deckel` in
+   basis.css): Diese Datei steht in der Kaskade VOR ihnen.
+   =========================================================================== */
+
+.preisliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.preiszeile,
+.preisfrage {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto 32px;
+  align-items: center;
+  column-gap: var(--a3);
+  row-gap: var(--a2);
+  padding: var(--a2) 0;
+  border-bottom: 1px solid var(--linie);
+}
+
+/* Erledigt, verworfen: blass – aber nicht das Menue. Eine Deckkraft am
+   ganzen <li> machte es zu einem eigenen Stapel, und die Tafel laege unter
+   dem "..." der naechsten Zeile. */
+.preiszeile.erledigt > :not(.menueanker),
+.preisfrage.erledigt > * {
+  opacity: 0.55;
+}
+
+.preiszeile-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Hoechstens zwei Zeilen: Lange Titel ("Director's Cut") sollen die Zeile
+   nicht hoeher machen als ihr Cover. */
+.preistitel {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: var(--schrift-display);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.preistitel .favstern {
+  margin-right: 3px;
+  vertical-align: -1px;
+  color: var(--gold);
+}
+
+/* Die Meta-Zeile darf umbrechen, und jeder Teil bricht als Ganzes um. Sie
+   traegt bewusst keine Trennpunkte: Bei 360 px stand einer sonst am Ende
+   (Prototyp) oder, als ::before des Folgeteils, am Anfang der neuen Zeile
+   (Bild vom 27.11.2026). Kennzeichen, Zahl und Zeichen trennt der Abstand. */
+.preismeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--a3);
+  font-size: 0.75rem;
+  color: var(--text-leise);
+}
+
+.preismeta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.sortwert {
+  font-family: var(--schrift-display);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.wagenzeichen {
+  display: inline-flex;
+}
+
+.platinzeichen {
+  display: inline-flex;
+  color: var(--troph-platin);
+}
+
+.preisbefund {
+  font-size: 0.72rem;
+  color: var(--text-still);
+}
+
+/* --- Preise: rechtsbuendig, tabellarische Ziffern ----------------------- */
+
+.preisspalten {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  font-family: var(--schrift-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.preisangabe {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.preisangabe svg {
+  flex: none;
+  color: var(--text-still);
+}
+
+.preisangabe a {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--linie);
+  text-underline-offset: 3px;
+}
+
+.preisunbekannt {
+  font-family: var(--schrift);
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-still);
+}
+
+.preisrabatt {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-leise);
+}
+
+/* Der Grundpreis nur am Desktop: Am Handy waere er die dritte Zahl in einer
+   Zeile, die schon zwei traegt. */
+.preisstatt {
+  display: none;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-still);
+  text-decoration: line-through;
+}
+
+/* --- Hauptaktion und Menue --------------------------------------------- */
+
+.hauptaktion {
+  display: none;
+}
+
+.preiszeile > .menueanker {
+  grid-column: -2;
+  justify-self: end;
+}
+
+.preiszeile .menueanker .ikone {
+  width: 32px;
+  height: 40px;
+}
+
+/* "Digital erfassen ...": die Quellenwahl unter der ganzen Zeile. */
+.preiszeile > .wahltafel {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+
+.menuetafel.zeilenmenue {
+  top: calc(100% - 6px);
+  padding: var(--a1) 0;
+}
+
+.zeilenmenue hr {
+  margin: var(--a1) 0;
+  border: none;
+  border-top: 1px solid var(--linie);
+}
+
+.zeilenmenue .menuepunkt {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--a3);
+  padding: 10px var(--a4);
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.zeilenmenue .menuepunkt svg {
+  flex: none;
+  color: var(--text-leise);
+}
+
+.zeilenmenue button.menuepunkt:hover:not(:disabled) {
+  background: var(--flaeche);
+}
+
+.zeilenmenue .menuepunkt.gefahr,
+.zeilenmenue .menuepunkt.gefahr svg {
+  color: var(--gefahr);
+}
+
+.zeilenmenue select {
+  margin: 0;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+/* --- Kopf der Liste, Verweis der Kaufliste ------------------------------ */
+
+.kopfzahl {
+  font-family: var(--schrift-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.spaltenkopf {
+  display: none;
+}
+
+.kaufverweis {
+  margin-top: var(--a5);
+  padding: var(--a3) var(--a4);
+  border: 1px dashed var(--linie);
+  border-radius: var(--r2);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-leise);
+}
+
+/* --- Luecken: Umschalter und "Disc unklar" ------------------------------ */
+
+.segmente {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0 0 var(--a2);
+  padding: 2px;
+  border: 1px solid var(--linie);
+  border-radius: var(--r-rund);
+}
+
+.segmente button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--a1);
+  height: 26px;
+  padding: 0 var(--a3);
+  border: none;
+  border-radius: var(--r-rund);
+  background: none;
+  color: var(--text-leise);
+  font: inherit;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.segmente button[aria-pressed='true'] {
+  background: var(--flaeche-hoch);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Am Handy stehen die Antworten unter dem Text, in dessen Spalte. */
+.preisfrage {
+  grid-template-columns: 40px minmax(0, 1fr);
+}
+
+.preisfrage .entscheid {
+  grid-column: 2;
+}
+
+.entscheid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a1);
+}
+
+.entscheid button {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--linie);
+  border-radius: var(--r-rund);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* --- Desktop: die Preise als Spalten ------------------------------------ */
+
+@media (min-width: 48rem) {
+  .spaltenkopf,
+  .preiszeile {
+    grid-template-columns: 44px minmax(0, 1fr) 7.5rem 10rem 11rem 32px;
+  }
+
+  /* Luecken tragen nur den Gebrauchtpreis. */
+  .spaltenkopf.luecke,
+  .preiszeile.luecke {
+    grid-template-columns: 44px minmax(0, 1fr) 7.5rem 11rem 32px;
+  }
+
+  .spaltenkopf {
+    display: grid;
+    column-gap: var(--a3);
+    padding: 0 0 var(--a1);
+    border-bottom: 1px solid var(--linie);
+    font-size: 0.72rem;
+    color: var(--text-still);
+  }
+
+  .spaltenkopf span:nth-child(n + 3) {
+    text-align: right;
+  }
+
+  /* Jeder Preis wird eine eigene Spalte. Fehlt der Digitalpreis (PS3, Vita),
+     bleibt seine Spalte leer: Die Pille sitzt fest in der vorletzten. */
+  .preisspalten {
+    display: contents;
+  }
+
+  .preisangabe {
+    justify-content: flex-end;
+  }
+
+  .preisstatt {
+    display: inline;
+  }
+
+  .hauptaktion {
+    display: flex;
+    justify-content: flex-end;
+    grid-column: -3;
+  }
+
+  .hauptaktion button,
+  .hauptaktion a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 var(--a3);
+    border: 1px solid var(--linie);
+    border-radius: var(--r-rund);
+    background: none;
+    color: var(--text-leise);
+    font: inherit;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .hauptaktion .ruhend {
+    border-color: transparent;
+    color: var(--text-still);
+  }
+
+  .preisfrage {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+
+  .preisfrage .entscheid {
+    grid-column: 3;
+  }
+}

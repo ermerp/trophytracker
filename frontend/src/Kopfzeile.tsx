@@ -38,7 +38,7 @@ type Props = {
 	titel: string
 	/** Name des Suchparameters in der URL; ohne ihn gibt es keine Lupe. */
 	sucheParam?: string
-	/** Kacheln/Zeilen; ohne ihn gibt es keinen Umschalter (To-Do, Lücken). */
+	/** Kacheln/Zeilen; ohne ihn gibt es keinen Umschalter (To-Do, seit f2e auch Wunschliste, Kaufliste und Lücken). */
 	ansicht?: Ansicht
 	/**
 	 * Zusätzliche Symbole vor der Lupe, in dieser Reihenfolge – in der Sammlung

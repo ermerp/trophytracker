@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useSearchParams } from 'react-router-dom'
 import { stateNachFilter } from './filterverlauf'
-import { HERKUNFTTEXT, PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, gebrauchtpreis, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
-import { Preis } from './Preis'
-import { StorePreis } from './StorePreis'
+import { PLAN_STATUSTEXT, PLATTFORMEN, anfrage, datum, type PlanArt, type PlanEintrag, type PlayStatus } from './api'
 import { SORTIERBAR, SORTIERTEXT, SORTIER_NATUERLICH, VERGLEICH, type Richtung, type Sortierung } from './vergleich'
 import type { Ansichtsart } from './Ansicht'
 import type { ChipGruppe } from './Chips'
@@ -12,15 +10,19 @@ import { Zeichen, type ZeichenName } from './Symbole'
 
 /**
  * Geteilte Bausteine der Listen (Abschnitt 5): Wunschliste (Stufe 10), To-Do
- * und Backlog (Stufe 12) und Kaufliste (Stufe 15) zeigen dieselbe Kachel und
- * dieselben Filter. Was sich unterscheidet – die IGDB-Suche der Wunschliste,
- * das Sortieren der To-Do-Liste, die Kandidaten von Backlog und Kaufliste –,
- * bleibt in den Ansichten.
+ * und Backlog (Stufe 12) und Kaufliste (Stufe 15) teilen Zustand, Filter und
+ * Schreibzugriffe. Was sich unterscheidet – die IGDB-Suche der Wunschliste,
+ * das Sortieren der To-Do-Liste, die Kandidaten des Backlogs –, bleibt in den
+ * Ansichten.
+ *
+ * Die Kachel `PlanKarte` tragen seit Nachtrag f2e nur noch To-Do und Backlog.
+ * Wunschliste und Kaufliste zeigen Zeilen mit Preisen (`PreisZeile.tsx`,
+ * Entscheidung des Nutzers vom 27.11.2026); „erledigt" gibt es dort nicht
+ * mehr als Handgriff – ein Wunsch oder Kauf erledigt sich durch das Erfassen
+ * einer Disc oder Berechtigung, das der Worker selbst nachzieht.
  *
  * Kaufliste (Entscheidungen des Nutzers vom 16.09.2026): Ein Wunsch kommt als
- * Kopie auf die Kaufliste, der Wunsch bleibt; „erledigt" am Kauf erledigt
- * den Wunsch mit. Was im Besitz ist, erledigt der Worker beim Erfassen
- * selbst – die Kachel zeigt „im Besitz" nur noch für Altfälle.
+ * Kopie auf die Kaufliste, der Wunsch bleibt.
  *
  * To-Do und Backlog sind mit der Bewertung gekoppelt (5.5): To-Do heißt
  * „am Spielen", Backlog „pausiert". Ihre Kacheln schließen deshalb nicht
@@ -64,7 +66,6 @@ export function usePlanListe(art: PlanArt) {
   const [meldung, setMeldung] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [eben, setEben] = useState<PlanEintrag | null>(null)
-  const [hinweis, setHinweis] = useState<string | null>(null)
 
   const standard: Sortierung = art === 'todo' ? 'position' : 'favorit'
   // „eigene Reihenfolge" gibt es nur auf To-Do. Anderswo ist `?sort=position`
@@ -147,12 +148,11 @@ export function usePlanListe(art: PlanArt) {
 
   async function aendern(id: number, koerper: Record<string, unknown>) {
     setMeldung(null)
-    setHinweis(null)
     try {
-      const e = await anfrage<PlanEintrag & { wuenscheErledigt?: number }>(`/api/plans/${id}`, { methode: 'PATCH', koerper })
-      ersetze(e)
-      // Kauf erledigt erledigt den Wunsch mit (Stufe 15) - das steht auf einer anderen Seite, deshalb sagen.
-      if (e.wuenscheErledigt) setHinweis(`„${e.titel}" ist damit auch auf der Wunschliste erledigt.`)
+      // Den Hinweis „auch auf der Wunschliste erledigt" (`wuenscheErledigt`)
+      // gibt es seit Nachtrag f2e nicht mehr: Kein Listenknopf setzt einen
+      // Kauf noch von Hand auf erledigt.
+      ersetze(await anfrage<PlanEintrag>(`/api/plans/${id}`, { methode: 'PATCH', koerper }))
     } catch (f) {
       setMeldung(f instanceof Error ? f.message : 'Ändern fehlgeschlagen.')
     }
@@ -174,7 +174,6 @@ export function usePlanListe(art: PlanArt) {
   async function anlegen(koerper: Record<string, unknown>): Promise<PlanEintrag | null> {
     setLaeuft(true)
     setMeldung(null)
-    setHinweis(null)
     try {
       const e = await anfrage<PlanEintrag & { spielAngelegt: boolean }>('/api/plans', {
         methode: 'POST',
@@ -229,7 +228,7 @@ export function usePlanListe(art: PlanArt) {
   }
 
   return {
-    art, daten, setDaten, meldung, setMeldung, hinweis, laeuft, setLaeuft, eben, setEben,
+    art, daten, setDaten, meldung, setMeldung, laeuft, setLaeuft, eben, setEben,
     sortierung, richtung, setzeSortierung, nurFavoriten, alle, plattformen, suche,
     laden, setzeParam, plattformFilterUmschalten, ersetze, aendern, entfernen, anlegen, rueckgaengig, bewerten, aufKaufliste,
   }
@@ -269,11 +268,10 @@ export const PLAN_CHIPS: readonly ChipGruppe[] = [
 
 /** Fehlermeldung und die Rückgängig-Zeile nach dem Anlegen. */
 export function Meldungen({ liste }: { liste: PlanListe }) {
-  const { meldung, hinweis, eben, rueckgaengig } = liste
+  const { meldung, eben, rueckgaengig } = liste
   return (
     <>
       {meldung && <p role="alert" className="auffaellig">{meldung}</p>}
-      {hinweis && <p role="status" className="hinweis">{hinweis}</p>}
       {eben && (
         <p role="status" className="hinweis">
           „{eben.titel}" {gesetztText(eben)}.{' '}
@@ -353,7 +351,9 @@ function IKnopf({
 }
 
 /**
- * Eine Karte der Absichtslisten – als Kachel oder als Zeile (Stufe 19).
+ * Eine Karte von To-Do und Backlog – als Kachel oder als Zeile (Stufe 19).
+ * Wunschliste und Kaufliste tragen seit Nachtrag f2e `PlanPreisZeile`; die
+ * Preise, die Herkunft und „im Besitz" stehen deshalb nur noch dort.
  *
  * Cover, Titel, Plattform, Wertung (die Spielerwertung, seit 20k) und Jahr, Favoritenstern und die Knöpfe als
  * Symbole. Bei To-Do und Backlog am Release stehen statt „erledigt" die
@@ -433,42 +433,6 @@ export function PlanKarte({ e, liste, art, knoepfe, liRef, style, className, zie
         {e.spielId === null ? 'ohne IGDB-Eintrag' : `Wertung ${e.spieler ?? 'unbekannt'}`}
         {e.releaseStatus === 'angekuendigt' && ` · erscheint ${e.erscheinungsdatum ? datum(e.erscheinungsdatum) : 'unbekannt'}`}
         {e.releaseStatus !== 'angekuendigt' && e.erscheinungsdatum && ` · ${e.erscheinungsdatum.slice(0, 4)}`}
-        {e.art === 'kauf' && e.herkunft && ` · ${HERKUNFTTEXT[e.herkunft] ?? e.herkunft}`}
-        {/* Der Preis nur dort, wo er eine Entscheidung trägt: auf der
-            Kaufliste und am offenen Wunsch. Im Backlog oder auf To-Do steht
-            das Spiel schon im Regal (Stufe 20e).
-
-            Und nur, wenn es einen gibt. „Gebraucht unbekannt" an jedem der
-            rund 350 Wünsche wäre Lärm – die Kachelzeile lässt auch sonst weg,
-            was leer ist (Herkunft, Jahr). Wo der Preis eine Spalte ist, in
-            der Lückenansicht, steht „unbekannt" weiterhin ausgeschrieben.
-
-            Die eine Ausnahme ist ein verworfenes Angebot (Stufe 20h): Dann
-            steht „unbekannt" WEIL du entschieden hast, und ohne die Zeile
-            gäbe es hier keinen Weg zurück. */}
-        {(e.art === 'kauf' || e.art === 'wunsch') &&
-          e.status === 'offen' &&
-          (e.preisCents !== null || e.preisVerworfen > 0) && (
-            <>
-              {' · '}Gebraucht{' '}
-              <Preis
-                {...gebrauchtpreis(e.preisCents, e.preisAnbieter, e.preisUrl, e.preisItemId, e.preisVerworfen)}
-                releaseId={e.releaseId}
-                onGeaendert={() => void liste.laden()}
-              />
-            </>
-          )}
-        {/* Der Store-Preis steht daneben, nicht dazwischen: „Gebraucht 12,77 €"
-            und „Digital 19,99 €" sind zwei Aussagen und werden nie zu einer
-            verrechnet (Abschnitt 6). Auch er nur, wenn es einen gibt – aus
-            demselben Grund wie oben. */}
-        {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.store !== null && (
-          <>
-            {' · '}
-            <StorePreis store={e.store} knapp />
-          </>
-        )}
-        {(e.art === 'kauf' || e.art === 'wunsch') && e.status === 'offen' && e.imBesitz && ' · im Besitz'}
         {e.status !== 'offen' && ` · ${PLAN_STATUSTEXT[e.status]}`}
       </span>
     </div>
