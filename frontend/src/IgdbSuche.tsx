@@ -48,16 +48,19 @@ export function KandidatenListe({
   onWahl,
   laeuft,
   mitPlattform = false,
+  vorschlag = (k) => neuestePlattform(k.plattformen),
 }: {
   kandidaten: IgdbKandidat[]
   /** Mit `mitPlattform` kommt die gewählte Plattform mit ('' = ohne). */
   onWahl: (k: IgdbKandidat, plattform: string) => void
   laeuft?: boolean
   mitPlattform?: boolean
+  /** Vorbelegung des Dropdowns; ohne Angabe die neueste des Treffers, im Import die zur Zeit der Liste (Nachtrag f1a). */
+  vorschlag?: (k: IgdbKandidat) => string
 }) {
   const [wahl, setWahl] = useState<Record<number, string>>({})
   if (kandidaten.length === 0) return null
-  const plattformVon = (k: IgdbKandidat) => wahl[k.igdbId] ?? neuestePlattform(k.plattformen)
+  const plattformVon = (k: IgdbKandidat) => wahl[k.igdbId] ?? vorschlag(k)
   return (
     <ul className="kandidaten">
       {kandidaten.map((k) => {
@@ -107,8 +110,11 @@ export function IgdbSuche({
   ohneTrefferText,
   laeuft,
   mitPlattform = false,
+  vorschlag,
 }: {
   vorgabe: string
+  /** Vorbelegung der Plattform je Treffer, durchgereicht an `KandidatenListe`. */
+  vorschlag?: (k: IgdbKandidat) => string
   /** Plattformen des Spiels – passende Kandidaten stehen dann vorn. */
   plattformen?: string[]
   onWahl: (k: IgdbKandidat, plattform: string) => void
@@ -174,6 +180,7 @@ export function IgdbSuche({
           onWahl={onWahl}
           laeuft={laeuft || sucht}
           mitPlattform={mitPlattform}
+          vorschlag={vorschlag}
         />
       )}
       {treffer && onOhneTreffer && begriff.trim() !== '' && (

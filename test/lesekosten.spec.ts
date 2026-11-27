@@ -6,6 +6,7 @@ import { FEED_HOECHSTENS } from "../src/api/feed";
 import { AUFFRISCH_FRIST_TAGE, CRON_PSN, CRON_WARTUNG, cronFenster, SCHLUESSEL_AUFFRISCHEN } from "../src/sync/cron";
 import { createExecutionContext } from "cloudflare:test";
 import { createRepositories } from "../src/db";
+import { IM_BESITZ_SQL } from "../src/db/ownership";
 import { einzeln, type Baustein } from "../src/db/baustein";
 import { Geheimnis } from "../src/domain/secret";
 import { createApp, createScheduled } from "../src/index";
@@ -881,6 +882,26 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 			expect((await SELF.fetch(`${B}${pfad}`)).status, pfad).toBe(200);
 		}
 		await env.DB.prepare("DELETE FROM wishlist_import").run();
+	});
+
+	it("misst die Besitzpruefung des Wunschlisten-Imports (Nachtrag f1a)", async () => {
+		// Je Importzeile mit bekanntem Release einmal, im Abgleich und in der
+		// Uebernahme. Ein eigenes Spiel im Bestand in Produktionsgroesse: ein
+		// Release mit Disc und Kauf, eines ohne. Danach faellt es samt Releases.
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title) VALUES (999999, 'Messung', 'messung')").run();
+		const mit = (await env.DB.prepare("INSERT INTO release (game_id, platform) VALUES (999999, 'PS4') RETURNING id").first<{ id: number }>())!.id;
+		const ohne = (await env.DB.prepare("INSERT INTO release (game_id, platform) VALUES (999999, 'PS5') RETURNING id").first<{ id: number }>())!.id;
+		await env.DB.batch([
+			env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)").bind(mit),
+			env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, 'kauf')").bind(mit),
+		]);
+		const besitz = await zeilenGelesen(IM_BESITZ_SQL, mit);
+		const keiner = await zeilenGelesen(IM_BESITZ_SQL, ohne);
+		console.info({ besitz, keiner });
+		// Zwei Index-Lookups: physical_copy.release_id und UNIQUE (release_id, source).
+		expect(besitz).toBeLessThan(10);
+		expect(keiner).toBeLessThan(10);
+		await env.DB.prepare("DELETE FROM game WHERE id = 999999").run();
 	});
 
 	it("misst Backlog-Kandidaten, To-Do-Liste und Umsortieren (Stufe 12)", async () => {

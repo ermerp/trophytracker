@@ -2,7 +2,8 @@ import type { Repositories } from "../db";
 import type { PlanZiel } from "../db/plan";
 import type { Abgleichergebnis, ImportZeile } from "../db/wunschliste";
 import { eindeutigerTreffer, normalisiereTrefferliste, ordneKandidaten, type IgdbKandidat } from "../domain/igdb";
-import { istErlaubtePlattform, neuestePlattform, titelSchluessel, type Plattform } from "../domain/titel";
+import { istErlaubtePlattform, plattformZurListe, titelSchluessel, type Plattform } from "../domain/titel";
+import { jahrWeichtAb } from "../domain/wunschliste";
 import { IgdbRateError, type IgdbClient } from "../igdb/client";
 import { KANDIDATEN_JE_SPIEL, kandidatenSuchen, meldungFuer } from "./igdb";
 import { zielAmSpiel, zielAusKandidat } from "./plan-ziel";
@@ -53,6 +54,7 @@ async function sammlungstreffer(
 	repos: Repositories,
 	schluessel: string,
 	plattform: Plattform | null,
+	listenDatum: string | null,
 ): Promise<{ gameId: number; releaseId: number | null; platform: Plattform | null } | null> {
 	const spiele = await repos.games.spieleNachSchluessel(schluessel);
 	if (spiele.length === 0) return null;
@@ -64,17 +66,25 @@ async function sammlungstreffer(
 	if (!spiel) return null;
 
 	const releases = await repos.games.releasesVon(spiel.id);
-	const gewaehlt = plattform ?? neuestePlattform(releases.map((r) => r.platform));
+	const gewaehlt = plattform ?? plattformZurListe(releases.map((r) => r.platform), listenDatum);
 	const release = gewaehlt !== null ? releases.find((r) => r.platform === gewaehlt) : undefined;
 	return { gameId: spiel.id, releaseId: release?.id ?? null, platform: gewaehlt };
 }
 
-/** Am Ziel haengt schon ein offener Wunsch (409-Regel aus Abschnitt 5) → 'schon_vorhanden'. */
+/**
+ * Am Ziel haengt schon ein offener Wunsch (409-Regel aus Abschnitt 5) → 'schon_vorhanden';
+ * liegt am Ziel-Release eine Disc oder ein Kauf (Nachtrag f1a) → 'schon_vorhanden'
+ * mit Hinweis 'besitz'. Ein Ziel ohne Release (es entsteht erst) hat keinen Besitz.
+ */
 async function entscheidungFuer(
 	repos: Repositories,
 	ziel: PlanZiel,
-): Promise<Abgleichergebnis["decision"]> {
-	return (await repos.plan.offenerEintrag("wunsch", ziel)) === null ? "offen" : "schon_vorhanden";
+): Promise<Pick<Abgleichergebnis, "decision" | "hinweis">> {
+	if ((await repos.plan.offenerEintrag("wunsch", ziel)) !== null) return { decision: "schon_vorhanden", hinweis: null };
+	if (ziel.releaseId !== undefined && (await repos.ownership.imBesitz(ziel.releaseId))) {
+		return { decision: "schon_vorhanden", hinweis: "besitz" };
+	}
+	return { decision: "offen", hinweis: null };
 }
 
 export async function importAbgleichSchritt(
@@ -91,7 +101,7 @@ export async function importAbgleichSchritt(
 			const schluessel = titelSchluessel(zeile.title);
 			const plattform = plattformDerZeile(zeile);
 
-			const inSammlung = await sammlungstreffer(repos, schluessel, plattform);
+			const inSammlung = await sammlungstreffer(repos, schluessel, plattform, zeile.listed_at);
 			if (inSammlung) {
 				const ziel: PlanZiel = inSammlung.releaseId !== null ? { releaseId: inSammlung.releaseId } : { gameId: inSammlung.gameId };
 				await repos.wishlistImport.ergebnisSetzen(
@@ -103,7 +113,7 @@ export async function importAbgleichSchritt(
 						igdbId: null,
 						searchPath: null,
 						platform: inSammlung.platform,
-						decision: await entscheidungFuer(repos, ziel),
+						...(await entscheidungFuer(repos, ziel)),
 					},
 					[],
 				);
@@ -118,14 +128,25 @@ export async function importAbgleichSchritt(
 			const treffer = eindeutigerTreffer(suchSchluessel, plattformen, kandidaten, jahrAus(zeile.listed_at));
 			const geordnet = ordneKandidaten(suchSchluessel, plattformen, kandidaten).slice(0, KANDIDATEN_JE_SPIEL);
 
-			if (treffer) {
+			if (treffer && jahrWeichtAb(zeile.listed_at, treffer.releaseDate)) {
+				// Nachtrag f1a: Der einzige Titeltreffer liegt neben dem Listenjahr -
+				// zur Durchsicht statt still uebernehmen, mit dem Treffer zuoberst.
+				const zuerst = [treffer, ...geordnet.filter((k) => k.igdbId !== treffer.igdbId)].slice(0, KANDIDATEN_JE_SPIEL);
+				await repos.wishlistImport.ergebnisSetzen(
+					zeile.id,
+					{ matchKind: "mehrdeutig", gameId: null, releaseId: null, igdbId: null, searchPath: weg, platform: null, decision: "offen", hinweis: "jahr" },
+					zuerst,
+				);
+				zaehler.mehrdeutig++;
+			} else if (treffer) {
 				const vorhanden = await repos.games.spielNachIgdbId(treffer.igdbId);
 				let ergebnis: Abgleichergebnis;
 				if (vorhanden !== null) {
 					// Das Spiel gibt es schon (etwa aus einem frueheren Wunsch) -
 					// wiederverwenden statt ein zweites mit derselben IGDB-Id anzulegen.
 					const releases = await repos.games.releasesVon(vorhanden);
-					const gewaehlt = plattform ?? neuestePlattform(releases.map((r) => r.platform)) ?? neuestePlattform(treffer.plattformen);
+					const gewaehlt =
+						plattform ?? plattformZurListe(releases.map((r) => r.platform), zeile.listed_at) ?? plattformZurListe(treffer.plattformen, zeile.listed_at);
 					const release = gewaehlt !== null ? releases.find((r) => r.platform === gewaehlt) : undefined;
 					const ziel: PlanZiel = release ? { releaseId: release.id } : { gameId: vorhanden };
 					ergebnis = {
@@ -135,7 +156,7 @@ export async function importAbgleichSchritt(
 						igdbId: treffer.igdbId,
 						searchPath: weg,
 						platform: gewaehlt,
-						decision: await entscheidungFuer(repos, ziel),
+						...(await entscheidungFuer(repos, ziel)),
 					};
 				} else {
 					// Neuestes der genannten Plattformen als Vorschlag; aenderbar vor der Uebernahme.
@@ -145,8 +166,9 @@ export async function importAbgleichSchritt(
 						releaseId: null,
 						igdbId: treffer.igdbId,
 						searchPath: weg,
-						platform: plattform ?? neuestePlattform(treffer.plattformen),
+						platform: plattform ?? plattformZurListe(treffer.plattformen, zeile.listed_at),
 						decision: "offen",
+						hinweis: null,
 					};
 				}
 				await repos.wishlistImport.ergebnisSetzen(zeile.id, ergebnis, geordnet);
@@ -162,6 +184,7 @@ export async function importAbgleichSchritt(
 						searchPath: weg,
 						platform: null,
 						decision: "offen",
+						hinweis: null,
 					},
 					geordnet,
 				);
@@ -225,7 +248,7 @@ export async function importUebernahmeSchritt(
 					// IGDB kennt den Eintrag nicht mehr - zurueck in die Durchsicht statt raten.
 					await repos.wishlistImport.ergebnisSetzen(
 						zeile.id,
-						{ matchKind: "ohne_treffer", gameId: null, releaseId: null, igdbId: null, searchPath: zeile.search_path, platform: null, decision: "offen" },
+						{ matchKind: "ohne_treffer", gameId: null, releaseId: null, igdbId: null, searchPath: zeile.search_path, platform: null, decision: "offen", hinweis: null },
 						[],
 					);
 					continue;
@@ -254,6 +277,12 @@ export async function importUebernahmeSchritt(
 			// Zwischen Abgleich und Uebernahme kann ein Wunsch von Hand entstanden sein.
 			if ((await repos.plan.offenerEintrag("wunsch", ziel)) !== null) {
 				await repos.wishlistImport.entscheiden(zeile.id, "schon_vorhanden");
+				continue;
+			}
+			// Nachtrag f1a: Besitz am Ziel-Release - auch nach einer im Dropdown
+			// geaenderten Plattform, deshalb hier und nicht nur im Abgleich.
+			if (ziel.releaseId !== undefined && (await repos.ownership.imBesitz(ziel.releaseId))) {
+				await repos.wishlistImport.imBesitzMarkieren(zeile.id);
 				continue;
 			}
 			const planId = await repos.plan.anlegen("wunsch", ziel, "import");

@@ -183,3 +183,26 @@ export function neuestePlattform(liste: readonly string[]): Plattform | null {
 	if (erlaubt.length === 0) return null;
 	return erlaubt.reduce((a, b) => ((RANG[b] ?? 0) > (RANG[a] ?? 0) ? b : a));
 }
+
+/**
+ * Seit wann es die Plattform in Europa gibt (`JJJJ-MM`) - für den Vorschlag
+ * beim Wunschlisten-Import (Nachtrag f1a, 8.2).
+ */
+export const PLATTFORM_START: Readonly<Record<Plattform, string>> = { PS3: "2007-03", PSVITA: "2012-02", PS4: "2013-11", PS5: "2020-11" };
+
+/**
+ * Der Plattform-Vorschlag einer Importzeile (Entscheidung des Nutzers vom
+ * 27.11.2026, ersetzt für den Import die vom 15.09.2026): die neueste, die
+ * es zum Datum der Liste schon gab. Eine Liste von 2018 bekommt PS4, auch wenn
+ * das Spiel später für PS5 erschien. Nennt die Liste nur ein Jahr, gilt sein
+ * Januar. Ohne Datum - oder gab es zur Zeit der Liste noch keine der
+ * Plattformen, etwa bei einer frühen Ankündigung - bleibt es bei der neuesten.
+ * Dieselbe Regel steht im Frontend (`plattformZurListe` in `frontend/src/api.ts`);
+ * ein Test hält beide gleich.
+ */
+export function plattformZurListe(liste: readonly string[], listenDatum: string | null): Plattform | null {
+	if (!listenDatum || !/^\d{4}/.test(listenDatum)) return neuestePlattform(liste);
+	const stand = /^\d{4}-\d{2}/.test(listenDatum) ? listenDatum.slice(0, 7) : `${listenDatum.slice(0, 4)}-01`;
+	const damals = liste.filter((p) => istErlaubtePlattform(p) && PLATTFORM_START[p] <= stand);
+	return neuestePlattform(damals) ?? neuestePlattform(liste);
+}

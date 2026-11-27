@@ -479,6 +479,8 @@ export type ImportZaehler = {
   uebernommen: number
   uebersprungen: number
   schonVorhanden: number
+  /** Nachtrag f1a: wegen Disc oder Kauf am Ziel nicht übernommen. */
+  imBesitz: number
 }
 
 export type ImportLauf = {
@@ -513,6 +515,8 @@ export type ImportZeile = {
   entscheidung: ImportEntscheidung
   planId: number | null
   entschiedenAm: string | null
+  /** Nachtrag f1a: 'jahr' – einziger Titeltreffer neben dem Listenjahr; 'besitz' – Disc oder Kauf am Ziel. */
+  hinweis: 'jahr' | 'besitz' | null
   kandidaten: IgdbKandidat[]
 }
 

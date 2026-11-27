@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 204 | 27.11.2026 | **Nachtrag f1a: Prüfung beim Wunschlisten-Import.** Plattform-Vorschlag zur Zeit der Liste statt „neueste", einziger Titeltreffer mit mehr als einem Jahr Abstand zur Durchsicht, Disc oder Kauf am Ziel-Release als „schon im Besitz" (Migration 0041, `hinweis`); „Wunsch umhängen" zurückgestellt; neun statt zehn offene Listen (8.2, 16.2, 16.4) |
 | 203 | 27.11.2026 | **Nachtrag f2e-c-b:** Preisfilter in der Filtertafel unter „Auswahl" neben den Favoriten statt in einer eigenen Gruppe (13.1) |
 | 202 | 27.11.2026 | **Nachtrag f2e-c: Preisfilter.** Wunsch- und Kaufliste filtern „mit Gebrauchtpreis", „mit Digitalpreis", „im Angebot" (nur Store), gemeinsam eingrenzend und im Browser; Lücken unter „Disc belegt" nur mit dem Gebrauchtpreis (13.1, 16.4) |
 | 201 | 27.11.2026 | **Abschluss 27.11. (nachgeholt):** Produktion zu Stufe 18t geprüft (Migration 0040, Asset-Hash, Route), Lehre zu f2e-b (lehren.md) |
