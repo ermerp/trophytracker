@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 203 | 27.11.2026 | **Nachtrag f2e-c-b:** Preisfilter in der Filtertafel unter „Auswahl" neben den Favoriten statt in einer eigenen Gruppe (13.1) |
 | 202 | 27.11.2026 | **Nachtrag f2e-c: Preisfilter.** Wunsch- und Kaufliste filtern „mit Gebrauchtpreis", „mit Digitalpreis", „im Angebot" (nur Store), gemeinsam eingrenzend und im Browser; Lücken unter „Disc belegt" nur mit dem Gebrauchtpreis (13.1, 16.4) |
 | 201 | 27.11.2026 | **Abschluss 27.11. (nachgeholt):** Produktion zu Stufe 18t geprüft (Migration 0040, Asset-Hash, Route), Lehre zu f2e-b (lehren.md) |
 | 200 | 27.11.2026 | **Stufe 18t: Käufe ohne Spiel.** Die Kaufliste merkt PSN-Käufe ohne Release (`psn_purchase_open`, Migration 0040, nicht exportiert) statt sie zu verwerfen, läuft zusätzlich nach einer neuen Trophäenliste ohne Release, Glocke und Einstellungen zeigen die Käufe; Stufe b (Übernehmen per Tipp über die Concept-Id) geplant; Befund der Wunschlistenprüfung in Stufe 1 (7.7, 10.1, 14.2, 16.2, 16.4) |

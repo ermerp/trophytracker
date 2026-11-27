@@ -271,17 +271,19 @@ export const PLAN_CHIPS: readonly ChipGruppe[] = [
 
 /**
  * Die Preisfilter (Nachtrag f2e-c) – nur auf Wunsch- und Kaufliste, wo die
- * Zeilen Preise tragen. Die Gruppe grenzt gemeinsam ein (`passtZuPreis`).
+ * Zeilen Preise tragen. Die Gruppe grenzt gemeinsam ein (`passtZuPreis`) und
+ * steht in der Tafel direkt hinter den Favoriten, in derselben Zeile.
  */
 export const PREIS_GRUPPE: ChipGruppe = {
   param: 'preis',
-  titel: 'Preis',
+  // Dieselbe Überschrift wie die Favoriten: eine Zeile „Auswahl" in der Tafel (Wunsch des Nutzers vom 27.11.2026).
+  titel: 'Auswahl',
   mehrfach: true,
   werte: PREIS_FILTER.map((w) => [w, PREIS_FILTER_TEXT[w]] as const),
 }
 
 /** Die Filter von Wunsch- und Kaufliste: die der Absichtslisten und die Preise. */
-export const PREISLISTE_CHIPS: readonly ChipGruppe[] = [...PLAN_CHIPS, PREIS_GRUPPE]
+export const PREISLISTE_CHIPS: readonly ChipGruppe[] = PLAN_CHIPS.flatMap((g) => (g.param === 'favorit' ? [g, PREIS_GRUPPE] : [g]))
 
 /** Fehlermeldung und die Rückgängig-Zeile nach dem Anlegen. */
 export function Meldungen({ liste }: { liste: PlanListe }) {
