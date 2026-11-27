@@ -52,11 +52,10 @@ function plattformDerZeile(z: ImportZeile): Plattform | null {
  */
 async function sammlungstreffer(
 	repos: Repositories,
-	schluessel: string,
+	spiele: ReadonlyArray<{ id: number; plattformen: string | null }>,
 	plattform: Plattform | null,
 	listenDatum: string | null,
 ): Promise<{ gameId: number; releaseId: number | null; platform: Plattform | null } | null> {
-	const spiele = await repos.games.spieleNachSchluessel(schluessel);
 	if (spiele.length === 0) return null;
 	let spiel = spiele.length === 1 ? spiele[0] : null;
 	if (!spiel && plattform !== null) {
@@ -97,11 +96,15 @@ export async function importAbgleichSchritt(
 	const zaehler = { geprueft: 0, sammlung: 0, eindeutig: 0, mehrdeutig: 0, ohneTreffer: 0 };
 
 	try {
-		for (const zeile of zeilen) {
-			const schluessel = titelSchluessel(zeile.title);
+		// Nachtrag f1f: die Sammlungstreffer aller Zeilen des Schritts in einer
+		// Abfrage statt einer je Zeile. Scheitert sie, endet der Schritt im
+		// Sammel-catch unten, bevor eine Zeile geschrieben ist - nichts bleibt halb.
+		const schluessel = zeilen.map((z) => titelSchluessel(z.title));
+		const nachSchluessel = await repos.games.spieleNachSchluesseln(schluessel);
+		for (const [i, zeile] of zeilen.entries()) {
 			const plattform = plattformDerZeile(zeile);
 
-			const inSammlung = await sammlungstreffer(repos, schluessel, plattform, zeile.listed_at);
+			const inSammlung = await sammlungstreffer(repos, nachSchluessel.get(schluessel[i]) ?? [], plattform, zeile.listed_at);
 			if (inSammlung) {
 				const ziel: PlanZiel = inSammlung.releaseId !== null ? { releaseId: inSammlung.releaseId } : { gameId: inSammlung.gameId };
 				await repos.wishlistImport.ergebnisSetzen(

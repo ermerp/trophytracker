@@ -58,6 +58,12 @@ export type UebersichtZeile = {
 	schluesselVeraltet?: boolean;
 };
 
+/** SQL zu `spieleNachSchluesseln` - exportiert fuer die Lesekosten-Messung. Hoechstens 100 Schluessel (D1-Bindegrenze). */
+export const spieleNachSchluesselnSql = (n: number): string =>
+	"SELECT g.id, g.title, g.sort_title, " +
+	"(SELECT GROUP_CONCAT(r.platform) FROM release r WHERE r.game_id = g.id) AS plattformen " +
+	`FROM game g WHERE g.sort_title IN (${Array.from({ length: n }, () => "?").join(",")}) ORDER BY g.id`;
+
 export const BESITZ_FILTER = ["physisch", "digital", "beide", "keins"] as const;
 export const JA_NEIN = ["ja", "nein"] as const;
 export const PLATIN_FILTER = ["ja", "nein", "nichtverfuegbar"] as const;
@@ -945,6 +951,30 @@ aeenliste haengt
 	async spielExistiert(id: number): Promise<boolean> {
 		const r = await this.db.prepare("SELECT 1 AS x FROM game WHERE id = ?").bind(id).first();
 		return r !== null;
+	}
+
+	/**
+	 * Dasselbe fuer mehrere Schluessel in einer Abfrage (Nachtrag f1f): Der
+	 * Wunschlisten-Abgleich fragte je Zeile einzeln - acht D1-Aufrufe je Schritt,
+	 * wo einer genuegt. Ueber `idx_game_sort_title`; das Ergebnis je Schluessel
+	 * in derselben Reihenfolge wie `spieleNachSchluessel`.
+	 */
+	async spieleNachSchluesseln(
+		schluessel: readonly string[],
+	): Promise<Map<string, Array<{ id: number; title: string; plattformen: string }>>> {
+		const nach = new Map<string, Array<{ id: number; title: string; plattformen: string }>>();
+		const eindeutig = [...new Set(schluessel)];
+		if (eindeutig.length === 0) return nach;
+		const { results } = await this.db
+			.prepare(spieleNachSchluesselnSql(eindeutig.length))
+			.bind(...eindeutig)
+			.all<{ id: number; title: string; plattformen: string; sort_title: string }>();
+		for (const { sort_title, ...spiel } of results) {
+			const liste = nach.get(sort_title);
+			if (liste) liste.push(spiel);
+			else nach.set(sort_title, [spiel]);
+		}
+		return nach;
 	}
 
 	/** Spiele mit gleichem Titelschluessel, fuer die Dublettenwarnung beim Anlegen. */

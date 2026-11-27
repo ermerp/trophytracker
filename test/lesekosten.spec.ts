@@ -17,6 +17,8 @@ import { AUFFRISCHEN_JE_AUFRUF, igdbAuffrischSchritt, igdbPhysischSchritt } from
 import { fakeFetch, jsonAntwort } from "./psn-fake";
 import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt, SPITZE_JE_SEITE } from "../src/sync/besitz";
 import { MARKT_JE_POST } from "../src/sync/markt";
+import { ZEILEN_JE_AUFRUF } from "../src/sync/wunschliste";
+import { spieleNachSchluesselnSql } from "../src/db/games";
 import { STORE_JE_POST } from "../src/sync/store";
 
 /** Das UTC-Datum, mit dem die Staende als "heute" gelten. */
@@ -402,6 +404,17 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		// genau das soll hier nie wieder unbemerkt passieren.
 		expect(treffer).toBeLessThan(10);
 		expect(danebenObwohlVorhanden).toBeLessThan(10);
+	});
+
+	it("misst die Sammlungstreffer eines Wunschlisten-Abgleichschritts in einer Abfrage (Nachtrag f1f)", async () => {
+		// Bis f1f fragte der Abgleich je Zeile einzeln (spieleNachSchluessel);
+		// jetzt alle Zeilen des Schritts in einem IN - fuenf Treffer, drei daneben.
+		const schluessel = ["spiel 0011", "spiel 0215", "spiel 0302", "spiel 0399", "spiel 0420", "gibt es nicht", "auch nicht", "nirgends"];
+		expect(schluessel).toHaveLength(ZEILEN_JE_AUFRUF);
+		const gelesen = await zeilenGelesen(spieleNachSchluesselnSql(schluessel.length), ...schluessel);
+		console.info({ sammlungstrefferJeSchritt: gelesen, schluessel: schluessel.length });
+		// Je Schluessel ein Index-Lookup, je Treffer seine Releases ueber idx_release_game.
+		expect(gelesen).toBeLessThan(schluessel.length * 5);
 	});
 
 	it("misst eine ganze Spielzeit-Seite als Schritt (Stufe 18k)", async () => {

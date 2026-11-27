@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { PlanZiel } from "../db/plan";
 import { ZEILEN_GRUPPEN, type ImportKandidatZeile, type ImportZaehler, type ImportZeile, type ZeilenGruppe } from "../db/wunschliste";
 import { istErlaubtePlattform, type Plattform } from "../domain/titel";
-import { aehnlicheWuensche, jahrAusDateiname, parseWunschliste } from "../domain/wunschliste";
+import { aehnlicheWuensche, jahrAusDateiname, parseWunschliste, vorbereiteteWuensche } from "../domain/wunschliste";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
 import { KeinePlattformError, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
@@ -148,8 +148,9 @@ export const importRoutes = new Hono<AppEnv>()
 		}
 		// Nachtrag f1b: je Zeile die aehnlichen offenen Wuensche - verglichen mit
 		// dem Listentitel, dem Spiel der Sammlung und dem eindeutigen Treffer; der
-		// Wunsch, den die Zeile selbst angelegt hat, zaehlt nicht. Eine Abfrage je Seite.
-		const wuensche = zeilen.length > 0 ? await c.var.repos.plan.offeneWunschtitel() : [];
+		// Wunsch, den die Zeile selbst angelegt hat, zaehlt nicht. Eine Abfrage je
+		// Seite, die Wunschtitel einmal je Seite vorbereitet (Nachtrag f1f).
+		const wuensche = vorbereiteteWuensche(zeilen.length > 0 ? await c.var.repos.plan.offeneWunschtitel() : []);
 		return c.json({
 			...laufAntwort(lauf),
 			gruppe,
