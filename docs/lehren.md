@@ -1001,3 +1001,26 @@ rendern und die Desktop-Fassung mitzuprüfen, gab es schon; sie war nicht eingeh
 nahm den Eintrag am Desktop aus dem Menü und blendet ein dann leeres Menü aus.
 → Immer drei Breiten, auch wenn die Änderung „nur das Handy" betrifft (CLAUDE.md, „Oberfläche
 wird angesehen").
+
+## Die Schwelle, die vor der Messung stand
+
+**27.11.2026 – Nachtrag f1c.** Das Protokoll sollte die Schritte eines Vorgangs zu einer Zeile
+bündeln. Der Plan, den der Nutzer freigab, nannte „höchstens 10 Sekunden" – geschätzt, nicht
+gemessen. Beim Ansehen mit den lokalen Daten verschluckte die Schwelle ein „Rückgängig" im
+Vorgang davor; eine zweite, ebenfalls ungemessene Regel („gleiche Art beginnt neu") trennte
+dafür ein Rückgängig, das Wunsch und Kauf zugleich öffnet. Erst die Messung an den letzten
+200 Ereignissen des Nutzers gab die Zahl: von 109 Paaren desselben Spiels 85 in derselben
+Sekunde, 6 eine Sekunde auseinander, ab zwei Sekunden einzelne Handgriffe. Gebaut wurde eine
+Sekunde. → Eine Zahl, auf der eine Entscheidung des Nutzers ruht, wird vor der Frage gemessen
+(CLAUDE.md, „Arbeitsweise") – auch eine, die nur nach Detail aussieht.
+
+## Der Apostroph, der es nicht war
+
+**27.11.2026 – Nachtrag f1b.** Der Nutzer meldete, die IGDB-Suche finde „Marvel's" und „Silent
+Hill: Townfall" nur mit `'` oder `:`. Zehn Marvel-Titel ließen sich mit und ohne Apostroph
+gleich finden. Die Telemetry zeigte die echten Eingaben: Wortanfänge („marvels wol", „star wars
+galac", „the blood of dawn"). IGDBs Volltextsuche findet nur ganze Wörter; `'` und `:` lösten
+zufällig einen Rückfall aus, der bei „silent hill: town" Silent Hill 2 und 3 lieferte. Über
+denselben Rückfall war vermutlich die Deluxe Edition statt des Hauptspiels auf die Wunschliste
+gekommen. → Ein gemeldeter Fehler wird erst belegt, dann behoben (CLAUDE.md) – mit der Eingabe,
+die tatsächlich ankam, nicht mit der, die man vermutet.
