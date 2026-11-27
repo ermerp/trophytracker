@@ -244,3 +244,35 @@ export function jahrWeichtAb(listenDatum: string | null, erscheinungsdatum: stri
 	if (!Number.isInteger(liste) || !Number.isInteger(treffer)) return false;
 	return Math.abs(liste - treffer) > 1;
 }
+
+/**
+ * Zwei Titel meinen vermutlich dasselbe Spiel (Nachtrag f1b, Wunsch des
+ * Nutzers vom 27.11.2026) - nur ein Hinweis beim Hinzufuegen und in der
+ * Import-Durchsicht, keine Sperre. Verglichen werden die Titelschluessel, die
+ * Editionsnamen schon abstreifen ("Marvel's Wolverine: Digital Deluxe
+ * Edition" ergibt `marvels wolverine`): gleich, oder einer beginnt mit dem
+ * anderen an einer Wortgrenze ("The Wolf Among Us" / "... Remastered").
+ * **Keine** Aehnlichkeit, wenn das naechste Wort eine Fortsetzungsnummer ist:
+ * "The Wolf Among Us 2", "Dragon's Dogma II" und "Anno 1800" sind andere Spiele.
+ */
+export function aehnlicherTitel(a: string, b: string): boolean {
+	const x = titelSchluessel(a);
+	const y = titelSchluessel(b);
+	if (x === "" || y === "") return false;
+	if (x === y) return true;
+	const [kurz, lang] = x.length < y.length ? [x, y] : [y, x];
+	if (!lang.startsWith(`${kurz} `)) return false;
+	const naechstes = lang.slice(kurz.length + 1).split(" ")[0];
+	return !/^(\d+|[ivxl]+)$/.test(naechstes);
+}
+
+/** Offene Wuensche, deren Titel dem gegebenen aehnelt (Nachtrag f1b) - Titel und Plattform, fuer den Hinweis. */
+export function aehnlicheWuensche(
+	titel: string,
+	wuensche: ReadonlyArray<{ id: number; titel: string | null; plattform: string | null }>,
+	ausser: number | null = null,
+): Array<{ titel: string; plattform: string | null }> {
+	return wuensche
+		.filter((w) => w.id !== ausser && w.titel !== null && aehnlicherTitel(titel, w.titel))
+		.map((w) => ({ titel: w.titel as string, plattform: w.plattform }));
+}

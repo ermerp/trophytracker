@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import type { SpielDetail } from "../db/games";
 import type { KandidatZeile } from "../db/igdb";
 import type { PlanArt } from "../db/plan";
-import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, type IgdbKandidat } from "../domain/igdb";
+import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, suchWoerter, type IgdbKandidat } from "../domain/igdb";
 import { istErlaubtePlattform, plattformenAus, titelSchluessel } from "../domain/titel";
+import { aehnlicheWuensche } from "../domain/wunschliste";
 import { IgdbKonfigError } from "../igdb/client";
 import { AUFFRISCHEN_JE_AUFRUF, igdbAbgleichSchritt, igdbAuffrischSchritt, igdbPhysischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
 import { KeinePlattformError, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
@@ -96,9 +97,35 @@ export const igdbRoutes = new Hono<AppEnv>()
 		if (q === "") return c.json({ treffer: [], weg: "keiner" });
 		const plattformen = plattformenAus(c.req.query("plattformen") ?? "");
 		try {
-			const { kandidaten, begriff, weg } = await kandidatenSuchen(c.var.igdb, q);
-			const treffer = ordneKandidaten(titelSchluessel(begriff), plattformen, kandidaten);
-			return c.json({ treffer: treffer.map(kandidatAntwort), weg });
+			const gefunden = await kandidatenSuchen(c.var.igdb, q);
+			let { kandidaten, weg } = gefunden;
+			const schluessel = titelSchluessel(gefunden.begriff);
+			// Nachtrag f1b: Passt kein Titel genau, auch nach allen Wortteilen im
+			// Slug - fuer Getipptes wie "marvels wol". Nur hier, in der Suche, die
+			// jemand tippt; der Import-Abgleich bekommt keine Anfrage dazu. Scheitert
+			// der Rueckfall, bleibt das Ergebnis davor stehen.
+			if (!kandidaten.some((k) => titelSchluessel(k.name) === schluessel)) {
+				try {
+					const woerter = normalisiereTrefferliste(await c.var.igdb.slugWoerter(suchWoerter(q)));
+					if (woerter.length > 0) {
+						const bekannt = new Set(woerter.map((k) => k.igdbId));
+						kandidaten = [...woerter, ...kandidaten.filter((k) => !bekannt.has(k.igdbId))];
+						weg = "woerter";
+					}
+				} catch (fehler) {
+					if (fehler instanceof IgdbKonfigError) throw fehler;
+				}
+			}
+			const treffer = ordneKandidaten(schluessel, plattformen, kandidaten);
+			// Nachtrag f1b: mit `wunsch=1` je Treffer die aehnlichen offenen Wuensche.
+			const wuensche = c.req.query("wunsch") === "1" ? await c.var.repos.plan.offeneWunschtitel() : [];
+			return c.json({
+				treffer: treffer.map((k) => ({
+					...kandidatAntwort(k),
+					...(c.req.query("wunsch") === "1" ? { aehnlich: aehnlicheWuensche(k.name, wuensche) } : {}),
+				})),
+				weg,
+			});
 		} catch (fehler) {
 			return c.json({ fehler: meldungFuer(fehler) }, 502);
 		}

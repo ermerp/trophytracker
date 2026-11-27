@@ -29,7 +29,10 @@ export function SpielAnlegen({
   plattformVorgabe = 'PS4',
   vorhandenesVerwenden = false,
   onSchliessen,
+  fokus = false,
 }: {
+  /** Cursor sofort in die Suche - in der Sammlung, wo ein Tipp das Formular öffnet; im Scanner nicht (Nachtrag f1b). */
+  fokus?: boolean
   onAngelegt: (releaseId: number) => Promise<void> | void
   titelVorgabe?: string
   plattformVorgabe?: Plattform
@@ -149,6 +152,7 @@ export function SpielAnlegen({
 
       <IgdbSuche
         vorgabe={titelVorgabe}
+        fokus={fokus}
         laeuft={laeuft}
         mitPlattform
         onWahl={(k: IgdbKandidat, gewaehlt: string) => { void anlegen({ igdbId: k.igdbId }, false, gewaehlt) }}

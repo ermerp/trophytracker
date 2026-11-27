@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 205 | 27.11.2026 | **Nachtrag f1b: Suche und Hinweise.** Die getippte IGDB-Suche findet Wortanfänge über den Slug („marvels wol", „silent hill town"), ähnliche offene Wünsche als Hinweis beim Hinzufügen und in der Import-Durchsicht, Cursor im Feld, das ein Tipp aufklappt (7.6, 8.2, 13.3) |
 | 204 | 27.11.2026 | **Nachtrag f1a: Prüfung beim Wunschlisten-Import.** Plattform-Vorschlag zur Zeit der Liste statt „neueste", einziger Titeltreffer mit mehr als einem Jahr Abstand zur Durchsicht, Disc oder Kauf am Ziel-Release als „schon im Besitz" (Migration 0041, `hinweis`); „Wunsch umhängen" zurückgestellt; neun statt zehn offene Listen (8.2, 16.2, 16.4) |
 | 203 | 27.11.2026 | **Nachtrag f2e-c-b:** Preisfilter in der Filtertafel unter „Auswahl" neben den Favoriten statt in einer eigenen Gruppe (13.1) |
 | 202 | 27.11.2026 | **Nachtrag f2e-c: Preisfilter.** Wunsch- und Kaufliste filtern „mit Gebrauchtpreis", „mit Digitalpreis", „im Angebot" (nur Store), gemeinsam eingrenzend und im Browser; Lücken unter „Disc belegt" nur mit dem Gebrauchtpreis (13.1, 16.4) |

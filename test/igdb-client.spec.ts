@@ -46,6 +46,16 @@ describe("IGDB-Client", () => {
 		expect(bodies[3]).toBe(`fields ${IGDB_FELDER}; where name ~ "THE FINALS" & platforms = (9,46,48,165,167,390) & game_type != (5,12,14); limit 10;`);
 	});
 
+	it("sucht Wortteile im Slug, alphabetisch und mit Plattformfilter (f1b)", async () => {
+		const { client, aufrufe } = fakeIgdb([[]]);
+		await client.slugWoerter(["marvels", "wol", 'x"*', ""]);
+		expect(await client.slugWoerter([])).toEqual([]);
+		const bodies = aufrufe.filter((a) => a.url.includes("api.igdb.com")).map((a) => String(a.init?.body));
+		expect(bodies).toEqual([
+			`fields ${IGDB_FELDER}; where slug ~ *"marvels"* & slug ~ *"wol"* & platforms = (9,46,48,165,167,390) & game_type != (5,12,14); sort name asc; limit 30;`,
+		]);
+	});
+
 	it("fragt nach IDs in einer Anfrage, bereinigt und begrenzt auf 50", async () => {
 		const { client, aufrufe } = fakeIgdb([[]]);
 		await client.nachIds([3, 3, -1, 0, 2.5, 7]);

@@ -1,5 +1,5 @@
 import { env, SELF } from "cloudflare:test";
-import { BACKLOG_KANDIDATEN, KAUF_KANDIDATEN, PLAN_AUSWAHL } from "../src/db/plan";
+import { BACKLOG_KANDIDATEN, KAUF_KANDIDATEN, OFFENE_WUNSCHTITEL, PLAN_AUSWAHL } from "../src/db/plan";
 import { describe, it, expect, beforeAll } from "vitest";
 import { EREIGNIS_AUSWAHL } from "../src/db/events";
 import { FEED_HOECHSTENS } from "../src/api/feed";
@@ -902,6 +902,19 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		expect(besitz).toBeLessThan(10);
 		expect(keiner).toBeLessThan(10);
 		await env.DB.prepare("DELETE FROM game WHERE id = 999999").run();
+	});
+
+	it("misst die offenen Wunschtitel fuer den Aehnlichkeits-Hinweis (Nachtrag f1b)", async () => {
+		// Je Suche mit wunsch=1 und je Seite der Import-Durchsicht einmal. 400
+		// offene Wuensche an Releases - mehr als nach dem Import der neun Listen.
+		const r = await env.DB.prepare("SELECT id FROM release ORDER BY id LIMIT 400").all<{ id: number }>();
+		const anlegen = env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('wunsch', ?, 'import')");
+		await env.DB.batch(r.results.map((x) => anlegen.bind(x.id)));
+		const gelesen = await zeilenGelesen(OFFENE_WUNSCHTITEL);
+		console.info({ offeneWunschtitel: gelesen, wuensche: r.results.length });
+		// idx_plan_offen, dann Release und Spiel je Zeile per Primaerschluessel.
+		expect(gelesen).toBeLessThan(3 * r.results.length + 50);
+		await env.DB.prepare("DELETE FROM plan_entry").run();
 	});
 
 	it("misst Backlog-Kandidaten, To-Do-Liste und Umsortieren (Stufe 12)", async () => {

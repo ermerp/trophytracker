@@ -67,6 +67,17 @@
   display: block;
 }
 
+/*
+ * Nachtrag f1b: ein offener Wunsch mit aehnlichem Titel - am Treffer der Suche
+ * und an der Import-Zeile. Nur ein Hinweis, keine Sperre: der Warnton als Text,
+ * wie jede Warnung (tokens.css).
+ */
+.aehnlich-hinweis {
+  display: block;
+  color: var(--warnung);
+  font-size: 0.85rem;
+}
+
 .offene-liste {
   list-style: none;
   padding: 0;

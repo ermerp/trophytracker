@@ -541,6 +541,41 @@ describe("Routen", () => {
 		expect((await json(await a.request("/api/igdb/search?q=", {}, env))).body).toEqual({ treffer: [], weg: "keiner" });
 	});
 
+	it("GET /api/igdb/search sucht Wortteile, wenn kein Titel genau passt (f1b)", async () => {
+		// Volltextsuche leer, Wortteil-Suche findet das Spiel.
+		const { client, aufrufe } = fakeIgdb([[], [], [spielRoh({ id: 7, name: "Marvel's Wolverine", slug: "marvels-wolverine" })]]);
+		const { body } = await json(await app(client).request("/api/igdb/search?q=marvels%20wol", {}, env));
+		expect(body.weg).toBe("woerter");
+		expect(body.treffer.map((t: { name: string }) => t.name)).toEqual(["Marvel's Wolverine"]);
+		expect(aufrufe.some((a) => String(a.init?.body).includes('slug ~ *"marvels"* & slug ~ *"wol"*'))).toBe(true);
+	});
+
+	it("GET /api/igdb/search fragt keine Wortteile, wenn ein Titel genau passt", async () => {
+		const { client, aufrufe } = fakeIgdb([[spielRoh()]]);
+		const { body } = await json(await app(client).request("/api/igdb/search?q=bloodborne", {}, env));
+		expect(body.weg).toBe("suche");
+		expect(aufrufe.some((a) => String(a.init?.body).includes("slug ~"))).toBe(false);
+	});
+
+	it("GET /api/igdb/search behaelt die Treffer, wenn die Wortteil-Suche scheitert", async () => {
+		const { client } = fakeIgdb([[spielRoh()], [], new Response("", { status: 429 })]);
+		const { status, body } = await json(await app(client).request("/api/igdb/search?q=blood", {}, env));
+		expect(status).toBe(200);
+		expect(body.treffer.map((t: { name: string }) => t.name)).toEqual(["Bloodborne"]);
+	});
+
+	it("GET /api/igdb/search nennt mit wunsch=1 die aehnlichen offenen Wuensche (f1b)", async () => {
+		await spiel(1, "Bloodborne: Game of the Year Edition", "bloodborne", ["PS4"]);
+		const r = await env.DB.prepare("SELECT id FROM release WHERE game_id = 1").first<{ id: number }>();
+		await env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('wunsch', ?, 'manuell')").bind(r!.id).run();
+		const a = app(fakeIgdb([[spielRoh()]]).client);
+		const mit = await json(await a.request("/api/igdb/search?q=bloodborne&wunsch=1", {}, env));
+		expect(mit.body.treffer[0].aehnlich).toEqual([{ titel: "Bloodborne: Game of the Year Edition", plattform: "PS4" }]);
+		const ohne = await json(await a.request("/api/igdb/search?q=bloodborne", {}, env));
+		expect(ohne.body.treffer[0].aehnlich).toBeUndefined();
+		await env.DB.prepare("DELETE FROM plan_entry").run();
+	});
+
 	it("Abgleich, Pruefansicht, manuelle Verknuepfung und Loesen", async () => {
 		await spiel(1, "MediEvil", "medievil", ["PS4"]);
 		await spiel(2, "Bloodborne", "bloodborne", ["PS4"]);

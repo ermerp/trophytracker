@@ -416,6 +416,26 @@ export function kurzbegriff(begriff: string): string {
 	return begriff.replace(/(\s+-\s+|:|\/).*$/, "").trim();
 }
 
+/**
+ * Die Wortteile einer getippten Suche, so geschrieben wie in IGDBs `slug`
+ * (Nachtrag f1b): klein, ohne Apostrophe und Akzente, getrennt an allem, was
+ * kein Buchstabe und keine Ziffer ist. IGDBs Volltextsuche findet nur ganze
+ * Woerter - "marvels wol", "star wars galac" oder "silent hill town" fanden
+ * nichts, obwohl die Spiele da sind. Der Slug kennt keine Apostrophe, deshalb
+ * trifft "marvels" auch "Marvel's" (Slug `marvels-wolverine`). Hoechstens
+ * sechs Teile; nur [a-z0-9], damit nichts in die Abfrage gelangt, was sie bricht.
+ */
+export function suchWoerter(text: string): string[] {
+	const woerter = text
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.toLowerCase()
+		.replace(/['’`´]/g, "")
+		.split(/[^a-z0-9]+/)
+		.filter((w) => w !== "");
+	return [...new Set(woerter)].slice(0, 6);
+}
+
 export function heuteIso(jetzt = new Date()): string {
 	return jetzt.toISOString().slice(0, 10);
 }

@@ -79,7 +79,7 @@ export function Wunschliste() {
 							neuesten und vor dem Speichern änderbar. Nur ein Freitext hat kein Spiel und deshalb keine
 							Plattform.
 						</p>
-						<IgdbSuche vorgabe="" onWahl={igdbWaehlen} onOhneTreffer={ohneTreffer} laeuft={laeuft} mitPlattform />
+						<IgdbSuche vorgabe="" onWahl={igdbWaehlen} onOhneTreffer={ohneTreffer} laeuft={laeuft} fokus mitWunschAbgleich mitPlattform />
 						{/* Der zweite Weg, Wünsche anzulegen – er gehört hinter dasselbe
 						    Pluszeichen (Wunsch des Nutzers vom 24.09.2026). */}
 						<p className="klein">

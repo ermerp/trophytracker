@@ -177,6 +177,19 @@ export function erstelleIgdbClient(
 			return abfrage(`fields ${IGDB_FELDER}; where name ~ *"${sauber}"* & ${filter}; limit ${limit};`);
 		},
 
+		/**
+		 * Alle Wortteile im Slug (Nachtrag f1b) - der Rueckfall der getippten
+		 * Suche, wenn kein Titel genau passt. Alphabetisch, damit das Hauptspiel
+		 * vor seinen Editionen steht ("Marvel's Wolverine" vor "Marvel's
+		 * Wolverine: Digital Deluxe Edition"). Dieselben Plattformen wie jede Suche.
+		 */
+		async slugWoerter(woerter: readonly string[], limit = 30): Promise<IgdbSpielRoh[]> {
+			const sauber = woerter.filter((w) => /^[a-z0-9]+$/.test(w)).slice(0, 6);
+			if (sauber.length === 0) return [];
+			const bedingung = sauber.map((w) => `slug ~ *"${w}"*`).join(" & ");
+			return abfrage(`fields ${IGDB_FELDER}; where ${bedingung} & ${filter}; sort name asc; limit ${limit};`);
+		},
+
 		/** Bis zu 50 Spiele nach ID - eine Anfrage fuer das Auffrischen. */
 		async nachIds(ids: readonly number[]): Promise<IgdbSpielRoh[]> {
 			const sauber = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 50);
