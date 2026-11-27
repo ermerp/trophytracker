@@ -7,6 +7,7 @@ import { Meldungen, PLAN_CHIPS, PlanKarte, Reiter, usePlanListe, type PlanListe 
 import { Chips } from './Chips'
 import { Kopfzeile } from './Kopfzeile'
 import { Zeichen } from './Symbole'
+import { naechstenKlickSchlucken } from './ziehklick'
 
 /**
  * To-Do (Use Case 5a, Stufe 12): kurz und in eigener Reihenfolge. „ins
@@ -60,6 +61,8 @@ export function Todo() {
 	}
 
 	function amEnde(ev: DragEndEvent) {
+		// Der Klick, den der Browser nach dem Loslassen schickt, öffnete sonst das Spiel (Nachtrag f1e).
+		naechstenKlickSchlucken(window)
 		if (!daten || !ev.over || ev.active.id === ev.over.id) return
 		const von = daten.eintraege.findIndex((e) => e.id === ev.active.id)
 		const nach = daten.eintraege.findIndex((e) => e.id === ev.over!.id)
@@ -89,7 +92,7 @@ export function Todo() {
 						<Link to="/backlog">Backlog und Kandidaten</Link>
 					</p>
 				) : (
-					<DndContext sensors={sensoren} collisionDetection={closestCenter} onDragEnd={amEnde}>
+					<DndContext sensors={sensoren} collisionDetection={closestCenter} onDragEnd={amEnde} onDragCancel={() => naechstenKlickSchlucken(window)}>
 						<SortableContext items={daten.eintraege.map((e) => e.id)} strategy={verticalListSortingStrategy}>
 							<ol className="zeilen sortierbar">
 								{daten.eintraege.map((e) => (
