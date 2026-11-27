@@ -36,6 +36,10 @@
  * - `wishlist_import`, `wishlist_import_line`, `wishlist_import_candidate` -
  *   Arbeitszustand eines Wunschlisten-Imports (Stufe 11). Die Quelldateien
  *   liegen beim Nutzer, das Ergebnis steht in `plan_entry`.
+ * - `psn_purchase_open` - Kaeufe ohne Spiel in der Sammlung (Migration 0040,
+ *   Stufe 18t). Abgeleitet wie `igdb_candidate`: keine Entscheidung des
+ *   Nutzers, und der naechste Lauf der Kaufliste stellt sie vollstaendig
+ *   wieder her. Verloren ginge nur `first_seen_at`.
  */
 export const EXPORT_TABELLEN = [
 	"game",
@@ -86,6 +90,7 @@ export const NICHT_EXPORTIERT = [
 	"wishlist_import",
 	"wishlist_import_line",
 	"wishlist_import_candidate",
+	"psn_purchase_open",
 ] as const;
 
 export type Exporttabelle = (typeof EXPORT_TABELLEN)[number];

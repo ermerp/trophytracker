@@ -64,6 +64,11 @@ export type CronLage = {
 		naechsteListe: ZuFuellen | null;
 		/** Die hoechste Release-Id: Gab es Neues seit dem Volllauf? (Stufe 18o) */
 		neuestesRelease: number;
+		/**
+		 * Die Trophaeenlisten ohne Release (Stufe 18t): Ist eine dabei, die der
+		 * letzte Lauf der Kaufliste nicht kannte, laeuft sie in dieser Nacht.
+		 */
+		ohneRelease: string[];
 	};
 	wartung?: {
 		erschienen: number;
@@ -122,6 +127,7 @@ export class CronLageRepository {
 					zugang: merke(this.q.credentials.zugangBaustein()),
 					liste: merke(this.q.trophaeen.naechsteZumFuellenBaustein(1)),
 					neuestesRelease: merke(this.q.games.neuestesReleaseBaustein()),
+					ohneRelease: merke(this.q.trophaeen.listenOhneReleaseBaustein()),
 				}
 			: null;
 		const w = wartung
@@ -159,6 +165,7 @@ export class CronLageRepository {
 							zugangsdaten: wert<{ zeile: ZugangsZeile | null }>(p.zugang).zeile,
 							naechsteListe: wert<ZuFuellen[]>(p.liste)[0] ?? null,
 							neuestesRelease: wert<number>(p.neuestesRelease),
+							ohneRelease: wert<string[]>(p.ohneRelease),
 						},
 					}
 				: {}),

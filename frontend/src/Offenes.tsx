@@ -24,7 +24,9 @@ import { Zeichen } from './Symbole'
  *
  * Rot und „zur Kenntnis" urteilt der Server (`GET /api/betrieb/warnungen`) –
  * bis 18m setzte diese Datei drei Warnungen selbst aus drei Antworten
- * zusammen. Die Glocke zählt die höchste Stufe, die da ist; ein Punkt in der
+ * zusammen. Die eine Ausnahme sind die Käufe ohne Spiel in der Sammlung
+ * (Stufe 18t): eine Zahl aus `GET /api/psn/kaeufe-offen`, die kein Urteil
+ * braucht. Die Glocke zählt die höchste Stufe, die da ist; ein Punkt in der
  * Farbe der nächsten sagt, dass darunter noch etwas wartet. Die Kopfzeile
  * klebt oben, das Alarmzeichen bleibt deshalb über die ganze Seite sichtbar,
  * während der Block wegscrollt.
@@ -72,6 +74,15 @@ export type BetriebAntwort = {
 	} | null
 }
 
+/** Was `GET /api/psn/kaeufe-offen` liefert (Stufe 18t, 7.7) – auch die Einstellungen lesen es. */
+export type OffeneKaeufe = {
+	anzahl: number
+	eintraege: Array<{ titel: string; plattform: string; seit: string; konzept: boolean }>
+}
+
+/** Der Anker der Liste in den Einstellungen – der Posten verlinkt dorthin. */
+export const ANKER_KAEUFE = 'kaeufe-offen'
+
 const ZIELE: Record<NonNullable<Betriebswarnung['ziel']>, string> = { einstellungen: '/einstellungen' }
 
 function alsPosten(w: Betriebswarnung, i: number): Posten {
@@ -99,6 +110,7 @@ export function useOffenePosten(): OffeneDaten {
 	const [importOffen, setImportOffen] = useState<{ id: number; offen: number } | null>(null)
 	const [freitext, setFreitext] = useState(0)
 	const [kandidaten, setKandidaten] = useState(0)
+	const [kaeufe, setKaeufe] = useState(0)
 	const [storeOffen, setStoreOffen] = useState(0)
 	const [betrieb, setBetrieb] = useState<Betriebswarnung[]>([])
 	const [alarmzeilen, setAlarmzeilen] = useState<Preisalarm[]>([])
@@ -139,11 +151,28 @@ export function useOffenePosten(): OffeneDaten {
 		anfrage<{ anzahl: number }>('/api/backlog-candidates')
 			.then((a) => setKandidaten(a.anzahl))
 			.catch(() => {})
+		anfrage<OffeneKaeufe>('/api/psn/kaeufe-offen')
+			.then((a) => setKaeufe(a.anzahl))
+			.catch(() => {})
 	}, [])
 
 	// --- Betriebswarnungen: geurteilt vom Server (Stufe 18m) ----------------
 	const rot = betrieb.filter((w) => w.stufe === 'rot').map(alsPosten)
 	const kenntnis = betrieb.filter((w) => w.stufe === 'kenntnis').map(alsPosten)
+	// Käufe ohne Spiel in der Sammlung (Stufe 18t): zur Kenntnis, nicht als
+	// Posten – zu tun ist noch nichts, übernommen wird erst in einer späteren
+	// Stufe. Die Liste steht in den Einstellungen.
+	if (kaeufe > 0) {
+		kenntnis.push({
+			key: 'kaeufe-offen',
+			inhalt: (
+				<>
+					<strong>{kaeufe}</strong> {kaeufe === 1 ? 'Kauf' : 'Käufe'} ohne Spiel in der Sammlung.{' '}
+					<Link to={`/einstellungen#${ANKER_KAEUFE}`}>Ansehen</Link>
+				</>
+			),
+		})
+	}
 	const posten: Posten[] = []
 
 	// --- Information: etwas wartet ------------------------------------------

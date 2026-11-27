@@ -50,7 +50,7 @@ const berechtigungen = async () =>
 
 beforeEach(async () => {
 	await env.DB.batch(
-		["game_event", "digital_entitlement", "psn_played_title", "plan_entry", "release", "game"].map((t) =>
+		["game_event", "digital_entitlement", "psn_played_title", "psn_purchase_open", "plan_entry", "release", "game"].map((t) =>
 			env.DB.prepare(`DELETE FROM ${t}`),
 		),
 	);
@@ -336,5 +336,135 @@ describe("besitzSchritt", () => {
 
 		const e = await env.DB.prepare("SELECT source, kind, new_value, detail FROM game_event").first();
 		expect(e).toEqual({ source: "sync", kind: "berechtigung_angelegt", new_value: "kauf", detail: "psn" });
+	});
+});
+
+/**
+ * Kaeufe ohne Spiel in der Sammlung (Stufe 18t, 7.7). Nachgebaute Eintraege,
+ * keine echten: Kennungen und Titel sind erfunden.
+ */
+describe("besitzSchritt: offene Kaeufe (Stufe 18t)", () => {
+	const kauf = (eid: string, name: string, extra: Record<string, unknown> = {}) => ({
+		titleId: `CUSA${eid}`,
+		name,
+		platform: "PS5",
+		subscriptionService: "NONE",
+		entitlementId: `EP0000-PPSA${eid}_00-ERFUNDEN`,
+		productId: `EP0000-PPSA${eid}_00-ERFUNDEN`,
+		...extra,
+	});
+	const offene = async () =>
+		(
+			await env.DB.prepare(
+				"SELECT entitlement_id, platform, title_name, product_id, concept_id, title_id, first_seen_at, last_seen_at " +
+					"FROM psn_purchase_open ORDER BY entitlement_id",
+			).all()
+		).results;
+
+	it("merkt einen Kauf ohne Release, und erneutes Sehen haelt first_seen_at", async () => {
+		const psn = psnMit([], 0, [kauf("1", "Erfundenes Neues", { conceptId: 10001 })], 1);
+
+		const e = await besitzSchritt(repos(), psn, TOKEN, 0, [], { jetzt: "2026-11-20 01:00:00" });
+		expect(e).toMatchObject({ status: "erfolg", kauf: 0, gemerkt: 1, mitKonzept: 1 });
+		await besitzSchritt(repos(), psn, TOKEN, 0, [], { jetzt: "2026-11-27 01:00:00" });
+
+		expect(await offene()).toEqual([
+			{
+				entitlement_id: "EP0000-PPSA1_00-ERFUNDEN",
+				platform: "PS5",
+				title_name: "Erfundenes Neues",
+				product_id: "EP0000-PPSA1_00-ERFUNDEN",
+				// Sony liefert die Zahl mal als Zahl, mal als Text - gespeichert als Text.
+				concept_id: "10001",
+				title_id: "CUSA1",
+				first_seen_at: "2026-11-20 01:00:00",
+				last_seen_at: "2026-11-27 01:00:00",
+			},
+		]);
+		// Kein Ereignis: Es aendert sich keine Bewertung und kein Besitz (8.5).
+		expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM game_event").first<{ n: number }>())?.n).toBe(0);
+	});
+
+	it("loescht einen gemerkten Kauf, sobald er einen Treffer hat", async () => {
+		const psn = psnMit([], 0, [kauf("1", "Spaeter Gesammelt")], 1);
+		await besitzSchritt(repos(), psn, TOKEN, 0, [], { jetzt: "2026-11-20 01:00:00" });
+		expect(await offene()).toHaveLength(1);
+
+		// Jetzt kennt die Sammlung das Spiel: Die Berechtigung entsteht, der
+		// offene Kauf geht - im selben Batch.
+		await spiel(1, "Spaeter Gesammelt", ["PS5"]);
+		const e = await besitzSchritt(repos(), psn, TOKEN, 0, [], { jetzt: "2026-11-27 01:00:00" });
+
+		expect(e).toMatchObject({ kauf: 1, gemerkt: 0 });
+		expect(await offene()).toEqual([]);
+		expect(await berechtigungen()).toEqual([{ release_id: 10, source: "kauf", herkunft: "psn" }]);
+	});
+
+	it("merkt nie einen PS+-Titel, nie ohne Berechtigungs-Id und nie eine fremde Plattform", async () => {
+		const psn = psnMit([], 0, [
+			kauf("1", "Im Abo", { subscriptionService: "PS_PLUS" }),
+			kauf("2", "Ohne Kennung", { entitlementId: undefined }),
+			kauf("3", "Anderswo", { platform: "PC" }),
+			kauf("4", "Doppelt"),
+			kauf("4", "Doppelt"),
+			// Zwei Releases mit demselben Titel: kein eindeutiger Treffer, also gemerkt.
+			kauf("5", "Zweimal da"),
+		], 6);
+		await spiel(5, "Zweimal da", ["PS5"]);
+		await spiel(6, "Zweimal da", ["PS5"]);
+
+		const e = await besitzSchritt(repos(), psn, TOKEN, 0, [], { jetzt: "2026-11-27 01:00:00" });
+
+		expect(e).toMatchObject({ status: "erfolg", gemerkt: 2, mitKonzept: 0 });
+		expect((await offene()).map((z) => z.title_name)).toEqual(["Doppelt", "Zweimal da"]);
+	});
+
+	it("raeumt am Ende eines vollstaendigen Laufs auf, was seit Laufbeginn nicht mehr kam", async () => {
+		const alt = psnMit([], 0, [kauf("1", "Erstattet"), kauf("2", "Bleibt")], 2);
+		await besitzSchritt(repos(), alt, TOKEN, 0, [], { jetzt: "2026-11-20 01:00:00", begonnen: "2026-11-20 01:00:00" });
+
+		// Zwei Seiten: Die erste raeumt nicht auf, auch wenn "Erstattet" fehlt.
+		const seite1 = psnMit([], 0, [kauf("2", "Bleibt")], 2);
+		const e1 = await besitzSchritt(repos(), seite1, TOKEN, 0, [], { jetzt: "2026-11-27 01:00:00", begonnen: "2026-11-27 01:00:00" });
+		expect(e1.weiter).toBe(true);
+		expect(await offene()).toHaveLength(2);
+
+		const seite2 = psnMit([], 0, [kauf("3", "Neu dazu")], 2);
+		await besitzSchritt(repos(), seite2, TOKEN, 1, [], { jetzt: "2026-11-27 01:05:00", begonnen: "2026-11-27 01:00:00" });
+		expect((await offene()).map((z) => z.title_name)).toEqual(["Bleibt", "Neu dazu"]);
+	});
+
+	it("raeumt ohne Laufbeginn und nach einer vorzeitig leeren Seite nichts auf", async () => {
+		const alt = psnMit([], 0, [kauf("1", "Alt")], 1);
+		await besitzSchritt(repos(), alt, TOKEN, 0, [], { jetzt: "2026-11-20 01:00:00" });
+
+		// Ohne Laufbeginn (ein Lauf von vor 18t): keine Grenze, nichts geloescht.
+		const ohne = psnMit([], 0, [kauf("2", "Anderes")], 1);
+		await besitzSchritt(repos(), ohne, TOKEN, 0, [], { jetzt: "2026-11-27 01:00:00" });
+		expect(await offene()).toHaveLength(2);
+
+		// Sony nennt 40, liefert aber eine leere Seite: kein vollstaendiger Lauf.
+		const leer = psnMit([], 0, [], 40);
+		await besitzSchritt(repos(), leer, TOKEN, 0, [], { jetzt: "2026-11-27 02:00:00", begonnen: "2026-11-27 02:00:00" });
+		expect(await offene()).toHaveLength(2);
+	});
+
+	it("schreibt bei einem Fehler im Batch weder Berechtigung noch offenen Kauf", async () => {
+		await spiel(1, "Gekauft", ["PS4"]);
+		const psn = psnMit([], 0, [
+			{ titleId: "A", name: "Gekauft", platform: "PS4", subscriptionService: "NONE", entitlementId: "E-A" },
+			kauf("2", "Ohne Spiel"),
+		], 2);
+		// Eine Plattform, die die Tabelle ablehnt, kann der Schritt nicht
+		// liefern (er filtert) - also scheitert hier die Tabelle selbst.
+		await env.DB.prepare("ALTER TABLE psn_purchase_open RENAME TO psn_purchase_open_weg").run();
+		try {
+			const e = await besitzSchritt(repos(), psn, TOKEN, 0, [], { jetzt: "2026-11-27 01:00:00" });
+			expect(e.status).toBe("fehler");
+		} finally {
+			await env.DB.prepare("ALTER TABLE psn_purchase_open_weg RENAME TO psn_purchase_open").run();
+		}
+		expect(await berechtigungen()).toEqual([]);
+		expect(await offene()).toEqual([]);
 	});
 });

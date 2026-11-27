@@ -169,3 +169,24 @@
   color: var(--text-leise);
 }
 
+
+/* --------------------------------------------------------------------------
+   Kaeufe ohne Spiel in der Sammlung (Stufe 18t)
+
+   Eine schlichte Liste unter dem Kauflisten-Knopf: Titel, Plattform-Chip,
+   seit wann. Gebaut wie der Cron-Verlauf, aber in der Textschrift - es sind
+   Titel, keine Logzeilen. Neuer Name, vorher ueber alle css/*.css gegrept.
+   -------------------------------------------------------------------------- */
+
+.offene-kaeufe {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--a3);
+  font-size: 0.85rem;
+}
+
+.offene-kaeufe li {
+  padding: var(--a1) 0;
+  border-bottom: 1px solid var(--linie);
+  overflow-wrap: anywhere;
+}

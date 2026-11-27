@@ -107,6 +107,12 @@ Einträge sind frei.
 Steht in [16-2-preisalarm.md](16-2-preisalarm.md): Kanal, Auslöser, Schreibweg, Oberfläche und was
 offen bleibt.
 
+#### 18t – Käufe ohne Spiel (gebaut und deployt am 27.11.2026) und Stufe b
+
+**18t** merkt PSN-Käufe ohne Release und lässt die Kaufliste zusätzlich nach einer neuen Trophäenliste ohne Release laufen ([7.7](07-7-ps-plus-gegen-kauf.md), [10.1](10-1-cron-schritte.md)). Vorgezogen vor das Ende der NPSSO-Beobachtung (Entscheidung des Nutzers vom 27.11.2026): Sie berührt die Anmeldung nicht. Die Nacht zum 28.11. misst nur den Leerlauf (Lesekosten-Test: PSN-Leerlauf 42 → 45 Zeilen, null zusätzliche D1-Aufrufe), **die Nacht zum 29.11. den ersten Lauf** (`lauf=woche`, wöchentlich fällig seit dem 22.11.) – mitzulesen: CPU je Kaufliste-Aufruf (vorher Median 19 ms), `offen=` und `konzept=`. Die **vollständige Liste** der gemerkten Käufe wird dem Nutzer vorgelegt. Scheitert in der Nacht die Anmeldung (NPSSO-Ende 28.11.), läuft kein PSN-Schritt und die Messung wartet auf ein neues NPSSO.
+
+**Stufe b – ein Tipp, ein sauberes Release**, gebaut erst nach dieser Messung: Aus einem gemerkten Kauf entstehen Spiel, Release (Plattform von Sony), IGDB-Verknüpfung über die Concept-Id (`external_games`, Quelle 36; ohne Treffer die Auswahl wie in der IGDB-Zuordnung), `psn_product_id` und die Berechtigung `kauf`; eine wartende Trophäenliste mit gleichem Titelschlüssel wird angehängt. **Nach einem Tipp, nicht automatisch** (Entscheidung vom 27.11.2026). Dazu nimmt das Übernehmen in der Zuordnung (Trophäenliste ohne Kauf) den IGDB-Abgleich für dieses eine Spiel gleich mit. Physisch bleibt der Barcode. Erster echter Fall: Grand Theft Auto VI – der Nutzer löscht das am 27.11. von Hand zugeordnete Spiel und schickt es durch den neuen Weg.
+
 #### Offen, bevor der grosse Wunschlisten-Import kommt
 
 **Die Zahlen dieses Abschnitts stammen von vor 20i:** Der Markt läuft seit dem 20.10.2026 als

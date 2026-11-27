@@ -13,7 +13,15 @@ import {
 	type AuffrischErgebnis,
 	type PhysischErgebnis,
 } from "./igdb";
-import { besitzSchritt, spielzeitSchritt, type BesitzErgebnis, type SpielzeitErgebnis, type SpielzeitLauf } from "./besitz";
+import {
+	besitzSchritt,
+	spielzeitSchritt,
+	zeitpunkt,
+	type BesitzAnlass,
+	type BesitzErgebnis,
+	type SpielzeitErgebnis,
+	type SpielzeitLauf,
+} from "./besitz";
 import { FEHLVERSUCHE_HOECHSTENS, psnSitzung, syncSchritt, type Anmeldung, type AnmeldungMelder, type SyncErgebnis } from "./run";
 import type { ZugangsZeile } from "../db/credentials";
 import {
@@ -237,7 +245,12 @@ export function entscheide(
 		if (mitZugang && syncFaellig(heutige)) return ["sync_starten"];
 		if (mitZugang) {
 			if (spielzeitFaellig(stand(SCHLUESSEL_SPIELZEIT), k.heute)) raus.push("spielzeit");
-			if (besitzFaellig(besitzStandAus(stand(SCHLUESSEL_BESITZ)), k.heute)) raus.push("besitz");
+			// Die Kaufliste auch dann, wenn der Sync eine neue Liste ohne Release
+			// gebracht hat (Stufe 18t). Erst hier, nach den beiden Ausgaengen
+			// oben: Bis der Sync der Nacht fertig ist, kommt die Kette gar nicht
+			// bis zu dieser Zeile, und die Listen sind dann die von heute.
+			if (besitzAnlass(besitzStandAus(stand(SCHLUESSEL_BESITZ)), k.heute, lage.psn.ohneRelease) !== null)
+				raus.push("besitz");
 			if (naechsteListe) raus.push("trophaeen");
 			if (levelStandAus(stand(SCHLUESSEL_LEVEL))?.standAm !== k.heute) raus.push("level");
 		}
@@ -358,6 +371,7 @@ async function cronArbeit(
 					} else if (kandidat === "besitz") {
 						const besitz = await besitzLauf(repos, psn, heute, {
 							gespeichert: besitzStandAus(stand(SCHLUESSEL_BESITZ)),
+							ohneRelease: lage.psn?.ohneRelease,
 							zeile,
 							melder,
 						});
@@ -574,8 +588,24 @@ async function spielzeitLauf(
 	return { ...ergebnis, lauf };
 }
 
-/** Der Stand der Kaufliste in app_setting (Stufe 18c, `fehlerAm` seit 18e). */
-export type BesitzStand = { fertigAm?: string; fehlerAm?: string; start?: number; gesehen?: number[] };
+/**
+ * Der Stand der Kaufliste in app_setting (Stufe 18c, `fehlerAm` seit 18e).
+ *
+ * Seit Stufe 18t: Mitten im Lauf haelt er Laufbeginn, Anlass und die bisher
+ * gemerkten Kaeufe; am Ende die Trophaeenlisten, die da ohne Release waren
+ * (`ohneRelease`) - daran erkennt der naechste Aufruf eine neue.
+ */
+export type BesitzStand = {
+	fertigAm?: string;
+	fehlerAm?: string;
+	start?: number;
+	gesehen?: number[];
+	begonnen?: string;
+	anlass?: BesitzAnlass;
+	gemerkt?: number;
+	mitKonzept?: number;
+	ohneRelease?: string[];
+};
 
 /** Was `GET /api/sync/status` ueber die Kaufliste sagt (Stufe 18e). */
 export async function besitzStand(repos: Repositories): Promise<BesitzStand> {
@@ -592,20 +622,42 @@ export function besitzStandAus(stand: string | null): BesitzStand {
 	}
 }
 
-/** Ob ein neuer oder fortgesetzter Durchlauf faellig ist. */
-function besitzFaellig(gespeichert: BesitzStand, heute: string, erzwingen = false): boolean {
-	const laeuft = typeof gespeichert.start === "number";
-	return (
-		laeuft ||
-		erzwingen ||
-		!gespeichert.fertigAm ||
-		tageSeit(gespeichert.fertigAm, heute) >= BESITZ_FRIST_TAGE
-	);
+/**
+ * Ob und warum die Kaufliste jetzt laeuft - `null` heisst "nicht faellig".
+ * Rein, ohne D1: Der Cron hat alles im Lage-Batch gelesen.
+ *
+ * - Ein offener Lauf wird fortgesetzt, mit dem Anlass, mit dem er begann.
+ * - `hand`: der Knopf, er ueberspringt die Frist (nicht die Blaetterung).
+ * - `woche`: kein fertiger Lauf (nie gelaufen oder `fehlerAm`) oder die Frist
+ *   von BESITZ_FRIST_TAGE ist um.
+ * - `neu` (Stufe 18t): Unter den Trophaeenlisten ohne Release ist eine, die
+ *   der letzte fertige Lauf nicht kannte. Neu gekaufte digitale Spiele kamen
+ *   bis dahin erst mit der Woche an - und ohne Release gar nicht (16.4).
+ *
+ * **Fehlt die gemerkte Menge, ist nichts neu.** Ein Stand von vor 18t hat
+ * keine; sonst loeste der erste Aufruf nach dem Deploy wegen einer Liste aus,
+ * die schon lange ohne Release ist. Die Menge schreibt erst der naechste
+ * fertige Lauf - bis dahin gilt allein die Woche.
+ */
+export function besitzAnlass(
+	gespeichert: BesitzStand,
+	heute: string,
+	ohneRelease: readonly string[] | undefined,
+	erzwingen = false,
+): BesitzAnlass | null {
+	if (typeof gespeichert.start === "number") return gespeichert.anlass ?? "woche";
+	if (erzwingen) return "hand";
+	if (!gespeichert.fertigAm || tageSeit(gespeichert.fertigAm, heute) >= BESITZ_FRIST_TAGE) return "woche";
+	if (ohneRelease && gespeichert.ohneRelease) {
+		const bekannt = new Set(gespeichert.ohneRelease);
+		if (ohneRelease.some((id) => !bekannt.has(id))) return "neu";
+	}
+	return null;
 }
 
 /**
- * Eine Seite der Kaufliste, wenn der letzte vollstaendige Durchlauf laenger
- * als BESITZ_FRIST_TAGE her ist. `null` heisst "nicht faellig".
+ * Eine Seite der Kaufliste, wenn sie faellig ist (`besitzAnlass`). `null`
+ * heisst "nicht faellig".
  *
  * Der Stand haelt Startdatum, Blaetterung und die bisher gesehenen
  * PS+-Releases: Erst wenn alle Seiten da sind, raeumt `besitzSchritt` auf -
@@ -625,30 +677,61 @@ function besitzFaellig(gespeichert: BesitzStand, heute: string, erzwingen = fals
  * `erzwingen` ueberspringt die Frist. Das nutzt der Knopf in den
  * Einstellungen: Ein Nutzer, der auf "Kaufliste jetzt abrufen" drueckt, will
  * nicht bis zum naechsten Termin warten.
+ *
+ * **Nach einem Lauf aus Anlass `neu` beginnt die Woche von vorn** (Stufe
+ * 18t): Er ist ein vollstaendiger Lauf wie jeder andere, PS+ ist danach
+ * abgeglichen, und ein zweiter wenige Tage spaeter brachte nichts, was die
+ * naechste neue Liste nicht ohnehin ausloest.
  */
 export async function besitzLauf(
 	repos: Repositories,
 	psn: PsnClient,
 	heute: string,
-	// `gespeichert` hat der Cron im Lage-Batch gelesen (Stufe 18j); der Knopf
-	// liest selbst.
+	// `gespeichert` und `ohneRelease` hat der Cron im Lage-Batch gelesen
+	// (Stufe 18j, 18t); der Knopf liest selbst.
 	// `zeile`: die Zugangszeile aus dem Lage-Batch (Nachtrag 18q).
-	optionen: { erzwingen?: boolean; gespeichert?: BesitzStand; zeile?: ZugangsZeile | null; melder?: AnmeldungMelder } = {},
+	optionen: {
+		erzwingen?: boolean;
+		gespeichert?: BesitzStand;
+		ohneRelease?: readonly string[];
+		zeile?: ZugangsZeile | null;
+		melder?: AnmeldungMelder;
+	} = {},
 ): Promise<BesitzErgebnis | null> {
 	const gespeichert = optionen.gespeichert ?? (await besitzStand(repos));
 	const laeuft = typeof gespeichert.start === "number";
-	if (!besitzFaellig(gespeichert, heute, optionen.erzwingen)) return null;
+	// Ohne gelesene Listen (der Knopf) kann `neu` nicht ausloesen - der Knopf
+	// erzwingt ohnehin, und eine Fortsetzung braucht die Listen nicht.
+	const lauf = besitzAnlass(gespeichert, heute, optionen.ohneRelease, optionen.erzwingen);
+	if (lauf === null) return null;
 
 	const sitzung = psnSitzung(repos, psn, optionen.zeile, optionen.melder);
 	const accessToken = await sitzung.token();
 	const gesehen = laeuft ? (gespeichert.gesehen ?? []) : [];
 	const start = laeuft ? (gespeichert.start ?? 0) : 0;
-	const ergebnis = await besitzSchritt(repos, sitzung.psn, accessToken, start, gesehen);
+	const jetzt = zeitpunkt();
+	// Der Laufbeginn steht im Stand, damit die letzte Seite aufraeumen kann,
+	// was seit dem Beginn nicht mehr kam. Ein Lauf, der vor 18t begann, hat
+	// keinen und raeumt nicht auf - der naechste tut es.
+	const begonnen = laeuft ? gespeichert.begonnen : jetzt;
+	const ergebnis = await besitzSchritt(repos, sitzung.psn, accessToken, start, gesehen, {
+		jetzt,
+		...(begonnen !== undefined ? { begonnen } : {}),
+	});
 
 	if (ergebnis.status === "fehler") {
 		await repos.sync.fortschrittSetzenWert(SCHLUESSEL_BESITZ, JSON.stringify({ fehlerAm: heute }));
-		return ergebnis;
+		return { ...ergebnis, lauf };
 	}
+	// Fuer den Lauf bisher: Die Verlaufszeile verdichtet aufeinanderfolgende
+	// Aufrufe zu "offen=3→41", und der letzte Wert ist dann der des Laufs.
+	const gemerkt = (laeuft ? (gespeichert.gemerkt ?? 0) : 0) + ergebnis.gemerkt;
+	const mitKonzept = (laeuft ? (gespeichert.mitKonzept ?? 0) : 0) + ergebnis.mitKonzept;
+	// Am Ende die Listen ohne Release von jetzt - der Knopf liest sie selbst,
+	// ein D1-Aufruf nur auf seiner letzten Seite.
+	const ohneRelease = ergebnis.weiter
+		? undefined
+		: [...(optionen.ohneRelease ?? (await repos.trophaeen.listenOhneRelease()))];
 	// Stand und "Zugang geglueckt" in EINEM Batch (Stufe 18p) - bis dahin zwei
 	// Aufrufe. Scheitert er, steht weder das eine noch das andere; der Stand
 	// von vorher bleibt, und der naechste Aufruf holt dieselbe Seite erneut.
@@ -656,12 +739,12 @@ export async function besitzLauf(
 		repos.sync.fortschrittBaustein(
 			SCHLUESSEL_BESITZ,
 			ergebnis.weiter
-				? JSON.stringify({ start: start + ergebnis.geholt, gesehen })
-				: JSON.stringify({ fertigAm: heute }),
+				? JSON.stringify({ start: start + ergebnis.geholt, gesehen, begonnen, anlass: lauf, gemerkt, mitKonzept })
+				: JSON.stringify({ fertigAm: heute, ohneRelease }),
 		),
 		repos.credentials.fehlerStatusLoeschenBaustein(),
 	] as const);
-	return ergebnis;
+	return { ...ergebnis, gemerkt, mitKonzept, lauf };
 }
 
 /**
@@ -797,7 +880,13 @@ export function cronLogzeile(e: CronErgebnis): string {
 			`kauf=${e.besitz.kauf}`,
 			`plus=${e.besitz.plus}`,
 			`entfallen=${e.besitz.entfallen}`,
+			// Kaeufe ohne Spiel in der Sammlung, im Lauf bisher (Stufe 18t) -
+			// nur Zahlen, nie ein Titel.
+			`offen=${e.besitz.gemerkt}`,
+			`konzept=${e.besitz.mitKonzept}`,
 		);
+		// Warum die Kaufliste lief: `woche` oder `neu` (Stufe 18t).
+		if (e.besitz.lauf) teile.push(`lauf=${e.besitz.lauf}`);
 		if (e.besitz.erledigt) teile.push(`erledigt=${e.besitz.erledigt}`);
 		if (e.besitz.meldung) teile.push(`meldung="${e.besitz.meldung}"`);
 	}

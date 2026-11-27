@@ -12,6 +12,8 @@ import {
 	AUFFRISCH_FRIST_TAGE,
 	auffrischGrenze,
 	bereichFuerAusdruck,
+	BESITZ_FRIST_TAGE,
+	besitzAnlass,
 	besitzLauf,
 	besitzStand,
 	CRON_PSN,
@@ -1289,11 +1291,95 @@ describe("cronSchritt", () => {
 		it("ein vollstaendiger Lauf ruht die Frist ab - und weicht dem Knopf", async () => {
 			const psn = psnLeereKaufliste();
 			expect(await besitzLauf(repos(), psn, "2026-09-27")).toMatchObject({ status: "erfolg", weiter: false });
-			expect(await besitzStand(repos())).toEqual({ fertigAm: "2026-09-27" });
+			// Seit Stufe 18t mit den Listen ohne Release von jetzt - hier keine.
+			expect(await besitzStand(repos())).toEqual({ fertigAm: "2026-09-27", ohneRelease: [] });
 
 			expect(await besitzLauf(repos(), psn, "2026-09-28")).toBeNull();
 			// "Kaufliste jetzt abrufen" wartet nicht bis zum naechsten Termin.
 			expect(await besitzLauf(repos(), psn, "2026-09-28", { erzwingen: true })).not.toBeNull();
+		});
+	});
+
+	describe("Ausloeser der Kaufliste (Stufe 18t)", () => {
+		const HEUTE_T = "2026-11-27";
+		const VOR = (tage: number) => new Date(Date.parse(`${HEUTE_T}T00:00:00Z`) - tage * 86_400_000).toISOString().slice(0, 10);
+
+		it("laeuft nach der Frist als 'woche' - und ohne fertigen Lauf, auch nach einer Fehler-Marke", () => {
+			expect(besitzAnlass({ fertigAm: VOR(BESITZ_FRIST_TAGE) }, HEUTE_T, [])).toBe("woche");
+			expect(besitzAnlass({ fertigAm: VOR(BESITZ_FRIST_TAGE - 1) }, HEUTE_T, [])).toBeNull();
+			expect(besitzAnlass({}, HEUTE_T, [])).toBe("woche");
+			expect(besitzAnlass({ fehlerAm: HEUTE_T }, HEUTE_T, [])).toBe("woche");
+		});
+
+		it("laeuft als 'neu', wenn eine Liste ohne Release dazukam, die der letzte Lauf nicht kannte", () => {
+			const stand = { fertigAm: VOR(2), ohneRelease: ["NPWR_ALT"] };
+			expect(besitzAnlass(stand, HEUTE_T, ["NPWR_ALT", "NPWR_NEU"])).toBe("neu");
+		});
+
+		it("laeuft nicht fuer eine bekannte Liste, ohne Liste oder wenn eine Liste ein Release bekam", () => {
+			const stand = { fertigAm: VOR(2), ohneRelease: ["NPWR_ALT"] };
+			expect(besitzAnlass(stand, HEUTE_T, ["NPWR_ALT"])).toBeNull();
+			expect(besitzAnlass(stand, HEUTE_T, [])).toBeNull();
+			expect(besitzAnlass({ fertigAm: VOR(2), ohneRelease: [] }, HEUTE_T, [])).toBeNull();
+		});
+
+		it("feuert nicht, solange kein Lauf die Menge geschrieben hat - der Stand vor dem Deploy", () => {
+			// Der Stand der Produktion am 27.11.2026: fertig am 22.11., ohne
+			// Menge, eine Liste ohne Release. Faellig erst am 29.11.
+			const stand = { fertigAm: "2026-11-22" };
+			expect(besitzAnlass(stand, "2026-11-27", ["NPWR_ALT"])).toBeNull();
+			expect(besitzAnlass(stand, "2026-11-28", ["NPWR_ALT"])).toBeNull();
+			expect(besitzAnlass(stand, "2026-11-29", ["NPWR_ALT"])).toBe("woche");
+			// Ohne gelesene Listen (der Knopf) ebenso.
+			expect(besitzAnlass({ fertigAm: VOR(2), ohneRelease: [] }, HEUTE_T, undefined)).toBeNull();
+		});
+
+		it("setzt einen offenen Lauf mit seinem Anlass fort; der Knopf heisst 'hand'", () => {
+			expect(besitzAnlass({ start: 50, gesehen: [], anlass: "neu" }, HEUTE_T, [])).toBe("neu");
+			expect(besitzAnlass({ start: 50, gesehen: [] }, HEUTE_T, [])).toBe("woche");
+			expect(besitzAnlass({ fertigAm: HEUTE_T }, HEUTE_T, [], true)).toBe("hand");
+		});
+
+		it("laeuft im Cron erst nach dem Sync, nennt den Anlass und schreibt die Menge fuer die naechste Nacht", async () => {
+			await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
+			// Eine Liste ohne Release, die der letzte Lauf nicht kannte.
+			await env.DB.prepare(
+				"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, progress_pct, synced_at) " +
+					"VALUES ('NPWR_NEU', 'trophy', 'Erfunden', 'PS5', 3, datetime('now'))",
+			).run();
+			await env.DB.prepare(
+				"INSERT INTO psn_sync_run (started_at, finished_at, status, next_offset, started_by) VALUES (datetime('now'), datetime('now'), 'erfolg', 0, 'cron')",
+			).run();
+			const setting = env.DB.prepare("INSERT INTO app_setting (key, value) VALUES (?, ?)");
+			await env.DB.batch([
+				setting.bind("psn_spielzeit_stand", `${HEUTE}:-1`),
+				setting.bind("psn_besitz_stand", JSON.stringify({ fertigAm: HEUTE, ohneRelease: [] })),
+			]);
+
+			const e = await cronSchritt(repos(), psnLeereKaufliste(), igdbOhne(), { bereich: "psn", heute: HEUTE });
+
+			expect(e.getan).toBe("besitz");
+			expect(cronLogzeile(e)).toContain("lauf=neu");
+			expect(cronLogzeile(e)).toContain("offen=0 konzept=0");
+			expect(await besitzStand(repos())).toEqual({ fertigAm: HEUTE, ohneRelease: ["NPWR_NEU"] });
+			// Die Liste ist jetzt bekannt: Die naechste Nacht laeuft nicht erneut.
+			expect(besitzAnlass(await besitzStand(repos()), MORGEN, ["NPWR_NEU"])).toBeNull();
+		});
+
+		it("laeuft nicht, solange der Sync der Nacht noch aussteht", async () => {
+			await repos().credentials.npssoSpeichern(new Geheimnis("npsso-test"));
+			await env.DB.prepare(
+				"INSERT INTO trophy_progress (np_communication_id, np_service_name, title_name, platform, progress_pct, synced_at) " +
+					"VALUES ('NPWR_NEU', 'trophy', 'Erfunden', 'PS5', 3, datetime('now'))",
+			).run();
+			await env.DB.prepare("INSERT INTO app_setting (key, value) VALUES (?, ?)")
+				.bind("psn_besitz_stand", JSON.stringify({ fertigAm: HEUTE, ohneRelease: [] }))
+				.run();
+			const { psn } = psnMit(10);
+
+			const e = await cronSchritt(repos(), psn, igdbOhne(), { bereich: "psn", heute: HEUTE });
+
+			expect(e.getan).toBe("sync");
 		});
 	});
 

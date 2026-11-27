@@ -116,6 +116,25 @@ export const psnRoutes = new Hono<AppEnv>()
 	})
 
 	/**
+	 * Kaeufe ohne Spiel in der Sammlung (Stufe 18t, 7.7) - fuer die Glocke und
+	 * die Liste in den Einstellungen. Nur sichtbar machen: Uebernommen wird
+	 * hier nichts. Die Kennungen von Sony bleiben im Haus; ob eine conceptId
+	 * da ist, sagt, ob ein spaeterer Schritt das Spiel daraus anlegen kann.
+	 */
+	.get("/psn/kaeufe-offen", async (c) => {
+		const zeilen = await c.var.repos.besitz.offeneKaeufe();
+		return c.json({
+			anzahl: zeilen.length,
+			eintraege: zeilen.map((z) => ({
+				titel: z.title_name,
+				plattform: z.platform,
+				seit: z.first_seen_at,
+				konzept: z.hat_konzept === 1,
+			})),
+		});
+	})
+
+	/**
 	 * Eine Portion Einzeltrophaeen holen (Stufe 19b, 7.7).
 	 *
 	 * Der Hauptweg zur Erstbefuellung: Die Oberflaeche ruft so lange nach,
