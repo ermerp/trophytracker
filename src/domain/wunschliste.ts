@@ -229,3 +229,18 @@ export function jahrAusDateiname(name: string | null | undefined): number | null
 	const m = /(?:^|\D)((?:19|20)\d{2})(?:\D|$)/.exec(name);
 	return m ? Number(m[1]) : null;
 }
+
+/**
+ * Liegt ein Treffer mehr als ein Jahr neben dem Datum der Liste (Nachtrag f1a,
+ * Entscheidung des Nutzers vom 27.11.2026)? Dann übernimmt der Import ihn nicht
+ * still, sondern legt ihn zur Durchsicht vor - das Jahr ist ein Hinweis, kein
+ * Zwang: Eine neuere Fassung kann dem Nutzer genügen. Anlass: Eine Liste von
+ * 2017 nannte ein Spiel, dessen einziger Titeltreffer das Original von 2012
+ * war. Fehlt eines der beiden Daten, gibt es nichts abzuwägen.
+ */
+export function jahrWeichtAb(listenDatum: string | null, erscheinungsdatum: string | null): boolean {
+	const liste = listenDatum ? Number(listenDatum.slice(0, 4)) : NaN;
+	const treffer = erscheinungsdatum ? Number(erscheinungsdatum.slice(0, 4)) : NaN;
+	if (!Number.isInteger(liste) || !Number.isInteger(treffer)) return false;
+	return Math.abs(liste - treffer) > 1;
+}

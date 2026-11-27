@@ -9,6 +9,10 @@ export type MatchArt = (typeof MATCH_ARTEN)[number];
 export const ENTSCHEIDUNGEN = ["offen", "uebernommen", "uebersprungen", "schon_vorhanden", "aufgeteilt"] as const;
 export type Entscheidung = (typeof ENTSCHEIDUNGEN)[number];
 
+/** Warum eine Zeile nicht still übernommen wird (Nachtrag f1a, Migration 0041). */
+export const HINWEISE = ["jahr", "besitz"] as const;
+export type Hinweis = (typeof HINWEISE)[number];
+
 export const ZEILEN_GRUPPEN = ["klar", "unklar", "uebersprungen", "uebernommen"] as const;
 export type ZeilenGruppe = (typeof ZEILEN_GRUPPEN)[number];
 
@@ -22,6 +26,8 @@ export type ImportZaehler = {
 	uebernommen: number;
 	uebersprungen: number;
 	schonVorhanden: number;
+	/** Nachtrag f1a: nicht uebernommen, weil am Ziel schon eine Disc oder ein Kauf liegt. */
+	imBesitz: number;
 };
 
 export type ImportLauf = {
@@ -50,6 +56,7 @@ export type ImportZeile = {
 	decision: Entscheidung;
 	plan_entry_id: number | null;
 	decided_at: string | null;
+	hinweis: Hinweis | null;
 	/** Titel des Spiels aus der Sammlung, wenn game_id gesetzt ist. */
 	spiel_titel: string | null;
 	spiel_cover: string | null;
@@ -82,11 +89,13 @@ export type Abgleichergebnis = {
 	platform: Plattform | null;
 	/** 'schon_vorhanden', wenn am Ziel bereits ein offener Wunsch haengt; sonst 'offen'. */
 	decision: Extract<Entscheidung, "offen" | "schon_vorhanden">;
+	/** 'jahr' bei einem Titeltreffer neben dem Listenjahr, 'besitz' bei Disc oder Kauf am Ziel; sonst null. */
+	hinweis: Hinweis | null;
 };
 
 const ZEILEN_AUSWAHL =
 	"SELECT l.id, l.import_id, l.position, l.title, l.originals, l.platform, l.listed_at, l.checked_at, " +
-	"l.search_path, l.match_kind, l.game_id, l.release_id, l.igdb_id, l.decision, l.plan_entry_id, l.decided_at, " +
+	"l.search_path, l.match_kind, l.game_id, l.release_id, l.igdb_id, l.decision, l.plan_entry_id, l.decided_at, l.hinweis, " +
 	"g.title AS spiel_titel, g.cover_url AS spiel_cover, r.platform AS release_plattform " +
 	"FROM wishlist_import_line l " +
 	"LEFT JOIN game g ON g.id = l.game_id " +
@@ -100,7 +109,8 @@ const ZAEHLER_AUSWAHL =
 	"SUM(decision = 'offen' AND match_kind = 'ohne_treffer') AS ohneTreffer, " +
 	"SUM(decision = 'uebernommen') AS uebernommen, " +
 	"SUM(decision = 'uebersprungen') AS uebersprungen, " +
-	"SUM(decision = 'schon_vorhanden') AS schonVorhanden";
+	"SUM(decision = 'schon_vorhanden' AND hinweis IS NOT 'besitz') AS schonVorhanden, " +
+	"SUM(decision = 'schon_vorhanden' AND hinweis = 'besitz') AS imBesitz";
 
 const GRUPPEN_BEDINGUNG: Record<ZeilenGruppe, string> = {
 	klar: "l.decision IN ('offen','schon_vorhanden') AND l.match_kind IN ('sammlung','vorhanden','eindeutig')",
@@ -110,7 +120,7 @@ const GRUPPEN_BEDINGUNG: Record<ZeilenGruppe, string> = {
 };
 
 function leererZaehler(): ImportZaehler {
-	return { gesamt: 0, ungeprueft: 0, klar: 0, mehrdeutig: 0, ohneTreffer: 0, uebernommen: 0, uebersprungen: 0, schonVorhanden: 0 };
+	return { gesamt: 0, ungeprueft: 0, klar: 0, mehrdeutig: 0, ohneTreffer: 0, uebernommen: 0, uebersprungen: 0, schonVorhanden: 0, imBesitz: 0 };
 }
 
 function zaehlerAus(z: Partial<ImportZaehler> | null | undefined): ImportZaehler {
@@ -254,10 +264,10 @@ export class WishlistImportRepository {
 			this.db
 				.prepare(
 					"UPDATE wishlist_import_line SET checked_at = datetime('now'), match_kind = ?, game_id = ?, release_id = ?, " +
-						"igdb_id = ?, search_path = ?, platform = COALESCE(?, platform), decision = ?, " +
+						"igdb_id = ?, search_path = ?, platform = COALESCE(?, platform), decision = ?, hinweis = ?, " +
 						"decided_at = CASE WHEN ? = 'offen' THEN NULL ELSE datetime('now') END WHERE id = ?",
 				)
-				.bind(e.matchKind, e.gameId, e.releaseId, e.igdbId, e.searchPath, e.platform, e.decision, e.decision, lineId),
+				.bind(e.matchKind, e.gameId, e.releaseId, e.igdbId, e.searchPath, e.platform, e.decision, e.hinweis, e.decision, lineId),
 		]);
 	}
 
@@ -282,6 +292,18 @@ export class WishlistImportRepository {
 		return (ergebnis.meta.changes ?? 0) > 0;
 	}
 
+	/**
+	 * Bei der Übernahme festgestellt: Am Ziel-Release liegt schon eine Disc oder
+	 * ein Kauf (Nachtrag f1a). Die Zeile steht danach wie ein Duplikat da;
+	 * „Doch entscheiden" öffnet sie wieder, etwa für eine andere Plattform.
+	 */
+	async imBesitzMarkieren(lineId: number): Promise<void> {
+		await this.db
+			.prepare("UPDATE wishlist_import_line SET decision = 'schon_vorhanden', hinweis = 'besitz', decided_at = datetime('now') WHERE id = ?")
+			.bind(lineId)
+			.run();
+	}
+
 	/** Plattform einer Zeile setzen oder leeren - vor der Uebernahme, ohne neuen Abgleich. */
 	async plattformSetzen(lineId: number, plattform: Plattform | null): Promise<boolean> {
 		const ergebnis = await this.db
@@ -301,7 +323,7 @@ export class WishlistImportRepository {
 				.prepare(
 					"UPDATE wishlist_import_line SET title = ?, checked_at = NULL, match_kind = NULL, game_id = NULL, " +
 						"release_id = NULL, igdb_id = NULL, search_path = NULL, decision = 'offen', plan_entry_id = NULL, " +
-						"decided_at = NULL WHERE id = ? AND decision <> 'uebernommen'",
+						"decided_at = NULL, hinweis = NULL WHERE id = ? AND decision <> 'uebernommen'",
 				)
 				.bind(titel, lineId),
 			this.db.prepare("DELETE FROM wishlist_import_candidate WHERE line_id = ?").bind(lineId),

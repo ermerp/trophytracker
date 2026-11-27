@@ -414,3 +414,122 @@ describe("Einzelentscheidungen", () => {
 		expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM wishlist_import_candidate").first<{ n: number }>())?.n).toBe(0);
 	});
 });
+
+/**
+ * Nachtrag f1a (8.2): Plattform nach dem Datum der Liste, Jahresabweichung zur
+ * Durchsicht, Besitz am Ziel-Release. Jeder Fall nimmt die Lage, in der nur
+ * die gepruefte Regel greift.
+ */
+describe("Pruefung beim Import (f1a)", () => {
+	const hinweise = async (importId: number) =>
+		(
+			await env.DB.prepare("SELECT match_kind, decision, hinweis, platform, igdb_id FROM wishlist_import_line WHERE import_id = ? ORDER BY position, id")
+				.bind(importId)
+				.all<Record<string, unknown>>()
+		).results;
+	const releaseVon = async (spielId: number, plattform: string) =>
+		(await env.DB.prepare("SELECT id FROM release WHERE game_id = ? AND platform = ?").bind(spielId, plattform).first<{ id: number }>())!.id;
+	const disc = (releaseId: number) => env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)").bind(releaseId).run();
+	const berechtigung = (releaseId: number, quelle: string) =>
+		env.DB.prepare("INSERT INTO digital_entitlement (release_id, source) VALUES (?, ?)").bind(releaseId, quelle).run();
+
+	it("schlaegt bei einem IGDB-Treffer aus einer Liste von 2018 PS4 vor, nicht PS5", async () => {
+		const id = await lauf("-Mai\nBloodborne\n", { jahr: 2018 });
+		const roh = spielRoh({ platforms: [48, 167], first_release_date: 1525132800 }); // 2018-05-01
+		await importAbgleichSchritt(repos(), fakeIgdb([[roh]]).client, id);
+		expect((await hinweise(id))[0]).toMatchObject({ match_kind: "eindeutig", platform: "PS4", hinweis: null });
+	});
+
+	it("schlaegt beim Sammlungstreffer die Plattform zur Zeit der Liste vor", async () => {
+		await spiel(1, "Bloodborne", "bloodborne", ["PS4", "PS5"]);
+		const id = await lauf("-Mai\nBloodborne\n", { jahr: 2018 });
+		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
+		expect((await hinweise(id))[0]).toMatchObject({ match_kind: "sammlung", platform: "PS4" });
+	});
+
+	it("schickt einen eindeutigen Titeltreffer mit fremdem Jahr zur Durchsicht, den Treffer zuoberst", async () => {
+		const id = await lauf("-Oktober\nDragons Dogma\n", { jahr: 2017 });
+		const original = spielRoh({ id: 3968, name: "Dragons Dogma", platforms: [9], first_release_date: 1337644800 }); // 2012-05-22
+		const andere = spielRoh({ id: 16300, name: "Dragons Dogma: Dark Arisen", platforms: [9, 48], first_release_date: 1507075200 }); // 2017-10-03
+		const e = await importAbgleichSchritt(repos(), fakeIgdb([[andere, original]]).client, id);
+		expect(e).toMatchObject({ eindeutig: 0, mehrdeutig: 1 });
+		const z = (await hinweise(id))[0];
+		expect(z).toMatchObject({ match_kind: "mehrdeutig", decision: "offen", hinweis: "jahr", igdb_id: null });
+		const k = await env.DB.prepare(
+			"SELECT c.igdb_id FROM wishlist_import_candidate c JOIN wishlist_import_line l ON l.id = c.line_id WHERE l.import_id = ? ORDER BY c.position",
+		)
+			.bind(id)
+			.all<{ igdb_id: number }>();
+		expect(k.results.map((x) => x.igdb_id)).toEqual([3968, 16300]);
+		// Nicht im Block "alle uebernehmen".
+		expect(await importUebernahmeSchritt(repos(), fakeIgdb([[]]).client, id)).toMatchObject({ uebernommen: 0 });
+		expect(await plaene()).toHaveLength(0);
+	});
+
+	it("laesst einen Treffer aus dem angrenzenden Jahr eindeutig", async () => {
+		const id = await lauf("-Dezember\nBloodborne\n", { jahr: 2016 });
+		await importAbgleichSchritt(repos(), fakeIgdb([[spielRoh({ first_release_date: 1485907200 })]]).client, id); // 2017-02-01
+		expect((await hinweise(id))[0]).toMatchObject({ match_kind: "eindeutig", hinweis: null });
+	});
+
+	it("markiert einen Sammlungstreffer mit Disc am Ziel-Release als schon im Besitz", async () => {
+		await spiel(1, "Bloodborne", "bloodborne", ["PS4"]);
+		await disc(await releaseVon(1, "PS4"));
+		const id = await lauf("Bloodborne\n");
+		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
+		expect((await hinweise(id))[0]).toMatchObject({ match_kind: "sammlung", decision: "schon_vorhanden", hinweis: "besitz" });
+		expect(await importUebernahmeSchritt(repos(), fakeIgdb([[]]).client, id)).toMatchObject({ uebernommen: 0 });
+	});
+
+	it("zaehlt eine gekaufte Berechtigung als Besitz", async () => {
+		await spiel(1, "Bloodborne", "bloodborne", ["PS4"]);
+		await berechtigung(await releaseVon(1, "PS4"), "kauf");
+		const id = await lauf("Bloodborne\n");
+		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
+		expect((await hinweise(id))[0]).toMatchObject({ decision: "schon_vorhanden", hinweis: "besitz" });
+	});
+
+	it("zaehlt PS Plus nicht als Besitz", async () => {
+		await spiel(1, "Bloodborne", "bloodborne", ["PS4"]);
+		await berechtigung(await releaseVon(1, "PS4"), "plus");
+		const id = await lauf("Bloodborne\n");
+		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
+		expect((await hinweise(id))[0]).toMatchObject({ decision: "offen", hinweis: null });
+	});
+
+	it("laesst Besitz auf einer anderen Plattform nicht blockieren", async () => {
+		await spiel(1, "Bloodborne", "bloodborne", ["PS4", "PS5"]);
+		await disc(await releaseVon(1, "PS4"));
+		const id = await lauf("Bloodborne\n"); // ohne Datum: PS5
+		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
+		expect((await hinweise(id))[0]).toMatchObject({ platform: "PS5", decision: "offen", hinweis: null });
+		expect(await importUebernahmeSchritt(repos(), fakeIgdb([[]]).client, id)).toMatchObject({ uebernommen: 1 });
+	});
+
+	it("prueft den Besitz bei der Uebernahme erneut, nach einer geaenderten Plattform", async () => {
+		await spiel(1, "Bloodborne", "bloodborne", ["PS4", "PS5"]);
+		await disc(await releaseVon(1, "PS4"));
+		const id = await lauf("Bloodborne\n");
+		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
+		const zeileId = (await zeilen(id))[0].id;
+		const a = app(fakeIgdb([[]]).client);
+		expect((await a.request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ plattform: "PS4" }, "PATCH"), env)).status).toBe(200);
+		expect(await importUebernahmeSchritt(repos(), fakeIgdb([[]]).client, id)).toMatchObject({ uebernommen: 0 });
+		expect((await hinweise(id))[0]).toMatchObject({ decision: "schon_vorhanden", hinweis: "besitz" });
+		expect(await plaene()).toHaveLength(0);
+		// Die Route nennt den Grund.
+		const s = await a.request(`/api/imports/wishlist/${id}?gruppe=klar`, { method: "GET" }, env);
+		const seite = (await s.json()) as { zaehler: Record<string, number>; zeilen: Array<{ hinweis: string | null }> };
+		expect(seite.zeilen[0].hinweis).toBe("besitz");
+		// Gezaehlt als Besitz, nicht als "schon auf der Wunschliste".
+		expect(seite.zaehler).toMatchObject({ imBesitz: 1, schonVorhanden: 0 });
+	});
+
+	it("vergisst den Hinweis beim Umbenennen", async () => {
+		const id = await lauf("-Oktober\nDragons Dogma\n", { jahr: 2017 });
+		await importAbgleichSchritt(repos(), fakeIgdb([[spielRoh({ name: "Dragons Dogma", first_release_date: 1337644800 })]]).client, id);
+		const zeileId = (await zeilen(id))[0].id;
+		await app(fakeIgdb([[]]).client).request(`/api/imports/wishlist/${id}/zeilen/${zeileId}`, json({ titel: "Dragons Dogma Dark Arisen" }, "PATCH"), env);
+		expect((await hinweise(id))[0]).toMatchObject({ match_kind: null, hinweis: null });
+	});
+});

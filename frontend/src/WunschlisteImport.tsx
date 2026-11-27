@@ -14,6 +14,7 @@ import {
   type PlanEintrag,
 } from './api'
 import { IgdbSuche, KandidatenListe } from './IgdbSuche'
+import { plattformZurListe } from './plattformwahl'
 
 /**
  * Wunschliste importieren (Use Case 9, Abschnitt 8.2).
@@ -354,6 +355,7 @@ function ImportLaufAnsicht({ id }: { id: number }) {
       <p className="zeile">
         {FORMTEXT[lauf.form]} · Jahr {lauf.jahr ?? 'unbekannt'} · {z.gesamt} Zeilen · {z.uebernommen} übernommen · {z.uebersprungen} übersprungen
         {z.schonVorhanden > 0 && ` · ${z.schonVorhanden} schon auf der Wunschliste`}
+        {z.imBesitz > 0 && ` · ${z.imBesitz} schon im Besitz`}
       </p>
 
       {hinweis && (
@@ -390,7 +392,8 @@ function ImportLaufAnsicht({ id }: { id: number }) {
           <h2>Eindeutig und in der Sammlung</h2>
           <p className="zeile">
             {z.klar} Zeilen treffen ein Spiel der Sammlung, ein schon angelegtes Spiel oder genau einen IGDB-Eintrag. Die Plattform ist
-            mit der neuesten des Treffers vorbelegt und in der Liste änderbar. Ein Spiel, das du digital gespielt hast, bleibt ein Wunsch –
+            mit der neuesten vorbelegt, die es zur Zeit der Liste gab, und in der Liste änderbar. Was du schon als Disc oder Kauf hast,
+            wird nicht übernommen. Ein Spiel, das du digital gespielt hast, bleibt ein Wunsch –
             „physisch besitzen wollen" ist genau die Lücke.
           </p>
           <div className="knopfzeile">
@@ -524,7 +527,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
           {TREFFERTEXT[zeile.treffer]}:{' '}
           {zeile.spielId !== null ? <Link to={`/spiel/${zeile.spielId}`}>{zeile.spielTitel}</Link> : zeile.spielTitel}
           {zeile.plattform ? (zeile.releasePlattform === zeile.plattform ? ` (${zeile.plattform})` : ` (${zeile.plattform}, Release entsteht)`) : ' (Plattform wählen)'}
-          {zeile.treffer === 'sammlung' && ' – schon gespielt, Wunsch bleibt'}
+          {zeile.treffer === 'sammlung' && zeile.hinweis !== 'besitz' && ' – schon gespielt, Wunsch bleibt'}
         </>
       )
     }
@@ -537,8 +540,15 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
         </>
       )
     }
+    if (zeile.hinweis === 'jahr') {
+      // Nachtrag f1a: Der Treffer steht zuoberst; ein Tipp nimmt ihn trotzdem.
+      const jahr = zeile.kandidaten[0]?.erscheinungsdatum?.slice(0, 4)
+      return <>einziger Titeltreffer erschien {jahr ?? 'unbekannt'} – passt er trotzdem, übernimm ihn</>
+    }
     return zeile.treffer ? TREFFERTEXT[zeile.treffer] : 'noch nicht abgeglichen'
   }
+
+  const vorschlag = (k: IgdbKandidat) => plattformZurListe(k.plattformen, zeile.listenDatum)
 
   return (
     <li className={offen ? 'offen-block' : 'offen-block erledigt'}>
@@ -549,7 +559,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
           {rohAnders.length > 0 && <span className="zeile"> · in der Liste: {rohAnders.join(' / ')}</span>}
           <div className="zeile">
             {zeile.listenDatum ? `Liste ${zeile.listenDatum}` : 'ohne Datum'} · {zeile.plattform ?? 'Plattform wählen'}
-            {zeile.entscheidung === 'schon_vorhanden' && ' · schon auf der Wunschliste'}
+            {zeile.entscheidung === 'schon_vorhanden' && (zeile.hinweis === 'besitz' ? ' · schon im Besitz (Disc oder Kauf)' : ' · schon auf der Wunschliste')}
             {zeile.entscheidung === 'uebersprungen' && ' · übersprungen'}
             {zeile.entscheidung === 'uebernommen' && ' · übernommen'}
           </div>
@@ -577,7 +587,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
       )}
 
       {offen && (unklar || zeigeWahl) && zeile.kandidaten.length > 0 && (
-        <KandidatenListe kandidaten={zeile.kandidaten} onWahl={(k, p) => void aktionen.uebernehmenIgdb(zeile, k, p)} laeuft={beschaeftigt} mitPlattform />
+        <KandidatenListe kandidaten={zeile.kandidaten} onWahl={(k, p) => void aktionen.uebernehmenIgdb(zeile, k, p)} laeuft={beschaeftigt} mitPlattform vorschlag={vorschlag} />
       )}
 
       <div className="knopfzeile">
@@ -611,6 +621,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
           onOhneTreffer={(begriff) => void aktionen.freitext(zeile, begriff)}
           laeuft={beschaeftigt}
           mitPlattform
+          vorschlag={vorschlag}
         />
       )}
 

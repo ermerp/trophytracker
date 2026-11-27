@@ -75,6 +75,8 @@ function zeileAntwort(z: ImportZeile, kandidaten: ImportKandidatZeile[] = []) {
 		entscheidung: z.decision,
 		planId: z.plan_entry_id,
 		entschiedenAm: z.decided_at,
+		// Nachtrag f1a: warum die Zeile nicht still uebernommen wird.
+		hinweis: z.hinweis,
 		kandidaten: kandidaten.map(kandidatAntwort),
 	};
 }

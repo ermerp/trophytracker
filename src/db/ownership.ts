@@ -56,6 +56,14 @@ function wert(feld: keyof PhysicalCopyFelder, felder: PhysicalCopyFelder): unkno
  * Besitz ist eine eigene Achse neben Fortschritt und Absicht (Abschnitt 1).
  * Nichts hier liest oder schreibt trophy_progress oder play_status.
  */
+/**
+ * Disc oder gekaufte Berechtigung an einem Release (Nachtrag f1a) - exportiert,
+ * damit `test/lesekosten.spec.ts` genau diese Abfrage misst.
+ */
+export const IM_BESITZ_SQL =
+	"SELECT EXISTS (SELECT 1 FROM physical_copy WHERE release_id = ?1) " +
+	"+ EXISTS (SELECT 1 FROM digital_entitlement WHERE release_id = ?1 AND source = 'kauf') AS n";
+
 export class OwnershipRepository {
 	constructor(
 		private readonly db: D1Database,
@@ -89,6 +97,22 @@ export class OwnershipRepository {
 			.bind(releaseId)
 			.first();
 		return r !== null;
+	}
+
+	/**
+	 * Besitz im Sinn des Wunschlisten-Imports (Nachtrag f1a, Entscheidung des
+	 * Nutzers vom 27.11.2026): eine Disc oder eine **gekaufte** Berechtigung an
+	 * genau diesem Release. PS Plus ist eine Momentaufnahme, kein Besitz (7.7),
+	 * und eine andere Plattform zählt nicht - ein Wunsch hängt am Release.
+	 * Zwei Index-Lookups (`physical_copy.release_id`, `UNIQUE (release_id, source)`),
+	 * kein OR in einer Unterabfrage.
+	 */
+	async imBesitz(releaseId: number): Promise<boolean> {
+		const r = await this.db
+			.prepare(IM_BESITZ_SQL)
+			.bind(releaseId)
+			.first<{ n: number }>();
+		return (r?.n ?? 0) > 0;
 	}
 
 	/** Exemplare und Berechtigungen aller Releases eines Spiels. */

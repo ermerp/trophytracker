@@ -125,7 +125,7 @@ Gebrauchtpreis-Schritt belegt **24 von 36** Aufrufen der Wartung und endet neun 
 Fensterschluss ([10.1](10-1-cron.md)). Die Decke des täglichen Takts liegt bei **520 bis 660
 Releases**; im Zuschnitt sind **431**.
 
-Die **zehn noch nicht importierten Wunschlisten** der finalen Stufe 1 brauchen diese Luft
+Die **neun noch nicht importierten Wunschlisten** der finalen Stufe 1 brauchen diese Luft
 auf – heute stammen 57 offene Wünsche aus drei Listen. **Zu entscheiden, bevor importiert
 wird:** ob der Takt täglich bleibt (dann muss der Zuschnitt enger werden oder ein weiteres
 Cron-Fenster dazu), oder ob er auf zwei Tage geht (dann halbiert sich die Punktdichte, die
