@@ -52,6 +52,8 @@ type FeedZeile = {
 	titel: string
 	spielId: number | null
 	text: string
+	/** Nachtrag f1c: die übrigen Schritte eines Vorgangs. */
+	zusatz: string | null
 }
 
 type FeedAntwort = { zeilen: FeedZeile[]; trophaeenVollstaendig: boolean }
@@ -134,6 +136,7 @@ export function Neu() {
 								)}
 								<br />
 								{e.text}
+								{e.zusatz && <span className="ruhig"> · {e.zusatz}</span>}
 							</span>
 							<span className="wann">{kurzesDatum(e.zeitpunkt)}</span>
 						</div>

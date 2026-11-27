@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { beschreibeEreignis, istEreignisQuelle, type Ereignis } from "../domain/ereignis";
+import { beschreibeBuendel, beschreibeEreignis, buendele, gehoertDazu, istEreignisQuelle, type Buendel, type Ereignis } from "../domain/ereignis";
 import type { AppEnv } from "../types";
 
 /**
@@ -32,6 +32,35 @@ export function ereignisAntwort(e: Ereignis) {
 	};
 }
 
+/**
+ * Eine Zeile aus einem Buendel (Nachtrag f1c): die Felder des tragenden
+ * Ereignisses, dazu Titel, Satz und Zusatz des Buendels. `id` ist die kleinste
+ * Id - die Oberflaeche blaettert mit `vor` = Id der letzten Zeile weiter.
+ */
+export function buendelAntwort(b: Buendel) {
+	return { ...ereignisAntwort(b.haupt), id: b.id, zeitpunkt: b.zuletzt, titel: b.titel, text: b.text, zusatz: b.zusatz, anzahl: b.ids.length };
+}
+
+/** So viele Ereignisse holt eine Seite ueber `limit` hinaus, damit ein Buendel an der Grenze ganz bleibt. */
+export const BUENDEL_VORLAUF = 20;
+
+/**
+ * Eine Seite in Buendeln (Nachtrag f1c). `limit` zaehlt weiter Ereignisse,
+ * nicht Zeilen. Faellt ein Buendel auf die Grenze, kommen seine restlichen
+ * Schritte aus dem Vorlauf dazu - **dieselbe Abfrage**, kein zweiter Aufruf -,
+ * und die Seite endet hinter ihm. So zerreisst das Keyset ueber `id` kein
+ * Buendel ueber zwei Seiten.
+ */
+export async function gebuendelteSeite(
+	laden: (limit: number) => Promise<{ ereignisse: Ereignis[]; weiter: boolean }>,
+	limit: number,
+): Promise<{ zeilen: Buendel[]; weiter: boolean }> {
+	const { ereignisse, weiter } = await laden(limit + BUENDEL_VORLAUF);
+	let ende = Math.min(limit, ereignisse.length);
+	while (ende < ereignisse.length && gehoertDazu(ereignisse[ende - 1], ereignisse[ende])) ende++;
+	return { zeilen: buendele(ereignisse.slice(0, ende)).map(beschreibeBuendel), weiter: ende < ereignisse.length || weiter };
+}
+
 /** `limit` (1..200, Standard 50) und `vor` (id, optional) aus der Query. */
 export function seitenParameter(q: Record<string, string>, standard = 50): { limit: number; vor: number | null } {
 	const vor = q.vor === undefined || q.vor === "" ? null : Number(q.vor);
@@ -45,6 +74,6 @@ export const eventRoutes = new Hono<AppEnv>().get("/", async (c) => {
 	const q = c.req.query();
 	const quelle = istEreignisQuelle(q.quelle) ? q.quelle : null;
 	const { limit, vor } = seitenParameter(q);
-	const { ereignisse, weiter } = await c.var.repos.events.liste({ quelle, limit, vor });
-	return c.json({ quelle, limit, weiter, ereignisse: ereignisse.map(ereignisAntwort) });
+	const { zeilen, weiter } = await gebuendelteSeite((n) => c.var.repos.events.liste({ quelle, limit: n, vor }), limit);
+	return c.json({ quelle, limit, weiter, ereignisse: zeilen.map(buendelAntwort) });
 });

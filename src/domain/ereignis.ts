@@ -270,6 +270,127 @@ export function beschreibeEreignis(e: Ereignis): string {
 	}
 }
 
+// --- Buendel: ein Vorgang, eine Zeile (Nachtrag f1c) ---------------------------
+
+/**
+ * Wie weit zwei Ereignisse eines Vorgangs auseinanderliegen duerfen. Ein
+ * Vorgang - etwa "Wunsch hinzufuegen" mit einem IGDB-Treffer - schreibt in
+ * einem Aufruf, also in derselben Sekunde oder knapp darueber. Zuerst waren
+ * es zehn Sekunden; beim Ansehen am 27.11.2026 verschluckte das ein
+ * "Rueckgaengig" im Vorgang davor - ein eigener Handgriff, Sekunden spaeter.
+ */
+export const BUENDEL_SEKUNDEN = 3;
+
+const sekunden = (zeitpunkt: string): number => Date.parse(`${zeitpunkt.replace(" ", "T")}Z`) / 1000;
+
+/**
+ * Gehoeren zwei benachbarte Ereignisse zu einem Vorgang? Dasselbe Spiel,
+ * dieselbe Quelle, hoechstens BUENDEL_SEKUNDEN auseinander. Ohne Spiel wird
+ * nie gebuendelt - dann gibt es nichts, was die Zeilen zusammenhielte.
+ */
+export function gehoertDazu(a: Ereignis, b: Ereignis): boolean {
+	return a.game_id !== null && a.game_id === b.game_id && a.source === b.source && Math.abs(sekunden(a.occurred_at) - sekunden(b.occurred_at)) <= BUENDEL_SEKUNDEN;
+}
+
+/**
+ * Aufeinanderfolgende Ereignisse eines Vorgangs zu Buendeln (Nachtrag f1c,
+ * Wunsch des Nutzers vom 27.11.2026: vier Zeilen fuer einen neuen Wunsch sind
+ * zu viel). Nur zur Lesezeit - gespeichert bleibt jeder Schritt, weil jeder
+ * Schreibpfad sich selbst protokolliert (8.5). Die Reihenfolge bleibt die der
+ * Eingabe; ein anderes Spiel dazwischen trennt.
+ */
+export function buendele(ereignisse: readonly Ereignis[]): Ereignis[][] {
+	const buendel: Ereignis[][] = [];
+	for (const e of ereignisse) {
+		const letztes = buendel.at(-1);
+		if (letztes && gehoertDazu(letztes[letztes.length - 1], e) && !wiederholt(letztes, e)) letztes.push(e);
+		else buendel.push([e]);
+	}
+	return buendel;
+}
+
+/**
+ * Kommt dieselbe Art mit demselben Feld im Buendel schon vor, beginnt ein
+ * neuer Vorgang: Ein Aufruf erfasst eine Disc einmal, setzt einen Wunsch
+ * einmal. Zwei "Disc erfasst" hintereinander sind zwei Handgriffe.
+ */
+function wiederholt(buendel: readonly Ereignis[], e: Ereignis): boolean {
+	return buendel.some((x) => x.kind === e.kind && x.field === e.field);
+}
+
+/** Was die Zeile traegt, wenn mehrere Schritte zusammenkommen: das Erfassen und die Listen zuerst. */
+const VORRANG: readonly EreignisArt[] = [
+	"exemplar_angelegt",
+	"berechtigung_angelegt",
+	"liste_eintrag_angelegt",
+	"status_geaendert",
+	"bewertung_geaendert",
+];
+/** Was fast immer nur Mittel zum Zweck ist - es steht hinten, im Zusatz. */
+const NEBENBEI: readonly EreignisArt[] = ["release_angelegt", "igdb_verknuepft", "spiel_angelegt"];
+
+function rang(art: EreignisArt): number {
+	const vorn = VORRANG.indexOf(art);
+	if (vorn >= 0) return vorn;
+	const hinten = NEBENBEI.indexOf(art);
+	return hinten >= 0 ? 100 + hinten : 50;
+}
+
+/** Die Teile ohne Doppel und ohne den Hauptsatz selbst; null, wenn nichts bleibt. */
+function zusatzAus(teile: readonly string[], haupt: string): string | null {
+	const rest = [...new Set(teile)].filter((t) => t !== haupt);
+	return rest.length > 0 ? rest.join(" · ") : null;
+}
+
+export type Buendel = {
+	/** Das Ereignis, dessen Satz die Zeile traegt. */
+	haupt: Ereignis;
+	/** Die kleinste Id - darauf setzt die naechste Seite an (Keyset `vor`). */
+	id: number;
+	ids: number[];
+	/** Der juengste Zeitpunkt im Buendel - danach mischt der Feed gegen die Trophaeen. */
+	zuletzt: string;
+	/** Titel mit Plattform, wenn ein Schritt des Buendels sie kennt. */
+	titel: string;
+	text: string;
+	/** Die uebrigen Schritte, knapp; null bei einem einzelnen Ereignis. */
+	zusatz: string | null;
+};
+
+/**
+ * Der Satz eines Buendels: der wichtigste Schritt, dahinter knapp die
+ * uebrigen. "Auf Wunschliste gesetzt (von Hand)" mit dem Zusatz "neu angelegt
+ * aus IGDB" statt vier Zeilen - Spiel, IGDB-Verknuepfung und Release sind bei
+ * einem neuen Spiel ein Schritt.
+ */
+export function beschreibeBuendel(buendel: readonly Ereignis[]): Buendel {
+	const haupt = [...buendel].sort((a, b) => rang(a.kind) - rang(b.kind) || b.id - a.id)[0];
+	const uebrige = buendel.filter((e) => e !== haupt).sort((a, b) => a.id - b.id);
+	const arten = new Set(uebrige.map((e) => e.kind));
+	const teile: string[] = [];
+	if (arten.has("spiel_angelegt")) {
+		teile.push(arten.has("igdb_verknuepft") || haupt.kind === "igdb_verknuepft" ? "neu angelegt aus IGDB" : "neu angelegt");
+	}
+	for (const e of uebrige) {
+		if (e.kind === "spiel_angelegt") continue;
+		if (arten.has("spiel_angelegt") && (e.kind === "igdb_verknuepft" || e.kind === "release_angelegt")) continue;
+		if (e.kind === "release_angelegt") teile.push(e.new_value ? `Release ${e.new_value} angelegt` : "Release angelegt");
+		else if (e.kind === "igdb_verknuepft") teile.push("mit IGDB verknüpft");
+		else teile.push(beschreibeEreignis(e));
+	}
+	const titel = haupt.release_id !== null ? haupt.label : (buendel.find((e) => e.release_id !== null)?.label ?? haupt.label);
+	const ids = buendel.map((e) => e.id);
+	return {
+		haupt,
+		id: Math.min(...ids),
+		ids,
+		zuletzt: buendel.reduce((z, e) => (e.occurred_at > z ? e.occurred_at : z), buendel[0].occurred_at),
+		titel,
+		text: beschreibeEreignis(haupt),
+		zusatz: zusatzAus(teile, beschreibeEreignis(haupt)),
+	};
+}
+
 /**
  * Feed-Zeilen aus erspielten Trophaeen (Stufe 19b, 8.5).
  *
