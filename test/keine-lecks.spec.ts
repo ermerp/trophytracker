@@ -335,6 +335,8 @@ describe("Dichtheitsprüfung", () => {
 			}),
 			await ruf(app, "/api/sync", { method: "POST" }),
 			await ruf(app, "/api/sync/status"),
+			// Die Kaeufe ohne Spiel in der Sammlung (Stufe 18t).
+			await ruf(app, "/api/psn/kaeufe-offen"),
 			// Die Betriebswarnungen (Stufe 18m) tragen die Meldung des Nachtlaufs.
 			await ruf(app, "/api/betrieb/warnungen"),
 			await ruf(app, "/api/health"),

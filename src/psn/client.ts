@@ -365,6 +365,10 @@ export type KaufRoh = {
 	name?: string;
 	platform?: string;
 	subscriptionService?: string;
+	/** Seit Stufe 18t: die Kennungen eines Kaufs ohne Spiel in der Sammlung. */
+	entitlementId?: string;
+	productId?: string;
+	conceptId?: string | number;
 };
 
 /** Was `/users/me/trophySummary` liefert, so weit wir es anfassen. */

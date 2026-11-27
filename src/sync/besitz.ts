@@ -1,5 +1,5 @@
 import type { Repositories } from "../db";
-import type { GespielterTitel } from "../db/besitz";
+import type { GespielterTitel, OffenerKauf } from "../db/besitz";
 import { absteigendNachLetztemSpiel, dauerInSekunden, plattformAusKategorie, spitzeReichtWeiter } from "../domain/psn-besitz";
 import { titelSchluessel } from "../domain/titel";
 import { PsnAbrufError, PsnAuthError, type PsnClient } from "../psn/client";
@@ -73,8 +73,47 @@ export type BesitzErgebnis = {
 	/** Offene Kauf-/Wunscheintraege, die ein erkannter Kauf geschlossen hat (nur bei "nur digital"). */
 	erledigt: number;
 	entfallen: number;
+	/**
+	 * Kaeufe ohne eindeutiges Release, gemerkt in `psn_purchase_open`
+	 * (Stufe 18t) - und wie viele davon eine conceptId tragen. Aus
+	 * `besitzSchritt` je Seite, aus `besitzLauf` fuer den Lauf bisher.
+	 */
+	gemerkt: number;
+	mitKonzept: number;
 	weiter: boolean;
 	meldung?: string;
+	/** Warum der Lauf laeuft (Stufe 18t) - nur aus `besitzLauf`. */
+	lauf?: BesitzAnlass;
+};
+
+/**
+ * Warum die Kaufliste laeuft (Stufe 18t): `woche` die Frist, `neu` eine
+ * Trophaeenliste ohne Release, die der letzte Lauf nicht kannte, `hand` der
+ * Knopf in den Einstellungen.
+ */
+export type BesitzAnlass = "woche" | "neu" | "hand";
+
+/** Wie `besitzSchritt` die offenen Kaeufe fuehrt (Stufe 18t). */
+export type BesitzOptionen = {
+	/** Zeitpunkt der Seite, Format von `datetime('now')`; ohne Angabe jetzt. */
+	jetzt?: string;
+	/**
+	 * Laufbeginn. Nur mit ihm raeumt die letzte Seite auf, was seit dem
+	 * Beginn nicht mehr kam - ein Lauf von vor 18t hat keinen und raeumt nicht.
+	 */
+	begonnen?: string;
+};
+
+/** Ein Zeitpunkt im Format von `datetime('now')` - so vergleicht SQLite Text richtig. */
+export const zeitpunkt = (d = new Date()) => d.toISOString().slice(0, 19).replace("T", " ");
+
+/** Die vier Plattformen, die ein offener Kauf tragen darf (CLAUDE.md, Migration 0040). */
+const PLATTFORMEN = new Set(["PS3", "PS4", "PS5", "PSVITA"]);
+
+/** Ein Feld von Sony als Text oder null - leere Angaben sind keine Kennung. */
+const kennung = (wert: unknown) => {
+	if (typeof wert === "number" && Number.isFinite(wert)) return String(wert);
+	return typeof wert === "string" && wert.trim() !== "" ? wert.trim() : null;
 };
 
 /** Eine Seite gespielter Titel holen, zuordnen und schreiben. */
@@ -163,9 +202,11 @@ export async function besitzSchritt(
 	accessToken: Parameters<PsnClient["holeKaeufeSeite"]>[0],
 	start: number,
 	gesehen: number[],
+	optionen: BesitzOptionen = {},
 ): Promise<BesitzErgebnis> {
 	try {
 		const { gesamt, eintraege } = await psn.holeKaeufeSeite(accessToken, start, KAEUFE_JE_SEITE);
+		const weiter = start + eintraege.length < gesamt && eintraege.length > 0;
 
 		// Die ganze Seite in einem Lese- und einem Schreib-Batch (Stufe 18k-b)
 		// statt zwei bis drei D1-Aufrufen je Eintrag. Zugeordnet wird wie
@@ -182,8 +223,28 @@ export async function besitzSchritt(
 		);
 		const kaufNeu: number[] = [];
 		const plusNeu: Array<{ id: number; hatKauf: boolean }> = [];
+		// Kaeufe ohne eindeutiges Release werden seit Stufe 18t gemerkt statt
+		// verworfen; ein Kauf mit Treffer faellt aus der Liste. PS Plus nie -
+		// ein Katalogtitel ist kein Besitz (7.7). Ohne Berechtigungs-Id gibt es
+		// keinen stabilen Schluessel, ohne eine der vier Plattformen keinen
+		// Platz in der Sammlung: beides bleibt liegen wie bisher.
+		const merken: OffenerKauf[] = [];
+		const treffer: Array<{ entitlementId: string; platform: string }> = [];
 		for (const { e, plattform, schluessel } of gueltig) {
 			const passend = (kandidaten.get(schluessel) ?? []).filter((k) => k.platform === plattform);
+			const entitlementId = kennung(e.entitlementId);
+			if (e.subscriptionService === "NONE" && entitlementId !== null && PLATTFORMEN.has(plattform)) {
+				if (passend.length === 1) treffer.push({ entitlementId, platform: plattform });
+				else
+					merken.push({
+						entitlementId,
+						platform: plattform,
+						titel: e.name!,
+						productId: kennung(e.productId),
+						conceptId: kennung(e.conceptId),
+						titleId: kennung(e.titleId),
+					});
+			}
 			if (passend.length !== 1) continue;
 			const { id, hatKauf } = passend[0];
 			if (e.subscriptionService === "PS_PLUS") {
@@ -198,10 +259,24 @@ export async function besitzSchritt(
 		// Kauf auf DERSELBEN Seite zaehlt; bis 18k-b hing das an der
 		// Reihenfolge der Eintraege.
 		const gekauft = new Set(kaufNeu);
-		const angelegt = await repos.besitz.berechtigungenErkennen({
-			kauf: kaufNeu,
-			plus: plusNeu.filter((p) => !p.hatKauf && !gekauft.has(p.id)).map((p) => p.id),
-		});
+		// Aufgeraeumt wird nur am Ende eines vollstaendigen Laufs: alle Seiten
+		// bis zur Gesamtzahl geholt, und die ist nicht null. Eine leere oder
+		// vorzeitig endende Antwort ist kein Beweis, dass Kaeufe fort sind -
+		// ein Teil-Ergebnis darf nie zu einem Loeschen fuehren (7.7).
+		const vollstaendig = !weiter && gesamt > 0 && start + eintraege.length >= gesamt;
+		const aufraeumen = vollstaendig && optionen.begonnen !== undefined;
+		const angelegt = await repos.besitz.berechtigungenErkennen(
+			{
+				kauf: kaufNeu,
+				plus: plusNeu.filter((p) => !p.hatKauf && !gekauft.has(p.id)).map((p) => p.id),
+			},
+			repos.besitz.offeneKaeufeAnweisungen({
+				merken,
+				treffer,
+				jetzt: optionen.jetzt ?? zeitpunkt(),
+				...(aufraeumen ? { ungesehenVor: optionen.begonnen } : {}),
+			}),
+		);
 
 		// Ein erkannter Kauf erledigt offene Kauf- und Wunscheintraege NUR,
 		// wenn es das Spiel ausschliesslich digital gibt. Sonst koennte der
@@ -220,13 +295,25 @@ export async function besitzSchritt(
 		const kauf = angelegt.kauf.length;
 		const plus = angelegt.plus.length;
 
-		const weiter = start + eintraege.length < gesamt && eintraege.length > 0;
 		// Nur am Ende eines vollstaendigen Durchlaufs aufraeumen.
 		const entfallen = weiter ? 0 : await repos.besitz.plusAufraeumen(gesehen);
 
-		return { status: "erfolg", geholt: eintraege.length, kauf, plus, erledigt, entfallen, weiter };
+		const gemerkt = new Set(merken.map((k) => `${k.entitlementId} ${k.platform}`)).size;
+		const mitKonzept = new Set(merken.filter((k) => k.conceptId !== null).map((k) => `${k.entitlementId} ${k.platform}`)).size;
+		return { status: "erfolg", geholt: eintraege.length, kauf, plus, erledigt, entfallen, gemerkt, mitKonzept, weiter };
 	} catch (fehler) {
-		return { status: "fehler", geholt: 0, kauf: 0, plus: 0, erledigt: 0, entfallen: 0, weiter: false, meldung: meldungFuer(fehler) };
+		return {
+			status: "fehler",
+			geholt: 0,
+			kauf: 0,
+			plus: 0,
+			erledigt: 0,
+			entfallen: 0,
+			gemerkt: 0,
+			mitKonzept: 0,
+			weiter: false,
+			meldung: meldungFuer(fehler),
+		};
 	}
 }
 

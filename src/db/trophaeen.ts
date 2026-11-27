@@ -28,6 +28,10 @@ const ZAEHLERSUMME =
 	"(earned_bronze + earned_silver + earned_gold + earned_platinum + " +
 	"defined_bronze + defined_silver + defined_gold + defined_platinum)";
 
+/** Listen ohne Release, fuer den Ausloeser der Kaufliste (Stufe 18t). */
+export const LISTEN_OHNE_RELEASE_SQL =
+	"SELECT np_communication_id FROM trophy_progress WHERE release_id IS NULL ORDER BY np_communication_id";
+
 /**
  * Die Auswahl der offenen Listen (Stufe 18j, Migration 0034): zwei
  * Teilabfragen statt eines OR, jede auf ihrem Teilindex. Exportiert, damit
@@ -120,6 +124,23 @@ export class TrophaeenRepository {
 	 * jedem PSN-Leerlauf (Befund vom 17.10.2026). Die Bedingungen muessen
 	 * woertlich denen der Indizes entsprechen.
 	 */
+	/**
+	 * Die Trophaeenlisten ohne Release (Stufe 18t) - fuer den Ausloeser der
+	 * Kaufliste: Eine neue Liste darunter heisst, dass Sony ein Spiel kennt,
+	 * das die Sammlung nicht hat, und dann ist vielleicht ein Kauf dazu da.
+	 * Ueber den Teilindex `idx_trophy_unmatched` (0001): Im Leerlauf liest die
+	 * Abfrage so viele Zeilen, wie Listen ohne Release sind, nicht 431.
+	 */
+	async listenOhneRelease(): Promise<string[]> {
+		return einzeln(this.db, this.listenOhneReleaseBaustein());
+	}
+
+	listenOhneReleaseBaustein(): Baustein<string[]> {
+		return eins(this.db.prepare(LISTEN_OHNE_RELEASE_SQL), (e) =>
+			zeilen<{ np_communication_id: string }>(e).map((r) => r.np_communication_id),
+		);
+	}
+
 	naechsteZumFuellenBaustein(limit: number): Baustein<ZuFuellen[]> {
 		const statement = this.db.prepare(ZU_FUELLEN_SQL).bind(limit);
 		return eins(statement, (e) =>

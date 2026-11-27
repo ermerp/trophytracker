@@ -4,6 +4,29 @@ import type { EventRepository } from "./events";
 
 /** Berechtigungen je INSERT: zwei Binds je Zeile, D1 erlaubt 100 je Statement. */
 const BERECHTIGUNGEN_JE_STUECK = 45;
+/** Offene Kaeufe je Upsert: acht Binds je Zeile (Stufe 18t). */
+const OFFENE_JE_UPSERT = 12;
+/** Offene Kaeufe je DELETE: zwei Binds je Zeile (Schluessel und Plattform). */
+const OFFENE_JE_DELETE = 45;
+
+/** Ein Kauf von Sony, zu dem die Sammlung kein eindeutiges Release kennt (Stufe 18t). */
+export type OffenerKauf = {
+	entitlementId: string;
+	platform: string;
+	/** Sonys Rohname, nie normalisiert. */
+	titel: string;
+	productId: string | null;
+	conceptId: string | null;
+	titleId: string | null;
+};
+
+/** Was `GET /api/psn/kaeufe-offen` je Kauf zeigt - die Kennungen bleiben im Haus. */
+export type OffenerKaufZeile = {
+	title_name: string;
+	platform: string;
+	first_seen_at: string;
+	hat_konzept: number;
+};
 
 /**
  * Spielzeit und digitaler Besitz aus PSN (Abschnitt 7.7, Stufe 18c).
@@ -27,6 +50,14 @@ export type GespielterTitel = {
 	letztesSpielAm: string | null;
 	releaseId: number | null;
 };
+
+/** Am Ende eines vollstaendigen Laufs: was seit Laufbeginn nicht mehr kam (Stufe 18t). */
+export const UNGESEHENE_KAEUFE_LOESCHEN_SQL = "DELETE FROM psn_purchase_open WHERE last_seen_at < ?";
+
+/** Die Liste der offenen Kaeufe - exportiert, damit die Messung dieselbe Abfrage nimmt. */
+export const OFFENE_KAEUFE_SQL =
+	"SELECT title_name, platform, first_seen_at, concept_id IS NOT NULL AS hat_konzept " +
+	"FROM psn_purchase_open ORDER BY first_seen_at DESC, title_name";
 
 export class BesitzRepository {
 	constructor(
@@ -125,10 +156,17 @@ export class BesitzRepository {
 	 * naechste Lauf holt dieselbe Seite neu (`besitzLauf` rueckt den Start
 	 * dann nicht vor). Stillstehen kann dabei nur die Kaufliste.
 	 */
-	async berechtigungenErkennen(neu: {
-		kauf: readonly number[];
-		plus: readonly number[];
-	}): Promise<{ kauf: number[]; plus: number[] }> {
+	async berechtigungenErkennen(
+		neu: {
+			kauf: readonly number[];
+			plus: readonly number[];
+		},
+		// Seit Stufe 18t: die offenen Kaeufe der Seite (`offeneKaeufeAnweisungen`),
+		// HINTER den Berechtigungen - kein eigener D1-Aufruf. Sie gehen mit der
+		// Seite unter, wenn eine Anweisung scheitert, und werden mit ihr neu
+		// geholt.
+		zusatz: readonly D1PreparedStatement[] = [],
+	): Promise<{ kauf: number[]; plus: number[] }> {
 		const anweisungen: D1PreparedStatement[] = [];
 		const inserts: Array<{ quelle: "kauf" | "plus"; index: number }> = [];
 		for (const quelle of ["kauf", "plus"] as const) {
@@ -162,12 +200,100 @@ export class BesitzRepository {
 			}
 		}
 		const raus = { kauf: [] as number[], plus: [] as number[] };
-		if (anweisungen.length === 0) return raus;
-		const ergebnisse = await this.db.batch(anweisungen);
+		if (anweisungen.length === 0 && zusatz.length === 0) return raus;
+		// Die Indizes in `inserts` zaehlen von vorn - der Zusatz verschiebt sie nicht.
+		const ergebnisse = await this.db.batch([...anweisungen, ...zusatz]);
 		for (const { quelle, index } of inserts) {
 			for (const z of zeilen<{ release_id: number }>(ergebnisse[index])) raus[quelle].push(z.release_id);
 		}
 		return raus;
+	}
+
+	/**
+	 * Die offenen Kaeufe einer Kaufliste-Seite als Anweisungen fuer deren
+	 * Schreib-Batch (Stufe 18t, 7.7). Kein Ereignis im Protokoll: Hier aendert
+	 * sich keine Bewertung, keine Liste und kein Besitz, nur was Sony gerade
+	 * nennt (8.5).
+	 *
+	 * In dieser Reihenfolge:
+	 *
+	 * 1. `treffer` loeschen - Kaeufe, die jetzt an genau einem Release haengen.
+	 *    Ihre Berechtigung legt derselbe Batch davor an oder fand sie schon.
+	 * 2. `merken` per Upsert: `first_seen_at` bleibt beim erneuten Sehen
+	 *    stehen, alles andere kommt neu von Sony.
+	 * 3. Nur am Ende eines vollstaendigen Laufs (`ungesehenVor`): loeschen, was
+	 *    seit dem Laufbeginn nicht mehr kam - etwa ein erstatteter Kauf. Hinter
+	 *    dem Upsert, sonst fiele die letzte Seite selbst darunter.
+	 *
+	 * 1 und 2 treffen verschiedene Schluessel, ihre Folge ist gleichgueltig.
+	 * Scheitert eine Anweisung, scheitert der ganze Batch samt Berechtigungen
+	 * (`berechtigungenErkennen`): Die Seite meldet "fehler", `besitzLauf`
+	 * schreibt `{fehlerAm}`, und der naechste Aufruf beginnt den Lauf von
+	 * vorn. Still steht dann nur die Kaufliste; die Tabelle behaelt den Stand
+	 * des letzten geglueckten Batches.
+	 */
+	offeneKaeufeAnweisungen(o: {
+		merken: readonly OffenerKauf[];
+		treffer: ReadonlyArray<{ entitlementId: string; platform: string }>;
+		/** Zeitpunkt der Seite im Format von `datetime('now')`. */
+		jetzt: string;
+		/** Laufbeginn - nur auf der letzten Seite eines vollstaendigen Laufs. */
+		ungesehenVor?: string;
+	}): D1PreparedStatement[] {
+		const raus: D1PreparedStatement[] = [];
+		// Doppelte Schluessel auf einer Seite wuerden den Upsert sprengen
+		// ("cannot affect row a second time") - der letzte gewinnt.
+		const merken = [...new Map(o.merken.map((k) => [`${k.entitlementId}\u0000${k.platform}`, k])).values()];
+		for (let i = 0; i < o.treffer.length; i += OFFENE_JE_DELETE) {
+			const stueck = o.treffer.slice(i, i + OFFENE_JE_DELETE);
+			raus.push(
+				this.db
+					.prepare(
+						"DELETE FROM psn_purchase_open WHERE (entitlement_id, platform) IN " +
+							`(VALUES ${stueck.map(() => "(?, ?)").join(", ")})`,
+					)
+					.bind(...stueck.flatMap((t) => [t.entitlementId, t.platform])),
+			);
+		}
+		for (let i = 0; i < merken.length; i += OFFENE_JE_UPSERT) {
+			const stueck = merken.slice(i, i + OFFENE_JE_UPSERT);
+			raus.push(
+				this.db
+					.prepare(
+						"INSERT INTO psn_purchase_open " +
+							"(entitlement_id, platform, title_name, product_id, concept_id, title_id, first_seen_at, last_seen_at) " +
+							`VALUES ${stueck.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ")} ` +
+							"ON CONFLICT(entitlement_id, platform) DO UPDATE SET " +
+							"title_name = excluded.title_name, product_id = excluded.product_id, " +
+							"concept_id = excluded.concept_id, title_id = excluded.title_id, last_seen_at = excluded.last_seen_at",
+					)
+					.bind(
+						...stueck.flatMap((k) => [
+							k.entitlementId,
+							k.platform,
+							k.titel,
+							k.productId,
+							k.conceptId,
+							k.titleId,
+							o.jetzt,
+							o.jetzt,
+						]),
+					),
+			);
+		}
+		if (o.ungesehenVor !== undefined) {
+			raus.push(this.db.prepare(UNGESEHENE_KAEUFE_LOESCHEN_SQL).bind(o.ungesehenVor));
+		}
+		return raus;
+	}
+
+	/**
+	 * Die offenen Kaeufe fuer Glocke und Einstellungen (Stufe 18t). Die Tabelle
+	 * ist klein - Kaeufe ohne Release, nie PS Plus -, gelesen wird sie ganz.
+	 */
+	async offeneKaeufe(): Promise<OffenerKaufZeile[]> {
+		const { results } = await this.db.prepare(OFFENE_KAEUFE_SQL).all<OffenerKaufZeile>();
+		return results;
 	}
 
 	/**

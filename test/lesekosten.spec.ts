@@ -494,6 +494,11 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 				name: `Spiel ${String(i).padStart(4, "0")}`,
 				platform: plattform,
 				subscriptionService: i % 3 === 0 ? "PS_PLUS" : "NONE",
+				// Seit Stufe 18t: Kaeufe ohne passendes Release werden gemerkt -
+				// hier die 16 mit falscher Plattform, jeder zweite mit conceptId.
+				entitlementId: `EP0000-CUSA${String(i).padStart(5, "0")}_00-ERFUNDEN`,
+				productId: `EP0000-CUSA${String(i).padStart(5, "0")}_00-ERFUNDEN`,
+				...(i % 2 === 0 ? { conceptId: 100_000 + i } : {}),
 			};
 		});
 		const psn = erstellePsnClient(
@@ -509,7 +514,11 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		);
 		const schritt = async () => {
 			const zaehler = zaehlendeDb(env.DB);
-			const e = await besitzSchritt(createRepositories(zaehler.db, env.NPSSO_KEY), psn, new Geheimnis("access-token-test"), 0, []);
+			// Mit Laufbeginn: Die eine Seite ist die letzte, ihr Batch raeumt also
+			// auch Ungesehenes auf (Stufe 18t) - gemessen wird der volle Batch.
+			const e = await besitzSchritt(createRepositories(zaehler.db, env.NPSSO_KEY), psn, new Geheimnis("access-token-test"), 0, [], {
+				begonnen: "2026-01-01 00:00:00",
+			});
 			return {
 				e,
 				aufrufe: zaehler.aufrufe(),
@@ -524,20 +533,29 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		const wieder = await schritt();
 		console.info({ kauflisteSeite: { neu: { ...neu, e: undefined }, wieder: { ...wieder, e: undefined } } });
 
-		expect(neu.e).toMatchObject({ status: "erfolg", geholt: 50, kauf: 18, plus: 8, weiter: false });
-		expect(wieder.e).toMatchObject({ status: "erfolg", kauf: 0, plus: 0 });
+		expect(neu.e).toMatchObject({ status: "erfolg", geholt: 50, kauf: 18, plus: 8, gemerkt: 16, mitKonzept: 8, weiter: false });
+		expect(wieder.e).toMatchObject({ status: "erfolg", kauf: 0, plus: 0, gemerkt: 16 });
 		// Ein Lese- und ein Schreib-Batch; in der ersten Woche dazu die Frage
 		// "nur digital?" fuer die neu erkannten Kaeufe. Das Aufraeumen am Ende
 		// des Durchlaufs ist ein dritter (weiter=false, eine Seite).
 		expect(neu.aufrufe).toBeLessThanOrEqual(4);
 		expect(wieder.aufrufe).toBeLessThanOrEqual(3);
-		// Weit unter den 50 Abfragen je Aufruf, gleich wie viele Eintraege.
-		expect(neu.anweisungen).toBeLessThanOrEqual(12);
-		expect(wieder.anweisungen).toBeLessThanOrEqual(12);
+		// Weit unter den 50 Abfragen je Aufruf, gleich wie viele Eintraege. Seit
+		// 18t haengen die offenen Kaeufe im Schreib-Batch der Seite: zwei
+		// Upserts (zwoelf je Anweisung), ein DELETE der Treffer, das Aufraeumen
+		// - vier Anweisungen mehr, kein Aufruf mehr (gemessen 27.11.2026: 8 -> 12).
+		expect(neu.anweisungen).toBeLessThanOrEqual(16);
+		expect(wieder.anweisungen).toBeLessThanOrEqual(16);
 		expect(neu.gelesen).toBeLessThan(1_500);
 		expect(wieder.gelesen).toBeLessThan(1_500);
 
-		await env.DB.prepare("DELETE FROM digital_entitlement").run();
+		// Die Route der Liste (Glocke und Einstellungen) mit den 16 gemerkten
+		// Kaeufen: Die Tabelle ist klein und wird ganz gelesen.
+		const kaeufeOffen = await routeGelesen("/api/psn/kaeufe-offen");
+		console.info({ kaeufeOffen });
+		expect(kaeufeOffen).toBeLessThan(40);
+
+		await env.DB.batch([env.DB.prepare("DELETE FROM digital_entitlement"), env.DB.prepare("DELETE FROM psn_purchase_open")]);
 	});
 
 	it("misst einen Auffrisch-Aufruf als Schritt (Nachtrag 18n-c)", async () => {
@@ -1589,7 +1607,7 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 	/**
 	 * Nachtrag 24c: das Oeffnen der Startseite als Ganzes. Die Kennzahlen oben
 	 * messen die SQL von /api/stats einzeln; die Startseite laedt aber
-	 * zwoelf Routen je Geraet, und erst ihre Summe ist, was ein Oeffnen kostet:
+	 * dreizehn Routen je Geraet, und erst ihre Summe ist, was ein Oeffnen kostet:
 	 *
 	 * - `Kennzahlen.tsx`: /api/stats und /api/stats/jahre,
 	 * - `Neu.tsx`: /api/feed, am Desktop mit `?anzahl=` (`FEED_DESKTOP` im
@@ -1622,6 +1640,7 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 			"/api/imports/wishlist",
 			"/api/unmatched",
 			"/api/backlog-candidates",
+			"/api/psn/kaeufe-offen",
 		];
 		const jeRoute: Record<string, number> = {};
 		for (const pfad of [...gemeinsam, feedHandy, feedDesktop]) jeRoute[pfad] = await routeGelesen(pfad);
@@ -1872,8 +1891,13 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 				"psn_spielzeit_stand",
 				`${HEUTE_UTC}:-1`,
 				"psn_besitz_stand",
-				JSON.stringify({ fertigAm: HEUTE_UTC }),
+				// Seit Stufe 18t mit der Menge der Listen ohne Release, die der
+				// letzte Lauf sah - sonst waere die Kaufliste faellig.
+				JSON.stringify({ fertigAm: HEUTE_UTC, ohneRelease: ["NPWR1"] }),
 			),
+			// Wie in der Produktion am 27.11.2026: eine Liste ohne Release. Der
+			// Ausloeser der Kaufliste (Stufe 18t) liest sie in jedem PSN-Aufruf.
+			env.DB.prepare("UPDATE trophy_progress SET release_id = NULL WHERE np_communication_id = 'NPWR1'"),
 			env.DB.prepare("DELETE FROM psn_sync_run"),
 			...Array.from({ length: 5 }, (_, i) =>
 				env.DB.prepare(
@@ -1904,6 +1928,15 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 		console.info({ auswahlenLeerlauf: auswahlen });
 		expect(auswahlen.auffrischen).toBeLessThan(10);
 		expect(auswahlen.disc).toBeLessThan(10);
+
+		// Der Ausloeser der Kaufliste (Stufe 18t) aus dem Code: ueber den
+		// Teilindex `idx_trophy_unmatched` so viele Zeilen wie Listen ohne
+		// Release, nicht 431.
+		const ohneReleaseBaustein = createRepositories(env.DB, env.NPSSO_KEY).trophaeen.listenOhneReleaseBaustein();
+		expect(await einzeln(env.DB, ohneReleaseBaustein)).toEqual(["NPWR1"]);
+		const ohneRelease = await bausteinGelesen(ohneReleaseBaustein);
+		console.info({ ohneReleaseLeerlauf: ohneRelease });
+		expect(ohneRelease).toBeLessThanOrEqual(3);
 
 		// Mit Zugang, sonst kaeme der PSN-Leerlauf nicht bis Spielzeit, Kaufliste,
 		// Einzeltrophaeen und Level.
@@ -2006,6 +2039,7 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 			env.DB.prepare("DELETE FROM psn_credentials"),
 			env.DB.prepare("UPDATE release SET store_geprueft_am = NULL"),
 			env.DB.prepare("UPDATE trophy_progress SET trophies_synced_at = NULL, trophies_synced_sum = NULL"),
+			env.DB.prepare("UPDATE trophy_progress SET release_id = ? WHERE np_communication_id = 'NPWR1'").bind(releaseVon(1)),
 		]);
 	});
 

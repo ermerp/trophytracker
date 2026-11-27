@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { alsDatum, anfrage, datumMitJahr } from './api'
-import type { BetriebAntwort } from './Offenes'
+import { ANKER_KAEUFE, type BetriebAntwort, type OffeneKaeufe } from './Offenes'
 import { ortsstunde, ortszeit } from './ortszeit'
+import { PlattformChip } from './SpielTeile'
 
 /**
  * Einstellungen: NPSSO hinterlegen und Sync auslösen.
@@ -484,6 +486,8 @@ export function Einstellungen() {
   const [markt, setMarkt] = useState<MarktStand | null>(null)
   const [store, setStore] = useState<StoreStand | null>(null)
   const [storeOffen, setStoreOffen] = useState<StoreOffen[] | null>(null)
+  const [kaeufe, setKaeufe] = useState<OffeneKaeufe | null>(null)
+  const { hash } = useLocation()
 
   const statusLaden = useCallback(async () => {
     const antwort = await fetch('/api/sync/status')
@@ -507,12 +511,27 @@ export function Einstellungen() {
     if (offen.ok) setStoreOffen(((await offen.json()) as { eintraege: StoreOffen[] }).eintraege)
   }, [])
 
+  const kaeufeLaden = useCallback(async () => {
+    const antwort = await fetch('/api/psn/kaeufe-offen')
+    if (antwort.ok) setKaeufe((await antwort.json()) as OffeneKaeufe)
+  }, [])
+
   useEffect(() => {
     void statusLaden()
     void trophaeenStandLaden()
     void marktStandLaden()
     void storeStandLaden()
-  }, [statusLaden, trophaeenStandLaden, marktStandLaden, storeStandLaden])
+    void kaeufeLaden()
+  }, [statusLaden, trophaeenStandLaden, marktStandLaden, storeStandLaden, kaeufeLaden])
+
+  // Die Glocke verlinkt auf die Liste der offenen Käufe (Stufe 18t). Der
+  // Router scrollt nicht von selbst zu einem Anker, und die Liste steht erst
+  // da, wenn sie geladen ist – deshalb hier, nach dem Laden.
+  useEffect(() => {
+    if (hash === `#${ANKER_KAEUFE}` && kaeufe && kaeufe.anzahl > 0) {
+      document.getElementById(ANKER_KAEUFE)?.scrollIntoView({ block: 'start' })
+    }
+  }, [hash, kaeufe])
 
   /**
    * Normalisierung erneut ausführen – ohne PSN-Zugriff.
@@ -603,6 +622,7 @@ export function Einstellungen() {
         if (!daten.weiter) break
       }
       await statusLaden()
+      await kaeufeLaden()
     } finally {
       setLaeuft(false)
     }
@@ -815,8 +835,25 @@ export function Einstellungen() {
       </button>
       <p className="zeile">
         Sonys Kaufliste sagt, was gekauft und was über PS Plus im Katalog ist. Sie läuft sonst einmal
-        wöchentlich mit; der Knopf holt sie sofort.
+        wöchentlich mit und zusätzlich in der Nacht, in der eine neue Trophäenliste ohne Spiel in der Sammlung
+        auftaucht; der Knopf holt sie sofort.
       </p>
+      {kaeufe !== null && kaeufe.anzahl > 0 && (
+        <>
+          <p className="zeile" id={ANKER_KAEUFE}>
+            <strong>{kaeufe.anzahl}</strong> {kaeufe.anzahl === 1 ? 'Kauf hat' : 'Käufe haben'} kein Spiel in der
+            Sammlung. Übernommen wird davon noch nichts – die Liste zeigt nur, was Sony als gekauft nennt.
+          </p>
+          <ul className="offene-kaeufe">
+            {kaeufe.eintraege.map((k, i) => (
+              <li key={`${k.titel}-${k.plattform}-${i}`}>
+                {k.titel} <PlattformChip plattform={k.plattform} />{' '}
+                <span className="still">seit {datumMitJahr(k.seit)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <h3>Gebrauchtpreise</h3>
       <p className="zeile">
         {markt === null
