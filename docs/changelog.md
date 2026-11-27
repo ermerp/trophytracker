@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 208 | 27.11.2026 | **Abschluss 27.11. (Abend):** nächster Schritt der finalen Stufe 1 (Import der neun Listen) in 16.4, zwei Lehren (Schwelle vor der Messung, Apostroph), Prozesse nach Name beenden (CLAUDE.md) |
 | 207 | 27.11.2026 | **Nachtrag f1d:** Der Hinweis am IGDB-Treffer nennt genau diesen Eintrag auf der Wunschliste und den Bestand der Sammlung je Plattform (Disc, gekauft, PS Plus, gespielt), ähnliche Wünsche nur noch anderer Einträge (8.2) |
 | 206 | 27.11.2026 | **Nachtrag f1c: ein Vorgang, eine Zeile.** Änderungen, Spielverlauf und Feed fassen Ereignisse desselben Spiels und derselben Quelle binnen einer Sekunde zu einer Zeile mit Zusatz zusammen; gespeichert bleibt jeder Schritt, das Keyset über die kleinste Id (8.5) |
 | 205 | 27.11.2026 | **Nachtrag f1b: Suche und Hinweise.** Die getippte IGDB-Suche findet Wortanfänge über den Slug („marvels wol", „silent hill town"), ähnliche offene Wünsche als Hinweis beim Hinzufügen und in der Import-Durchsicht, Cursor im Feld, das ein Tipp aufklappt (7.6, 8.2, 13.3) |
