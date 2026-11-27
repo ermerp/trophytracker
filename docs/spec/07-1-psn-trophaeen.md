@@ -56,8 +56,8 @@ Modell „kürzeste Lebensdauer" ist für ihn widerlegt, die Warnung steht seit 
 **Vermutung, nicht belegt:** Sonys Datum gilt für die ganze Kette, auch bei nächtlich rollendem
 Refresh-Token, und beim ersten Zugang endete etwas anderes vorzeitig (etwa die Web-Sitzung); der
 Nutzer erinnert sich an keinen Anlass. Scheitert der Sync in der Nacht zum 29.11., trägt sie. Läuft er
-weiter, ist sie **erst nach der Nacht zum 05.12.** widerlegt: Der Refresh-Token gilt bis 04.12. 00:00 UTC
-(unten). Die Warnung wird erst danach umgebaut (Entscheidung des
+weiter, ist sie **erst nach der Nacht zum 08.12.** widerlegt: Der Refresh-Token gilt bis 07.12. 00:55 UTC
+(unten), oder früher, wenn der Punkt nach dem 28.11. springt. Die Warnung wird erst danach umgebaut (Entscheidung des
 Nutzers vom 21.11.2026). Die Tabelle enthält ausschließlich Zeitpunkte und steht deshalb in
 `EXPORT_TABELLEN`; die Zeitreihe ist ihr ganzer Zweck und nach einem Verlust nicht
 wiederherstellbar.
@@ -118,8 +118,8 @@ war: `abgelaufen`. Ein Refresh-Token, das allein abgelegt wird, verwirft das ges
 Der normale Sync fasst das NPSSO damit gar nicht an – schonend gegenüber einer inoffiziellen
 Schnittstelle.
 
-**Der Refresh-Token hält zehn Tage, und eine Erneuerung in derselben Nacht verlängert ihn nicht** (Befund vom
-24.11.2026). In der Nacht zum 24.11. steht `access_expires_at` auf 01:55:46.419, erneuert wurde also
+**Der Refresh-Token hält zehn Tage ab einer Erneuerung, aber nicht jede setzt die Frist neu** (Befund vom
+24.11.2026, ergänzt am 27.11.). In der Nacht zum 24.11. steht `access_expires_at` auf 01:55:46.419, erneuert wurde also
 zuletzt gegen 00:55:46; `refresh_expires_at` aus derselben Anweisung ist der **04.12. 00:00:47.419**, zehn
 Tage nach dem **ersten** Aufruf der Nacht. Sonys `refresh_token_expires_in` zählte dort auf einen festen
 Punkt herunter.
@@ -141,10 +141,17 @@ Knopfläufe schreiben keine Cron-Zeile. Stirbt der Aufruf vor der Zeile, fehlt d
 **Nacht zum 25.11.:** beide Anmeldungen (00:00 und 00:55) `refresh`, kein Rückfall; der Punkt steht auf
 04.12. 00:00:47.918 (eine halbe Sekunde weiter). Wodurch er am 24.11. sprang, bleibt offen – 18q-c lief da noch nicht.
 
+**Nächte zum 26. und 27.11.:** alle vier Anmeldungen `refresh`, kein Rückfall – und am 27.11. um 13:13 UTC steht
+der Punkt auf **07.12. 00:55:45.822**, zehn Tage nach der **zweiten** Anmeldung der Nacht zum 27.11.
+(00:55). **Dieser Sprung kam also aus einer Erneuerung mit dem Refresh-Token**, nicht aus dem NPSSO: Sony
+gibt dabei manchmal eine neue Frist. Ob er schon am 26.11. einmal sprang, ist nicht zu sehen – die
+Datenbank hält nur den letzten Wert. Wann Sony die Frist neu setzt, bleibt offen.
+
 Praktische Folge für das NPSSO-Ende (28.11. 17:58 UTC): Bleibt der Punkt stehen, trägt der
-Refresh-Token bis zur Nacht zum 03.12.; am 04.12. läuft er fast auf die Sekunde mit dem ersten Aufruf ab.
-**Läuft der Sync weiter, entscheidet erst die Nacht zum 05.12.**, und jeder weitere Sprung vor dem 28.11.
-schiebt das hinaus. Ein Sprung nach dem 28.11. spräche gegen die NPSSO-Erklärung.
+Refresh-Token bis zur Nacht zum 07.12.; am 07.12. läuft er um 00:55 ab, nach dem ersten Aufruf.
+**Läuft der Sync weiter, entscheidet erst die Nacht zum 08.12.** (bis 25.11.: 05.12.). Ein Sprung nach dem
+28.11. spräche schon vorher gegen die NPSSO-Erklärung – seit dem 27.11. ist belegt, dass Sony die Frist
+beim Erneuern verschiebt, der Weg dazu braucht also kein NPSSO.
 Bleibt der Lauf länger als zehn Tage aus, fällt der nächste in jedem Fall auf
 Schritt 2 zurück.
 

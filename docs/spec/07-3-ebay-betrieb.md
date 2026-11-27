@@ -12,7 +12,7 @@ verschiebt den Start regelmäßig, und Haupt- und Rückfalllauf um denselben Bet
 20.10.2026 um 07:31 (5 h 14 min), am 21.10. um 07:37 (5 h 20 min), am 22.10. um 07:33 (5 h 16 min),
 am 23.10. um 07:30 (5 h 13 min), der Rückfall 08:17 am 21.10. und am 22.10. jeweils um 13:47
 (5 h 30 min); die Store-Action am Abend des 22.10. 2 h 49 und 2 h 11 (7.4); die Abendläufe 20:17 bis
-**6 h 38** ([16-2-naechte-3.md](16-2-naechte-3.md)). Am Nachmittag (24.11.) waren es 9 h 44. Der Rückfall fängt also
+**6 h 38** ([16-2-naechte-3.md](16-2-naechte-3.md)). Am Nachmittag (24. bis 26.11.) waren es 8 h 00 bis 9 h 44 ([16-2-naechte-4.md](16-2-naechte-4.md)). Der Rückfall fängt also
 keine Verspätung auf, nur einen ausgefallenen Lauf; wer einen Zeitplan setzt, rechnet mit dem
 verspäteten Start. Der Rückfall prüft dank der Frist nur, was der erste nicht geschafft hat; zwei
 Läufe zugleich stellt die `concurrency`-Gruppe hintereinander. Still gilt die Action wie der Store

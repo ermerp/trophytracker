@@ -1,4 +1,4 @@
-← [Inhaltsverzeichnis](README.md) · [16.2 CPU-Grenze](16-2-cpu-und-betrieb.md) · [Nächte bis 08.11.](16-2-naechte-2.md)
+← [Inhaltsverzeichnis](README.md) · [16.2 CPU-Grenze](16-2-cpu-und-betrieb.md) · [Nächte bis 08.11.](16-2-naechte-2.md) · [ab 26.11.](16-2-naechte-4.md)
 
 ## 16. Nachtmessungen ab dem 09.11.2026
 
