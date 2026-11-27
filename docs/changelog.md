@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 211 | 27.11.2026 | **Abschluss 27.11. (Nacht):** Wunschlisten-Import abgeschlossen (16.4), Blockübernahme zurückgestellt, 16.2 vom Worker-Takt auf das Zeitlimit der Action umgestellt, zwei Lehren (Gerät, Uhrzeit), Gerät eines Fehlers erfragen (CLAUDE.md) |
 | 210 | 27.11.2026 | **Nachtrag f1f: CPU der Import-Durchsicht.** Cloudflare brach am Abend die Seiten der Import-Durchsicht mit `exceededCpu` ab; die Wunschtitel werden jetzt einmal je Aufruf vorbereitet (`vorbereiteteWuensche`), `titelSchluessel` baut seine Ausdrücke nur noch einmal, der Abgleich fragt die Sammlung je Schritt in einer Abfrage; Blockübernahme zur Entscheidung offen (8.2, 16.4) |
 | 209 | 27.11.2026 | **Nachtrag f1e:** Rückmeldungen des Nutzers vom 27.11.2026 – der Klick nach dem Ziehen auf To-Do öffnet das Spiel nicht mehr (am PC gemeldet und mit der Maus belegt), Backlog-Kandidaten bekommen „Zustand …" (ohne Rückgängig, Entscheidung des Nutzers), eine Zeile nur aus einer Jahreszahl ist im Wunschlisten-Import Überschrift (5.4, 8.2) |
 | 208 | 27.11.2026 | **Abschluss 27.11. (Abend):** nächster Schritt der finalen Stufe 1 (Import der neun Listen) in 16.4, zwei Lehren (Schwelle vor der Messung, Apostroph), Prozesse nach Name beenden (CLAUDE.md) |

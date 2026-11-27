@@ -1039,3 +1039,21 @@ Wünschen: 467 ms je Seite vorher, 3 ms nach dem Vorbereiten. → Abgleiche bere
 **einmal** vor, nicht je Eingabe (CLAUDE.md, „CPU-Grenze respektieren") – und wer gegen einen
 wachsenden Bestand vergleicht, misst die Rechenzeit mit der Größe, die er erreichen wird,
 nicht mit der von heute.
+
+## Das Gerät, das ich annahm
+
+**27.11.2026 – Nachtrag f1e.** Der Nutzer meldete: Nach dem Verschieben in der To-Do-Liste
+öffnet sich das Spiel. Ich nahm das Handy an, weil die Erinnerung „Gerät des Nutzers" es
+nennt, und ließ den Fingerweg nachstellen: nicht nachstellbar; mit der Maus dagegen belegt.
+Der Bericht nannte den Fix deshalb „für das Handy eine Vermutung", und ich schlug vor, dass
+der Nutzer auf dem Handy prüft. Gemeldet war der Fehler am PC – genau der belegte Fall. →
+Bei einem gemeldeten Fehler wird das Gerät gefragt, nicht aus der Erinnerung ergänzt
+(CLAUDE.md, „Arbeitsweise").
+
+## Die Uhrzeit aus der Erinnerung
+
+**27.11.2026 – nach f1f.** Ich kündigte zweimal an, den Gebrauchtpreis-Lauf „um 22:17 UTC"
+zu lesen – die Zeit aus der Reihenfolge-Entscheidung vom 22.10. (20i-c), die 18r-b am
+23.11. auf 13:17 und 15:17 verlegt hat. Erst `markt.yml` zeigte es. → Wer einen Termin nennt,
+liest ihn aus der Quelle (Workflow, `wrangler.jsonc`), nicht aus einer Spezifikationszeile,
+die eine spätere Stufe überholt hat (CLAUDE.md, „Was berichtet … wird, kommt aus der Sache selbst").

@@ -113,23 +113,9 @@ offen bleibt.
 
 **Stufe b – ein Tipp, ein sauberes Release**, gebaut erst nach dieser Messung: Aus einem gemerkten Kauf entstehen Spiel, Release (Plattform von Sony), IGDB-Verknüpfung über die Concept-Id (`external_games`, Quelle 36; ohne Treffer die Auswahl wie in der IGDB-Zuordnung), `psn_product_id` und die Berechtigung `kauf`; eine wartende Trophäenliste mit gleichem Titelschlüssel wird angehängt. **Nach einem Tipp, nicht automatisch** (Entscheidung vom 27.11.2026). Dazu nimmt das Übernehmen in der Zuordnung (Trophäenliste ohne Kauf) den IGDB-Abgleich für dieses eine Spiel gleich mit. Physisch bleibt der Barcode. Erster echter Fall: Grand Theft Auto VI – der Nutzer löscht das am 27.11. von Hand zugeordnete Spiel und schickt es durch den neuen Weg.
 
-#### Offen, bevor der grosse Wunschlisten-Import kommt
+#### Nach dem grossen Wunschlisten-Import
 
-**Die Zahlen dieses Abschnitts stammen von vor 20i:** Der Markt läuft seit dem 20.10.2026 als
-Action und belegt keine Wartungsaufrufe mehr; am 04.11. waren es 431 Releases in 87 Portionen und
-529 s. Die Decke ist für den neuen Weg nicht gemessen. Vor dem Import neu zu messen.
-
-**Die Fensterkapazität entscheidet, ob der tägliche Takt überlebt** – und damit, ob 20f
-weiter Punkte bekommt und 20g weiter melden kann. Gemessen am 09.10.2026: Der
-Gebrauchtpreis-Schritt belegt **24 von 36** Aufrufen der Wartung und endet neun Minuten vor
-Fensterschluss ([10.1](10-1-cron.md)). Die Decke des täglichen Takts liegt bei **520 bis 660
-Releases**; im Zuschnitt sind **431**.
-
-Die **neun noch nicht importierten Wunschlisten** der finalen Stufe 1 brauchen diese Luft
-auf – heute stammen 57 offene Wünsche aus drei Listen. **Zu entscheiden, bevor importiert
-wird:** ob der Takt täglich bleibt (dann muss der Zuschnitt enger werden oder ein weiteres
-Cron-Fenster dazu), oder ob er auf zwei Tage geht (dann halbiert sich die Punktdichte, die
-20f und 20g tragen). Vorher ist jede Antwort eine Schätzung auf unvollständigem Bestand.
+Der Import ist am **27.11.2026** abgeschlossen (16.4). Die Frage, ob der tägliche Takt der Gebrauchtpreise den grösseren Bestand trägt, stellt sich seit 20i nicht mehr an den Wartungsaufrufen, sondern am Zeitlimit der Action von 30 Minuten (04.11.: 431 Releases in 87 Portionen, 529 s; 26.11.: 487 s); die alte Decke von 520 bis 660 Releases (09.10.2026, 24 von 36 Wartungsaufrufen, Ende neun Minuten vor Fensterschluss; vor dem Import 57 offene Wünsche aus drei Listen) gilt für den Worker-Weg und ist überholt. **Gemessen wird am Lauf vom 28.11.2026, 13:17 UTC** – erst danach ist zu entscheiden, ob Zuschnitt oder Takt sich ändern müssen.
 
 **Ungeklärt, als Befund notiert:** `rows_read_24h` stand am 09.10.2026 bei **1 212 977**.
 Über einer Million ohne Import heisst laut CLAUDE.md „stimmt etwas nicht". Der gerechnete
