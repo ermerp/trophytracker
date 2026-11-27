@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { anfrage, type BacklogKandidat } from './api'
+import { anfrage, STATUSTEXT, type BacklogKandidat, type PlayStatus } from './api'
 import { Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
 import { useAnsicht } from './Ansicht'
 import { Chips } from './Chips'
 import { Sortierleiste } from './Sortierung'
 import { Kopfzeile } from './Kopfzeile'
 import { Zeichen } from './Symbole'
+import { ZustandTafel } from './spieldetail/ZustandTafel'
 import { TODO_REITER } from './Todo'
 
 /**
@@ -19,12 +20,25 @@ import { TODO_REITER } from './Todo'
  * Backlog-Eintrag (Migration 0014) – die Ablehnung bleibt gespeichert, die
  * View blendet den Kandidaten aus; „entfernen" unter „auch erledigte und
  * verworfene" macht ihn wieder zum Kandidaten.
+ *
+ * „Zustand …" (Nachtrag f1e, Wunsch des Nutzers vom 27.11.2026: „den Status
+ * bei den Backlog-Kandidaten ändern können, damit sie verschwinden") öffnet
+ * dieselbe Tafel wie das Spieldetail und schreibt über PATCH play-status:
+ * nur der Status, Datum, Bewertung und Notiz bleiben – PUT löschte sie. Die
+ * Kopplung zieht die Liste nach (5.5); jeder Zustand außer „nicht gespielt"
+ * nimmt den Titel aus den Kandidaten. Ein Rückgängig gibt es dafür nicht
+ * (offen, 5.4: der Schreibweg stempelt die Durchsicht und legt eine Zeile an, die
+ * kein bestehender Weg wieder entfernt).
  */
 export function Backlog() {
   const liste = usePlanListe('backlog')
   const { daten, laeuft, nurFavoriten, plattformen, suche, aendern, alle, setzeParam, sortierung, richtung, setzeSortierung } = liste
   const ansicht = useAnsicht('backlog')
   const [kandidaten, setKandidaten] = useState<{ kandidaten: BacklogKandidat[]; abgelehnt: number } | null>(null)
+  /** Der Kandidat, dessen Zustandstafel offen ist. */
+  const [zustandFuer, setZustandFuer] = useState<number | null>(null)
+  const [gesetzt, setGesetzt] = useState<string | null>(null)
+  const tafelSchliessen = useCallback(() => setZustandFuer(null), [])
 
   const kandidatenLaden = useCallback(async () => {
     try {
@@ -39,7 +53,25 @@ export function Backlog() {
   }, [kandidatenLaden])
 
   async function uebernehmen(k: BacklogKandidat, koerper: Record<string, unknown>) {
+    setGesetzt(null)
     if (await liste.anlegen({ releaseId: k.releaseId, ...koerper })) await kandidatenLaden()
+  }
+
+  /** Zustand eines Kandidaten setzen; „nicht gespielt" ist sein Stand schon und schreibt nichts. */
+  async function zustandSetzen(k: BacklogKandidat, status: PlayStatus) {
+    setZustandFuer(null)
+    if (status === 'nicht_gespielt') return
+    liste.setMeldung(null)
+    liste.setLaeuft(true)
+    try {
+      await anfrage(`/api/releases/${k.releaseId}/play-status`, { methode: 'PATCH', koerper: { status } })
+      setGesetzt(`„${k.titel}" (${k.plattform}): ${STATUSTEXT[status]}.`)
+      await Promise.all([liste.laden(), kandidatenLaden()])
+    } catch (f) {
+      liste.setMeldung(f instanceof Error ? f.message : 'Zustand setzen fehlgeschlagen.')
+    } finally {
+      liste.setLaeuft(false)
+    }
   }
 
   /** Rückgängig bringt den Kandidaten zurück – auch nach der Ablehnung. */
@@ -70,6 +102,7 @@ export function Backlog() {
       <p className="ruhig klein">Pausiert oder nie gestartet. „auf To-Do" zieht einen Eintrag ans Ende der To-Do-Liste und setzt „am Spielen".</p>
 
       <Meldungen liste={{ ...liste, rueckgaengig }} />
+      {gesetzt && <p role="status" className="hinweis">{gesetzt}</p>}
 
       {!daten ? (
         <p className="ruhig">wird geladen …</p>
@@ -137,7 +170,19 @@ export function Backlog() {
                   <button type="button" className="klein" disabled={laeuft} onClick={() => uebernehmen(k, { art: 'backlog' })}>ins Backlog</button>
                   <button type="button" className="klein" disabled={laeuft} onClick={() => uebernehmen(k, { art: 'todo' })}>auf To-Do</button>
                   <button type="button" className="klein" disabled={laeuft} onClick={() => uebernehmen(k, { art: 'backlog', status: 'verworfen' })}>nicht vorgesehen</button>
+                  <button
+                    type="button"
+                    className="klein"
+                    disabled={laeuft}
+                    aria-expanded={zustandFuer === k.releaseId}
+                    onClick={() => setZustandFuer(zustandFuer === k.releaseId ? null : k.releaseId)}
+                  >
+                    Zustand …
+                  </button>
                 </div>
+                {zustandFuer === k.releaseId && (
+                  <ZustandTafel aktuell="nicht_gespielt" laeuft={laeuft} schliessen={tafelSchliessen} onWaehlen={(s) => void zustandSetzen(k, s)} />
+                )}
               </li>
             ))}
           </ul>

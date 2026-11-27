@@ -49,6 +49,15 @@ const AUFZAEHLUNG = /^(?:[-*•–]\s+|\d{1,2}[.)]\s+)/;
 
 const TABELLENKOPF = /^datum\ttitel\tplattform/i;
 
+/**
+ * Eine Zeile nur aus einer Jahreszahl ("2019", auch "- 2019") ist eine
+ * Ueberschrift, kein Wunsch (Nachtrag f1e, Rueckmeldung des Nutzers vom
+ * 27.11.2026: eine Jahresliste begann mit ihrem Jahr). Sie aendert weder Form
+ * noch Monat noch Jahr - das Jahr kommt aus dem Dateinamen und bleibt
+ * korrigierbar. Titel mit Zahl und mehr Text ("1979 Revolution") bleiben Titel.
+ */
+const JAHRESZEILE = /^-?\s*(?:[-*•–]\s+|\d{1,2}[.)]\s+)?(?:19|20)\d{2}$/;
+
 function levenshtein(a: string, b: string): number {
 	const zeile = Array.from({ length: b.length + 1 }, (_, i) => i);
 	for (let i = 1; i <= a.length; i++) {
@@ -178,6 +187,11 @@ export function parseWunschliste(text: string, optionen: { jahr?: number | null 
 
 	for (const zeile of roh) {
 		const z = zeile.trim();
+		// Vor der Monatszeile: "-2019" waere dort eine Ueberschrift ohne Monat und setzte den Monat zurueck.
+		if (JAHRESZEILE.test(z)) {
+			ueberschriften.push(z);
+			continue;
+		}
 		const monatsUeberschrift = alsMonatsueberschrift(z);
 		if (monatsUeberschrift) {
 			form = form === "einfach" ? "jahresliste" : form;

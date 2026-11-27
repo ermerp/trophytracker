@@ -414,3 +414,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 27.11.2026 | **Ähnliche Wünsche nur als Hinweis**, beim Hinzufügen und in der Import-Durchsicht – keine Sperre | [8.2](spec/08-2-wunschlisten-import.md) |
 | 27.11.2026 | **Der Cursor steht im Feld, das ein Tipp aufklappt**, überall; nicht in Feldern, die von selbst offen stehen | [13.3](spec/13-3-bedienung.md) |
 | 27.11.2026 | **Ein Vorgang, eine Zeile** in Änderungen, Spielverlauf und Feed – als Zeile mit Zusatz, nicht aufklappbar | [8.5](spec/08-5-aenderungsprotokoll.md) |
+| 27.11.2026 | „Zustand …" an den Backlog-Kandidaten **zunächst ohne Rückgängig**; ein vollständiges käme als eigener Nachtrag | [5.4](spec/05-4-todo-und-kopplung.md) |

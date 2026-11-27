@@ -74,6 +74,37 @@ describe("parseWunschliste - Tabelle", () => {
 	});
 });
 
+describe("parseWunschliste - Jahreszeile (Nachtrag f1e)", () => {
+	it("liest eine Jahreszahl am Anfang als Ueberschrift, nicht als Wunsch", () => {
+		const e = parseWunschliste("\uFEFF2019\r\nErstes Spiel\r\nZweites Spiel\r\n", { jahr: 2019 });
+		expect(e.zeilen.map((z) => z.titel)).toEqual(["Erstes Spiel", "Zweites Spiel"]);
+		expect(e.ueberschriften).toEqual(["2019"]);
+		expect(e.form).toBe("einfach");
+		expect(e.zeilen[0].listedAt).toBe("2019");
+	});
+
+	it("aendert weder Monat noch Jahr der Liste", () => {
+		// "-2020" waere ohne die Regel eine Monatsueberschrift ohne Monat und setzte den Monat zurueck.
+		const e = parseWunschliste("-März\nErstes Spiel\n-2020\nZweites Spiel\n", { jahr: 2019 });
+		expect(e.zeilen.map((z) => [z.titel, z.listedAt])).toEqual([
+			["Erstes Spiel", "2019-03"],
+			["Zweites Spiel", "2019-03"],
+		]);
+		expect(e.ueberschriften).toEqual(["-März", "-2020"]);
+	});
+
+	it("laesst Titel mit Jahreszahl und mehr Text als Titel stehen", () => {
+		const e = parseWunschliste("2064: Read Only Memories\n1979 Revolution\nAnno 1800\n");
+		expect(e.zeilen.map((z) => z.titel)).toEqual(["2064: Read Only Memories", "1979 Revolution", "Anno 1800"]);
+		expect(e.ueberschriften).toEqual([]);
+	});
+
+	it("nimmt nur vierstellige Jahre 19xx und 20xx", () => {
+		const e = parseWunschliste("1899\n2112\n");
+		expect(e.zeilen.map((z) => z.titel)).toEqual(["1899", "2112"]);
+	});
+});
+
 describe("parseWunschliste - einfache Liste und Doppelungen", () => {
 	it("entfernt Aufzaehlungszeichen und Leerzeilen", () => {
 		const e = parseWunschliste("* Eins\n\n1. Zwei\n• Drei™\n   \n");

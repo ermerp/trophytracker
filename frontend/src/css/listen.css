@@ -73,6 +73,14 @@
   margin: 0;
 }
 
+/* Die Zustandstafel (Nachtrag f1e) unter der ganzen Zeile. `div.` haelt die
+   Spezifitaet der Textspalte darueber, sonst bekaeme die Tafel deren flex. */
+.kandidatenliste > li > div.wahltafel {
+  flex: 1 1 100%;
+  min-width: 0;
+  margin-top: 0;
+}
+
 
 /* ===========================================================================
    Preisliste (Nachtrag f2e): Wunschliste, Kaufliste und Luecken in Zeilen,
