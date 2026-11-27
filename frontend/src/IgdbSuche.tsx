@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PLATTFORMEN, aehnlichText, anfrage, datum, igdbLink, neuestePlattform, type IgdbKandidat } from './api'
+import { PLATTFORMEN, aehnlichText, anfrage, datum, igdbLink, neuestePlattform, standText, type IgdbKandidat } from './api'
 
 /**
  * IGDB-Suche und Trefferliste (Abschnitt 7.6).
@@ -78,6 +78,9 @@ export function KandidatenListe({
                 {k.plattformen.length > 0 && ` · ${k.plattformen.join(', ')}`}
                 {k.spieler && ` · Wertung ${k.spieler.wert}`}
               </span>
+              {standText(k).map((t) => (
+                <span key={t} className="aehnlich-hinweis">{t}</span>
+              ))}
               {k.aehnlich && k.aehnlich.length > 0 && (
                 <span className="aehnlich-hinweis">Ähnlich auf der Wunschliste: {aehnlichText(k.aehnlich)}</span>
               )}

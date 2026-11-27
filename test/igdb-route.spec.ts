@@ -564,6 +564,22 @@ describe("Routen", () => {
 		expect(body.treffer.map((t: { name: string }) => t.name)).toEqual(["Bloodborne"]);
 	});
 
+	it("GET /api/igdb/search nennt mit wunsch=1, was von genau diesem Eintrag schon da ist (f1d)", async () => {
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title, igdb_id) VALUES (1, 'Bloodborne', 'bloodborne', 1001)").run();
+		await env.DB.prepare("INSERT INTO release (id, game_id, platform) VALUES (11, 1, 'PS4'), (12, 1, 'PS5')").run();
+		await env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (11)").run();
+		await env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('wunsch', 12, 'manuell')").run();
+		const a = app(fakeIgdb([[spielRoh()]]).client);
+		const { body } = await json(await a.request("/api/igdb/search?q=bloodborne&wunsch=1", {}, env));
+		expect(body.treffer[0]).toMatchObject({
+			inSammlung: [{ plattform: "PS4", art: "Disc" }],
+			aufWunschliste: [{ plattform: "PS5" }],
+			// Der eigene Wunsch ist kein "aehnlicher".
+			aehnlich: [],
+		});
+		await env.DB.batch([env.DB.prepare("DELETE FROM plan_entry"), env.DB.prepare("DELETE FROM physical_copy")]);
+	});
+
 	it("GET /api/igdb/search nennt mit wunsch=1 die aehnlichen offenen Wuensche (f1b)", async () => {
 		await spiel(1, "Bloodborne: Game of the Year Edition", "bloodborne", ["PS4"]);
 		const r = await env.DB.prepare("SELECT id FROM release WHERE game_id = 1").first<{ id: number }>();

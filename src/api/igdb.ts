@@ -4,7 +4,7 @@ import type { KandidatZeile } from "../db/igdb";
 import type { PlanArt } from "../db/plan";
 import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, suchWoerter, type IgdbKandidat } from "../domain/igdb";
 import { istErlaubtePlattform, plattformenAus, titelSchluessel } from "../domain/titel";
-import { aehnlicheWuensche } from "../domain/wunschliste";
+import { trefferStand } from "../domain/wunschliste";
 import { IgdbKonfigError } from "../igdb/client";
 import { AUFFRISCHEN_JE_AUFRUF, igdbAbgleichSchritt, igdbAuffrischSchritt, igdbPhysischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
 import { KeinePlattformError, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
@@ -117,15 +117,14 @@ export const igdbRoutes = new Hono<AppEnv>()
 				}
 			}
 			const treffer = ordneKandidaten(schluessel, plattformen, kandidaten);
-			// Nachtrag f1b: mit `wunsch=1` je Treffer die aehnlichen offenen Wuensche.
-			const wuensche = c.req.query("wunsch") === "1" ? await c.var.repos.plan.offeneWunschtitel() : [];
-			return c.json({
-				treffer: treffer.map((k) => ({
-					...kandidatAntwort(k),
-					...(c.req.query("wunsch") === "1" ? { aehnlich: aehnlicheWuensche(k.name, wuensche) } : {}),
-				})),
-				weg,
-			});
+			// Nachtrag f1b/f1d: mit `wunsch=1` je Treffer, was schon da ist - genau
+			// dieser Eintrag als Wunsch, in der Sammlung, aehnliche Wuensche.
+			if (c.req.query("wunsch") !== "1") return c.json({ treffer: treffer.map(kandidatAntwort), weg });
+			const [wuensche, bestand] = await Promise.all([
+				c.var.repos.plan.offeneWunschtitel(),
+				c.var.repos.ownership.bestandNachIgdb(treffer.map((k) => k.igdbId)),
+			]);
+			return c.json({ treffer: treffer.map((k) => ({ ...kandidatAntwort(k), ...trefferStand(k, wuensche, bestand) })), weg });
 		} catch (fehler) {
 			return c.json({ fehler: meldungFuer(fehler) }, 502);
 		}

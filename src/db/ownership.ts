@@ -64,6 +64,22 @@ export const IM_BESITZ_SQL =
 	"SELECT EXISTS (SELECT 1 FROM physical_copy WHERE release_id = ?1) " +
 	"+ EXISTS (SELECT 1 FROM digital_entitlement WHERE release_id = ?1 AND source = 'kauf') AS n";
 
+/**
+ * Was die Sammlung zu bis zu 90 IGDB-Eintraegen schon hat (Nachtrag f1d): je
+ * Release Disc, Kauf, PS Plus und Trophaeenliste. Ueber idx_game_igdb und die
+ * release_id-Indizes der vier Tabellen; ein Bind je Id - D1 erlaubt 100 je Statement.
+ * Exportiert, damit `test/lesekosten.spec.ts` genau diese Abfrage misst.
+ */
+export const bestandNachIgdbSql = (n: number) =>
+	"SELECT g.igdb_id, r.platform, " +
+	"EXISTS (SELECT 1 FROM physical_copy p WHERE p.release_id = r.id) AS disc, " +
+	"EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'kauf') AS kauf, " +
+	"EXISTS (SELECT 1 FROM digital_entitlement d WHERE d.release_id = r.id AND d.source = 'plus') AS plus, " +
+	"EXISTS (SELECT 1 FROM trophy_progress t WHERE t.release_id = r.id) AS gespielt " +
+	`FROM game g JOIN release r ON r.game_id = g.id WHERE g.igdb_id IN (${Array.from({ length: n }, () => "?").join(",")})`;
+
+export type BestandZeile = { igdb_id: number; platform: string; disc: number; kauf: number; plus: number; gespielt: number };
+
 export class OwnershipRepository {
 	constructor(
 		private readonly db: D1Database,
@@ -113,6 +129,13 @@ export class OwnershipRepository {
 			.bind(releaseId)
 			.first<{ n: number }>();
 		return (r?.n ?? 0) > 0;
+	}
+
+	async bestandNachIgdb(igdbIds: readonly number[]): Promise<BestandZeile[]> {
+		const ids = [...new Set(igdbIds)].slice(0, 90);
+		if (ids.length === 0) return [];
+		const { results } = await this.db.prepare(bestandNachIgdbSql(ids.length)).bind(...ids).all<BestandZeile>();
+		return results;
 	}
 
 	/** Exemplare und Berechtigungen aller Releases eines Spiels. */

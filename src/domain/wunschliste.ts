@@ -276,3 +276,40 @@ export function aehnlicheWuensche(
 		.filter((w) => w.id !== ausser && w.titel !== null && aehnlicherTitel(titel, w.titel))
 		.map((w) => ({ titel: w.titel as string, plattform: w.plattform }));
 }
+
+/** Was die Sammlung an einem Release schon hat, das Staerkste zuerst (Nachtrag f1d). */
+export type SammlungsArt = "Disc" | "gekauft" | "PS Plus" | "gespielt";
+
+/**
+ * Was ein IGDB-Treffer beim Wunsch hinzufuegen schon mitbringt (Nachtrag f1d,
+ * Wunsch des Nutzers vom 27.11.2026): **genau** dieser Eintrag als offener
+ * Wunsch, in der Sammlung (Disc, Kauf, PS Plus, gespielte Trophaeenliste - je
+ * Plattform das Staerkste), und erst danach aehnliche Wuensche anderer
+ * Eintraege. Nur Hinweise, keine Sperre.
+ */
+export function trefferStand(
+	treffer: { igdbId: number; name: string },
+	wuensche: ReadonlyArray<{ id: number; titel: string | null; plattform: string | null; igdb_id: number | null }>,
+	bestand: ReadonlyArray<{ igdb_id: number; platform: string; disc: number; kauf: number; plus: number; gespielt: number }>,
+): {
+	aufWunschliste: Array<{ plattform: string | null }>;
+	inSammlung: Array<{ plattform: string; art: SammlungsArt }>;
+	aehnlich: Array<{ titel: string; plattform: string | null }>;
+} {
+	const genau = wuensche.filter((w) => w.igdb_id === treffer.igdbId);
+	const inSammlung = bestand
+		.filter((b) => b.igdb_id === treffer.igdbId)
+		.map((b) => {
+			const art: SammlungsArt | null = b.disc ? "Disc" : b.kauf ? "gekauft" : b.plus ? "PS Plus" : b.gespielt ? "gespielt" : null;
+			return art === null ? null : { plattform: b.platform, art };
+		})
+		.filter((x): x is { plattform: string; art: SammlungsArt } => x !== null);
+	return {
+		aufWunschliste: genau.map((w) => ({ plattform: w.plattform })),
+		inSammlung,
+		aehnlich: aehnlicheWuensche(
+			treffer.name,
+			wuensche.filter((w) => w.igdb_id !== treffer.igdbId),
+		),
+	};
+}
