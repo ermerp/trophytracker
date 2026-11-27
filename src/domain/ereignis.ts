@@ -275,11 +275,13 @@ export function beschreibeEreignis(e: Ereignis): string {
 /**
  * Wie weit zwei Ereignisse eines Vorgangs auseinanderliegen duerfen. Ein
  * Vorgang - etwa "Wunsch hinzufuegen" mit einem IGDB-Treffer - schreibt in
- * einem Aufruf, also in derselben Sekunde oder knapp darueber. Zuerst waren
- * es zehn Sekunden; beim Ansehen am 27.11.2026 verschluckte das ein
- * "Rueckgaengig" im Vorgang davor - ein eigener Handgriff, Sekunden spaeter.
+ * einem Aufruf. Gemessen am 27.11.2026 an den letzten 200 Ereignissen des
+ * Nutzers: von 109 benachbarten Paaren desselben Spiels 85 in derselben
+ * Sekunde, 6 eine Sekunde auseinander; ab zwei Sekunden einzelne Handgriffe.
+ * Zehn Sekunden, der erste Entwurf, verschluckten ein "Rueckgaengig" im
+ * Vorgang davor.
  */
-export const BUENDEL_SEKUNDEN = 3;
+export const BUENDEL_SEKUNDEN = 1;
 
 const sekunden = (zeitpunkt: string): number => Date.parse(`${zeitpunkt.replace(" ", "T")}Z`) / 1000;
 
@@ -303,26 +305,22 @@ export function buendele(ereignisse: readonly Ereignis[]): Ereignis[][] {
 	const buendel: Ereignis[][] = [];
 	for (const e of ereignisse) {
 		const letztes = buendel.at(-1);
-		if (letztes && gehoertDazu(letztes[letztes.length - 1], e) && !wiederholt(letztes, e)) letztes.push(e);
+		if (letztes && gehoertDazu(letztes[letztes.length - 1], e)) letztes.push(e);
 		else buendel.push([e]);
 	}
 	return buendel;
 }
 
-/**
- * Kommt dieselbe Art mit demselben Feld im Buendel schon vor, beginnt ein
- * neuer Vorgang: Ein Aufruf erfasst eine Disc einmal, setzt einen Wunsch
- * einmal. Zwei "Disc erfasst" hintereinander sind zwei Handgriffe.
- */
-function wiederholt(buendel: readonly Ereignis[], e: Ereignis): boolean {
-	return buendel.some((x) => x.kind === e.kind && x.field === e.field);
-}
 
 /** Was die Zeile traegt, wenn mehrere Schritte zusammenkommen: das Erfassen und die Listen zuerst. */
 const VORRANG: readonly EreignisArt[] = [
 	"exemplar_angelegt",
 	"berechtigung_angelegt",
+	// Ein Rueckgaengig entfernt die Disc und oeffnet die Listen wieder - die Zeile traegt "Disc entfernt".
+	"exemplar_geloescht",
+	"berechtigung_geloescht",
 	"liste_eintrag_angelegt",
+	"liste_eintrag_geloescht",
 	"status_geaendert",
 	"bewertung_geaendert",
 ];

@@ -272,7 +272,7 @@ describe("Buendel (Nachtrag f1c)", () => {
 		expect(seite.ereignisse[0].titel).toContain("(");
 	});
 
-	it("trennt verschiedene Quellen und Abstaende ueber drei Sekunden", async () => {
+	it("trennt verschiedene Quellen und Abstaende ueber einer Sekunde", async () => {
 		await release(1, 45);
 		await repos().playStatus.vorbelegen();
 		await repos().playStatus.statusSetzen(1, "pausiert");
@@ -282,7 +282,7 @@ describe("Buendel (Nachtrag f1c)", () => {
 		await repos().playStatus.statusSetzen(1, "durchgespielt");
 		const ids = (await env.DB.prepare("SELECT id FROM game_event WHERE source = 'nutzer' ORDER BY id").all<{ id: number }>()).results.map((x) => x.id);
 		await zeit(ids[0], 0);
-		await zeit(ids[1], 4);
+		await zeit(ids[1], 2);
 		const getrennt = (await (await SELF.fetch(`${B}/api/events?quelle=nutzer`)).json()) as typeof alle;
 		expect(getrennt.ereignisse.map((e) => e.anzahl)).toEqual([1, 1]);
 	});

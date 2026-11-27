@@ -34,16 +34,18 @@ describe("buendele", () => {
 		expect(buendele([e({ game_id: null }), e({ game_id: null })]).map((x) => x.length)).toEqual([1, 1]);
 	});
 
-	it("laesst drei Sekunden zu, vier nicht - ein Rueckgaengig ist ein eigener Handgriff", () => {
-		expect(buendele([e({ kind: "igdb_verknuepft", occurred_at: "2026-11-27 10:00:03" }), e({ occurred_at: "2026-11-27 10:00:00" })])).toHaveLength(1);
-		expect(buendele([e({ kind: "igdb_verknuepft", occurred_at: "2026-11-27 10:00:04" }), e({ occurred_at: "2026-11-27 10:00:00" })])).toHaveLength(2);
+	it("laesst eine Sekunde zu, zwei nicht - ein Rueckgaengig ist ein eigener Handgriff", () => {
+		expect(buendele([e({ kind: "igdb_verknuepft", occurred_at: "2026-11-27 10:00:01" }), e({ occurred_at: "2026-11-27 10:00:00" })])).toHaveLength(1);
+		expect(buendele([e({ kind: "igdb_verknuepft", occurred_at: "2026-11-27 10:00:02" }), e({ occurred_at: "2026-11-27 10:00:00" })])).toHaveLength(2);
 	});
 
-	it("beginnt einen neuen Vorgang, wenn dieselbe Art mit demselben Feld wiederkommt", () => {
-		const b = buendele([e({ kind: "exemplar_angelegt" }), e({ kind: "exemplar_geloescht" }), e({ kind: "exemplar_angelegt" })]);
-		expect(b.map((x) => x.map((y) => y.kind))).toEqual([["exemplar_angelegt", "exemplar_geloescht"], ["exemplar_angelegt"]]);
-		// Verschiedene Felder derselben Art gehoeren zusammen: Wunsch und Kauf erledigt.
-		expect(buendele([e({ kind: "liste_eintrag_erledigt", field: "wunsch" }), e({ kind: "liste_eintrag_erledigt", field: "kauf" })])).toHaveLength(1);
+	it("haelt gleiche Schritte eines Aufrufs zusammen - Rueckgaengig oeffnet Wunsch und Kauf", () => {
+		const b = buendele([
+			e({ kind: "liste_eintrag_geaendert", field: "status" }),
+			e({ kind: "liste_eintrag_geaendert", field: "status" }),
+			e({ kind: "exemplar_geloescht" }),
+		]);
+		expect(b).toHaveLength(1);
 	});
 });
 
@@ -64,6 +66,12 @@ describe("beschreibeBuendel", () => {
 		expect(b.titel).toBe("Glutmark (PS5)");
 		expect(b.text).toBe("Release angelegt: PS5");
 		expect(b.zusatz).toBe("mit IGDB verknüpft");
+	});
+
+	it("traegt bei einem Rueckgaengig das Entfernen, nicht das Wiederoeffnen", () => {
+		const b = beschreibeBuendel([e({ kind: "liste_eintrag_geaendert", field: "status", old_value: "erledigt", new_value: "offen" }), e({ kind: "exemplar_geloescht" })]);
+		expect(b.text).toBe("Disc entfernt");
+		expect(b.zusatz).toBe("Listeneintrag: erledigt → offen");
 	});
 
 	it("wiederholt den Hauptsatz nicht im Zusatz", () => {
