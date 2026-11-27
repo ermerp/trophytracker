@@ -1024,3 +1024,18 @@ zufällig einen Rückfall aus, der bei „silent hill: town" Silent Hill 2 und 3
 denselben Rückfall war vermutlich die Deluxe Edition statt des Hauptspiels auf die Wunschliste
 gekommen. → Ein gemeldeter Fehler wird erst belegt, dann behoben (CLAUDE.md) – mit der Eingabe,
 die tatsächlich ankam, nicht mit der, die man vermutet.
+
+## Der Vergleich, der mit dem Bestand wuchs
+
+**27.11.2026 – Nachtrag f1f.** f1b und f1d bauten den Hinweis auf ähnliche
+Wünsche: je Zeile der Import-Durchsicht bis zu drei Namen gegen **alle** offenen Wünsche, und
+jeder Vergleich normalisierte beide Titel neu – bei 20 Zeilen und 300 Wünschen rund 36 000
+`titelSchluessel` je Seite. Gemessen wurde nur das Lesen der Wunschtitel (drei Zeilen je
+Wunsch), nicht die Rechenzeit; deployt wurde bei 57 offenen Wünschen. Am selben Abend
+importierte der Nutzer seine Listen, der Bestand stieg auf 298: Die Seite brauchte von
+19:35 bis 21:35 UTC im Median 12 ms CPU, höchstens 199, 286 von 541 Aufrufen lagen über
+10 ms, ab 21:31 brach Cloudflare fast jeden mit `exceededCpu` ab. Lokal mit 600 erfundenen
+Wünschen: 467 ms je Seite vorher, 3 ms nach dem Vorbereiten. → Abgleiche bereiten den Bestand
+**einmal** vor, nicht je Eingabe (CLAUDE.md, „CPU-Grenze respektieren") – und wer gegen einen
+wachsenden Bestand vergleicht, misst die Rechenzeit mit der Größe, die er erreichen wird,
+nicht mit der von heute.

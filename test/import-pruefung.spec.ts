@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { plattformZurListe } from "../src/domain/titel";
-import { aehnlicherTitel, aehnlicheWuensche, jahrWeichtAb, trefferStand } from "../src/domain/wunschliste";
+import { aehnlicherTitel, aehnlicheWuensche, jahrWeichtAb, trefferStand, vorbereiteteWuensche } from "../src/domain/wunschliste";
 import { standText } from "../frontend/src/trefferstand";
 import { suchWoerter } from "../src/domain/igdb";
 import { plattformZurListe as plattformZurListeFrontend } from "../frontend/src/plattformwahl";
@@ -121,6 +121,49 @@ describe("aehnlicheWuensche (f1b)", () => {
 
 	it("laesst den eigenen Wunsch weg", () => {
 		expect(aehnlicheWuensche("Marvel's Wolverine", wuensche, 3)).toEqual([{ titel: "Marvel's Wolverine: Digital Deluxe Edition", plattform: "PS5" }]);
+	});
+});
+
+describe("vorbereiteteWuensche (f1f)", () => {
+	// Erfundene Titel, die sich im ersten Wort beruehren, trennen oder leer sind.
+	const wuensche = [
+		{ id: 1, titel: "Ember Tide: Deluxe Edition", plattform: "PS5", igdb_id: 11 },
+		{ id: 2, titel: "Ember Tide 2", plattform: "PS5", igdb_id: 12 },
+		{ id: 3, titel: null, plattform: "PS4", igdb_id: 13 },
+		{ id: 4, titel: "The Ember Tide", plattform: "PS4", igdb_id: null },
+		{ id: 5, titel: "Ember", plattform: null, igdb_id: 15 },
+		{ id: 6, titel: "Ember Tide Remastered", plattform: "PS4", igdb_id: 16 },
+		{ id: 7, titel: "Emberfall", plattform: "PS3", igdb_id: 17 },
+		{ id: 8, titel: "王と魔王", plattform: "PSVITA", igdb_id: 18 },
+		{ id: 9, titel: "Ember Tide", plattform: "PS3", igdb_id: 19 },
+	];
+	const namen = ["Ember Tide", "ember", "The Ember Tide Remastered", "Emberfall", "王と魔王", "Tide", "", "Ember Tide II"];
+
+	it("findet je Name genau, was der Vergleich mit jedem einzelnen Wunsch findet - in derselben Reihenfolge", () => {
+		// Die Gruppen nach erstem Wort duerfen keinen Treffer verlieren.
+		const v = vorbereiteteWuensche(wuensche);
+		for (const name of namen) {
+			for (const ausser of [null, 1, 9]) {
+				const einzeln = wuensche
+					.filter((w) => w.id !== ausser && w.titel !== null && aehnlicherTitel(name, w.titel))
+					.map((w) => ({ titel: w.titel, plattform: w.plattform }));
+				expect(aehnlicheWuensche(name, v, ausser)).toEqual(einzeln);
+			}
+		}
+	});
+
+	it("liefert fuer trefferStand genau diesen Eintrag - auch ohne Titel - und die aehnlichen anderer Eintraege", () => {
+		const v = vorbereiteteWuensche(wuensche);
+		for (const igdbId of [11, 13, 19, 99]) {
+			const s = trefferStand({ igdbId, name: "Ember Tide" }, v, []);
+			expect(s.aufWunschliste).toEqual(wuensche.filter((w) => w.igdb_id === igdbId).map((w) => ({ plattform: w.plattform })));
+			expect(s.aehnlich).toEqual(
+				wuensche
+					.filter((w) => w.igdb_id !== igdbId && w.titel !== null && aehnlicherTitel("Ember Tide", w.titel))
+					.map((w) => ({ titel: w.titel, plattform: w.plattform })),
+			);
+		}
+		expect(trefferStand({ igdbId: 13, name: "Ember Tide" }, v, []).aufWunschliste).toEqual([{ plattform: "PS4" }]);
 	});
 });
 

@@ -270,8 +270,11 @@ export function jahrWeichtAb(listenDatum: string | null, erscheinungsdatum: stri
  * "The Wolf Among Us 2", "Dragon's Dogma II" und "Anno 1800" sind andere Spiele.
  */
 export function aehnlicherTitel(a: string, b: string): boolean {
-	const x = titelSchluessel(a);
-	const y = titelSchluessel(b);
+	return aehnlicherSchluessel(titelSchluessel(a), titelSchluessel(b));
+}
+
+/** Dieselbe Regel ueber fertigen Titelschluesseln - der Kern von `aehnlicherTitel`. */
+function aehnlicherSchluessel(x: string, y: string): boolean {
 	if (x === "" || y === "") return false;
 	if (x === y) return true;
 	const [kurz, lang] = x.length < y.length ? [x, y] : [y, x];
@@ -280,15 +283,76 @@ export function aehnlicherTitel(a: string, b: string): boolean {
 	return !/^(\d+|[ivxl]+)$/.test(naechstes);
 }
 
-/** Offene Wuensche, deren Titel dem gegebenen aehnelt (Nachtrag f1b) - Titel und Plattform, fuer den Hinweis. */
+type Wunschtitel = { id: number; titel: string | null; plattform: string | null; igdb_id?: number | null };
+
+type VorbereiteterWunsch = { id: number; titel: string | null; plattform: string | null; igdb_id: number | null };
+
+/**
+ * Offene Wuensche, einmal je Aufruf fuer den Vergleich vorbereitet (Nachtrag
+ * f1f) - dasselbe Muster wie `vorbereiten` in `scan-titel.ts`. Vorher
+ * normalisierte jeder Vergleich beide Titel neu: eine Seite der
+ * Import-Durchsicht (20 Zeilen x bis zu 3 Namen) gegen 300 offene Wuensche
+ * waren rund 36 000 `titelSchluessel`, und Cloudflare brach die Route am
+ * 27.11.2026 mit "exceeded CPU" ab (Abschnitt 8.2).
+ *
+ * `alle` haelt jeden Wunsch, auch ohne Titel (fuer "genau dieser Eintrag" in
+ * `trefferStand`). Jeder Schluessel entsteht hier genau einmal, gruppiert nach seinem ersten
+ * Wort: Gleich oder Wortgrenzen-Praefix (die beiden Faelle von
+ * `aehnlicherTitel`) setzen dasselbe erste Wort voraus, ein Name fasst also
+ * nur die Wuensche seiner Gruppe an. Innerhalb der Gruppe bleibt die
+ * Reihenfolge der Eingabe - das Ergebnis ist dasselbe wie ohne Vorbereitung.
+ */
+export type VorbereiteteWuensche = {
+	readonly alle: readonly VorbereiteterWunsch[];
+	readonly nachErstemWort: ReadonlyMap<string, ReadonlyArray<VorbereiteterWunsch & { titel: string; schluessel: string }>>;
+};
+
+const ersteWort = (schluessel: string): string => schluessel.split(" ")[0];
+
+export function vorbereiteteWuensche(wuensche: readonly Wunschtitel[]): VorbereiteteWuensche {
+	const alle: VorbereiteterWunsch[] = [];
+	const nachErstemWort = new Map<string, Array<VorbereiteterWunsch & { titel: string; schluessel: string }>>();
+	for (const w of wuensche) {
+		alle.push({ id: w.id, titel: w.titel, plattform: w.plattform, igdb_id: w.igdb_id ?? null });
+		if (w.titel === null) continue;
+		const v = { id: w.id, titel: w.titel, plattform: w.plattform, igdb_id: w.igdb_id ?? null };
+		const schluessel = titelSchluessel(w.titel);
+		if (schluessel === "") continue;
+		const wort = ersteWort(schluessel);
+		const gruppe = nachErstemWort.get(wort);
+		if (gruppe) gruppe.push({ ...v, schluessel });
+		else nachErstemWort.set(wort, [{ ...v, schluessel }]);
+	}
+	return { alle, nachErstemWort };
+}
+
+function vorbereitet(wuensche: readonly Wunschtitel[] | VorbereiteteWuensche): VorbereiteteWuensche {
+	return Array.isArray(wuensche) ? vorbereiteteWuensche(wuensche) : (wuensche as VorbereiteteWuensche);
+}
+
+function aehnlicheIn(
+	titel: string,
+	v: VorbereiteteWuensche,
+	auslassen: (w: VorbereiteterWunsch) => boolean,
+): Array<{ titel: string; plattform: string | null }> {
+	const schluessel = titelSchluessel(titel);
+	if (schluessel === "") return [];
+	return (v.nachErstemWort.get(ersteWort(schluessel)) ?? [])
+		.filter((w) => !auslassen(w) && aehnlicherSchluessel(schluessel, w.schluessel))
+		.map((w) => ({ titel: w.titel, plattform: w.plattform }));
+}
+
+/**
+ * Offene Wuensche, deren Titel dem gegebenen aehnelt (Nachtrag f1b) - Titel und
+ * Plattform, fuer den Hinweis. Wer mehrere Titel gegen denselben Bestand prueft,
+ * reicht `vorbereiteteWuensche(…)` herein statt der Liste (Nachtrag f1f).
+ */
 export function aehnlicheWuensche(
 	titel: string,
-	wuensche: ReadonlyArray<{ id: number; titel: string | null; plattform: string | null }>,
+	wuensche: readonly Wunschtitel[] | VorbereiteteWuensche,
 	ausser: number | null = null,
 ): Array<{ titel: string; plattform: string | null }> {
-	return wuensche
-		.filter((w) => w.id !== ausser && w.titel !== null && aehnlicherTitel(titel, w.titel))
-		.map((w) => ({ titel: w.titel as string, plattform: w.plattform }));
+	return aehnlicheIn(titel, vorbereitet(wuensche), (w) => w.id === ausser);
 }
 
 /** Was die Sammlung an einem Release schon hat, das Staerkste zuerst (Nachtrag f1d). */
@@ -303,14 +367,15 @@ export type SammlungsArt = "Disc" | "gekauft" | "PS Plus" | "gespielt";
  */
 export function trefferStand(
 	treffer: { igdbId: number; name: string },
-	wuensche: ReadonlyArray<{ id: number; titel: string | null; plattform: string | null; igdb_id: number | null }>,
+	wuensche: ReadonlyArray<{ id: number; titel: string | null; plattform: string | null; igdb_id: number | null }> | VorbereiteteWuensche,
 	bestand: ReadonlyArray<{ igdb_id: number; platform: string; disc: number; kauf: number; plus: number; gespielt: number }>,
 ): {
 	aufWunschliste: Array<{ plattform: string | null }>;
 	inSammlung: Array<{ plattform: string; art: SammlungsArt }>;
 	aehnlich: Array<{ titel: string; plattform: string | null }>;
 } {
-	const genau = wuensche.filter((w) => w.igdb_id === treffer.igdbId);
+	const v = vorbereitet(wuensche);
+	const genau = v.alle.filter((w) => w.igdb_id === treffer.igdbId);
 	const inSammlung = bestand
 		.filter((b) => b.igdb_id === treffer.igdbId)
 		.map((b) => {
@@ -321,9 +386,6 @@ export function trefferStand(
 	return {
 		aufWunschliste: genau.map((w) => ({ plattform: w.plattform })),
 		inSammlung,
-		aehnlich: aehnlicheWuensche(
-			treffer.name,
-			wuensche.filter((w) => w.igdb_id !== treffer.igdbId),
-		),
+		aehnlich: aehnlicheIn(treffer.name, v, (w) => w.igdb_id === treffer.igdbId),
 	};
 }
