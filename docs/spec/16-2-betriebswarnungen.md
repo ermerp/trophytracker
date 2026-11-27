@@ -94,11 +94,18 @@ der Markt sieht den Sync desselben Tages. Frist (12 h), Stillstand (30 h) und Al
   Rückfälle um 23:55 (8 h 38) und 00:07 (8 h 20). Die Verspätung ist größer als am Abend. Den Sync ab
   00:00 UTC berührt der Rückfall ab 8 h 43 (Markt) und 8 h 13 (Store): Der leere Store-Rückfall (1 s) lag
   schon im Fenster, der Hauptlauf des Marktes 59 Minuten davor. Beim leeren Store-Lauf vom 24.11. 02:36 bleibt offen, ob er der neue Termin
-  15:47 vom Vortag (10 h 49) oder der alte um 22:47 (3 h 49) war. Am 25.11. war um 15:49 UTC wieder keiner gestartet.
-- **Offen: die Schwellen reichen mit 9 h 44 nicht** (zu entscheiden nach der Nacht zum 26.11., dem zweiten Messtag; Vorschlag 36 h Stillstand und 48 h Store-Ziel, nichts geändert): vom pünktlichen Rückfall zum
-  ebenso verspäteten Hauptlauf 31 h 44 (über 30 h), vom Store-Probelauf um 03:47 zum nächsten um 23:15 des
-  Folgetags 43 h 28 (über 42 h). Zwischen Handlauf (23.11. 15:53) und Markt (24.11. 23:10) lagen 31 h 17 –
-  rechnerisch stand die Stillstand-Warnung gut eine Stunde; am 25.11. um 15:49 UTC steht keine. Kein Handlauf
+  15:47 vom Vortag (10 h 49) oder der alte um 22:47 (3 h 49) war.
+- **Am 25. und 26.11.** 9 h 15 / 8 h 59 / 8 h 22 / 8 h 00 und 9 h 04 / 8 h 48 / 8 h 35 / 8 h 14
+  ([16-2-naechte-4.md](16-2-naechte-4.md)). Drei Tage zwischen 8 h 00 und 9 h 44, Start jeden Abend
+  zwischen 22:21 und 00:07 UTC; zwischen zwei prüfenden Markt-Läufen lagen höchstens rund 23 h 30.
+- **Die Schwellen bleiben bei 30 h und 42 h** (Entscheidung des Nutzers vom 27.11.2026, nach drei
+  Messtagen). Sie reißen nur, wenn ein Lauf pünktlich kommt und der nächste wieder rund 9 h 44 spät: vom
+  pünktlichen Rückfall zum verspäteten Hauptlauf 31 h 44 (über 30 h), vom Store-Probelauf um 03:47 zum
+  nächsten um 23:15 des Folgetags 43 h 28 (über 42 h) – an keinem der drei Tage kam ein Lauf pünktlich.
+  Verworfen: 36 h Stillstand und 48 h Store-Ziel. Sie meldeten einen ausgefallenen Tag sechs Stunden später, und
+  48 h auf den Stempel griffen nach einem ausgefallenen Store-Tag erst kurz vor dem nächsten Lauf. Die
+  Verspätung zeigt `scripts/nacht.mjs` jede Nacht (18r-c). Zwischen Handlauf (23.11. 15:53) und Markt
+  (24.11. 23:10) lagen 31 h 17 – rechnerisch stand die Stillstand-Warnung gut eine Stunde. Kein Handlauf
   (Entscheidung des Nutzers vom 24.11.2026).
 - **Nachgerechnet mit 6 h 38**, der bis dahin größten gemessenen Verspätung (überholt, oben): vom pünktlichen Rückfall zum
   maximal verspäteten Hauptlauf 28 h 38 (unter 30 h); vom Probelauf um 03:47 zum nächsten prüfenden
