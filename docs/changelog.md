@@ -10,7 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
-| 209 | 27.11.2026 | **Nachtrag f1e:** Rückmeldungen des Nutzers vom 27.11.2026 – der Klick nach dem Ziehen auf To-Do öffnet das Spiel nicht mehr (am PC gemeldet und mit der Maus belegt), Backlog-Kandidaten bekommen „Zustand …" (Rückgängig offen), eine Zeile nur aus einer Jahreszahl ist im Wunschlisten-Import Überschrift (5.4, 8.2) |
+| 209 | 27.11.2026 | **Nachtrag f1e:** Rückmeldungen des Nutzers vom 27.11.2026 – der Klick nach dem Ziehen auf To-Do öffnet das Spiel nicht mehr (am PC gemeldet und mit der Maus belegt), Backlog-Kandidaten bekommen „Zustand …" (ohne Rückgängig, Entscheidung des Nutzers), eine Zeile nur aus einer Jahreszahl ist im Wunschlisten-Import Überschrift (5.4, 8.2) |
 | 208 | 27.11.2026 | **Abschluss 27.11. (Abend):** nächster Schritt der finalen Stufe 1 (Import der neun Listen) in 16.4, zwei Lehren (Schwelle vor der Messung, Apostroph), Prozesse nach Name beenden (CLAUDE.md) |
 | 207 | 27.11.2026 | **Nachtrag f1d:** Der Hinweis am IGDB-Treffer nennt genau diesen Eintrag auf der Wunschliste und den Bestand der Sammlung je Plattform (Disc, gekauft, PS Plus, gespielt), ähnliche Wünsche nur noch anderer Einträge (8.2) |
 | 206 | 27.11.2026 | **Nachtrag f1c: ein Vorgang, eine Zeile.** Änderungen, Spielverlauf und Feed fassen Ereignisse desselben Spiels und derselben Quelle binnen einer Sekunde zu einer Zeile mit Zusatz zusammen; gespeichert bleibt jeder Schritt, das Keyset über die kleinste Id (8.5) |
