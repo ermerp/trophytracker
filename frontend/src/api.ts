@@ -104,6 +104,7 @@ export const datum = (wert: string | null) => {
 }
 
 import { euro } from './geld'
+import { erledigteListe } from './preisliste'
 export { euro }
 
 /**
@@ -117,35 +118,6 @@ export { euro }
  */
 export const gebrauchtpreisText = (cents: number | null, anbieter: string | null) =>
   cents === null ? 'unbekannt' : `ab ${euro(cents)}${anbieter ? ` bei ${anbieter}` : ''}`
-
-/**
- * Der Gebrauchtpreis als Satz, bei vorhandenem Angebot als Link (Stufe 20e).
- *
- * Gibt die Teile zurück statt fertigem JSX, damit jede Liste sie in ihre
- * eigene Zeile setzen kann. `url` ist null, wenn kein Angebot bekannt ist –
- * oder wenn das gespeicherte verschwunden ist, bevor die nächste Auffrischung
- * lief; dann steht der Preis ohne Link da.
- */
-export function gebrauchtpreis(
-  cents: number | null,
-  anbieter: string | null,
-  url: string | null,
-  itemId: string | null = null,
-  verworfen = 0,
-) {
-  return {
-    text: gebrauchtpreisText(cents, anbieter),
-    url: cents === null ? null : url,
-    // Ohne Preis gibt es kein Angebot, das zu verwerfen wäre – aber sehr wohl
-    // etwas zurückzunehmen: Genau dann steht dort „unbekannt", WEIL alles
-    // verworfen ist (Stufe 20h).
-    itemId: cents === null ? null : itemId,
-    verworfen,
-    // „Kein Angebot" und „Angebot ohne Kennung" sind zwei Dinge, und die
-    // Tafel sagt zu beiden etwas anderes (Stufe 20h).
-    ohneAngebot: cents === null,
-  }
-}
 
 /** Eine Zeile der Sperrliste (Stufe 20h): was verworfen wurde, und für wie viel. */
 export type VerworfenesAngebot = {
@@ -454,30 +426,6 @@ export const HERKUNFTTEXT: Record<string, string> = {
   triage: 'aus Prüfliste',
 }
 
-/** Kandidat für die Kaufliste aus v_kaufkandidaten: belegte Lücke oder offener Wunsch (Stufe 15). */
-export type KaufKandidat = {
-  quelle: 'luecke' | 'wunsch'
-  /** Der Wunsch, bei Lücken null. */
-  planId: number | null
-  releaseId: number | null
-  spielId: number | null
-  titel: string
-  plattform: Plattform | null
-  bild: string | null
-  kritik: number | null
-  spieler: number | null
-  favorit: boolean
-  /** null heißt unbekannt – nie 0. */
-  besterGebrauchtpreisCents: number | null
-  /** Wer das Angebot stellt – 'rebuy', 'medimops' oder 'eBay' (Stufe 20). */
-  gebrauchtpreisAnbieter: string | null
-  gebrauchtpreisUrl: string | null
-  /** eBays Angebotskennung (Stufe 20h); null heißt: nicht verwerfbar. */
-  gebrauchtpreisItemId: string | null
-  /** Wie viele Angebote hier verworfen sind. */
-  gebrauchtpreisVerworfen: number
-}
-
 /** Vorgemerkter, noch nicht erschienener Titel aus v_erscheint_bald (Use Case 11). */
 export type ErscheintBaldEintrag = {
   planId: number
@@ -497,14 +445,17 @@ export type ErfasstAntwort = {
   absichtenErledigt: Array<{ id: number; art: PlanArt; titel: string }>
   /** Offener To-Do-/Backlog-Eintrag am Release – dann kein „ins Backlog"-Angebot. */
   aufListe: boolean
+  /**
+   * Nur bei der Disc: Das Erfassen hat die Disc-Fassung von „unbekannt" auf
+   * „ja" gesetzt. Ein Rückgängig setzt sie dann zurück (Nachtrag f2e).
+   */
+  physischStatusGesetzt?: boolean
 }
 
 
 /** „Von der Wunsch- und Kaufliste erledigt." – je nachdem, was der Worker erledigt hat (Stufe 15). */
 export function erledigtText(absichten: ErfasstAntwort['absichtenErledigt']): string {
-  const arten = new Set(absichten.map((a) => a.art))
-  const liste = arten.has('wunsch') && arten.has('kauf') ? 'Wunsch- und Kaufliste' : arten.has('kauf') ? 'Kaufliste' : 'Wunschliste'
-  return `Von der ${liste} erledigt.`
+  return `Von der ${erledigteListe(absichten.map((a) => a.art))} erledigt.`
 }
 
 /** Kandidat für den Backlog aus v_backlog_kandidaten: im Besitz, nie angefasst (Stufe 12). */

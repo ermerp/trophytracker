@@ -266,12 +266,6 @@ textarea {
   color: var(--text-still);
 }
 
-/* Die Überschrift ist in der Lückenansicht ein Schalter und nimmt nur ihre
-   eigene Breite (Stufe 20e). */
-.listenkopf .knopfname {
-  width: auto;
-}
-
 /* Die Sortierung ist ein verankertes Menue (Stufe 20e) - dieselbe Tafel wie
    im Spieldetail, statt eines nativen <select>, das als einziges
    Bedienelement die Gestaltungslinie aus Stufe 19 nicht mitmachte. Seit

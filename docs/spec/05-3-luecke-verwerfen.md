@@ -24,16 +24,17 @@ späterer Sinneswandel ist ein Feld-Update auf `offen`, kein Neuanlegen.
 - Die Lückenansicht blendet verworfene Einträge **standardmäßig aus**, mit einem Umschalter für
   "auch verworfene zeigen". So verschwinden sie aus dem Blick, ohne aus den Daten zu verschwinden.
 
-Umgesetzt in Stufe 14 (Lückenansicht, `POST /api/gaps/:releaseId/verwerfen`); seit Stufe 15 steht
-derselbe Knopf am Lücken-Kandidaten der Kaufliste, und der verworfene Eintrag liegt dort unter „auch
-erledigte und verworfene" – „wieder öffnen" macht ihn per Feld-Update zum offenen Kauf. Rückgängig
+Umgesetzt in Stufe 14 (Lückenansicht, `POST /api/gaps/:releaseId/verwerfen`); seit Nachtrag f2e steht
+er im Menü „⋯" der Lückenzeile (Stufe 15 bis f2e auch am Lücken-Kandidaten der Kaufliste, der entfallen
+ist), und der verworfene Eintrag liegt auf der Kaufliste unter „auch erledigte und verworfene" – „wieder öffnen" macht ihn per Feld-Update zum offenen Kauf. Rückgängig
 ist `DELETE /api/plans/:id` – dieselbe Mechanik wie „nicht vorgesehen" im Backlog (5.4): Der
 verworfene Eintrag ist eine gespeicherte Ablehnung, kein Zustand des Releases. Ein zweiter
 Kaufeintrag am selben Release (offen oder verworfen) wird mit `409` abgewiesen.
 
 **`unbekannt` in der Ansicht (Entscheidung des Nutzers vom 16.09.2026, „Block B").** Nach dem
 IGDB-Lauf tragen rund 200 der 481 Releases ein `ja`; der Rest bleibt `unbekannt`. Die Ansicht zeigt
-belegte Lücken oben und darunter zugeklappt „Disc-Fassung unbekannt (n)": digital gespielt, nicht im
+belegte Lücken und – über den Umschalter „Disc unklar (n)", seit f2e; vorher zugeklappt darunter als
+„Disc-Fassung unbekannt (n)" – die Releases ohne Beleg: digital gespielt, nicht im
 Regal, aber ohne Beleg für eine Disc – mit „Disc gibt es" / „gibt es nicht" / „physisch nicht
 gewünscht" je Zeile. Dort entsteht das `nein` von Hand, das laut Entscheidung das Einzige ist, was
 nicht aus einer Quelle kommt; der dritte Knopf (Wunsch des Nutzers vom 16.09.2026) lässt die Frage

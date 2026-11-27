@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { type IgdbKandidat } from './api'
-import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, PlanKarte, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
-import { useAnsicht } from './Ansicht'
+import { ErscheintBaldLink, Meldungen, PLAN_CHIPS, Reiter, SORTIERBAR, SORTIER_NATUERLICH, type ListenSortierung, usePlanListe } from './Absichten'
 import { Chips } from './Chips'
 import { Sortierleiste } from './Sortierung'
 import { IgdbSuche } from './IgdbSuche'
 import { Kopfzeile } from './Kopfzeile'
-import { Zeichen } from './Symbole'
+import { wunschKopf } from './preisliste'
+import { KopfSatz, PlanPreisZeile, RueckwegZeile, Spaltenkopf, useRueckweg } from './PreisZeile'
 
 /**
  * Wunschliste (Use Case 4, ab Stufe 10; Use Case 11 für das Datum).
@@ -21,6 +21,10 @@ import { Zeichen } from './Symbole'
  * Seit Stufe 19 ist sie die erste von **drei Reitern** – Kaufliste und Lücken
  * sitzen daneben, wie das Backlog neben To-Do. Damit trägt die untere Leiste
  * vier Symbole statt sieben.
+ *
+ * Seit Nachtrag f2e nur noch Zeilen mit Gebraucht- und Digitalpreis, ohne
+ * Kacheln (Entscheidung des Nutzers vom 27.11.2026, am Prototyp): Hier wird
+ * verglichen, und Preise vergleicht man untereinander, nicht in einem Raster.
  */
 
 /** Die drei Reiter dieser Seite (Stufe 19). */
@@ -33,10 +37,11 @@ export const WUNSCH_REITER = [
 export function Wunschliste() {
 	const liste = usePlanListe('wunsch')
 	const { daten, laeuft, sortierung, richtung, setzeSortierung } = liste
-	const ansicht = useAnsicht('wunsch')
+	const weg = useRueckweg(liste.laden, liste.setMeldung)
 	const [hinzufuegen, setHinzufuegen] = useState(false)
 
 	async function anlegen(koerper: Record<string, unknown>) {
+		weg.setRueckweg(null)
 		if (await liste.anlegen(koerper)) setHinzufuegen(false)
 	}
 	const igdbWaehlen = (k: IgdbKandidat, plattform: string) => anlegen({ igdbId: k.igdbId, plattform })
@@ -48,7 +53,6 @@ export function Wunschliste() {
 			<Kopfzeile
 				titel="Wunschliste"
 				sucheParam="suche"
-				ansicht={ansicht}
 				aktionen={[{ name: 'plus', text: 'Wunsch hinzufügen', offen: hinzufuegen, onClick: () => setHinzufuegen(!hinzufuegen) }]}
 			/>
 			<Reiter eintraege={WUNSCH_REITER} />
@@ -83,6 +87,7 @@ export function Wunschliste() {
 				)}
 
 				<Meldungen liste={liste} />
+				<RueckwegZeile weg={weg} />
 
 				{!daten ? (
 					<p className="ruhig">wird geladen …</p>
@@ -91,36 +96,13 @@ export function Wunschliste() {
 				) : (
 					<>
 						<div className="listenkopf">
-							<span>{daten.eintraege.length} Einträge</span>
+							<KopfSatz {...wunschKopf(daten.eintraege)} />
 							<ErscheintBaldLink />
 						</div>
-
-						<ul className={ansicht.art === 'kacheln' ? 'kacheln' : 'zeilen'}>
+						<Spaltenkopf />
+						<ul className="preisliste">
 							{daten.eintraege.map((e) => (
-								<PlanKarte
-									key={e.id}
-									e={e}
-									liste={liste}
-									art={ansicht.art}
-									knoepfe={
-										e.aufKaufliste !== null ? (
-											<Link to="/kaufliste" className="ikone" aria-label="steht auf der Kaufliste" title="steht auf der Kaufliste">
-												<Zeichen name="umhaengen" groesse={19} gefuellt />
-											</Link>
-										) : (
-											<button
-												type="button"
-												className="ikone"
-												aria-label="Auf die Kaufliste"
-												title="Auf die Kaufliste"
-												disabled={laeuft}
-												onClick={() => liste.aufKaufliste(e)}
-											>
-												<Zeichen name="umhaengen" groesse={19} />
-											</button>
-										)
-									}
-								/>
+								<PlanPreisZeile key={e.id} e={e} liste={liste} weg={weg} />
 							))}
 						</ul>
 					</>

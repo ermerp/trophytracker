@@ -39,6 +39,7 @@ export function Preis({
   verworfen = 0,
   ohneAngebot = false,
   onGeaendert,
+  titel,
 }: {
   text: string
   url: string | null
@@ -52,12 +53,17 @@ export function Preis({
   ohneAngebot?: boolean
   /** Nach Verwerfen oder Rücknahme neu laden; fehlt er, bleibt es beim Preis. */
   onGeaendert?: () => void
+  /**
+   * Der Hinweis am Link (Nachtrag f2e). Die Preisliste zeigt nur die Zahl und
+   * legt „ab … bei eBay" hierher; ohne ihn bleibt der bisherige Satz.
+   */
+  titel?: string
 }) {
   const [menue, setMenue] = useState(false)
   const anker = useRef<HTMLButtonElement>(null)
 
   const zahl = url === null ? <>{text}</> : (
-    <a href={url} target="_blank" rel="noreferrer noopener" title="Angebot bei eBay – kann inzwischen verkauft sein">
+    <a href={url} target="_blank" rel="noreferrer noopener" title={titel ?? 'Angebot bei eBay – kann inzwischen verkauft sein'}>
       {text}
     </a>
   )
@@ -108,8 +114,12 @@ export function Preis({
  * Keine Rückfrage vor dem Verwerfen: Es ist vollständig umkehrbar, und die
  * Rücknahme steht in derselben Tafel. Eine Bestätigung gehört vor das
  * Unumkehrbare.
+ *
+ * Exportiert für die Preisliste (Nachtrag f2e): Dort öffnet sie der Eintrag
+ * „Gebrauchtangebot verwerfen" im Menü „⋯" der Zeile, und der Preis selbst
+ * trägt kein eigenes Menü – zwei Punktmenüs in einer Zeile wären eines zu viel.
  */
-function AngebotMenue({
+export function AngebotMenue({
   releaseId,
   itemId,
   text,

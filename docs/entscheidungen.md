@@ -394,3 +394,8 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 27.11.2026 | **Die Spielzeit-Spitze wartet bis zum Ende der NPSSO-Beobachtung** (Nacht zum 08.12. oder ein neues NPSSO): Ihr Hebel ist die Anmeldung um 00:55, die beobachtet wird | [16.2](spec/16-2-bewertung-02-11.md) |
 | 27.11.2026 | **Der Sync wird in einem Rutsch optimiert** (Abruf und Normalisierung), mit der Spitze nach dem Ende der NPSSO-Beobachtung; nichts davon wird vorab gebaut | [16.2](spec/16-2-offene-stufen.md) |
 | 27.11.2026 | **Die Startseite wird nicht umgebaut**, nur bewertet (rund 11 000 Zeilen je Öffnen, 0,2 % des Tages); ihr Messtest bleibt mit Grenze | [16.2](spec/16-2-offene-stufen.md) |
+| 27.11.2026 | **Wunschliste, Kaufliste und Lücken nur als Zeilen** (Preisliste am Prototyp), die Kacheln dort sind gestrichen | [13.3](spec/13-3-bedienung.md) |
+| 27.11.2026 | **Die Kandidatenblöcke der Kaufliste entfallen**; Lücken bekommen ein eigenes „auf die Kaufliste" | [13.1](spec/13-1-ansichten-listen-und-werkzeuge.md) |
+| 27.11.2026 | **„auf die Kaufliste" liegt am Handy nur im Menü „⋯"**, am Desktop als Knopf in der Zeile | [13.3](spec/13-3-bedienung.md) |
+| 27.11.2026 | **Erledigt wird durch Erfassen, nicht von Hand:** „Disc erfassen" und „digital erfassen" in Wunschliste, Kaufliste (und Disc in Lücken), „erledigt" entfällt dort | [5](spec/05-absichten.md), [13.1](spec/13-1-ansichten.md) |
+| 27.11.2026 | **Der Prüfstempel der Disc-Fassung bleibt nach einem Rückgängig auf „jetzt"**; Lücken-Kaufstatus und Scanner-Rückgängig als eigene Nachträge später | [5](spec/05-absichten.md), [16.4](spec/16-4-finale-stufen.md) |

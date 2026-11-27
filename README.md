@@ -44,12 +44,12 @@ erfasste Discs, nächtliche Läufe seit dem 20.09.2026.
 | IGDB | Cover, Kritikerwertung, Erscheinungsdatum, Disc-Nachweis; nächtliches Auffrischen mit 7-Tage-Frist | [7.6](docs/spec/07-6-igdb.md) |
 | IGDB-Titel | Ein Spiel ohne Trophäenliste übernimmt beim Verknüpfen den IGDB-Namen, änderbar im Spieldetail | [7.6](docs/spec/07-6-igdb.md) |
 | Ohne Zuordnung | Freitext-Einträge und Spiele ohne IGDB-Eintrag listenübergreifend, abgelehnte hinter einem Umschalter | [8.3](docs/spec/08-3-metadaten.md) |
-| Wunschliste | Favoriten zuerst, dann Kritikerwertung; Filter, Notiz, erledigt/verworfen. Jeder Wunsch hängt an einem Release | [5](docs/spec/05-absichten.md) |
+| Wunschliste | Preisliste in Zeilen (gebraucht und digital), Favoriten zuerst, Filter, Menü je Zeile; erledigt wird durch Erfassen. Jeder Wunsch hängt an einem Release | [5](docs/spec/05-absichten.md) |
 | Wunschlisten-Import | Datei oder Textfeld, Jahres- und Plattformlisten, Abgleich in Schritten, Durchsicht je Zeile | [8.2](docs/spec/08-2-wunschlisten-import.md) |
 | To-Do | Eigene Reihenfolge, die **ganze Karte** zieht (Finger, Maus, Tastatur), sofort gespeichert; heißt „am Spielen" | [5.4](docs/spec/05-4-todo-und-kopplung.md) |
 | Backlog | Sortiert und gefiltert wie die Wunschliste, Kandidaten aus dem Besitz; heißt „pausiert" | [5.4](docs/spec/05-4-todo-und-kopplung.md) |
-| Lücken | Digital gespielt, Disc belegt. Block A mit drei Knöpfen, darunter zuklappbar „Disc-Fassung unbekannt" mit **zwei** | [5.3](docs/spec/05-3-luecke-verwerfen.md) |
-| Kaufliste | Kandidaten aus belegten Lücken und offenen Wünschen; ein Wunsch kommt als **Kopie**, der Wunsch bleibt offen | [5](docs/spec/05-absichten.md) |
+| Lücken | Digital gespielt, Disc belegt, mit „auf die Kaufliste"; Umschalter zu „Disc unklar" mit **zwei** Knöpfen (gibt es / gibt es nicht) | [5.3](docs/spec/05-3-luecke-verwerfen.md) |
+| Kaufliste | Gespeist aus Lücken und Wünschen (ein Wunsch kommt als **Kopie**, der Wunsch bleibt offen); „Disc erfassen" erledigt Kauf und Wunsch | [5](docs/spec/05-absichten.md) |
 | Erscheint bald | Unveröffentlichte Titel, `angekuendigt → erschienen` täglich im Cron | [8.4](docs/spec/08-4-unveroeffentlicht.md) |
 | Gebrauchtpreise | Zwei eBay-Suchen je Release (Händler, Markt), Titelabgleich Pflicht, als Link aufs Angebot, sortierbar; ein untaugliches Angebot lässt sich verwerfen und zurücknehmen | [7.3](docs/spec/07-3-ebay.md) |
 | Preisverlauf | Diagramm je Release im Spieldetail: eine Treppe je Kanal (Händler, Markt, Store), verdichtet beim Lesen, verworfene Angebote bleiben draußen | [6](docs/spec/06-marktdaten.md) |

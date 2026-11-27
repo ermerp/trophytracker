@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { stateNachFilter } from './filterverlauf'
-import { STATUSTEXT, anfrage, gebrauchtpreis, marktBefund, type DiscFassung, type PlayStatus } from './api'
-import { Preis } from './Preis'
+import { STATUSTEXT, anfrage, gebrauchtpreisText, marktBefund, type DiscFassung, type PlayStatus } from './api'
 import { Sortierleiste, type Richtung } from './Sortierung'
 import { LUECKEN_NATUERLICH, LUECKEN_SORTIERUNG, lueckenVergleich, type LueckenSortierung } from './vergleich'
+import { lueckeMenue, lueckenSortierwert, nachBefund, type MenueAktion } from './preisliste'
 import { Reiter } from './Absichten'
 import { Chips, type ChipGruppe } from './Chips'
 import { Kopfzeile } from './Kopfzeile'
 import { Zeichen } from './Symbole'
-import { PlattformChip } from './SpielTeile'
+import { Cover, PlattformChip, zustandsFarbe } from './SpielTeile'
+import { Gebraucht, PreisZeile, RueckwegZeile, SortierwertText, Spaltenkopf, besitzErfassen, useRueckweg, type RueckwegZustand } from './PreisZeile'
 import { WUNSCH_REITER } from './Wunschliste'
 
 /**
@@ -17,26 +18,32 @@ import { WUNSCH_REITER } from './Wunschliste'
  * nicht im Regal. „physisch nicht gewünscht" ist ein verworfener Kaufeintrag
  * (5.3) – die Lücke bleibt als Tatsache in der View, die Ansicht blendet sie
  * nur aus; „Rückgängig" und „wieder zeigen" löschen den Eintrag (wie
- * „nicht vorgesehen" im Backlog). Stufe 15 macht daraus die Kaufliste.
+ * „nicht vorgesehen" im Backlog).
  *
- * Darunter „Disc-Fassung unbekannt": digital gespielt, nicht im Regal, aber
- * ohne Beleg für eine Disc (Entscheidung des Nutzers vom 16.09.2026, Block
- * B). Dort entsteht das „nein" von Hand – oder ein „ja", wenn er es besser
- * weiß als IGDB.
+ * Daneben „Disc unklar": digital gespielt, nicht im Regal, aber ohne Beleg
+ * für eine Disc (Entscheidung des Nutzers vom 16.09.2026, Block B). Dort
+ * entsteht das „nein" von Hand – oder ein „ja", wenn er es besser weiß als
+ * IGDB. **„physisch nicht gewünscht" gibt es dort nicht** (Entscheidung des
+ * Nutzers vom 02.10.2026): eine einzige Frage – gibt es die Disc? Die Absicht
+ * entscheidet sich danach unter „Disc belegt".
  *
- * **„physisch nicht gewünscht" gibt es im zweiten Block nicht mehr**
- * (Entscheidung des Nutzers vom 02.10.2026, sie kehrt seinen Wunsch vom
- * 16.09.2026 um). Dort steht eine einzige Frage – gibt es die Disc? –, und
- * ein dritter Knopf, der die Frage offen lässt und die Zeile trotzdem
- * ausblendet, gehört nicht in dieselbe Reihe. Die Absicht entscheidet sich
- * danach in der Lückenliste, wo die Disc-Fassung geklärt ist.
+ * Seit Nachtrag f2e (Entscheidung des Nutzers vom 27.11.2026):
  *
- * Seit Stufe 20 stehen echte Gebrauchtpreise darin – „ab 12,77 € bei rebuy",
- * eine Forderung bei einem Anbieter, kein Wert. Und der zweite Block nennt,
- * was die eBay-Suche über die unbekannte Disc-Fassung sagt: Findet sie in der
- * Plattform-Kategorie gar nichts, spricht das für „nur digital" (gemessen 3 %
- * Fehlrate). Die Reihenfolge holt diese Fälle nach vorne, damit der Block
- * abarbeitbar ist; entschieden wird er trotzdem von Hand (Abschnitt 3).
+ * - **Ein Umschalter statt zweier Blöcke.** „Disc belegt | Disc unklar" steht
+ *   oben; vorher lag der zweite Block erst nach allen Lücken und war
+ *   zugeklappt kaum zu finden (Rückmeldung vom 02.10.2026). Der Zustand
+ *   bleibt im URL-Parameter `unbekannte=1` und übersteht ein Neuladen.
+ * - **Zeilen wie Wunsch- und Kaufliste**, mit „auf die Kaufliste" als
+ *   Hauptaktion. Bis hierher übernahm erst die Kaufliste die Lücken aus
+ *   ihrem Kandidatenblock; jetzt geschieht es dort, wo die Lücke steht.
+ * - **Ob eine Lücke schon auf der Kaufliste steht, weiß die Ansicht nicht:**
+ *   `/api/gaps` nennt nur den verworfenen Kaufeintrag. Der Knopf bleibt
+ *   deshalb stehen, und ein zweites Übernehmen beantwortet der Worker mit 409
+ *   – die Meldung steht dann oben.
+ *
+ * Der Gebrauchtpreis ist eine Forderung eines Anbieters, kein Wert. Die eBay-
+ * Zahl bei „Disc unklar" sagt, wie viele Fälle eBay in der Plattform-
+ * Kategorie gar nicht kennt – bei bekannten Discs trifft das nur auf 3 % zu.
  */
 
 type Luecke = {
@@ -67,49 +74,23 @@ type Luecke = {
   planId: number | null
 }
 
-/**
- * Die eindeutigen Fälle zuerst: erst „eBay kennt nichts" (0 Rohangebote),
- * dann das Ungeprüfte, dann das mit Angeboten ohne klare Zuordnung. So steht
- * oben, was sich in einem Klick entscheiden lässt.
- */
-function nachBefund(zeilen: readonly Luecke[]): Luecke[] {
-  const rang = (l: Luecke) => (l.marktRohangebote === 0 ? 0 : l.marktRohangebote === null ? 1 : 2)
-  return [...zeilen].sort((a, b) => rang(a) - rang(b) || a.titel.localeCompare(b.titel, 'de'))
-}
-
-/** Die beiden Umschalter der Ansicht, als Chips wie überall sonst (Stufe 19). */
-const LUECKEN_CHIPS: readonly ChipGruppe[] = [
-  { param: 'verworfene', titel: 'Verworfene', werte: [['1', 'auch verworfene']] },
-  { param: 'unbekannte', titel: 'Zweiter Block', werte: [['1', 'Disc-Fassung unbekannt']] },
-]
+/** Nur noch „auch verworfene" – „Disc unklar" ist seit f2e der Umschalter oben. */
+const LUECKEN_CHIPS: readonly ChipGruppe[] = [{ param: 'verworfene', titel: 'Verworfene', werte: [['1', 'auch verworfene']] }]
 
 type Antwort = { anzahl: number; verworfen: number; unbekannt: number; luecken: Luecke[]; moeglich: Luecke[] }
 
-type Eben =
-  | { art: 'verworfen'; titel: string; planId: number }
-  | { art: 'disc'; titel: string; releaseId: number; gesetzt: DiscFassung }
-
 export function Luecken() {
-  // Die beiden Umschalter schreibt jetzt die Chip-Leiste in die URL.
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const mitVerworfenen = params.get('verworfene') === '1'
-  const moeglichOffen = params.get('unbekannte') === '1'
+  const unklar = params.get('unbekannte') === '1'
   const sortierung: LueckenSortierung =
     (params.get('sort') as LueckenSortierung) in LUECKEN_SORTIERUNG ? (params.get('sort') as LueckenSortierung) : 'titel'
   const richtung: Richtung = params.get('richtung') === 'ab' || params.get('richtung') === 'auf'
     ? (params.get('richtung') as Richtung)
     : LUECKEN_NATUERLICH[sortierung]
-  // Der obere Block ist zugeklappbar, damit der zweite schnell erreichbar ist
-  // (Wunsch des Nutzers vom 02.10.2026). Bewusst KEIN URL-Parameter: Er soll
-  // beim Aufruf der Ansicht immer offen sein, das Zuklappen gilt nur für den
-  // Moment. Der zweite Block steht dagegen in der URL - dort ist "geöffnet"
-  // eine Arbeitsentscheidung, die ein Neuladen überstehen soll.
-  const [lueckenOffen, setLueckenOffen] = useState(true)
   const [daten, setDaten] = useState<Antwort | null>(null)
-  const [laeuft, setLaeuft] = useState(false)
   const [meldung, setMeldung] = useState<string | null>(null)
-  const [eben, setEben] = useState<Eben | null>(null)
 
   const laden = useCallback(async () => {
     try {
@@ -123,47 +104,36 @@ export function Luecken() {
     void laden()
   }, [laden])
 
+  const weg = useRueckweg(laden, setMeldung)
 
-  async function tue(aktion: () => Promise<unknown>, danach?: Eben | null) {
-    setLaeuft(true)
-    setMeldung(null)
-    try {
-      await aktion()
-      if (danach !== undefined) setEben(danach)
-      await laden()
-    } catch (f) {
-      setMeldung(f instanceof Error ? f.message : 'Fehlgeschlagen.')
-    } finally {
-      setLaeuft(false)
-    }
+  function segment(zuUnklar: boolean) {
+    if (zuUnklar === unklar) return
+    const neu = new URLSearchParams(params)
+    if (zuUnklar) neu.set('unbekannte', '1')
+    else neu.delete('unbekannte')
+    setParams(neu, { replace: true, state: stateNachFilter(location.state) })
   }
 
-  const verwerfen = (l: Luecke) =>
-    tue(async () => {
-      const a = await anfrage<{ id: number }>(`/api/gaps/${l.releaseId}/verwerfen`, { methode: 'POST' })
-      setEben({ art: 'verworfen', titel: l.titel, planId: a.id })
+  /** Die Disc-Frage unter „Disc unklar"; Rückgängig setzt sie auf „unbekannt" zurück. */
+  const discSetzen = (l: Luecke, fassung: DiscFassung) =>
+    weg.tue(async () => {
+      await anfrage(`/api/releases/${l.releaseId}`, { methode: 'PATCH', koerper: { discFassung: fassung } })
+      return {
+        text: `„${l.titel}": Disc-Fassung auf „${fassung}" gesetzt.`,
+        schritte: [{ methode: 'PATCH', pfad: `/api/releases/${l.releaseId}`, koerper: { discFassung: 'unbekannt' } }],
+      }
     })
 
-  const wiederZeigen = (l: Luecke) =>
-    l.planId !== null ? tue(() => anfrage(`/api/plans/${l.planId}`, { methode: 'DELETE' }), null) : Promise.resolve()
-
-  const discSetzen = (l: Luecke, fassung: DiscFassung) =>
-    tue(
-      () => anfrage(`/api/releases/${l.releaseId}`, { methode: 'PATCH', koerper: { discFassung: fassung } }),
-      { art: 'disc', titel: l.titel, releaseId: l.releaseId, gesetzt: fassung },
-    )
-
-  async function rueckgaengig() {
-    if (!eben) return
-    const e = eben
-    await tue(
-      () =>
-        e.art === 'verworfen'
-          ? anfrage(`/api/plans/${e.planId}`, { methode: 'DELETE' })
-          : anfrage(`/api/releases/${e.releaseId}`, { methode: 'PATCH', koerper: { discFassung: 'unbekannt' } }),
-      null,
-    )
+  const wiederZeigen = (l: Luecke) => {
+    const planId = l.planId
+    if (planId === null) return
+    void weg.tue(async () => {
+      await anfrage(`/api/plans/${planId}`, { methode: 'DELETE' })
+      return null
+    })
   }
+
+  const ebayUnbekannt = daten ? daten.moeglich.filter((l) => !l.verworfen && l.marktRohangebote === 0).length : 0
 
   return (
     <>
@@ -172,177 +142,209 @@ export function Luecken() {
       <Chips
         gruppen={LUECKEN_CHIPS}
         rechts={
-          <Sortierleiste
-            texte={LUECKEN_SORTIERUNG}
-            natuerlich={LUECKEN_NATUERLICH}
-            wert={sortierung}
-            richtung={richtung}
-            waehlen={(w, r) => {
-              const neu = new URLSearchParams(params)
-              if (w === 'titel') neu.delete('sort')
-              else neu.set('sort', w)
-              // Nur eine Abweichung von der natürlichen Richtung in die URL.
-              if (r === LUECKEN_NATUERLICH[w]) neu.delete('richtung')
-              else neu.set('richtung', r)
-              // Eine offene Filtertafel bleibt offen (Stufe f2b, `filterverlauf.ts`).
-              setParams(neu, { replace: true, state: stateNachFilter(location.state) })
-            }}
-          />
+          // Unter „Disc unklar" ordnet der Befund (`nachBefund`), nicht die Sortierung.
+          !unklar && (
+            <Sortierleiste
+              texte={LUECKEN_SORTIERUNG}
+              natuerlich={LUECKEN_NATUERLICH}
+              wert={sortierung}
+              richtung={richtung}
+              waehlen={(w, r) => {
+                const neu = new URLSearchParams(params)
+                if (w === 'titel') neu.delete('sort')
+                else neu.set('sort', w)
+                // Nur eine Abweichung von der natürlichen Richtung in die URL.
+                if (r === LUECKEN_NATUERLICH[w]) neu.delete('richtung')
+                else neu.set('richtung', r)
+                // Eine offene Filtertafel bleibt offen (Stufe f2b, `filterverlauf.ts`).
+                setParams(neu, { replace: true, state: stateNachFilter(location.state) })
+              }}
+            />
+          )
         }
       />
 
       <div className="seite">
-      <p className="ruhig klein">
-        Digital gespielt, Disc-Fassung belegt, nicht im Regal. Die Disc-Fassung kommt aus IGDB (Einstellungen → IGDB → „Disc-Fassungen prüfen"), aus einem
-        eBay-Angebot oder von Hand im Spieldetail. Der Preis ist eine Forderung bei einem Anbieter, kein Wert.
-      </p>
-
-      {meldung && <p role="alert" className="auffaellig">{meldung}</p>}
-      {eben && (
-        <p role="status" className="hinweis">
-          „{eben.titel}"{' '}
-          {eben.art === 'verworfen' ? 'als physisch nicht gewünscht verworfen' : `Disc-Fassung auf „${eben.gesetzt}" gesetzt`}.{' '}
-          <button type="button" onClick={rueckgaengig} disabled={laeuft}>Rückgängig</button>
-        </p>
-      )}
-
-      {!daten ? (
-        <p className="ruhig">wird geladen …</p>
-      ) : daten.luecken.length === 0 ? (
-        <p className="ruhig">
-          {daten.anzahl === 0 && daten.verworfen === 0
-            ? 'Keine Lücken. Lücke ist ein digital gespieltes Release, dessen Disc-Fassung belegt ist und das nicht im Regal steht.'
-            : 'Alle Lücken sind verworfen – „auch verworfene zeigen" holt sie zurück.'}
-        </p>
-      ) : (
-        <>
-          <div className="listenkopf">
-            <h2>
-              <button
-                type="button"
-                className="knopfname kandidatenkopf"
-                aria-expanded={lueckenOffen}
-                onClick={() => setLueckenOffen(!lueckenOffen)}
-              >
-                <span>
-                  {daten.anzahl} {daten.anzahl === 1 ? 'Lücke' : 'Lücken'}
-                  {mitVerworfenen && daten.verworfen > 0 && `, dazu ${daten.verworfen} verworfen`}
-                </span>
-                <span className={lueckenOffen ? 'pfeil auf' : 'pfeil'}>
-                  <Zeichen name="winkel" groesse={18} strich={2.1} />
-                </span>
-              </button>
-            </h2>
-          </div>
-          {lueckenOffen && (
-          <ul className="kandidatenliste">
-            {[...daten.luecken].sort(lueckenVergleich<Luecke>(sortierung, richtung)).map((l) => (
-              <LueckeZeile key={l.releaseId} l={l} onGeaendert={() => void laden()}>
-                {l.verworfen ? (
-                  <button type="button" className="klein" disabled={laeuft} onClick={() => wiederZeigen(l)}>wieder als Lücke zeigen</button>
-                ) : (
-                  <button type="button" className="klein" disabled={laeuft} onClick={() => verwerfen(l)}>physisch nicht gewünscht</button>
-                )}
-              </LueckeZeile>
-            ))}
-          </ul>
-          )}
-        </>
-      )}
-
-      <section className="kandidaten">
-        {/*
-          Die Überschrift IST der Schalter. Vorher stand der zweite Block nur
-          hinter dem Chip „Disc-Fassung unbekannt" – und der liegt zwei Ebenen
-          tief hinter der Filter-Pille, während die Überschrift hier erst nach
-          allen 213 Lücken auftaucht. Zugeklappt war der Block damit praktisch
-          unauffindbar (Rückmeldung des Nutzers vom 02.10.2026). Der Chip
-          schreibt denselben Parameter und bleibt gleichwertig.
-        */}
-        <h2>
-          <button
-            type="button"
-            className="knopfname kandidatenkopf"
-            aria-expanded={moeglichOffen}
-            onClick={() => {
-              const neu = new URLSearchParams(params)
-              if (moeglichOffen) neu.delete('unbekannte')
-              else neu.set('unbekannte', '1')
-              setParams(neu, { replace: true })
-            }}
-          >
-            <span>Disc-Fassung unbekannt{daten && ` (${daten.unbekannt})`}</span>
-            <span className={moeglichOffen ? 'pfeil auf' : 'pfeil'}>
-              <Zeichen name="winkel" groesse={18} strich={2.1} />
-            </span>
+        <div className="segmente" role="group" aria-label="Disc-Fassung">
+          <button type="button" aria-pressed={!unklar} onClick={() => segment(false)}>
+            Disc belegt{daten && <span className="zahl">{daten.anzahl}</span>}
           </button>
-        </h2>
-        {moeglichOffen && (
-          <p className="ruhig klein">
-            Digital gespielt und nicht im Regal, aber ohne Beleg, dass es eine Disc gibt. „Disc gibt es" macht daraus eine Lücke, „gibt es nicht" nimmt das
-            Release dauerhaft heraus – beides gilt als deine Entscheidung und wird von IGDB nicht mehr überschrieben. Hier geht es nur um diese eine Frage;
-            ob du die Disc haben willst, entscheidest du danach in der Lückenliste. Oben stehen die Fälle, zu denen eBay in der
-            Plattform-Kategorie gar kein Angebot kennt – bei bekannten Discs trifft das nur auf 3 % zu, es spricht also für „nur digital".
-          </p>
-        )}
-        {moeglichOffen &&
-          (!daten ? (
-            <p>wird geladen …</p>
-          ) : daten.moeglich.length === 0 ? (
-            <p>Nichts offen.</p>
+          <button type="button" aria-pressed={unklar} onClick={() => segment(true)}>
+            Disc unklar{daten && <span className="zahl">{daten.unbekannt}</span>}
+          </button>
+        </div>
+        <p className="ruhig klein">
+          {unklar
+            ? `Digital gespielt, nicht im Regal – gibt es eine Disc? Deine Antwort überschreibt IGDB nicht mehr.${
+                ebayUnbekannt > 0 ? ` ${ebayUnbekannt} davon kennt eBay gar nicht.` : ''
+              }`
+            : 'Digital gespielt, als Disc erschienen, nicht im Regal.'}
+        </p>
+
+        {meldung && <p role="alert" className="auffaellig">{meldung}</p>}
+        <RueckwegZeile weg={weg} />
+
+        {!daten ? (
+          <p className="ruhig">wird geladen …</p>
+        ) : unklar ? (
+          daten.moeglich.length === 0 ? (
+            <p className="ruhig">Nichts offen.</p>
           ) : (
-            <ul className="kandidatenliste">
+            <ul className="preisliste">
               {nachBefund(daten.moeglich).map((l) => (
-                <LueckeZeile key={l.releaseId} l={l} onGeaendert={() => void laden()}>
+                <FrageZeile key={l.releaseId} l={l}>
                   {l.verworfen ? (
-                    <button type="button" className="klein" disabled={laeuft} onClick={() => wiederZeigen(l)}>wieder zeigen</button>
+                    <button type="button" disabled={weg.laeuft} onClick={() => wiederZeigen(l)}>wieder zeigen</button>
                   ) : (
                     <>
-                      <button type="button" className="klein" disabled={laeuft} onClick={() => discSetzen(l, 'ja')}>Disc gibt es</button>
-                      <button type="button" className="klein" disabled={laeuft} onClick={() => discSetzen(l, 'nein')}>gibt es nicht</button>
+                      <button type="button" disabled={weg.laeuft} onClick={() => void discSetzen(l, 'ja')}>Disc gibt es</button>
+                      <button type="button" disabled={weg.laeuft} onClick={() => void discSetzen(l, 'nein')}>gibt es nicht</button>
                     </>
                   )}
-                </LueckeZeile>
+                </FrageZeile>
               ))}
             </ul>
-          ))}
-      </section>
+          )
+        ) : daten.luecken.length === 0 ? (
+          <p className="ruhig">
+            {daten.anzahl === 0 && daten.verworfen === 0
+              ? 'Keine Lücken. Lücke ist ein digital gespieltes Release, dessen Disc-Fassung belegt ist und das nicht im Regal steht.'
+              : 'Alle Lücken sind verworfen – „auch verworfene" holt sie zurück.'}
+          </p>
+        ) : (
+          <>
+            <Spaltenkopf digital={false} />
+            <ul className="preisliste">
+              {[...daten.luecken].sort(lueckenVergleich<Luecke>(sortierung, richtung)).map((l) => (
+                <LueckeZeile key={l.releaseId} l={l} sortierung={sortierung} weg={weg} laden={laden} wiederZeigen={wiederZeigen} />
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     </>
   )
 }
 
-function LueckeZeile({ l, children, onGeaendert }: { l: Luecke; children: ReactNode; onGeaendert: () => void }) {
-  // Nur im zweiten Block interessant: Bei einer belegten Luecke ist die Frage
-  // ja schon beantwortet.
-  const befund = l.discFassung === 'unbekannt' ? marktBefund(l.marktRohangebote, l.marktGeprueftAm) : null
+/**
+ * Eine belegte Lücke: Plattform · Fortschritt in der Zustandsfarbe · Platin ·
+ * Zustand · Sortierwert, rechts nur der Gebrauchtpreis.
+ */
+function LueckeZeile({
+  l,
+  sortierung,
+  weg,
+  laden,
+  wiederZeigen,
+}: {
+  l: Luecke
+  sortierung: LueckenSortierung
+  weg: RueckwegZustand
+  laden: () => Promise<void>
+  wiederZeigen: (l: Luecke) => void
+}) {
+  const w = lueckenSortierwert(sortierung, {
+    spieler: l.spieler,
+    kritik: l.kritik,
+    erscheinungsdatum: l.erscheinungsdatum,
+    angekuendigt: false,
+  })
+  const meta: ReactNode[] = [
+    <PlattformChip plattform={l.plattform} />,
+    <>
+      <span className="prozent" style={{ color: zustandsFarbe(l.eigenerStatus) }}>
+        {l.fortschritt}&thinsp;%
+      </span>
+      {l.platin && (
+        <span className="platinzeichen" title="Platin" aria-label="Platin">
+          <Zeichen name="pokal" groesse={13} />
+        </span>
+      )}
+    </>,
+  ]
+  if (l.eigenerStatus) meta.push(STATUSTEXT[l.eigenerStatus])
+  if (w) meta.push(<SortierwertText w={w} />)
+  if (l.verworfen) meta.push('verworfen')
+
+  function aktion(a: MenueAktion) {
+    switch (a) {
+      case 'aufKaufliste':
+        // Wie bis f2e der Kandidatenblock der Kaufliste: Herkunft „luecke".
+        void weg.tue(async () => {
+          const e = await anfrage<{ id: number }>('/api/plans', {
+            methode: 'POST',
+            koerper: { art: 'kauf', herkunft: 'luecke', releaseId: l.releaseId },
+          })
+          return { text: `„${l.titel}" auf die Kaufliste gesetzt.`, schritte: [{ methode: 'DELETE', pfad: `/api/plans/${e.id}` }] }
+        })
+        return
+      case 'disc':
+        if (!confirm(`Disc für ${l.plattform} erfassen?`)) return
+        void weg.tue(() => besitzErfassen(l.releaseId, l.titel, { art: 'disc' }))
+        return
+      case 'nichtGewuenscht':
+        // „physisch nicht gewünscht" (5.3): kauf/luecke/verworfen; Rückgängig löscht den Eintrag.
+        void weg.tue(async () => {
+          const a = await anfrage<{ id: number }>(`/api/gaps/${l.releaseId}/verwerfen`, { methode: 'POST' })
+          return { text: `„${l.titel}" als physisch nicht gewünscht verworfen.`, schritte: [{ methode: 'DELETE', pfad: `/api/plans/${a.id}` }] }
+        })
+        return
+      case 'wiederZeigen':
+        wiederZeigen(l)
+        return
+    }
+  }
+
   return (
-    <li className={l.verworfen ? 'verworfen' : undefined}>
-      <Link to={`/spiel/${l.spielId}`} className={l.bild ? 'bild cover' : 'bild'}>
-        {l.bild ? <img src={l.bild} alt="" loading="lazy" /> : <span aria-hidden="true">{l.titel.slice(0, 1)}</span>}
-      </Link>
-      <div>
-        <Link to={`/spiel/${l.spielId}`} className="titel">{l.titel}</Link>
-        <div className="ruhig klein">
-          <PlattformChip plattform={l.plattform} /> {l.fortschritt} %{l.platin && ' · Platin'}
-          {l.eigenerStatus && ` · ${STATUSTEXT[l.eigenerStatus]}`}
-          {' · '}Gebraucht:{' '}
-          <Preis
-            {...gebrauchtpreis(
-              l.besterGebrauchtpreisCents,
-              l.gebrauchtpreisAnbieter,
-              l.gebrauchtpreisUrl,
-              l.gebrauchtpreisItemId,
-              l.gebrauchtpreisVerworfen,
-            )}
-            releaseId={l.releaseId}
-            onGeaendert={onGeaendert}
-          />
-          {l.verworfen && ' · verworfen'}
-        </div>
-        {befund && <div className="ruhig klein">{befund}</div>}
+    <PreisZeile
+      schluessel={`l${l.releaseId}`}
+      klasse={l.verworfen ? 'luecke erledigt' : 'luecke'}
+      spielId={l.spielId}
+      titel={l.titel}
+      bild={l.bild}
+      meta={meta}
+      preise={<Gebraucht cents={l.besterGebrauchtpreisCents} anbieter={l.gebrauchtpreisAnbieter} url={l.gebrauchtpreisUrl} />}
+      menue={lueckeMenue({
+        verworfen: l.verworfen,
+        angebotItemId: l.besterGebrauchtpreisCents === null ? null : l.gebrauchtpreisItemId,
+        angebotVerworfen: l.gebrauchtpreisVerworfen,
+      })}
+      laeuft={weg.laeuft}
+      onAktion={aktion}
+      angebot={{
+        releaseId: l.releaseId,
+        itemId: l.besterGebrauchtpreisCents === null ? null : l.gebrauchtpreisItemId,
+        text: gebrauchtpreisText(l.besterGebrauchtpreisCents, l.gebrauchtpreisAnbieter),
+        ohneAngebot: l.besterGebrauchtpreisCents === null,
+        onGeaendert: () => void laden(),
+      }}
+    />
+  )
+}
+
+/**
+ * Eine Zeile unter „Disc unklar": Cover | Titel, Plattform, eBay-Befund |
+ * die beiden Antworten. Am Handy stehen die Knöpfe unter dem Text, am
+ * Desktop rechts daneben.
+ */
+function FrageZeile({ l, children }: { l: Luecke; children: ReactNode }) {
+  const befund = marktBefund(l.marktRohangebote, l.marktGeprueftAm)
+  return (
+    <li className={l.verworfen ? 'preisfrage erledigt' : 'preisfrage'}>
+      <Cover bild={l.bild} cover={l.bild !== null} titel={l.titel} ziel={`/spiel/${l.spielId}`} />
+      <div className="preiszeile-text">
+        <Link to={`/spiel/${l.spielId}`} className="preistitel">
+          {l.titel}
+        </Link>
+        <span className="preismeta">
+          <span>
+            <PlattformChip plattform={l.plattform} />
+          </span>
+          {l.verworfen && <span>verworfen</span>}
+        </span>
+        {befund && <span className="preisbefund">{befund}</span>}
       </div>
-      <div className="knopfzeile">{children}</div>
+      <div className="entscheid">{children}</div>
     </li>
   )
 }

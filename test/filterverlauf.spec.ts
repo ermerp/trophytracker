@@ -11,6 +11,8 @@ import {
 	stateZumMenue,
 	stateZumOeffnen,
 	tafelOffen,
+	zeilenmenueOffen,
+	stateZumZeilenmenue,
 } from "../frontend/src/filterverlauf";
 
 /**
@@ -141,5 +143,22 @@ describe("nachMenue", () => {
 		expect(nachMenue(true, null, false, "?sort=preis", "")).toBeNull();
 		expect(nachMenue(true, null, true, "?a=1&b=2", "?b=2&a=1")).toBeNull();
 		expect(nachMenue(false, null, true, "?sort=preis", "")).toBeNull();
+	});
+});
+
+/** Das Menue einer Zeile der Preisliste (Nachtrag f2e): ein Schluessel je Zeile. */
+describe("zeilenmenueOffen", () => {
+	it("nennt den Schluessel der offenen Zeile und sonst null", () => {
+		expect(zeilenmenueOffen({ zeilenmenue: "p12" })).toBe("p12");
+		expect(zeilenmenueOffen({ zeilenmenue: true })).toBeNull();
+		expect(zeilenmenueOffen(MENUE_STATE)).toBeNull();
+		expect(zeilenmenueOffen(null)).toBeNull();
+	});
+});
+
+describe("stateZumZeilenmenue", () => {
+	it("setzt den Schluessel, laesst die Tafel stehen und nimmt die Suche weg", () => {
+		expect(stateZumZeilenmenue({ ...SUCH_STATE, ...TAFEL_STATE }, "l7")).toEqual({ filtertafel: true, zeilenmenue: "l7" });
+		expect(stateZumZeilenmenue(null, "p1")).toEqual({ zeilenmenue: "p1" });
 	});
 });
