@@ -1587,6 +1587,60 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 	});
 
 	/**
+	 * Nachtrag 24c: das Oeffnen der Startseite als Ganzes. Die Kennzahlen oben
+	 * messen die SQL von /api/stats einzeln; die Startseite laedt aber
+	 * zwoelf Routen je Geraet, und erst ihre Summe ist, was ein Oeffnen kostet:
+	 *
+	 * - `Kennzahlen.tsx`: /api/stats und /api/stats/jahre,
+	 * - `Neu.tsx`: /api/feed, am Desktop mit `?anzahl=` (`FEED_DESKTOP` im
+	 *   Frontend, dieselbe Zahl wie `FEED_HOECHSTENS`),
+	 * - `Offenes.tsx` (`useOffenePosten`, von `Start.tsx` immer geladen, auch
+	 *   bei geschlossener Glocke): die uebrigen zehn.
+	 *
+	 * `Start.tsx` und `Kopfzeile.tsx` laden selbst nichts. Die Routenliste ist
+	 * eine ABSCHRIFT der Frontend-Aufrufe - das Frontend ist im Worker-Test
+	 * nicht importierbar. Wer der Startseite einen Abruf hinzufuegt, traegt ihn
+	 * hier ein; sonst misst dieser Test still zu wenig.
+	 *
+	 * Bewertung vom 27.11.2026: rund 11 000 Zeilen je Oeffnen sind 0,2 % der
+	 * 5 Mio. Tageslesungen. Nicht umgebaut (Entscheidung des Nutzers vom
+	 * 27.11.2026). Die Grenzen sollen auffallen lassen, wenn eine neue Abfrage
+	 * die Startseite verteuert.
+	 */
+	it("misst das Oeffnen der Startseite als Summe ihrer Routen (Nachtrag 24c)", async () => {
+		const feedHandy = "/api/feed";
+		const feedDesktop = `/api/feed?anzahl=${FEED_HOECHSTENS}`;
+		const gemeinsam = [
+			"/api/stats",
+			"/api/stats/jahre",
+			"/api/review/progress",
+			"/api/betrieb/warnungen",
+			"/api/zuordnung/offen?limit=1",
+			"/api/igdb/status",
+			"/api/preisalarme",
+			"/api/sync/store/offen",
+			"/api/imports/wishlist",
+			"/api/unmatched",
+			"/api/backlog-candidates",
+		];
+		const jeRoute: Record<string, number> = {};
+		for (const pfad of [...gemeinsam, feedHandy, feedDesktop]) jeRoute[pfad] = await routeGelesen(pfad);
+		const basis = gemeinsam.reduce((n, pfad) => n + jeRoute[pfad], 0);
+		const handy = basis + jeRoute[feedHandy];
+		const desktop = basis + jeRoute[feedDesktop];
+		console.info({ startseite: jeRoute, handy, desktop });
+
+		// Grenzen mit rund 13-14 % Luft ueber dem Messwert vom 27.11.2026 im
+		// vollen Lauf der Datei: /api/stats 6 305 (die teuerste Route, mehr als
+		// die Haelfte), Summe 10 925 an beiden Geraeten - der Feed liest mit und
+		// ohne `anzahl` dieselben 432 Zeilen.
+		expect(jeRoute["/api/stats"]).toBeLessThan(16.5 * LISTEN);
+		// Der Desktop holt den laengeren Feed und ist damit die obere Summe.
+		expect(handy).toBeLessThanOrEqual(desktop);
+		expect(desktop).toBeLessThan(29 * LISTEN);
+	});
+
+	/**
 	 * Einzeltrophaeen (Stufe 19b). Gemessen wird BEIDES - die Leseansicht und
 	 * der Schreibschritt. Bis zum 28.09.2026 mass diese Datei ausschliesslich
 	 * Leseansichten, und ein Sync-Schritt mit einer Abfrage je Eintrag lief

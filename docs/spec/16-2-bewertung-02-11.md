@@ -135,3 +135,29 @@ fragt in sich nur zweimal und gewinnt allein durch 18q. 18p wird **nach der Kauf
 15.11.** ausgeliefert, damit die Kaufliste 18q allein zeigt. **Verworfen:** den Ausgang in den
 Schreib-Batch des Schritts zu legen – er muss auch bei einem Fehler im Schritt stehen und bräuchte
 einen Rückfallweg, mehr Risiko als ein D1-Aufruf wert ist.
+
+#### Die Spielzeit-Spitze: Was kostet, ist die Anmeldung (gemessen am 27.11.2026)
+
+**Seit 18q ist die Spitze in sich so schlank wie Level** (4 D1-Aufrufe gegen 3), und trotzdem ist sie jede
+Nacht der teuerste Aufruf. Der Unterschied ist die Anmeldung bei Sony: Das Access Token von 00:00 hat um
+00:55 knapp sechs Minuten Rest, `ACCESS_RESTZEIT_MS` verlangt zehn (`src/db/credentials.ts`), also erneuert
+die Spitze jede Nacht. Nächte zum 23. bis 27.11., aus den Cron-Zeilen (`anmeldung=` seit 18q-c, 25.11.):
+
+| Aufruf | mit Anmeldung | ohne Anmeldung |
+|---|---|---|
+| Spitze 00:55 | 28, 14, 20, 15, 11 ms | – |
+| Sync 00:00 | 25, 11, 15 ms (23./24.11.: 9, 13, ohne Angabe) | – |
+| übriger Sync | – | meist 4–10, Median rund 7 |
+| Level 01:00 (auch eine Seite bei Sony) | – | 3–9 ms |
+
+Am selben Standort (ORD, 27.11.) Sync 15 ms mit, 6 ms ohne Anmeldung. **Dass die Anmeldung 5–10 ms kostet,
+ist aus diesem Vergleich geschlossen, nicht je Aufruf gemessen.** Das Bündeln der vier D1-Aufrufe erklärte
+die Spanne nicht und brächte rund 1–2 ms.
+
+**Vorschlag, nicht gebaut:** `ACCESS_RESTZEIT_MS` von zehn auf drei Minuten – die Spitze verwendet dann das
+Token von 00:00 wieder, eine Anmeldung je Nacht statt zwei. Lehnt Sony es ab, erneuert `psnSitzung` einmal
+und wiederholt den Abruf. Erwartet: die Spitze bei Level; belegt erst über mehrere Nächte, je Standort.
+**Termin: nach dem Ende der NPSSO-Beobachtung** (Entscheidung des Nutzers vom 27.11.2026) – nach der Nacht
+zum 08.12. oder früher, wenn der Sync scheitert und ein neues NPSSO eingetragen ist ([7.1](07-1-psn-trophaeen.md)).
+Vorher änderte sie die beobachtete Größe: Der Sprung des Refresh-Tokens auf den 07.12. kam aus der
+Erneuerung um 00:55.

@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 196 | 27.11.2026 | **Nachtrag 24c: Startseite bewertet, nicht umgebaut.** 10 925 Zeilen je Öffnen (0,2 % des Tages), Messtest mit Grenze; Spielzeit-Spitze: teuer ist die Anmeldung um 00:55, Vorschlag Restzeit 3 min, nach dem Ende der NPSSO-Beobachtung (16.2) |
 | 195 | 27.11.2026 | **Nachtrag: Nächte zum 26. und 27.11.** 120 Aufrufe `ok`, keiner über 15 ms, kein Leerlauf über 10 ms; Preisläufe 8 h 00 bis 9 h 15 verspätet, Schwellen bleiben (Nutzer); Refresh-Token sprang bei `anmeldung=refresh` auf 07.12., NPSSO-Urteil damit erst nach der Nacht zum 08.12. (16.2, 7.1) |
 | 194 | 25.11.2026 | **Abschluss 25.11.:** Teilindex für `discBelegt` verworfen; Schwellen der Preisläufe und Termin der Spielzeit-Spitze offen (16.2) |
 | 193 | 25.11.2026 | **Nachtrag 18r-c: Verspätung der Preisläufe in der Nachtauswertung.** `scripts/nacht.mjs` nennt je Lauf Termin, Start und Verspätung (16.2) |
