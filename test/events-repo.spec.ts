@@ -212,6 +212,9 @@ describe("Lesen", () => {
 	it("GET /api/games/:id/events liefert den Verlauf neueste zuerst, seitenweise ueber vor", async () => {
 		await release(1);
 		for (const s of ["am_spielen", "pausiert", "durchgespielt"] as const) await repos().playStatus.statusSetzen(1, s);
+		// Drei Handgriffe, nicht ein Vorgang: eine Minute auseinander, sonst
+		// fasst die Anzeige sie zu einer Zeile zusammen (Nachtrag f1c).
+		await env.DB.prepare("UPDATE game_event SET occurred_at = datetime('2026-11-27 10:00:00', '+' || id || ' minutes')").run();
 
 		const erste = (await (await SELF.fetch(`${B}/api/games/1/events?limit=2`)).json()) as {
 			weiter: boolean;
@@ -236,5 +239,76 @@ describe("Lesen", () => {
 		expect(alle.ereignisse.map((e) => e.quelle)).toEqual(["nutzer", "sync"]);
 		const sync = (await (await SELF.fetch(`${B}/api/events?quelle=sync`)).json()) as typeof alle;
 		expect(sync.ereignisse.map((e) => e.quelle)).toEqual(["sync"]);
+	});
+});
+
+describe("Buendel (Nachtrag f1c)", () => {
+	const zeit = (id: number, sek: number) =>
+		env.DB.prepare("UPDATE game_event SET occurred_at = datetime('2026-11-27 10:00:00', '+' || ? || ' seconds') WHERE id = ?").bind(sek, id).run();
+
+	it("fasst die Schritte eines Vorgangs zu einer Zeile, Plattform im Titel, der Rest im Zusatz", async () => {
+		await release(1, null, "Glutmark");
+		const r = repos();
+		const ids: number[] = [];
+		for (const [kind, releaseId, neu, detail] of [
+			["spiel_angelegt", null, null, "aus IGDB"],
+			["igdb_verknuepft", null, null, "glutmark"],
+			["release_angelegt", 1, "PS5", "für einen Listeneintrag"],
+			["liste_eintrag_angelegt", 1, null, "manuell"],
+		] as const) {
+			await env.DB.batch([r.events.statement({ source: "nutzer", kind, gameId: 1, releaseId, neu, detail, field: kind === "liste_eintrag_angelegt" ? "wunsch" : undefined })]);
+			ids.push((await env.DB.prepare("SELECT MAX(id) AS id FROM game_event").first<{ id: number }>())!.id);
+		}
+		const seite = (await (await SELF.fetch(`${B}/api/events`)).json()) as {
+			ereignisse: Array<{ id: number; titel: string; text: string; zusatz: string | null; anzahl: number }>;
+		};
+		expect(seite.ereignisse).toHaveLength(1);
+		expect(seite.ereignisse[0]).toMatchObject({
+			id: Math.min(...ids),
+			text: "Auf Wunschliste gesetzt (von Hand)",
+			zusatz: "neu angelegt aus IGDB",
+			anzahl: 4,
+		});
+		expect(seite.ereignisse[0].titel).toContain("(");
+	});
+
+	it("trennt verschiedene Quellen und Abstaende ueber einer Sekunde", async () => {
+		await release(1, 45);
+		await repos().playStatus.vorbelegen();
+		await repos().playStatus.statusSetzen(1, "pausiert");
+		const alle = (await (await SELF.fetch(`${B}/api/events`)).json()) as { ereignisse: Array<{ quelle: string; anzahl: number }> };
+		expect(alle.ereignisse.map((e) => [e.quelle, e.anzahl])).toEqual([["nutzer", 1], ["sync", 1]]);
+
+		await repos().playStatus.statusSetzen(1, "durchgespielt");
+		const ids = (await env.DB.prepare("SELECT id FROM game_event WHERE source = 'nutzer' ORDER BY id").all<{ id: number }>()).results.map((x) => x.id);
+		await zeit(ids[0], 0);
+		await zeit(ids[1], 2);
+		const getrennt = (await (await SELF.fetch(`${B}/api/events?quelle=nutzer`)).json()) as typeof alle;
+		expect(getrennt.ereignisse.map((e) => e.anzahl)).toEqual([1, 1]);
+	});
+
+	it("zerreisst ein Buendel nicht an der Seitengrenze - die Seite endet dahinter", async () => {
+		await release(1, 45);
+		await release(2, 46);
+		// Spiel 2 einmal, aelter; Spiel 1 dreimal, juenger und in einem Vorgang.
+		await repos().playStatus.statusSetzen(2, "am_spielen");
+		// Drei verschiedene Schritte an Spiel 1 - ein Vorgang.
+		const r = repos();
+		for (const kind of ["spiel_umbenannt", "igdb_verknuepft", "status_geaendert"] as const) {
+			await env.DB.batch([r.events.statement({ source: "nutzer", kind, gameId: 1, releaseId: kind === "status_geaendert" ? 1 : null })]);
+		}
+		const ids = (await env.DB.prepare("SELECT id FROM game_event ORDER BY id").all<{ id: number }>()).results.map((x) => x.id);
+		await zeit(ids[0], 0);
+		for (const id of ids.slice(1)) await zeit(id, 60);
+
+		const erste = (await (await SELF.fetch(`${B}/api/events?limit=2`)).json()) as {
+			weiter: boolean;
+			ereignisse: Array<{ id: number; anzahl: number; spielId: number }>;
+		};
+		expect(erste.ereignisse.map((e) => [e.spielId, e.anzahl])).toEqual([[1, 3]]);
+		expect(erste.weiter).toBe(true);
+		const zweite = (await (await SELF.fetch(`${B}/api/events?limit=2&vor=${erste.ereignisse[0].id}`)).json()) as typeof erste;
+		expect(zweite.ereignisse.map((e) => [e.spielId, e.anzahl])).toEqual([[2, 1]]);
+		expect(zweite.weiter).toBe(false);
 	});
 });

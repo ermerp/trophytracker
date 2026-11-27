@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { beschreibeEreignis, beschreibeFeedTrophaeen, type FeedArt } from "../domain/ereignis";
+import { beschreibeBuendel, beschreibeFeedTrophaeen, buendele, type FeedArt } from "../domain/ereignis";
 import { seltenheitStufe } from "../domain/trophaee";
 import type { AppEnv } from "../types";
 
@@ -49,7 +49,16 @@ type Zeile = {
 	titel: string;
 	spielId: number | null;
 	text: string;
+	/** Nachtrag f1c: die uebrigen Schritte eines Buendels; bei Trophaeen null. */
+	zusatz: string | null;
 };
+
+/**
+ * Ereignisse, die der Feed fuer `anzahl` Zeilen liest (Nachtrag f1c): Ein
+ * Buendel fasst mehrere zusammen, also reicht `anzahl` nicht mehr - vier je
+ * Zeile, wie ein neues Spiel aus IGDB mit Wunsch, hoechstens 80.
+ */
+export const feedEreignisse = (anzahl: number) => Math.min(80, anzahl * 4);
 
 export const feedRoutes = new Hono<AppEnv>().get("/", async (c) => {
 	const anzahl = feedAnzahl(c.req.query("anzahl"));
@@ -59,20 +68,24 @@ export const feedRoutes = new Hono<AppEnv>().get("/", async (c) => {
 	const vollstaendig = stand.gesamt > 0 && stand.offen === 0;
 
 	const [ereignisse, trophaeen] = await Promise.all([
-		c.var.repos.events.liste({ quelle: null, limit: anzahl, vor: null }),
+		c.var.repos.events.liste({ quelle: null, limit: feedEreignisse(anzahl), vor: null }),
 		vollstaendig ? c.var.repos.trophaeen.feed(anzahl) : Promise.resolve([]),
 	]);
 
 	const zeilen: Zeile[] = [
-		...ereignisse.ereignisse.map((e) => ({
-			id: `e${e.id}`,
-			quelle: e.source,
-			art: e.kind,
-			zeitpunkt: e.occurred_at,
-			titel: e.label,
-			spielId: e.game_id,
-			text: beschreibeEreignis(e),
-		})),
+		...buendele(ereignisse.ereignisse)
+			.map(beschreibeBuendel)
+			.slice(0, anzahl)
+			.map((b) => ({
+				id: `e${b.id}`,
+				quelle: b.haupt.source,
+				art: b.haupt.kind,
+				zeitpunkt: b.zuletzt,
+				titel: b.titel,
+				spielId: b.haupt.game_id,
+				text: b.text,
+				zusatz: b.zusatz,
+			})),
 		...trophaeen.map((t) => {
 			const art: FeedArt = t.platin ? "platin_erspielt" : "trophaeen_erspielt";
 			return {
@@ -87,6 +100,7 @@ export const feedRoutes = new Hono<AppEnv>().get("/", async (c) => {
 				titel: t.titel ?? "(ohne Spiel)",
 				spielId: t.spielId,
 				text: beschreibeFeedTrophaeen({ art, ...t }),
+				zusatz: null,
 			};
 		}),
 	];

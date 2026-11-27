@@ -413,3 +413,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 27.11.2026 | **„Wunsch umhängen" zurückgestellt**, bis ein Fall auftritt, den „Anderen Eintrag wählen" nicht löst | [16.4](spec/16-4-finale-stufen.md) |
 | 27.11.2026 | **Ähnliche Wünsche nur als Hinweis**, beim Hinzufügen und in der Import-Durchsicht – keine Sperre | [8.2](spec/08-2-wunschlisten-import.md) |
 | 27.11.2026 | **Der Cursor steht im Feld, das ein Tipp aufklappt**, überall; nicht in Feldern, die von selbst offen stehen | [13.3](spec/13-3-bedienung.md) |
+| 27.11.2026 | **Ein Vorgang, eine Zeile** in Änderungen, Spielverlauf und Feed – als Zeile mit Zusatz, nicht aufklappbar | [8.5](spec/08-5-aenderungsprotokoll.md) |

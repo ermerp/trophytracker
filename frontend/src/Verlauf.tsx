@@ -16,6 +16,7 @@ export function Verlauf({ ereignisse, mitTitel }: { ereignisse: Ereignis[]; mitT
           {mitTitel && (e.spielId !== null ? <Link to={`/spiel/${e.spielId}`} className="titel">{e.titel}</Link> : <span className="titel">{e.titel}</span>)}
           {mitTitel && ' – '}
           {e.text}
+          {e.zusatz && <span className="ruhig"> · {e.zusatz}</span>}
         </li>
       ))}
     </ul>

@@ -581,6 +581,10 @@ export type Ereignis = {
   neu: string | null
   detail: string | null
   text: string
+  /** Nachtrag f1c: die übrigen Schritte desselben Vorgangs, knapp; null bei einem einzelnen. */
+  zusatz: string | null
+  /** Wie viele Ereignisse die Zeile zusammenfasst. */
+  anzahl: number
 }
 
 export type EreignisSeite = { weiter: boolean; ereignisse: Ereignis[] }

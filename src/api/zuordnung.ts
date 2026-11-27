@@ -1,6 +1,6 @@
 import { alarmKanal } from "../domain/preisalarm";
 import { Hono } from "hono";
-import { ereignisAntwort, seitenParameter } from "./events";
+import { buendelAntwort, gebuendelteSeite, seitenParameter } from "./events";
 import {
 	BESITZ_FILTER,
 	DISC_FILTER,
@@ -407,8 +407,8 @@ export const gameRoutes = new Hono<AppEnv>()
 		if (!Number.isInteger(id)) return c.json({ fehler: "Ungültige Id." }, 400);
 		if (!(await c.var.repos.games.spielExistiert(id))) return c.json({ fehler: "Spiel nicht gefunden." }, 404);
 		const { limit, vor } = seitenParameter(c.req.query(), 20);
-		const { ereignisse, weiter } = await c.var.repos.events.fuerSpiel(id, limit, vor);
-		return c.json({ limit, weiter, ereignisse: ereignisse.map(ereignisAntwort) });
+		const { zeilen, weiter } = await gebuendelteSeite((n) => c.var.repos.events.fuerSpiel(id, n, vor), limit);
+		return c.json({ limit, weiter, ereignisse: zeilen.map(buendelAntwort) });
 	})
 
 	.get("/:id", async (c) => {
