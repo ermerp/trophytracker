@@ -8,6 +8,7 @@ import {
 	erledigteListe,
 	lueckeMenue,
 	lueckenSortierwert,
+	menueNurHandy,
 	nachBefund,
 	planMenue,
 	rabattProzent,
@@ -119,13 +120,15 @@ describe("planMenue", () => {
 		const m = planMenue(plan());
 		expect(aktionen(m)).toEqual(["aufKaufliste", "disc", "digital", "favorit", "plattform", "verworfen", "entfernen"]);
 		expect(m[0].haupt).toEqual({ knopf: "auf die Kaufliste" });
+		expect(m[0].nurHandy).toBe(true);
+		expect(m.filter((e) => e.nurHandy)).toHaveLength(1);
 		expect(m.at(-1)).toMatchObject({ gefahr: true, trenner: true });
 		expect(m.find((e) => e.aktion === "verworfen")?.trenner).toBe(true);
 	});
 
 	it("zeigt beim Wunsch auf der Kaufliste den ruhigen Verweis statt des Knopfs", () => {
 		const m = planMenue(plan({ aufKaufliste: 12 }));
-		expect(m[0]).toMatchObject({ aktion: "kauflisteAnsehen", haupt: { ruhend: true } });
+		expect(m[0]).toMatchObject({ aktion: "kauflisteAnsehen", haupt: { ruhend: true }, nurHandy: true });
 		expect(aktionen(m)).not.toContain("aufKaufliste");
 	});
 
@@ -133,6 +136,9 @@ describe("planMenue", () => {
 		const m = planMenue(plan({ art: "kauf" }));
 		expect(aktionen(m)).toEqual(["disc", "digital", "favorit", "plattform", "verworfen", "entfernen"]);
 		expect(m[0].haupt).toEqual({ knopf: "Disc erfassen" });
+		expect(m[0].nurHandy).toBe(true);
+		// Die naechste Zeile gehoert zur selben Gruppe: keine Trennlinie, die oben stuende.
+		expect(m[1].trenner).toBeUndefined();
 	});
 
 	it('kennt kein „erledigt" von Hand – weder bei Wunsch noch bei Kauf (Entscheidung vom 27.11.2026)', () => {
@@ -144,7 +150,7 @@ describe("planMenue", () => {
 	it("bietet das Angebot nur an, wenn es eines gibt oder etwas verworfen ist", () => {
 		expect(aktionen(planMenue(plan()))).not.toContain("angebot");
 		expect(planMenue(plan({ angebotItemId: "v1|123|0" })).find((e) => e.aktion === "angebot")).toMatchObject({
-			text: "Gebrauchtangebot verwerfen",
+			text: "Gebrauchtangebot prüfen …",
 			trenner: true,
 		});
 		expect(planMenue(plan({ angebotVerworfen: 2 })).find((e) => e.aktion === "angebot")?.text).toBe("Verworfene Angebote (2)");
@@ -163,7 +169,7 @@ describe("planMenue", () => {
 	it("bietet ohne Release kein Erfassen und keine Hauptaktion beim Kauf", () => {
 		const m = planMenue(plan({ art: "kauf", releaseId: null }));
 		expect(aktionen(m)).toEqual(["favorit", "plattform", "verworfen", "entfernen"]);
-		expect(m.some((e) => e.haupt)).toBe(false);
+		expect(m.some((e) => e.haupt || e.nurHandy || e.trennerNurHandy)).toBe(false);
 	});
 
 	it('laesst Erledigtem und Verworfenem nur „wieder oeffnen" und „entfernen"', () => {
@@ -172,6 +178,9 @@ describe("planMenue", () => {
 				const m = planMenue(plan({ art, status, angebotItemId: "x" }));
 				expect(aktionen(m)).toEqual(["oeffnen", "entfernen"]);
 				expect(m[0].haupt).toEqual({ knopf: "wieder öffnen" });
+				// Am Desktop beginnt das Menue mit „Entfernen" – ohne Trennlinie darueber.
+				expect(m[0].nurHandy).toBe(true);
+				expect(m[1]).toMatchObject({ trenner: true, trennerNurHandy: true });
 			}
 		}
 	});
@@ -183,6 +192,8 @@ describe("lueckeMenue", () => {
 		expect(m.map((e) => e.aktion)).toEqual(["aufKaufliste", "disc", "nichtGewuenscht", "angebot"]);
 		expect(m[0].haupt).toEqual({ knopf: "auf die Kaufliste" });
 		expect(m[2].trenner).toBe(true);
+		expect(m[0].nurHandy).toBe(true);
+		expect(m.some((e) => e.trennerNurHandy)).toBe(false);
 		expect(m.some((e) => e.aktion === "entfernen")).toBe(false);
 	});
 
@@ -197,6 +208,18 @@ describe("lueckeMenue", () => {
 	it("kennt bei einer verworfenen Luecke nur den Weg zurueck", () => {
 		const m = lueckeMenue({ verworfen: true, angebotItemId: "x", angebotVerworfen: 1 });
 		expect(m).toEqual([expect.objectContaining({ aktion: "wiederZeigen", haupt: { knopf: "wieder als Lücke zeigen" } })]);
+		// Der einzige Eintrag steht am Desktop als Knopf – dort faellt das ganze Menue weg.
+		expect(m[0].nurHandy).toBe(true);
+		expect(menueNurHandy(m)).toBe(true);
+	});
+
+	it("blendet das Menue am Desktop nur aus, wenn alles darin schon in der Zeile steht", () => {
+		expect(menueNurHandy(lueckeMenue({ verworfen: false, angebotItemId: null, angebotVerworfen: 0 }))).toBe(false);
+		for (const art of ["wunsch", "kauf"] as const) {
+			for (const status of ["offen", "erledigt"] as const) expect(menueNurHandy(planMenue(plan({ art, status })))).toBe(false);
+		}
+		expect(menueNurHandy(planMenue(plan({ aufKaufliste: 12 })))).toBe(false);
+		expect(menueNurHandy([])).toBe(false);
 	});
 });
 
