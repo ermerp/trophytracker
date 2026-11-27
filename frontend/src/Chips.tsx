@@ -37,7 +37,12 @@ import { Zeichen } from './Symbole'
 export type ChipGruppe = {
 	/** Der Parametername in der URL, etwa `platform` oder `owned`. */
 	param: string
-	/** Überschrift der Gruppe in der Tafel. */
+	/**
+	 * Überschrift der Gruppe in der Tafel. Folgen zwei Gruppen mit derselben
+	 * Überschrift aufeinander, stehen ihre Chips in **einer** Zeile – so teilen
+	 * sich Favoriten und Preisfilter „Auswahl", obwohl sie verschiedene
+	 * Parameter setzen (Nachtrag f2e-c-b).
+	 */
 	titel: string
 	/** Mehrere Werte gleichzeitig, kommagetrennt (Plattformen). */
 	mehrfach?: boolean
@@ -116,6 +121,14 @@ export function Chips({ gruppen, rechts }: { gruppen: readonly ChipGruppe[]; rec
 
 	const aktive = nachGruppe.flatMap(({ chips }) => chips.filter((c) => c.aktiv))
 
+	// Aufeinanderfolgende Gruppen gleicher Überschrift zu einer Zeile der Tafel.
+	const zeilen: { titel: string; chips: Chip[] }[] = []
+	for (const { gruppe, chips } of nachGruppe) {
+		const letzte = zeilen.at(-1)
+		if (letzte && letzte.titel === gruppe.titel) letzte.chips.push(...chips)
+		else zeilen.push({ titel: gruppe.titel, chips: [...chips] })
+	}
+
 	function allesAb() {
 		const neu = new URLSearchParams()
 		// Sortierung ist kein Filter und bleibt stehen – mit ihrer Richtung.
@@ -161,9 +174,9 @@ export function Chips({ gruppen, rechts }: { gruppen: readonly ChipGruppe[]; rec
 
 			{offen && (
 				<div className="filtertafel">
-					{nachGruppe.map(({ gruppe, chips }) => (
-						<div key={gruppe.param} className="filtergruppe">
-							<span className="filtername">{gruppe.titel}</span>
+					{zeilen.map(({ titel, chips }) => (
+						<div key={titel} className="filtergruppe">
+							<span className="filtername">{titel}</span>
 							<div className="chips lose">
 								{chips.map((c) => (
 									<button

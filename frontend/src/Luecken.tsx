@@ -86,7 +86,7 @@ const LUECKEN_CHIPS: readonly ChipGruppe[] = [{ param: 'verworfene', titel: 'Ver
  */
 const LUECKEN_CHIPS_BELEGT: readonly ChipGruppe[] = [
   ...LUECKEN_CHIPS,
-  { param: 'preis', titel: 'Preis', mehrfach: true, werte: [['gebraucht', PREIS_FILTER_TEXT.gebraucht]] },
+  { param: 'preis', titel: 'Auswahl', mehrfach: true, werte: [['gebraucht', PREIS_FILTER_TEXT.gebraucht]] },
 ]
 
 type Antwort = { anzahl: number; verworfen: number; unbekannt: number; luecken: Luecke[]; moeglich: Luecke[] }
