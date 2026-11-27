@@ -158,6 +158,6 @@ die Spanne nicht und brächte rund 1–2 ms.
 Token von 00:00 wieder, eine Anmeldung je Nacht statt zwei. Lehnt Sony es ab, erneuert `psnSitzung` einmal
 und wiederholt den Abruf. Erwartet: die Spitze bei Level; belegt erst über mehrere Nächte, je Standort.
 **Termin: nach dem Ende der NPSSO-Beobachtung** (Entscheidung des Nutzers vom 27.11.2026) – nach der Nacht
-zum 08.12. oder früher, wenn der Sync scheitert und ein neues NPSSO eingetragen ist ([7.1](07-1-psn-trophaeen.md)).
+zum 08.12. oder früher: wenn der Sync scheitert und ein neues NPSSO eingetragen ist, oder wenn der Punkt nach dem 28.11. noch einmal springt ([7.1](07-1-psn-trophaeen.md)).
 Vorher änderte sie die beobachtete Größe: Der Sprung des Refresh-Tokens auf den 07.12. kam aus der
 Erneuerung um 00:55.

@@ -392,4 +392,5 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 25.11.2026 | **Kein Teilindex für `discBelegt`**: zu wenig Gewinn für eine Migration | [16.2](spec/16-2-cpu-und-betrieb.md) |
 | 27.11.2026 | **Die Schwellen der Preisläufe bleiben bei 30 h Stillstand und 42 h Store-Ziel**, trotz 8 bis 9 h 44 Verspätung am Nachmittag; 36 h / 48 h verworfen | [16.2](spec/16-2-betriebswarnungen.md) |
 | 27.11.2026 | **Die Spielzeit-Spitze wartet bis zum Ende der NPSSO-Beobachtung** (Nacht zum 08.12. oder ein neues NPSSO): Ihr Hebel ist die Anmeldung um 00:55, die beobachtet wird | [16.2](spec/16-2-bewertung-02-11.md) |
+| 27.11.2026 | **Der Sync wird in einem Rutsch optimiert** (Abruf und Normalisierung), mit der Spitze nach dem Ende der NPSSO-Beobachtung; nichts davon wird vorab gebaut | [16.2](spec/16-2-offene-stufen.md) |
 | 27.11.2026 | **Die Startseite wird nicht umgebaut**, nur bewertet (rund 11 000 Zeilen je Öffnen, 0,2 % des Tages); ihr Messtest bleibt mit Grenze | [16.2](spec/16-2-offene-stufen.md) |
