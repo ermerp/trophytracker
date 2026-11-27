@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   FORMTEXT,
+  aehnlichText,
   PLATTFORMEN,
   anfrage,
   textAusDatei,
@@ -511,6 +512,8 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
   const unklar = zeile.treffer === 'mehrdeutig' || zeile.treffer === 'ohne_treffer'
   const [zeigeWahl, setZeigeWahl] = useState(false)
   const [suche, setSuche] = useState(offen && zeile.treffer === 'ohne_treffer')
+  // Nur eine von Hand geöffnete Suche bekommt den Cursor (Nachtrag f1b).
+  const [sucheVonHand, setSucheVonHand] = useState(false)
   const [teilen, setTeilen] = useState(false)
   const [teilText, setTeilText] = useState(zeile.titel)
   const [umbenennen, setUmbenennen] = useState(false)
@@ -564,6 +567,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
             {zeile.entscheidung === 'uebernommen' && ' · übernommen'}
           </div>
           <div className="zeile">{treffer()}</div>
+          {zeile.aehnlich.length > 0 && <div className="aehnlich-hinweis">Ähnlich auf der Wunschliste: {aehnlichText(zeile.aehnlich)}</div>}
         </div>
       </header>
 
@@ -598,7 +602,7 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
         )}
         {offen && (
           <>
-            <button type="button" className="klein" onClick={() => setSuche(!suche)} disabled={beschaeftigt}>
+            <button type="button" className="klein" onClick={() => { setSucheVonHand(!suche); setSuche(!suche) }} disabled={beschaeftigt}>
               {suche ? 'Suche schließen' : 'Anders suchen'}
             </button>
             <button type="button" className="klein" onClick={() => setUmbenennen(!umbenennen)} disabled={beschaeftigt}>Umbenennen</button>
@@ -622,6 +626,8 @@ function ImportZeileKarte({ zeile, aktionen }: { zeile: ImportZeile; aktionen: Z
           laeuft={beschaeftigt}
           mitPlattform
           vorschlag={vorschlag}
+          fokus={sucheVonHand}
+          mitWunschAbgleich
         />
       )}
 

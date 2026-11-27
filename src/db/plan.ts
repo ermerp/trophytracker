@@ -220,6 +220,18 @@ export const POSITION_ANS_ENDE =
  * Route: Die Listen sind klein, und die Regeln aendern sich oefter als das
  * Schema. Seit Migration 0013 gibt es keine Prioritaet und keinen Rang mehr.
  */
+/**
+ * Titel und Plattform aller offenen Wuensche (Nachtrag f1b) - fuer den Hinweis
+ * auf aehnliche Titel beim Hinzufuegen und in der Import-Durchsicht. Ueber
+ * idx_plan_offen; Spiel und Release je Zeile per Primaerschluessel. Exportiert,
+ * damit `test/lesekosten.spec.ts` genau diese Abfrage misst.
+ */
+export const OFFENE_WUNSCHTITEL =
+	"SELECT pe.id, COALESCE(g.title, pe.title_raw) AS titel, r.platform AS plattform FROM plan_entry pe " +
+	"LEFT JOIN release r ON r.id = pe.release_id " +
+	"LEFT JOIN game g ON g.id = COALESCE(pe.game_id, r.game_id) " +
+	"WHERE pe.kind = 'wunsch' AND pe.status = 'offen'";
+
 export class PlanRepository {
 	constructor(
 		private readonly db: D1Database,
@@ -290,6 +302,11 @@ export class PlanRepository {
 	 * Aussagen. Nur genau dasselbe Ziel derselben Art zaehlt als Duplikat.
 	 * Freitext wird nicht geprueft - er hat kein Ziel, das sich vergleichen liesse.
 	 */
+	async offeneWunschtitel(): Promise<Array<{ id: number; titel: string | null; plattform: string | null }>> {
+		const { results } = await this.db.prepare(OFFENE_WUNSCHTITEL).all<{ id: number; titel: string | null; plattform: string | null }>();
+		return results;
+	}
+
 	async offenerEintrag(kind: PlanArt, ziel: PlanZiel): Promise<number | null> {
 		if (ziel.titleRaw !== undefined) return null;
 		const spalte = ziel.releaseId !== undefined ? "release_id" : "game_id";

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PLATTFORMEN, anfrage, datum, igdbLink, neuestePlattform, type IgdbKandidat } from './api'
+import { PLATTFORMEN, aehnlichText, anfrage, datum, igdbLink, neuestePlattform, type IgdbKandidat } from './api'
 
 /**
  * IGDB-Suche und Trefferliste (Abschnitt 7.6).
@@ -78,6 +78,9 @@ export function KandidatenListe({
                 {k.plattformen.length > 0 && ` · ${k.plattformen.join(', ')}`}
                 {k.spieler && ` · Wertung ${k.spieler.wert}`}
               </span>
+              {k.aehnlich && k.aehnlich.length > 0 && (
+                <span className="aehnlich-hinweis">Ähnlich auf der Wunschliste: {aehnlichText(k.aehnlich)}</span>
+              )}
               {link && (
                 <a href={link} target="_blank" rel="noreferrer" className="zeile">
                   bei IGDB ansehen
@@ -111,8 +114,18 @@ export function IgdbSuche({
   laeuft,
   mitPlattform = false,
   vorschlag,
+  fokus = false,
+  mitWunschAbgleich = false,
 }: {
   vorgabe: string
+  /**
+   * Cursor sofort ins Feld (Nachtrag f1b, Wunsch des Nutzers vom 27.11.2026) -
+   * nur, wo ein Tipp die Suche aufklappt. Wo sie von selbst offen steht, etwa an
+   * Import-Zeilen ohne Treffer, bliebe sonst die Tastatur ungefragt offen.
+   */
+  fokus?: boolean
+  /** Je Treffer die ähnlichen offenen Wünsche (`wunsch=1`, Nachtrag f1b). */
+  mitWunschAbgleich?: boolean
   /** Vorbelegung der Plattform je Treffer, durchgereicht an `KandidatenListe`. */
   vorschlag?: (k: IgdbKandidat) => string
   /** Plattformen des Spiels – passende Kandidaten stehen dann vorn. */
@@ -148,7 +161,7 @@ export function IgdbSuche({
     setFehler(null)
     try {
       const a = await anfrage<{ treffer: IgdbKandidat[] }>(
-        `/api/igdb/search?q=${encodeURIComponent(begriff.trim())}&plattformen=${encodeURIComponent(plattformen.join(','))}`,
+        `/api/igdb/search?q=${encodeURIComponent(begriff.trim())}&plattformen=${encodeURIComponent(plattformen.join(','))}${mitWunschAbgleich ? '&wunsch=1' : ''}`,
       )
       setTreffer(a.treffer)
     } catch (f) {
@@ -167,6 +180,7 @@ export function IgdbSuche({
           onChange={(e) => setBegriff(e.target.value)}
           aria-label="Suchbegriff für IGDB"
           placeholder="Titel bei IGDB suchen"
+          autoFocus={fokus}
         />
         <button type="submit" disabled={sucht || laeuft || begriff.trim() === ''}>
           {sucht ? 'sucht …' : 'Suchen'}

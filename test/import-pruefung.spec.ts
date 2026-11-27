@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { plattformZurListe } from "../src/domain/titel";
-import { jahrWeichtAb } from "../src/domain/wunschliste";
+import { aehnlicherTitel, aehnlicheWuensche, jahrWeichtAb } from "../src/domain/wunschliste";
+import { suchWoerter } from "../src/domain/igdb";
 import { plattformZurListe as plattformZurListeFrontend } from "../frontend/src/plattformwahl";
 
 /**
@@ -61,5 +62,63 @@ describe("jahrWeichtAb", () => {
 	it("hat ohne eines der beiden Daten nichts abzuwaegen", () => {
 		expect(jahrWeichtAb(null, "2012-05-22")).toBe(false);
 		expect(jahrWeichtAb("2017", null)).toBe(false);
+	});
+});
+
+describe("suchWoerter (f1b)", () => {
+	it("schreibt wie IGDBs Slug: klein, ohne Apostroph, getrennt an Satzzeichen", () => {
+		expect(suchWoerter("Marvel's Wol")).toEqual(["marvels", "wol"]);
+		expect(suchWoerter("marvels wol")).toEqual(["marvels", "wol"]);
+		expect(suchWoerter("Star Wars: Galac")).toEqual(["star", "wars", "galac"]);
+	});
+
+	it("streift Akzente ab und laesst nur Buchstaben und Ziffern durch", () => {
+		expect(suchWoerter('Pokémon "Sun" *')).toEqual(["pokemon", "sun"]);
+	});
+
+	it("nimmt jedes Wort einmal und hoechstens sechs", () => {
+		expect(suchWoerter("a a b c d e f g")).toEqual(["a", "b", "c", "d", "e", "f"]);
+		expect(suchWoerter(" :: ")).toEqual([]);
+	});
+});
+
+describe("aehnlicherTitel (f1b)", () => {
+	it("findet eine Edition desselben Spiels", () => {
+		expect(aehnlicherTitel("Marvel's Wolverine", "Marvel's Wolverine: Digital Deluxe Edition")).toBe(true);
+	});
+
+	it("findet einen Titel, der mit dem anderen beginnt", () => {
+		expect(aehnlicherTitel("The Wolf Among Us", "The Wolf Among Us Remastered")).toBe(true);
+	});
+
+	it("haelt Fortsetzungen auseinander - Ziffer oder roemische Zahl", () => {
+		expect(aehnlicherTitel("The Wolf Among Us", "The Wolf Among Us 2")).toBe(false);
+		expect(aehnlicherTitel("Dragon's Dogma", "Dragon's Dogma II")).toBe(false);
+		expect(aehnlicherTitel("Anno", "Anno 1800")).toBe(false);
+	});
+
+	it("findet nichts zwischen verschiedenen Spielen und bei leerem Titel", () => {
+		expect(aehnlicherTitel("Dragon's Dogma: Dark Arisen", "Dragon's Dogma II: Dark Arisen")).toBe(false);
+		expect(aehnlicherTitel("Bloodborne", "Blood of Dawnwalker")).toBe(false);
+		expect(aehnlicherTitel("", "Bloodborne")).toBe(false);
+	});
+});
+
+describe("aehnlicheWuensche (f1b)", () => {
+	const wuensche = [
+		{ id: 1, titel: "Marvel's Wolverine: Digital Deluxe Edition", plattform: "PS5" },
+		{ id: 2, titel: null, plattform: null },
+		{ id: 3, titel: "Marvel's Wolverine", plattform: "PS4" },
+	];
+
+	it("nennt Titel und Plattform der aehnlichen und uebergeht Eintraege ohne Titel", () => {
+		expect(aehnlicheWuensche("Marvel's Wolverine", wuensche)).toEqual([
+			{ titel: "Marvel's Wolverine: Digital Deluxe Edition", plattform: "PS5" },
+			{ titel: "Marvel's Wolverine", plattform: "PS4" },
+		]);
+	});
+
+	it("laesst den eigenen Wunsch weg", () => {
+		expect(aehnlicheWuensche("Marvel's Wolverine", wuensche, 3)).toEqual([{ titel: "Marvel's Wolverine: Digital Deluxe Edition", plattform: "PS5" }]);
 	});
 });

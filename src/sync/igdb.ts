@@ -37,7 +37,7 @@ export const AUFFRISCHEN_JE_AUFRUF = 50;
 /** Mehr Kandidaten liest niemand durch; die Sortierung bringt das Passende nach vorn. */
 export const KANDIDATEN_JE_SPIEL = 10;
 
-export type Suchweg = "suche" | "suche+exakt" | "kurz" | "teilstring" | "teilstring_roh" | "keiner";
+export type Suchweg = "suche" | "suche+exakt" | "kurz" | "teilstring" | "teilstring_roh" | "woerter" | "keiner";
 
 /**
  * Suche mit Rueckfaellen.

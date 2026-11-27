@@ -139,7 +139,7 @@ export function OhneZuordnung() {
                         <button type="button" className="klein" onClick={() => dochSuchen(e)} disabled={laeuft === k}>Doch suchen</button>
                       )}
                     </div>
-                    {suche === k && <IgdbSuche vorgabe={e.titel} onWahl={(kand, p) => verknuepfen(e, kand, p)} laeuft={laeuft === k} mitPlattform={e.quelle !== 'spiel'} />}
+                    {suche === k && <IgdbSuche fokus vorgabe={e.titel} onWahl={(kand, p) => verknuepfen(e, kand, p)} laeuft={laeuft === k} mitPlattform={e.quelle !== 'spiel'} />}
                   </li>
                 )
               })}

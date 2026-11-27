@@ -533,3 +533,19 @@ describe("Pruefung beim Import (f1a)", () => {
 		expect((await hinweise(id))[0]).toMatchObject({ match_kind: null, hinweis: null });
 	});
 });
+
+describe("Aehnliche Wuensche in der Durchsicht (f1b)", () => {
+	it("nennt an der Zeile einen offenen Wunsch mit aehnlichem Titel, nicht den eigenen", async () => {
+		await spiel(1, "Bloodborne: Game of the Year Edition", "bloodborne", ["PS4"]);
+		const r = await env.DB.prepare("SELECT id FROM release WHERE game_id = 1").first<{ id: number }>();
+		await env.DB.prepare("INSERT INTO plan_entry (kind, release_id, origin) VALUES ('wunsch', ?, 'manuell')").bind(r!.id).run();
+		const id = await lauf("Bloodborne Remastered\nAnderes Spiel\n");
+		await importAbgleichSchritt(repos(), fakeIgdb([[]]).client, id);
+		const s = await app(fakeIgdb([[]]).client).request(`/api/imports/wishlist/${id}?gruppe=unklar`, { method: "GET" }, env);
+		const seite = (await s.json()) as { zeilen: Array<{ titel: string; aehnlich: Array<{ titel: string; plattform: string | null }> }> };
+		expect(seite.zeilen.find((z) => z.titel === "Bloodborne Remastered")?.aehnlich).toEqual([
+			{ titel: "Bloodborne: Game of the Year Edition", plattform: "PS4" },
+		]);
+		expect(seite.zeilen.find((z) => z.titel === "Anderes Spiel")?.aehnlich).toEqual([]);
+	});
+});

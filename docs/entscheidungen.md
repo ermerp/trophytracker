@@ -411,3 +411,5 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 27.11.2026 | **Ein einziger Titeltreffer mit mehr als einem Jahr Abstand zur Liste geht zur Durchsicht**, statt still übernommen zu werden – das Jahr ist ein Hinweis, kein Zwang | [8.2](spec/08-2-wunschlisten-import.md) |
 | 27.11.2026 | **Besitz beim Import:** Disc oder gekaufte Berechtigung am selben Release verhindert die Übernahme; PS Plus zählt nicht, eine andere Plattform blockiert nicht | [8.2](spec/08-2-wunschlisten-import.md) |
 | 27.11.2026 | **„Wunsch umhängen" zurückgestellt**, bis ein Fall auftritt, den „Anderen Eintrag wählen" nicht löst | [16.4](spec/16-4-finale-stufen.md) |
+| 27.11.2026 | **Ähnliche Wünsche nur als Hinweis**, beim Hinzufügen und in der Import-Durchsicht – keine Sperre | [8.2](spec/08-2-wunschlisten-import.md) |
+| 27.11.2026 | **Der Cursor steht im Feld, das ein Tipp aufklappt**, überall; nicht in Feldern, die von selbst offen stehen | [13.3](spec/13-3-bedienung.md) |

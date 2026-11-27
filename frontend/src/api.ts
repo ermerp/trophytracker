@@ -252,7 +252,15 @@ export type IgdbKandidat = {
   kritik: { wert: number; anzahl: number | null } | null
   /** Spielerwertung (IGDB-Nutzer, Stufe 20k). */
   spieler: { wert: number; anzahl: number | null } | null
+  /** Nachtrag f1b: offene Wünsche mit ähnlichem Titel - nur bei `wunsch=1`. */
+  aehnlich?: AehnlicherWunsch[]
 }
+
+export type AehnlicherWunsch = { titel: string; plattform: string | null }
+
+/** „Marvel's Wolverine (PS5), Ghost of Yotei (PS5)" - für den Hinweis auf ähnliche Wünsche. */
+export const aehnlichText = (liste: readonly AehnlicherWunsch[]) =>
+  liste.map((w) => (w.plattform ? `${w.titel} (${w.plattform === 'PSVITA' ? 'Vita' : w.plattform})` : w.titel)).join(', ')
 
 /** Eine Meldung des Preisalarms (Stufe 20g) - steht in `preisalarm.ts`, das ohne diese Datei auskommt. */
 export type { Preisalarm } from './preisalarm'
@@ -517,6 +525,8 @@ export type ImportZeile = {
   entschiedenAm: string | null
   /** Nachtrag f1a: 'jahr' – einziger Titeltreffer neben dem Listenjahr; 'besitz' – Disc oder Kauf am Ziel. */
   hinweis: 'jahr' | 'besitz' | null
+  /** Nachtrag f1b: offene Wünsche mit ähnlichem Titel, ohne den eigenen. */
+  aehnlich: AehnlicherWunsch[]
   kandidaten: IgdbKandidat[]
 }
 

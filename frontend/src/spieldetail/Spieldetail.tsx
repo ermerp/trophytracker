@@ -353,7 +353,7 @@ export function Spieldetail() {
         {igdbSuche && (
           <section className="karte">
             <h2>IGDB-Eintrag wählen</h2>
-            <IgdbSuche vorgabe={spiel.titel} plattformen={spiel.releases.map((r) => r.plattform)} onWahl={igdbWaehlen} laeuft={laeuft} />
+            <IgdbSuche fokus vorgabe={spiel.titel} plattformen={spiel.releases.map((r) => r.plattform)} onWahl={igdbWaehlen} laeuft={laeuft} />
           </section>
         )}
 

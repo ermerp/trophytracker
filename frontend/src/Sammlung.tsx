@@ -341,7 +341,7 @@ export function Sammlung() {
 			/>
 
 			<div className="seite">
-				{anlegenOffen && <SpielAnlegen onAngelegt={angelegt} onSchliessen={() => setAnlegenOffen(false)} />}
+				{anlegenOffen && <SpielAnlegen fokus onAngelegt={angelegt} onSchliessen={() => setAnlegenOffen(false)} />}
 
 				{meldung && (
 					<p role="alert" className="auffaellig">

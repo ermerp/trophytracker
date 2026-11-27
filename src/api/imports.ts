@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { PlanZiel } from "../db/plan";
 import { ZEILEN_GRUPPEN, type ImportKandidatZeile, type ImportZaehler, type ImportZeile, type ZeilenGruppe } from "../db/wunschliste";
 import { istErlaubtePlattform, type Plattform } from "../domain/titel";
-import { jahrAusDateiname, parseWunschliste } from "../domain/wunschliste";
+import { aehnlicheWuensche, jahrAusDateiname, parseWunschliste } from "../domain/wunschliste";
 import { IgdbKonfigError } from "../igdb/client";
 import { meldungFuer } from "../sync/igdb";
 import { KeinePlattformError, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
@@ -146,13 +146,23 @@ export const importRoutes = new Hono<AppEnv>()
 			if (liste) liste.push(k);
 			else jeZeile.set(k.line_id, [k]);
 		}
+		// Nachtrag f1b: je Zeile die aehnlichen offenen Wuensche - verglichen mit
+		// dem Listentitel, dem Spiel der Sammlung und dem eindeutigen Treffer; der
+		// Wunsch, den die Zeile selbst angelegt hat, zaehlt nicht. Eine Abfrage je Seite.
+		const wuensche = zeilen.length > 0 ? await c.var.repos.plan.offeneWunschtitel() : [];
 		return c.json({
 			...laufAntwort(lauf),
 			gruppe,
 			gesamt,
 			limit,
 			offset,
-			zeilen: zeilen.map((z) => zeileAntwort(z, jeZeile.get(z.id) ?? [])),
+			zeilen: zeilen.map((z) => {
+				const ks = jeZeile.get(z.id) ?? [];
+				const namen = [z.title, z.spiel_titel, ks.find((k) => k.igdb_id === z.igdb_id)?.name ?? null].filter((n): n is string => n !== null);
+				const aehnlich = new Map<string, { titel: string; plattform: string | null }>();
+				for (const n of namen) for (const w of aehnlicheWuensche(n, wuensche, z.plan_entry_id)) aehnlich.set(`${w.titel}|${w.plattform}`, w);
+				return { ...zeileAntwort(z, ks), aehnlich: [...aehnlich.values()] };
+			}),
 		});
 	})
 
