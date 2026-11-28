@@ -667,7 +667,7 @@ function PlattformAuswahl({
       aria-label={text}
       onChange={(e) => e.target.value && onWahl(e.target.value)}
     >
-      <option value="">{text} …</option>
+      <option value="">{text}</option>
       {optionen.map((o) => (
         <option key={o.wert} value={o.wert}>{o.text}</option>
       ))}
@@ -851,7 +851,7 @@ function SammlungsKarte({
               else onZuordnen({ spielId: k.spielId, plattform: a.plattform }, { ...z, releaseNeu: true })
             }}
           />
-          <Leise onClick={() => onModus('suche')}>Anderes Spiel suchen</Leise>
+          <Leise onClick={() => onModus('suche')}>Anderes Spiel</Leise>
         </>
       }
     >
@@ -890,6 +890,7 @@ function SammlungsKarte({
                     <Cover bild={x.bild} klein />
                     <span className="scan-wahl-titel">{x.titel}</span>
                     {h ? <PlattformChip plattform={h.plattform} /> : <span className="scan-still">im Regal</span>}
+                    {x.spielId === k.spielId && <Zeichen name="haken" groesse={16} className="scan-haken" />}
                   </button>
                 </li>
               )
@@ -975,16 +976,16 @@ function NeuKarte({
       leise={
         <>
           <PlattformAuswahl
-            text="Ohne IGDB anlegen"
+            text="Ohne IGDB"
             disabled={beschaeftigt || treffer === null || begriff.trim() === ''}
-            optionen={PLATTFORMEN.map((p) => ({ wert: p, text: `„${begriff.trim()}" als ${p}` }))}
+            optionen={PLATTFORMEN.map((p) => ({ wert: p, text: `„${begriff.trim()}" als ${p} anlegen` }))}
             onWahl={(p) => a.anlegen({ titel: begriff.trim() }, false, p)}
           />
-          <Leise onClick={() => onModus('suche')}>In der Sammlung suchen</Leise>
+          <Leise onClick={() => onModus('suche')}>In Sammlung suchen</Leise>
         </>
       }
     >
-      <p className="scan-zeile einzeilig">
+      <p className="scan-zeile">
         {online?.art === 'laeuft'
           ? 'Frage eBay nach dem Titel …'
           : online?.art === 'aus'
@@ -1023,7 +1024,7 @@ function NeuKarte({
                       {k.typ && ` · ${k.typ}`}
                     </span>
                   </span>
-                  {!an && <PlattformChip plattform={plattformVon(k)} />}
+                  {an ? <Zeichen name="haken" groesse={16} className="scan-haken" /> : <PlattformChip plattform={plattformVon(k)} />}
                 </button>
                 {an && (
                   <select

@@ -412,10 +412,10 @@
   white-space: nowrap;
 }
 
+/* Nichts wird gekürzt: Die Beschriftungen sind so kurz, dass sie bei 360 px
+   in eine Zeile passen (gemessen, Nachtrag f1g). */
 .scan-leise > * {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
 }
 
 /* Leise Aktionen: Knopf, Link und Auswahlfeld sehen gleich aus. */
@@ -432,10 +432,10 @@
   cursor: pointer;
 }
 
+/* Das Auswahlfeld ist so breit wie seine Beschriftung, nicht wie die längste Option. */
 select.scan-link {
-  max-width: 50%;
   appearance: none;
-  text-overflow: ellipsis;
+  field-sizing: content;
 }
 
 .scan-link:disabled {
@@ -474,14 +474,29 @@ button.scan-wahl {
   border-radius: var(--r1);
 }
 
+/*
+ * Der gewählte Treffer ist der, den der Hauptknopf meint: heller Rand,
+ * angehobene Fläche, ein Haken. Im IGDB-Fall umfasst der Rahmen auch das
+ * Plattformfeld darunter, es gehört zur Wahl.
+ */
 button.scan-wahl.gewaehlt,
-.scan-wahlzeile.gewaehlt > button.scan-wahl {
-  border-color: var(--linie);
+.scan-wahlzeile.gewaehlt {
+  border: 1px solid var(--text-leise);
+  border-radius: var(--r1);
   background: var(--flaeche-hoch);
 }
 
+.scan-wahlliste > li.scan-wahlzeile.gewaehlt + li {
+  border-top-color: transparent;
+}
+
 .scan-wahlzeile.gewaehlt select {
-  margin: var(--a1) 0 var(--a1) calc(1.4rem + var(--a3));
+  margin: 0 0 var(--a1) calc(1.25rem + var(--a3));
+}
+
+.scan-haken {
+  flex: none;
+  color: var(--text);
 }
 
 .scan-wahl-titel {

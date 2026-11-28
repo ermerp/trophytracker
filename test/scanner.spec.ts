@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	MUSTER,
+	angelegtAus,
 	anderePlattformen,
 	hauptRelease,
 	kandidatenOrdnen,
@@ -161,5 +162,42 @@ describe("scanZurueck", () => {
 	it("vorheriges Mapping auf ein Release ohne Disc laesst sich nicht wiederherstellen - es wird geloest", () => {
 		const s = scanZurueck({ ...basis, vorherMapping: { releaseId: 99, mitDisc: false } });
 		expect(s[1]).toEqual({ methode: "DELETE", pfad: "/api/scan/4005209114554" });
+	});
+});
+
+describe("angelegtAus (POST /api/games)", () => {
+	it("neues Spiel: Spiel und Release sind neu", () => {
+		expect(angelegtAus({})).toEqual({ spielNeu: true, releaseNeu: true });
+	});
+
+	it("vorhandenes Spiel, Release eben angelegt", () => {
+		expect(angelegtAus({ vorhanden: true, releaseNeu: true })).toEqual({ spielNeu: false, releaseNeu: true });
+	});
+
+	it("vorhandenes Spiel, Release schon da", () => {
+		expect(angelegtAus({ vorhanden: true, releaseNeu: false })).toEqual({ spielNeu: false, releaseNeu: false });
+	});
+
+	it("fehlender Schluessel heisst unbekannt - es wird nichts geloescht", () => {
+		expect(angelegtAus({ vorhanden: true })).toEqual({ spielNeu: false, releaseNeu: false });
+	});
+});
+
+describe("scanZurueck nach vorhandenem Spiel mit neuem Release", () => {
+	it("loescht das Release, nicht das Spiel", () => {
+		const s = scanZurueck({
+			exemplarId: 7,
+			ean: "4005209114554",
+			releaseId: 20,
+			spielId: 10,
+			absichtenErledigt: [],
+			vorherMapping: null,
+			...angelegtAus({ vorhanden: true, releaseNeu: true }),
+		});
+		expect(s.map((x) => `${x.methode} ${x.pfad}`)).toEqual([
+			"DELETE /api/physical-copies/7",
+			"DELETE /api/scan/4005209114554",
+			"DELETE /api/releases/20",
+		]);
 	});
 });

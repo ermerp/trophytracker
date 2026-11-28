@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiFehler, PLATTFORMEN, anfrage, type IgdbKandidat, type Plattform } from './api'
 import { IgdbSuche } from './IgdbSuche'
+import { angelegtAus } from './scanner'
 
 /**
  * Spiel von Hand anlegen – für Discs, die nie gestartet wurden und deshalb
@@ -26,10 +27,9 @@ type Kandidat = { spielId: number; titel: string; plattformen: string[] }
  * Gedächtnis für ein Rückgängig im Scanner (Nachtrag f1g): Was in diesem Zug
  * entstand, muss es wieder entfernen.
  *
- * Grenze: Kennt die Sammlung den IGDB-Eintrag schon, antwortet der Server mit
- * `vorhanden` und legt das Release der Plattform bei Bedarf an
- * (`releaseFuerPlattform`), sagt aber nicht, ob es neu ist. `releaseNeu` ist
- * dann `false` – ein Rückgängig ließe ein so entstandenes Release stehen.
+ * Kennt die Sammlung den IGDB-Eintrag schon, antwortet der Server mit
+ * `vorhanden` und sagt mit `releaseNeu`, ob er das Release der Plattform eben
+ * erst angelegt hat (`angelegtAus` in `scanner.ts`).
  */
 export type Angelegt = {
   spielId: number
@@ -40,7 +40,7 @@ export type Angelegt = {
   releaseNeu: boolean
 }
 
-type Antwort = { spielId: number; releaseId: number; titel: string; vorhanden?: boolean }
+type Antwort = { spielId: number; releaseId: number; titel: string; vorhanden?: boolean; releaseNeu?: boolean }
 
 /**
  * Der Schreibweg des Anlegens ohne Oberfläche – geteilt von „Spiel anlegen"
@@ -90,9 +90,7 @@ export function useAnlegen(onAngelegt: (a: Angelegt) => Promise<void> | void, st
         releaseId: a.releaseId,
         titel: a.titel,
         plattform: ziel,
-        spielNeu: a.vorhanden !== true,
-        // Neu angelegtes Spiel: das Release kam mit ihm. Vorhandenes: unbekannt (siehe `Angelegt`).
-        releaseNeu: a.vorhanden !== true,
+        ...angelegtAus(a),
       })
     } catch (f) {
       if (f instanceof ApiFehler && f.status === 409 && Array.isArray(f.antwort.kandidaten)) {

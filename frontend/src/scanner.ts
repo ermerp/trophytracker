@@ -122,6 +122,19 @@ export function kandidatenOrdnen<K extends { spielId: number }>(kandidaten: read
   return [...ziel, ...kandidaten.filter((k) => k.spielId !== zielSpielId)]
 }
 
+/**
+ * Was `POST /api/games` neu angelegt hat (Nachtrag f1g). Ein neues Spiel
+ * bringt sein Release mit. Bei `vorhanden: true` sagt `releaseNeu`, ob das
+ * Release der Plattform eben erst entstand. **Fehlt der Schlüssel** (ein
+ * älterer Worker), heißt das „unbekannt" – und dann wird nichts gelöscht:
+ * Ein Rückgängig, das ein schon vorhandenes Release entfernte, wäre schlimmer
+ * als eines, das ein neues stehen lässt.
+ */
+export function angelegtAus(a: { vorhanden?: boolean; releaseNeu?: boolean }): { spielNeu: boolean; releaseNeu: boolean } {
+  if (a.vorhanden !== true) return { spielNeu: true, releaseNeu: true }
+  return { spielNeu: false, releaseNeu: a.releaseNeu === true }
+}
+
 // --- Rückgängig ---------------------------------------------------------------------
 
 /** Ein Schreibzugriff des Rückwegs. `erwartet`: ein Status, der hier Erfolg heißt. */

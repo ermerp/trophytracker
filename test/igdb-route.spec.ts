@@ -71,12 +71,28 @@ describe("POST /api/games mit igdbId (Stufe 17, Rueckmeldung vom 18.09.2026)", (
 
 		const antwort = await anlegen(client, { igdbId: 1001, plattform: "PS5" });
 		expect(antwort.status).toBe(200);
-		expect(await antwort.json()).toMatchObject({ spielId: 7, titel: "Bloodborne", vorhanden: true });
+		// releaseNeu (Nachtrag f1g): das PS5-Release ist eben erst entstanden.
+		expect(await antwort.json()).toMatchObject({ spielId: 7, titel: "Bloodborne", vorhanden: true, releaseNeu: true });
 		// Ohne IGDB-Anfrage, und das PS5-Release entsteht am vorhandenen Spiel.
 		expect(aufrufe.length).toBe(0);
 		const r = await env.DB.prepare("SELECT platform FROM release WHERE game_id = 7 ORDER BY platform").all();
 		expect(r.results.map((x: any) => x.platform)).toEqual(["PS4", "PS5"]);
 		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM game").first()).toEqual({ n: 1 });
+	});
+
+	it("meldet releaseNeu: false, wenn das Release der Plattform schon da ist (Nachtrag f1g)", async () => {
+		await spiel(7, "Bloodborne", "bloodborne", ["PS4"]);
+		await env.DB.prepare("UPDATE game SET igdb_id = 1001 WHERE id = 7").run();
+		const { client } = fakeIgdb([[spielRoh()]]);
+		const vorher = await env.DB.prepare("SELECT id FROM release WHERE game_id = 7").first<{ id: number }>();
+
+		const antwort = await anlegen(client, { igdbId: 1001, plattform: "PS4" });
+		expect(antwort.status).toBe(200);
+		const ergebnis = (await antwort.json()) as Record<string, unknown>;
+		// Ausdruecklich false, nicht fehlend: Der Scanner liest einen fehlenden Schluessel als "unbekannt".
+		expect(ergebnis.releaseNeu).toBe(false);
+		expect(ergebnis.releaseId).toBe(vorher?.id);
+		expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM release WHERE game_id = 7").first()).toEqual({ n: 1 });
 	});
 
 	it("warnt bei gleichem Titelschluessel und legt mit trotzdem an", async () => {
