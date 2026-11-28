@@ -206,6 +206,78 @@ export function zieleOrdnen(wahl: readonly HuellenWahl[], vorherReleaseId: numbe
   return [...vorn, ...wahl.filter((w) => !vorn.includes(w))]
 }
 
+// --- Eine Collection aus IGDB (Nachtrag f1i) ----------------------------------------
+
+/**
+ * Ist der IGDB-Treffer ein Bundle? Dann führt der Scanner zu den Spielen der
+ * Sammlung, die darin stecken, statt die Collection als eigenes Spiel
+ * anzulegen (Entscheidung des Nutzers vom 28.11.2026). Der Typ kommt als
+ * Anzeigetext aus `IGDB_TYPEN` (`src/domain/igdb.ts`).
+ */
+export const istBundle = (typ: string | null | undefined): boolean => typ === 'Bundle'
+
+/** Ein Spiel der Sammlung, das im Bundle steckt – wie `GET /api/igdb/bundle/:id/inhalt` es nennt. */
+export type BundleSpiel = { spielId: number; titel: string; bild: string | null; releases: readonly KandidatRelease[] }
+
+/**
+ * Vorab gewählt sind alle Spiele des Bundles auf der Plattform des Treffers:
+ * an ihrem Release dort, sonst an einem neuen (die Disc ist ein Beleg für die
+ * Plattform). Steht dort schon eine Disc, bleibt das Spiel ungewählt – je
+ * Release genau eine. Höchstens `HOECHSTENS_SPIELE`.
+ */
+export function bundleVorwahl(spiele: readonly BundleSpiel[], plattform: ScanPlattform): HuellenWahl[] {
+  let wahl: HuellenWahl[] = []
+  for (const s of spiele) {
+    const z = zielAufPlattform(s.spielId, s.releases, plattform)
+    if (z) wahl = wahlUmschalten(wahl, { spielId: s.spielId, titel: s.titel, plattform, ...z })
+  }
+  return wahl
+}
+
+/** Wörter, die eine Hülle beschreiben, nicht die Reihe – sie fallen am Ende weg. */
+const HUELLEN_WORT =
+  /^(collection|trilogy|trilogie|anthology|compilation|bundle|pack|double|triple|saga|legacy|hd|remastered|remaster|remix|classics|edition|complete|limited|box|set|series|volume|vol\.?|duology|quadrilogy|[ivx]+|\d+(\.\d+)?)$/i
+
+/**
+ * Ein Suchbegriff für die Sammlung aus dem Namen einer Collection – wenn der
+ * Inhalt nicht weiterhilft. Die Suche der Sammlung sucht Teilstrings
+ * (`GET /api/games?search=`), also reicht der Anfang der Reihe:
+ *
+ * - vor einem Untertitel („Far Cry: Wild Expedition" → „Far Cry"),
+ * - das erste Spiel einer Aufzählung („Ico & Shadow of the Colossus" → „Ico"),
+ * - ohne Hüllenwörter und Nummern am Ende („God of War Collection",
+ *   „Kingdom Hearts HD 1.5" → „Kingdom Hearts").
+ *
+ * Bleibt nichts übrig, steht der Name unverändert da.
+ */
+export function reihenName(name: string): string {
+  const roh = name.trim().replace(/\s+/g, ' ')
+  const vorUntertitel = roh.split(/\s*:\s*|\s+[-–—]\s+/)[0]
+  const erstes = vorUntertitel.split(/\s*(?:&|\+|\/)\s*|\s+(?:and|und)\s+/i)[0]
+  const woerter = erstes.split(' ').filter((w) => w !== '')
+  while (woerter.length > 1 && HUELLEN_WORT.test(woerter[woerter.length - 1])) woerter.pop()
+  const ergebnis = woerter.join(' ')
+  return ergebnis === '' ? roh : ergebnis
+}
+
+/**
+ * Der ruhige Satz über der Liste der Hülle – warum sie so aussieht. Auch im
+ * Normalfall sagt er, wie viele Spiele der Collection die Sammlung hat, damit
+ * ein fehlendes auffällt (es lässt sich per Suche dazunehmen).
+ */
+export type BundleLage =
+  | { art: 'fehler' }
+  | { art: 'inhalt'; imBundle: number; spiele: number; gewaehlt: number; plattform: ScanPlattform }
+
+export function bundleHinweis(l: BundleLage): string {
+  if (l.art === 'fehler') return 'IGDB nennt den Inhalt gerade nicht – such die Spiele in deiner Sammlung.'
+  if (l.imBundle === 0) return 'IGDB kennt keine Spiele dieser Collection – such sie in deiner Sammlung.'
+  if (l.spiele === 0) return `Keines der ${l.imBundle} Spiele steht in deiner Sammlung – such sie hier.`
+  const anteil = `${l.spiele} von ${l.imBundle} Spielen in deiner Sammlung`
+  if (l.gewaehlt === 0) return `${anteil}, auf ${l.plattform === 'PSVITA' ? 'Vita' : l.plattform} schon im Regal.`
+  return `${anteil}.`
+}
+
 // --- Der Rahmen des Kamerabilds --------------------------------------------------
 
 /**

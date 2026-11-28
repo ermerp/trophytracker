@@ -234,6 +234,35 @@ export type ReleaseFelder = {
 	preis_grenze_cents: number | null;
 };
 
+/** D1 erlaubt 100 gebundene Werte je Statement; ein Bundle hat hoechstens 50 Spiele (`BUNDLE_HOECHSTENS`). */
+export const SPIELE_NACH_IGDB_HOECHSTENS = 90;
+
+/**
+ * Spiele der Sammlung mit ihren Releases und der Zahl der Exemplare je
+ * Release, nach IGDB-Id - fuer den Inhalt eines Bundles im Scanner
+ * (Nachtrag f1i). Je Id ein Lookup ueber `idx_game_igdb`, je Spiel die
+ * Releases ueber `idx_release_game`, je Release die Exemplare ueber
+ * `idx_physical_copy_release`. LEFT JOIN: Ein Spiel ohne Release (aus einem
+ * Wunsch, Abschnitt 3) steht mit `release_id` NULL da und bekommt seine
+ * Disc an einem neuen Release. Exportiert fuer `test/lesekosten.spec.ts`.
+ */
+export const spieleNachIgdbSql = (n: number) =>
+	"SELECT g.id AS game_id, g.title, g.cover_url, g.igdb_id, r.id AS release_id, r.platform, " +
+	"(SELECT COUNT(*) FROM physical_copy p WHERE p.release_id = r.id) AS exemplare " +
+	"FROM game g LEFT JOIN release r ON r.game_id = g.id " +
+	`WHERE g.igdb_id IN (${Array.from({ length: n }, () => "?").join(",")}) ` +
+	"ORDER BY g.sort_title, g.id, r.id";
+
+export type SpielNachIgdbZeile = {
+	game_id: number;
+	title: string;
+	cover_url: string | null;
+	igdb_id: number;
+	release_id: number | null;
+	platform: Plattform | null;
+	exemplare: number;
+};
+
 export class GamesRepository {
 	constructor(
 		private readonly db: D1Database,
@@ -892,6 +921,17 @@ aeenliste haengt
 			.prepare("SELECT id, platform FROM release WHERE game_id = ? ORDER BY id")
 			.bind(gameId)
 			.all<{ id: number; platform: string }>();
+		return results;
+	}
+
+	/**
+	 * Die Spiele der Sammlung zu den Einzelspielen eines IGDB-Bundles
+	 * (Nachtrag f1i) - eine Abfrage, siehe `spieleNachIgdbSql`.
+	 */
+	async spieleNachIgdb(igdbIds: readonly number[]): Promise<SpielNachIgdbZeile[]> {
+		const ids = [...new Set(igdbIds.filter((n) => Number.isInteger(n) && n > 0))].slice(0, SPIELE_NACH_IGDB_HOECHSTENS);
+		if (ids.length === 0) return [];
+		const { results } = await this.db.prepare(spieleNachIgdbSql(ids.length)).bind(...ids).all<SpielNachIgdbZeile>();
 		return results;
 	}
 

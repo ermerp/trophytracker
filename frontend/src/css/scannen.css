@@ -718,6 +718,12 @@ button.scan-wahl.gewaehlt,
   text-align: left;
 }
 
+/* „Als eigenes Spiel anlegen" am gewählten Bundle-Treffer, neben dem
+   Plattformfeld (Nachtrag f1i). */
+.scan-wahlzeile.gewaehlt .scan-weitere {
+  margin: 0 0 var(--a1) var(--a3);
+}
+
 /* Fall 1: die Spiele der Hülle als Links zum Spiel. */
 a.scan-wahl {
   color: var(--text);

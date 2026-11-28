@@ -5,7 +5,7 @@ import type { PlanArt } from "../db/plan";
 import { heuteIso, metadatenAus, normalisiereTrefferliste, ordneKandidaten, suchWoerter, type IgdbKandidat } from "../domain/igdb";
 import { istErlaubtePlattform, plattformenAus, titelSchluessel } from "../domain/titel";
 import { trefferStand, vorbereiteteWuensche } from "../domain/wunschliste";
-import { IgdbKonfigError } from "../igdb/client";
+import { IgdbKonfigError, IgdbRateError } from "../igdb/client";
 import { AUFFRISCHEN_JE_AUFRUF, igdbAbgleichSchritt, igdbAuffrischSchritt, igdbPhysischSchritt, kandidatenSuchen, meldungFuer } from "../sync/igdb";
 import { KeinePlattformError, zielAusIgdbId, type PlattformWahl } from "../sync/plan-ziel";
 import type { AppEnv } from "../types";
@@ -130,6 +130,50 @@ export const igdbRoutes = new Hono<AppEnv>()
 		} catch (fehler) {
 			return c.json({ fehler: meldungFuer(fehler) }, 502);
 		}
+	})
+
+	/**
+	 * Der Inhalt eines Bundles in der Sammlung (Nachtrag f1i, 9.1): Ist der
+	 * IGDB-Treffer im Scanner eine Collection, fuehrt der Scanner zu den
+	 * Spielen der Sammlung, die darin stecken, statt die Collection als
+	 * eigenes Spiel anzulegen (Entscheidung des Nutzers vom 28.11.2026).
+	 *
+	 * Eine IGDB-Anfrage (`bundles = (:id)`, Plattformfilter, Zeitgrenze), dann
+	 * ein Lookup ueber `game.igdb_id`. Liest nur; kein Ereignis. 503 nur hier,
+	 * wenn IGDB fehlt oder drosselt - die Oberflaeche faellt dann in die
+	 * Suche in der Sammlung zurueck.
+	 */
+	.get("/bundle/:id/inhalt", async (c) => {
+		const bundleId = Number(c.req.param("id"));
+		if (!Number.isInteger(bundleId) || bundleId <= 0) return c.json({ fehler: "Ungültige IGDB-Id." }, 400);
+		if (!c.var.igdb.konfiguriert()) return ohneZugang(c);
+		let inhalt: IgdbKandidat[];
+		try {
+			// Dieselbe Normalisierung wie jeder Treffer: nur die vier Plattformen, keine Mods und Updates.
+			inhalt = normalisiereTrefferliste(await c.var.igdb.bundleInhalt(bundleId));
+		} catch (fehler) {
+			const status = fehler instanceof IgdbKonfigError || fehler instanceof IgdbRateError ? 503 : 502;
+			return c.json({ fehler: meldungFuer(fehler) }, status);
+		}
+		const zeilen = await c.var.repos.games.spieleNachIgdb(inhalt.map((k) => k.igdbId));
+		const spiele: Array<{
+			spielId: number;
+			titel: string;
+			bild: string | null;
+			igdbId: number;
+			releases: Array<{ releaseId: number; plattform: string; exemplare: number }>;
+		}> = [];
+		for (const z of zeilen) {
+			let s = spiele.find((x) => x.spielId === z.game_id);
+			if (!s) {
+				s = { spielId: z.game_id, titel: z.title, bild: z.cover_url, igdbId: z.igdb_id, releases: [] };
+				spiele.push(s);
+			}
+			if (z.release_id !== null && z.platform !== null) {
+				s.releases.push({ releaseId: z.release_id, plattform: z.platform, exemplare: z.exemplare });
+			}
+		}
+		return c.json({ bundleId, imBundle: inhalt.length, spiele });
 	})
 
 	.get("/status", async (c) => {

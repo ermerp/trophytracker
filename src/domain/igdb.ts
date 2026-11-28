@@ -180,6 +180,18 @@ export const IGDB_FELDER_PHYSISCH = "id,external_games.media,external_games.plat
 export const IGDB_MEDIUM_PHYSISCH = 2;
 
 /**
+ * Der Inhalt eines Bundles (Nachtrag f1i): die Spiele, die IGDB unter
+ * `bundles` mit dem Bundle verknuepft. Nur Name, Typ und Plattformen - mehr
+ * braucht der Abgleich mit `game.igdb_id` nicht. Gemessen am 28.11.2026
+ * gegen die vier Collections der Sammlung: 8 von 8 Einzelspielen getroffen,
+ * keines falsch; der Plattformfilter nahm nur einen PSP-Eintrag heraus.
+ */
+export const IGDB_FELDER_BUNDLE = "name,game_type,platforms";
+
+/** Hoechstens so viele Spiele eines Bundles - die groessten Collections haben rund zehn. */
+export const BUNDLE_HOECHSTENS = 50;
+
+/**
  * Die Concept-Id des PlayStation Store aus IGDB (7.4, Stufe 21).
  *
  * Dieselbe Tabelle wie bei der Disc-Fassung, andere Frage - deshalb eine

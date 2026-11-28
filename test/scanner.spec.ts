@@ -4,6 +4,10 @@ import {
 	MUSTER,
 	angelegtAus,
 	anderePlattformen,
+	bundleHinweis,
+	bundleVorwahl,
+	istBundle,
+	reihenName,
 	erfassungAus,
 	gemeinsamePlattform,
 	hauptRelease,
@@ -323,5 +327,94 @@ describe("rahmenFuer (Wunsch des Nutzers vom 28.11.2026)", () => {
 		expect(rahmenFuer({ art: "erfasst" }, "erfasst")).toBe("erfasst");
 		expect(rahmenFuer({ art: "erfasst" }, null)).toBeNull();
 		expect(rahmenFuer({ art: "leer" }, null)).toBeNull();
+	});
+});
+
+describe("Collection aus IGDB (Nachtrag f1i)", () => {
+	it("erkennt ein Bundle nur am Typ", () => {
+		expect(istBundle("Bundle")).toBe(true);
+		expect(istBundle("Hauptspiel")).toBe(false);
+		expect(istBundle(null)).toBe(false);
+		expect(istBundle(undefined)).toBe(false);
+	});
+
+	describe("reihenName", () => {
+		it.each([
+			["God of War Collection", "God of War"],
+			["Far Cry: Wild Expedition", "Far Cry"],
+			["Metal Gear Solid: The Legacy Collection", "Metal Gear Solid"],
+			["Ico & Shadow of the Colossus Collection: Limited Box", "Ico"],
+			["Kingdom Hearts HD 1.5 + 2.5 ReMIX", "Kingdom Hearts"],
+			["Uncharted: The Nathan Drake Collection", "Uncharted"],
+			["Metal Gear Solid HD Collection", "Metal Gear Solid"],
+			["Ratchet & Clank Trilogy", "Ratchet"],
+			["Jak and Daxter Collection", "Jak"],
+			["Sly Cooper - Collection", "Sly Cooper"],
+			["  Doppelte   Leerzeichen   Trilogy ", "Doppelte Leerzeichen"],
+		])("%s → %s", (name, erwartet) => {
+			expect(reihenName(name)).toBe(erwartet);
+		});
+
+		it("laesst ein einzelnes Wort stehen, auch wenn es ein Huellenwort ist", () => {
+			expect(reihenName("Collection")).toBe("Collection");
+		});
+
+		it("gibt den Namen zurueck, wenn nach dem Kuerzen nichts bleibt", () => {
+			expect(reihenName(": Untertitel")).toBe(": Untertitel");
+		});
+	});
+
+	describe("bundleVorwahl", () => {
+		const spiele = [
+			{ spielId: 1, titel: "Eins", bild: null, releases: [{ releaseId: 11, plattform: "PS3" as const, exemplare: 0 }] },
+			// Auf PS3 schon im Regal - bleibt ungewaehlt.
+			{ spielId: 2, titel: "Zwei", bild: null, releases: [{ releaseId: 21, plattform: "PS3" as const, exemplare: 1 }] },
+			// Nur auf PS4 in der Sammlung - die Disc kommt an ein neues PS3-Release.
+			{ spielId: 3, titel: "Drei", bild: null, releases: [{ releaseId: 31, plattform: "PS4" as const, exemplare: 0 }] },
+			// Ohne Release (aus einem Wunsch).
+			{ spielId: 4, titel: "Vier", bild: null, releases: [] },
+		];
+
+		it("waehlt jedes Spiel auf der Plattform des Treffers, ausser dort steht schon eine Disc", () => {
+			expect(bundleVorwahl(spiele, "PS3")).toEqual([
+				{ spielId: 1, titel: "Eins", plattform: "PS3", ziel: { releaseId: 11 }, releaseNeu: false },
+				{ spielId: 3, titel: "Drei", plattform: "PS3", ziel: { spielId: 3, plattform: "PS3" }, releaseNeu: true },
+				{ spielId: 4, titel: "Vier", plattform: "PS3", ziel: { spielId: 4, plattform: "PS3" }, releaseNeu: true },
+			]);
+		});
+
+		it("nimmt auf einer anderen Plattform das Release dort", () => {
+			expect(bundleVorwahl(spiele, "PS4").map((w) => w.ziel)).toEqual([
+				{ spielId: 1, plattform: "PS4" },
+				{ spielId: 2, plattform: "PS4" },
+				{ releaseId: 31 },
+				{ spielId: 4, plattform: "PS4" },
+			]);
+		});
+
+		it("haelt die Grenze je Huelle", () => {
+			const viele = Array.from({ length: HOECHSTENS_SPIELE + 3 }, (_, i) => ({ spielId: i + 1, titel: `S${i}`, bild: null, releases: [] }));
+			expect(bundleVorwahl(viele, "PS3")).toHaveLength(HOECHSTENS_SPIELE);
+		});
+
+		it("ist leer ohne Spiele", () => {
+			expect(bundleVorwahl([], "PS3")).toEqual([]);
+		});
+	});
+
+	describe("bundleHinweis", () => {
+		it("nennt den Grund, warum gesucht werden muss", () => {
+			expect(bundleHinweis({ art: "fehler" })).toMatch(/such die Spiele in deiner Sammlung/);
+			expect(bundleHinweis({ art: "inhalt", imBundle: 0, spiele: 0, gewaehlt: 0, plattform: "PS3" })).toMatch(/keine Spiele dieser Collection/);
+			expect(bundleHinweis({ art: "inhalt", imBundle: 3, spiele: 0, gewaehlt: 0, plattform: "PS3" })).toBe("Keines der 3 Spiele steht in deiner Sammlung – such sie hier.");
+		});
+
+		it("sagt im Normalfall, wie viele Spiele der Collection die Sammlung hat", () => {
+			expect(bundleHinweis({ art: "inhalt", imBundle: 4, spiele: 2, gewaehlt: 2, plattform: "PS3" })).toBe("2 von 4 Spielen in deiner Sammlung.");
+		});
+
+		it("sagt, wenn auf der Plattform alles schon im Regal steht", () => {
+			expect(bundleHinweis({ art: "inhalt", imBundle: 2, spiele: 2, gewaehlt: 0, plattform: "PSVITA" })).toBe("2 von 2 Spielen in deiner Sammlung, auf Vita schon im Regal.");
+		});
 	});
 });

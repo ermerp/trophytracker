@@ -172,6 +172,7 @@ const IGDB_ROUTEN = (app: ReturnType<typeof createApp>) => [
 	ruf(app, "/api/igdb/abgleich", { method: "POST" }),
 	ruf(app, "/api/igdb/auffrischen", { method: "POST" }),
 	ruf(app, "/api/igdb/physisch", { method: "POST" }),
+	ruf(app, "/api/igdb/bundle/1001/inhalt"),
 	ruf(app, "/api/unmatched/spiel/1/link", {
 		method: "POST",
 		headers: { "content-type": "application/json" },
