@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiFehler, PLATTFORMEN, anfrage, erledigtText, neuestePlattform, type ErfasstAntwort, type IgdbKandidat, type Plattform } from './api'
 import { Kopfzeile } from './Kopfzeile'
-import { ScanAuswahl } from './ScanAuswahl'
+import { ScanAuswahl, type SuchSpiel } from './ScanAuswahl'
 import { Dubletten, useAnlegen, type Angelegt } from './SpielAnlegen'
 import { PlattformChip } from './SpielTeile'
 import { Zeichen } from './Symbole'
@@ -10,12 +10,16 @@ import { useKamera } from './kamera'
 import {
   PLATTFORM_FOLGE,
   anderePlattformen,
+  bundleHinweis,
+  bundleVorwahl,
   erfassungAus,
   gemeinsamePlattform,
   hauptRelease,
   hauptText,
+  istBundle,
   kandidatenOrdnen,
   rahmenFuer,
+  reihenName,
   scanZurueck,
   signalFuer,
   wahlUmschalten,
@@ -73,6 +77,13 @@ import { signalGeben, tonBereit } from './ton'
  * erfassen"), Fall 1 zeigt alle Spiele der Hülle, und „+ weiteres Spiel
  * dieser Hülle" hängt eines an einen schon erfassten Code an. Rückgängig
  * nimmt den ganzen Zug zurück.
+ *
+ * **Collection aus IGDB** (Nachtrag f1i): Ist der gewählte IGDB-Treffer in
+ * Fall 3 ein Bundle, heißt der Hauptknopf „Spiele der Hülle wählen" und führt
+ * zu den Spielen der Sammlung, die darin stecken (`GET /api/igdb/bundle/:id/
+ * inhalt`) – vorab gewählt auf der Plattform des Treffers. Trifft nichts oder
+ * scheitert die Route, steht die Suche mit dem Reihennamen da (`reihenName`).
+ * „Als eigenes Spiel anlegen" behält den Weg davor.
  *
  * Jeder Fall gibt ein Signal – Rahmenfarbe, Ton und Vibration (`scanner.ts`,
  * `ton.ts`) –, damit man beim Abscannen nicht auf den Bildschirm sehen muss.
@@ -136,8 +147,11 @@ type Wiederholung =
   | { art: 'zuordnen'; ean: string; ziele: Ziel[]; z: Zusammenhang }
   | { art: 'zurueck'; rest: Schritt[]; erfasst: ErfasstKarte }
 
-/** `weitere`: die Suche für ein weiteres Spiel eines schon erfassten Codes (Nachtrag f1h). */
-type Modus = 'vorschlag' | 'suche' | 'anlegen' | 'weitere'
+/**
+ * `weitere`: die Suche für ein weiteres Spiel eines schon erfassten Codes (Nachtrag f1h).
+ * `huelle`: die Spiele einer Collection aus IGDB (Nachtrag f1i).
+ */
+type Modus = 'vorschlag' | 'suche' | 'anlegen' | 'weitere' | 'huelle'
 
 type ErfasstKarte = {
   art: 'erfasst'
@@ -149,9 +163,27 @@ type ErfasstKarte = {
   eintragId: string
 }
 
+/** Die Collection aus IGDB, deren Spiele die Karte zeigt (Nachtrag f1i). */
+type Huelle = {
+  /** Cover der Collection – für den Erfasst-Block und „Letzte Scans". */
+  bild: string | null
+  /** Die Spiele der Sammlung im Bundle; leer, wenn nichts traf oder die Route scheiterte. */
+  spiele: SuchSpiel[]
+  /** Der ruhige Satz über der Liste (`bundleHinweis`). */
+  hinweis: string
+  /** Vorbelegung der Suche: leer, wenn Spiele dastehen, sonst der Reihenname. */
+  vorgabe: string
+}
+
+/** Antwort von `GET /api/igdb/bundle/:id/inhalt`. */
+type BundleInhalt = {
+  imBundle: number
+  spiele: Array<{ spielId: number; titel: string; bild: string | null; releases: Array<{ releaseId: number; plattform: Plattform; exemplare: number }> }>
+}
+
 type Karte =
   | { art: 'leer'; hinweis: string | null }
-  | { art: 'code'; t: Treffer; modus: Modus; vorwahl?: HuellenWahl[] }
+  | { art: 'code'; t: Treffer; modus: Modus; vorwahl?: HuellenWahl[]; huelle?: Huelle }
   | ErfasstKarte
   | { art: 'fehler'; ean: string | null; meldung: string; nochmal: Wiederholung | null }
 
@@ -613,9 +645,10 @@ export function Scannen() {
               t={karte.t}
               modus={karte.modus}
               vorwahl={karte.vorwahl ?? []}
+              huelle={karte.huelle ?? null}
               online={online?.ean === karte.t.ean ? online : null}
               laeuft={laeuft}
-              onModus={(modus, vorwahl) => setKarte({ ...karte, modus, vorwahl })}
+              onModus={(modus, vorwahl, huelle) => setKarte({ ...karte, modus, vorwahl, huelle })}
               onAbbrechen={abbrechen}
               onWeiter={() => weiter()}
               onZuordnen={(ziele, z) => zuordnen(karte.t.ean, ziele, z)}
@@ -767,10 +800,13 @@ function HauptWahl({ wahl, laeuft, onClick }: { wahl: readonly HuellenWahl[]; la
 }
 
 /** Fall 1–3 für einen Code: Vorschlag, Suche in der Sammlung oder Anlegen. */
+type OnModus = (m: Modus, vorwahl?: HuellenWahl[], huelle?: Huelle) => void
+
 function CodeKarte({
   t,
   modus,
   vorwahl,
+  huelle,
   online,
   laeuft,
   onModus,
@@ -781,9 +817,10 @@ function CodeKarte({
   t: Treffer
   modus: Modus
   vorwahl: HuellenWahl[]
+  huelle: Huelle | null
   online: OnlineStand | null
   laeuft: boolean
-  onModus: (m: Modus, vorwahl?: HuellenWahl[]) => void
+  onModus: OnModus
   onAbbrechen: () => void
   onWeiter: () => void
   onZuordnen: (ziele: Ziel[], z: Zusammenhang) => void
@@ -792,17 +829,19 @@ function CodeKarte({
   /** Worauf der Code vorher zeigte – Rückgängig bringt es zurück. */
   const vorherMapping: Erfassung['vorherMapping'] = r ? { releaseId: r.releaseId, mitDisc: r.exemplare > 0 } : null
 
-  if (modus === 'suche' || modus === 'weitere') {
+  if (modus === 'suche' || modus === 'weitere' || modus === 'huelle') {
+    const h = modus === 'huelle' ? huelle : null
     return (
       <SuchKarte
         t={t}
         modus={modus}
         vorwahl={vorwahl}
-        vorgabe={t.angebot?.titel ?? (online?.art === 'da' ? (online.o.titel ?? '') : '')}
+        huelle={h}
+        vorgabe={h ? h.vorgabe : (t.angebot?.titel ?? (online?.art === 'da' ? (online.o.titel ?? '') : ''))}
         laeuft={laeuft}
         onModus={onModus}
         onAbbrechen={onAbbrechen}
-        onZuordnen={(wahl) => onZuordnen(zieleAus(wahl, vorherMapping), { ...KEIN_ZUSAMMENHANG, bild: null, vorherMapping })}
+        onZuordnen={(wahl) => onZuordnen(zieleAus(wahl, vorherMapping), { ...KEIN_ZUSAMMENHANG, bild: h?.bild ?? null, vorherMapping })}
       />
     )
   }
@@ -914,6 +953,7 @@ function SuchKarte({
   t,
   modus,
   vorwahl,
+  huelle,
   vorgabe,
   laeuft,
   onModus,
@@ -921,18 +961,20 @@ function SuchKarte({
   onZuordnen,
 }: {
   t: Treffer
-  modus: 'suche' | 'weitere'
+  modus: 'suche' | 'weitere' | 'huelle'
   vorwahl: HuellenWahl[]
+  /** Die Collection aus IGDB (Nachtrag f1i) – ihre Spiele stehen vorgegeben da. */
+  huelle: Huelle | null
   vorgabe: string
   laeuft: boolean
-  onModus: (m: Modus, vorwahl?: HuellenWahl[]) => void
+  onModus: OnModus
   onAbbrechen: () => void
   onZuordnen: (wahl: HuellenWahl[]) => void
 }) {
   const [wahl, setWahl] = useState<HuellenWahl[]>(vorwahl)
   return (
     <KartenRahmen
-      kennung={modus === 'weitere' || vorwahl.length > 0 ? 'Spiele der Hülle' : t.treffer === 'mapping' ? 'Anderes Spiel' : 'In der Sammlung suchen'}
+      kennung={modus === 'weitere' || modus === 'huelle' || vorwahl.length > 0 ? 'Spiele der Hülle' : t.treffer === 'mapping' ? 'Anderes Spiel' : 'In der Sammlung suchen'}
       ean={t.ean}
       onAbbrechen={onAbbrechen}
       haupt={<HauptWahl wahl={wahl} laeuft={laeuft} onClick={() => onZuordnen(wahl)} />}
@@ -945,12 +987,23 @@ function SuchKarte({
         )
       }
     >
-      {t.angebot && (
-        <p className="scan-zeile">
-          Händler: „{t.angebot.titel}"{t.angebot.plattform ? ` (${t.angebot.plattform})` : ''}
-        </p>
+      {huelle ? (
+        <p className="scan-zeile" role="status">{huelle.hinweis}</p>
+      ) : (
+        t.angebot && (
+          <p className="scan-zeile">
+            Händler: „{t.angebot.titel}"{t.angebot.plattform ? ` (${t.angebot.plattform})` : ''}
+          </p>
+        )
       )}
-      <ScanAuswahl ean={t.ean} vorgabe={vorgabe} laeuft={laeuft} wahl={wahl} onUmschalten={(w) => setWahl((alt) => wahlUmschalten(alt, w))} />
+      <ScanAuswahl
+        ean={t.ean}
+        vorgabe={vorgabe}
+        laeuft={laeuft}
+        wahl={wahl}
+        vorgegeben={huelle && huelle.spiele.length > 0 ? huelle.spiele : undefined}
+        onUmschalten={(w) => setWahl((alt) => wahlUmschalten(alt, w))}
+      />
     </KartenRahmen>
   )
 }
@@ -968,7 +1021,7 @@ function SammlungsKarte({
   t: Treffer
   o: Online
   laeuft: boolean
-  onModus: (m: Modus, vorwahl?: HuellenWahl[]) => void
+  onModus: OnModus
   onAbbrechen: () => void
   onWeiter: () => void
   onZuordnen: (wahl: HuellenWahl[], bild: string | null) => void
@@ -1109,7 +1162,7 @@ function NeuKarte({
   t: Treffer
   online: OnlineStand | null
   laeuft: boolean
-  onModus: (m: Modus, vorwahl?: HuellenWahl[]) => void
+  onModus: OnModus
   onAbbrechen: () => void
   /** `bild`: das Cover des gewählten Treffers – für den Erfasst-Block und „Letzte Scans". */
   onAngelegt: (a: Angelegt, bild: string | null) => void
@@ -1151,7 +1204,40 @@ function NeuKarte({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const beschaeftigt = laeuft || a.laeuft || sucht
+  /**
+   * „Spiele der Hülle wählen" (Nachtrag f1i): den Inhalt der Collection holen
+   * und zur Mehrfachwahl wechseln – vorab gewählt auf der Plattform des
+   * Treffers. Trifft nichts oder scheitert die Route, steht die Suche mit dem
+   * Reihennamen da, mit einem Satz, warum.
+   */
+  const [laedtHuelle, setLaedtHuelle] = useState(false)
+  async function huelleWaehlen(k: IgdbKandidat) {
+    const plattform = plattformVon(k)
+    setLaedtHuelle(true)
+    try {
+      const b = await anfrage<BundleInhalt>(`/api/igdb/bundle/${k.igdbId}/inhalt`)
+      const spiele = b.spiele.map((x) => ({ spielId: x.spielId, titel: x.titel, bild: x.bild, releases: x.releases }))
+      const vorwahl = bundleVorwahl(spiele, plattform)
+      onModus('huelle', vorwahl, {
+        bild: k.cover,
+        spiele: b.spiele.map((x) => ({
+          id: x.spielId,
+          titel: x.titel,
+          bild: x.bild,
+          releases: x.releases.map((r) => ({ id: r.releaseId, plattform: r.plattform, exemplare: r.exemplare, digital: [] })),
+        })),
+        hinweis: bundleHinweis({ art: 'inhalt', imBundle: b.imBundle, spiele: spiele.length, gewaehlt: vorwahl.length, plattform }),
+        vorgabe: spiele.length > 0 ? '' : reihenName(k.name),
+      })
+    } catch {
+      onModus('huelle', [], { bild: k.cover, spiele: [], hinweis: bundleHinweis({ art: 'fehler' }), vorgabe: reihenName(k.name) })
+    } finally {
+      setLaedtHuelle(false)
+    }
+  }
+
+  const beschaeftigt = laeuft || a.laeuft || sucht || laedtHuelle
+  const bundle = wahl !== null && istBundle(wahl.typ)
 
   return (
     <KartenRahmen
@@ -1159,14 +1245,20 @@ function NeuKarte({
       ean={t.ean}
       onAbbrechen={onAbbrechen}
       haupt={
-        <button
-          type="button"
-          className="scan-haupt"
-          disabled={beschaeftigt || !wahl}
-          onClick={() => wahl && a.anlegen({ igdbId: wahl.igdbId }, false, plattformVon(wahl))}
-        >
-          Anlegen + Disc erfassen
-        </button>
+        bundle ? (
+          <button type="button" className="scan-haupt" disabled={beschaeftigt} onClick={() => void huelleWaehlen(wahl)}>
+            {laedtHuelle ? 'Inhalt wird geladen …' : 'Spiele der Hülle wählen'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="scan-haupt"
+            disabled={beschaeftigt || !wahl}
+            onClick={() => wahl && a.anlegen({ igdbId: wahl.igdbId }, false, plattformVon(wahl))}
+          >
+            Anlegen + Disc erfassen
+          </button>
+        )
       }
       leise={
         <>
@@ -1235,6 +1327,19 @@ function NeuKarte({
                       </option>
                     ))}
                   </select>
+                )}
+                {an && istBundle(k.typ) && (
+                  // Der Weg vor f1i: die Collection als eigenes Spiel. Hier am
+                  // Treffer, nicht in der leisen Zeile – dort passt er bei 360 px
+                  // nicht neben „Ohne IGDB" und „In Sammlung suchen" (gemessen).
+                  <button
+                    type="button"
+                    className="scan-link scan-weitere"
+                    disabled={beschaeftigt}
+                    onClick={() => a.anlegen({ igdbId: k.igdbId }, false, plattformVon(k))}
+                  >
+                    Als eigenes Spiel anlegen
+                  </button>
                 )}
               </li>
             )

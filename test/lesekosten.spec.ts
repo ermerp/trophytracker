@@ -19,7 +19,7 @@ import { fakeFetch, jsonAntwort } from "./psn-fake";
 import { besitzSchritt, GESPIELTE_JE_SEITE, KAEUFE_JE_SEITE, spielzeitSchritt, SPITZE_JE_SEITE } from "../src/sync/besitz";
 import { MARKT_JE_POST } from "../src/sync/markt";
 import { ZEILEN_JE_AUFRUF } from "../src/sync/wunschliste";
-import { spieleNachSchluesselnSql } from "../src/db/games";
+import { spieleNachIgdbSql, spieleNachSchluesselnSql } from "../src/db/games";
 import { STORE_JE_POST } from "../src/sync/store";
 
 /** Das UTC-Datum, mit dem die Staende als "heute" gelten. */
@@ -2385,5 +2385,50 @@ describe("Huellen mit mehreren Spielen (Nachtrag f1h)", () => {
 		expect(zuordnen.gelesen).toBeLessThan(200);
 
 		await env.DB.batch([env.DB.prepare("DELETE FROM physical_copy"), env.DB.prepare("DELETE FROM ean_mapping"), env.DB.prepare("DELETE FROM game_event")]);
+	});
+});
+
+describe("Inhalt eines IGDB-Bundles (Nachtrag f1i)", () => {
+	it("liest je Spiel des Bundles nur sein Release und dessen Discs", async () => {
+		// Im Zustand der Produktion: mit IGDB-Zugang, eine Collection mit vier
+		// Einzelspielen, drei davon in der Sammlung (eines mit zwei Releases),
+		// dazu Discs im Regal. Dazu die groesste Antwort, die IGDB liefern darf.
+		const spiele = [ZWEITE[0], 201, 202];
+		const ids = (
+			await env.DB.prepare(`SELECT igdb_id FROM game WHERE id IN (${spiele.join(",")}) AND igdb_id IS NOT NULL`).all<{ igdb_id: number }>()
+		).results.map((x) => x.igdb_id);
+		expect(ids).toHaveLength(3);
+		const disc = env.DB.prepare("INSERT INTO physical_copy (release_id) VALUES (?)");
+		await env.DB.batch(Array.from({ length: 150 }, (_, i) => disc.bind(releaseVon(i + 1))));
+
+		const roh = [...ids, 990001].map((id) => spielRoh({ id, name: `Teil ${id}`, platforms: [9] }));
+		const app = createApp(
+			() => erstellePsnClient(fakeFetch([]).fetch),
+			() => fakeIgdb([roh]).client,
+		);
+		const zaehler = zaehlendeDb(env.DB);
+		const antwort = await app.request("/api/igdb/bundle/990000/inhalt", undefined, { ...env, DB: zaehler.db });
+		expect(antwort.status).toBe(200);
+		const body = (await antwort.json()) as any;
+		expect(body.spiele).toHaveLength(3);
+		const route = { aufrufe: zaehler.aufrufe(), anweisungen: zaehler.anweisungen(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
+
+		// Die Abfrage aus dem Code: vier Ids und die Obergrenze von 50.
+		const vier = await zeilenGelesen(spieleNachIgdbSql(4), ...ids, 990001);
+		const alle = (await env.DB.prepare("SELECT igdb_id FROM game WHERE igdb_id IS NOT NULL ORDER BY id LIMIT 50").all<{ igdb_id: number }>()).results.map((x) => x.igdb_id);
+		const fuenfzig = await zeilenGelesen(spieleNachIgdbSql(alle.length), ...alle);
+		console.info({ bundleRoute: route, bundleVier: vier, bundleFuenfzig: fuenfzig, ids: alle.length });
+
+		// Ein Aufruf, nichts geschrieben; je Id ein Lookup ueber idx_game_igdb,
+		// je Spiel seine Releases (Autoindex game_id, platform), je Release
+		// seine Discs (idx_physical_copy_release) - kein Lauf ueber game.
+		// Gemessen am 28.11.2026: 23 Zeilen fuer vier Ids, 402 fuer 50.
+		expect(route.aufrufe).toBe(1);
+		expect(route.geschrieben).toBe(0);
+		expect(route.gelesen).toBeLessThan(40);
+		expect(vier).toBeLessThan(40);
+		expect(fuenfzig).toBeLessThan(alle.length * 10);
+
+		await env.DB.prepare("DELETE FROM physical_copy").run();
 	});
 });

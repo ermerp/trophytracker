@@ -5,7 +5,8 @@ import { createApp } from "../src/index";
 import { erstellePsnClient } from "../src/psn/client";
 import { eindeutigerTreffer, type IgdbMetadaten } from "../src/domain/igdb";
 import { igdbAbgleichSchritt, igdbAuffrischSchritt, kandidatenSuchen } from "../src/sync/igdb";
-import { fakeIgdb, spielRoh } from "./igdb-fake";
+import { erstelleIgdbClient } from "../src/igdb/client";
+import { ZUGANG, fakeIgdb, spielRoh } from "./igdb-fake";
 import { fakeFetch } from "./psn-fake";
 
 /**
@@ -699,5 +700,107 @@ describe("Routen", () => {
 		expect((await json(await a.request("/api/unmatched/spiel/1/suchen", { method: "POST" }, env))).body).toEqual({ id: 1, freigegeben: true });
 		expect((await json(await a.request("/api/igdb/status", {}, env))).body).toMatchObject({ abgelehnt: 0, ungeprueft: 1 });
 		expect((await a.request("/api/unmatched/spiel/99/ablehnen", { method: "POST" }, env)).status).toBe(404);
+	});
+});
+
+describe("GET /api/igdb/bundle/:id/inhalt (Nachtrag f1i)", () => {
+	// Erfundene Collection mit drei Einzelspielen; zwei davon stehen in der
+	// Sammlung, das dritte nicht. Ids und Namen sind ausgedacht.
+	const inhalt = [
+		spielRoh({ id: 7101, name: "Fabelreich", platforms: [9], game_type: 9 }),
+		spielRoh({ id: 7102, name: "Fabelreich II", platforms: [9, 46], game_type: 9 }),
+		spielRoh({ id: 7103, name: "Fabelreich: Bonus", platforms: [9], game_type: 0 }),
+	];
+	const holen = (client: ReturnType<typeof fakeIgdb>["client"], pfad = "/api/igdb/bundle/7100/inhalt") =>
+		app(client).request(pfad, {}, env);
+
+	async function sammlung() {
+		await spiel(1, "Fabelreich", "fabelreich", ["PS3"]);
+		await spiel(2, "Fabelreich II", "fabelreich ii", ["PS3", "PSVITA"]);
+		await spiel(3, "Anderes Spiel", "anderes spiel", ["PS4"]);
+		// Spiel ohne Release (aus einem Wunsch, Abschnitt 3) - steht im Bundle, Disc kommt an ein neues Release.
+		await env.DB.prepare("INSERT INTO game (id, title, sort_title, igdb_id) VALUES (4, 'Fabelreich: Bonus', 'fabelreich bonus', 7103)").run();
+		await env.DB.batch([
+			env.DB.prepare("UPDATE game SET igdb_id = 7101, cover_url = 'https://bild/1.jpg' WHERE id = 1"),
+			env.DB.prepare("UPDATE game SET igdb_id = 7102 WHERE id = 2"),
+			env.DB.prepare("UPDATE game SET igdb_id = 9999 WHERE id = 3"),
+			env.DB.prepare("DELETE FROM physical_copy"),
+		]);
+		const ps3 = await env.DB.prepare("SELECT id FROM release WHERE game_id = 2 AND platform = 'PS3'").first<{ id: number }>();
+		await env.DB.prepare("INSERT INTO physical_copy (release_id, ean) VALUES (?, '4006381333931')").bind(ps3!.id).run();
+	}
+
+	it("nennt die Spiele der Sammlung im Bundle mit Releases und Discs - eine IGDB-Anfrage", async () => {
+		await sammlung();
+		const { client, aufrufe } = fakeIgdb([inhalt]);
+		const antwort = await holen(client);
+		expect(antwort.status).toBe(200);
+		const body = (await antwort.json()) as any;
+		expect(body.bundleId).toBe(7100);
+		expect(body.imBundle).toBe(3);
+		expect(body.spiele.map((s: any) => s.spielId)).toEqual([1, 4, 2]);
+		expect(body.spiele[0]).toMatchObject({ titel: "Fabelreich", bild: "https://bild/1.jpg", igdbId: 7101 });
+		expect(body.spiele[0].releases).toEqual([{ releaseId: expect.any(Number), plattform: "PS3", exemplare: 0 }]);
+		expect(body.spiele[1].releases).toEqual([]);
+		expect(body.spiele[2].releases.map((r: any) => [r.plattform, r.exemplare])).toEqual([
+			["PS3", 1],
+			["PSVITA", 0],
+		]);
+		// Ein Spiel ausserhalb des Bundles kommt nicht vor.
+		expect(body.spiele.some((s: any) => s.spielId === 3)).toBe(false);
+
+		const igdb = aufrufe.filter((a) => a.url.includes("api.igdb.com"));
+		expect(igdb).toHaveLength(1);
+		const koerper = String(igdb[0].init?.body);
+		expect(koerper).toContain("where bundles = (7100)");
+		// Nur PlayStation (7.6): derselbe Filter wie jede Suche.
+		expect(koerper).toContain("platforms = (9,46,48,165,167,390)");
+		expect(koerper).toContain("game_type != (5,12,14)");
+		// Mit Zeitgrenze - fetch wartet sonst unbegrenzt.
+		expect(igdb[0].init?.signal).toBeInstanceOf(AbortSignal);
+	});
+
+	it("verwirft Eintraege ohne eigene Plattform, auch wenn IGDB sie liefert", async () => {
+		await sammlung();
+		const { client } = fakeIgdb([[spielRoh({ id: 7101, name: "Fabelreich", platforms: [6] })]]);
+		const body = (await (await holen(client)).json()) as any;
+		expect(body).toEqual({ bundleId: 7100, imBundle: 0, spiele: [] });
+	});
+
+	it("schreibt nichts und protokolliert nichts", async () => {
+		await sammlung();
+		const zaehlen = () =>
+			env.DB.prepare("SELECT (SELECT COUNT(*) FROM game_event) AS e, (SELECT COUNT(*) FROM release) AS r, (SELECT COUNT(*) FROM physical_copy) AS p, (SELECT COUNT(*) FROM game) AS g").first();
+		const vorher = await zaehlen();
+		await holen(fakeIgdb([inhalt]).client);
+		expect(await zaehlen()).toEqual(vorher);
+	});
+
+	it("antwortet ohne Zugangsdaten und bei Ratenlimit mit 503, bei anderem Fehler mit 502", async () => {
+		expect((await holen(fakeIgdb([[]], { zugang: null }).client)).status).toBe(503);
+		expect((await holen(fakeIgdb([new Response("", { status: 429 })]).client)).status).toBe(503);
+		const kaputt = await holen(fakeIgdb([new Response("", { status: 500 })]).client);
+		expect(kaputt.status).toBe(502);
+		expect(await kaputt.json()).toEqual({ fehler: "Der IGDB-Abruf ist fehlgeschlagen." });
+	});
+
+	it("lehnt eine ungueltige Id mit 400 ab, ohne IGDB zu fragen", async () => {
+		const { client, aufrufe } = fakeIgdb([inhalt]);
+		expect((await holen(client, "/api/igdb/bundle/abc/inhalt")).status).toBe(400);
+		expect((await holen(client, "/api/igdb/bundle/0/inhalt")).status).toBe(400);
+		expect(aufrufe).toHaveLength(0);
+	});
+
+	it("macht aus einer Zeitueberschreitung einen Abruffehler (502), keinen Haenger", async () => {
+		const { fetch } = fakeFetch([
+			[/id\.twitch\.tv/, () => new Response(JSON.stringify({ access_token: "t", expires_in: 5000000 }))],
+		]);
+		const zeitueberschreitung = (async (url: RequestInfo | URL, init?: RequestInit) => {
+			if (String(url).includes("api.igdb.com")) throw new DOMException("zu langsam", "TimeoutError");
+			return fetch(url, init);
+		}) as typeof fetch;
+		const client = erstelleIgdbClient(ZUGANG, zeitueberschreitung, async () => {});
+		const antwort = await holen(client);
+		expect(antwort.status).toBe(502);
 	});
 });

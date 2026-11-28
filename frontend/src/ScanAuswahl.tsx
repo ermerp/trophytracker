@@ -19,10 +19,14 @@ import { gleichesZiel, type HuellenWahl } from './scanner'
  * und jedes bekommt seine Disc mit demselben Code. Die Wahl überlebt einen
  * neuen Suchbegriff (ICO und Shadow of the Colossus findet keine Suche
  * zugleich); zugeordnet wird über den Hauptknopf der Karte.
+ *
+ * Seit Nachtrag f1i kann die Karte eine Liste **vorgeben** – die Spiele einer
+ * Collection aus IGDB. Sie steht da, solange das Suchfeld leer ist; wer tippt,
+ * sucht weitere Spiele dazu, und die Wahl bleibt.
  */
 
 type SuchRelease = { id: number; plattform: Plattform; exemplare: number; digital: string[] }
-type SuchSpiel = { id: number; titel: string; bild: string | null; releases: SuchRelease[] }
+export type SuchSpiel = { id: number; titel: string; bild: string | null; releases: SuchRelease[] }
 
 export const istPlattform = (w: string | null | undefined): w is Plattform =>
   (PLATTFORMEN as readonly string[]).includes(w ?? '')
@@ -32,11 +36,14 @@ export function ScanAuswahl({
   vorgabe = '',
   laeuft,
   wahl,
+  vorgegeben,
   onUmschalten,
 }: {
   ean: string
   /** Vorbelegung des Suchfelds. */
   vorgabe?: string
+  /** Spiele, die bei leerem Suchfeld dastehen (die Collection, Nachtrag f1i). */
+  vorgegeben?: readonly SuchSpiel[]
   laeuft: boolean
   /** Die gewählten Spiele dieser Hülle. */
   wahl: readonly HuellenWahl[]
@@ -67,9 +74,11 @@ export function ScanAuswahl({
     return () => clearTimeout(zeit)
   }, [suchtext])
 
+  /** Was gerade dasteht: das Suchergebnis, bei leerem Feld die vorgegebene Liste. */
+  const sichtbar: readonly SuchSpiel[] | null = suchtext.trim() === '' ? (vorgegeben ?? null) : spiele
   const gewaehlt = (spielId: number, ziel: HuellenWahl['ziel']) => wahl.some((w) => w.spielId === spielId && gleichesZiel(w.ziel, ziel))
   /** Gewählte Spiele, die die aktuelle Suche nicht zeigt – sonst sähe man sie nicht mehr. */
-  const ausserhalb = wahl.filter((w) => !spiele?.some((s) => s.id === w.spielId))
+  const ausserhalb = wahl.filter((w) => !sichtbar?.some((s) => s.id === w.spielId))
 
   return (
     <div className="scan-suche">
@@ -77,7 +86,7 @@ export function ScanAuswahl({
         type="search"
         value={suchtext}
         onChange={(e) => setSuchtext(e.target.value)}
-        placeholder="Titel in der Sammlung suchen"
+        placeholder={vorgegeben ? 'Weitere Spiele suchen' : 'Titel in der Sammlung suchen'}
         aria-label={`Titel in der Sammlung suchen für ${ean}`}
       />
       {ausserhalb.length > 0 && (
@@ -92,10 +101,10 @@ export function ScanAuswahl({
         </p>
       )}
       {sucht && <p className="scan-still">sucht …</p>}
-      {spiele && spiele.length === 0 && !sucht && <p className="scan-still">Kein Spiel mit diesem Titel in der Sammlung.</p>}
-      {spiele && spiele.length > 0 && (
+      {sichtbar === spiele && spiele && spiele.length === 0 && !sucht && <p className="scan-still">Kein Spiel mit diesem Titel in der Sammlung.</p>}
+      {sichtbar && sichtbar.length > 0 && (
         <ul className="scan-wahlliste">
-          {spiele.map((s) => {
+          {sichtbar.map((s) => {
             const neu = wahl.find((w) => w.spielId === s.id && 'spielId' in w.ziel)
             return (
               <li key={s.id} className="scan-wahl">

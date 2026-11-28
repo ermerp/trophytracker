@@ -1,5 +1,7 @@
 import {
+	BUNDLE_HOECHSTENS,
 	IGDB_FELDER,
+	IGDB_FELDER_BUNDLE,
 	IGDB_FELDER_PHYSISCH,
 	IGDB_FELDER_STORE,
 	IGDB_PLATTFORM_IDS,
@@ -31,6 +33,13 @@ const TOKEN_URL = "https://id.twitch.tv/oauth2/token";
 const API_BASIS = "https://api.igdb.com/v4";
 
 export const ABSTAND_MS = 260;
+
+/**
+ * So lange wartet der Bundle-Abruf auf IGDB (Nachtrag f1i). Der Scanner
+ * wartet mit offener Karte darauf; antwortet IGDB nicht, faellt die Karte in
+ * die Suche in der Sammlung zurueck.
+ */
+export const BUNDLE_ZEITGRENZE_MS = 8_000;
 
 /** Zugangsdaten fehlen - die Anwendung laeuft ohne IGDB weiter. */
 export class IgdbKonfigError extends Error {}
@@ -105,22 +114,32 @@ export function erstelleIgdbClient(
 	 * Eine Apicalypse-Anfrage an /games. Bei 401 wird das Token genau einmal
 	 * erneuert und die Anfrage wiederholt.
 	 */
-	async function abfrage<T = IgdbSpielRoh>(koerper: string, zweiterVersuch = false): Promise<T[]> {
+	async function abfrage<T = IgdbSpielRoh>(koerper: string, zweiterVersuch = false, zeitgrenzeMs?: number): Promise<T[]> {
 		const z = zugangOderFehler();
 		const t = await tokenBesorgen(zweiterVersuch);
 		await bremsen();
 
-		const antwort = await hole(`${API_BASIS}/games`, {
-			method: "POST",
-			headers: {
-				"Client-ID": z.clientId,
-				Authorization: `Bearer ${t.offenlegen()}`,
-				Accept: "application/json",
-			},
-			body: koerper,
-		});
+		let antwort: Response;
+		try {
+			antwort = await hole(`${API_BASIS}/games`, {
+				method: "POST",
+				headers: {
+					"Client-ID": z.clientId,
+					Authorization: `Bearer ${t.offenlegen()}`,
+					Accept: "application/json",
+				},
+				body: koerper,
+				// Nur wo eine Zeitgrenze verlangt ist (Nachtrag f1i); fetch wartet sonst unbegrenzt.
+				...(zeitgrenzeMs === undefined ? {} : { signal: AbortSignal.timeout(zeitgrenzeMs) }),
+			});
+		} catch (fehler) {
+			if (fehler instanceof Error && (fehler.name === "TimeoutError" || fehler.name === "AbortError")) {
+				throw new IgdbAbrufError("IGDB hat nicht rechtzeitig geantwortet.");
+			}
+			throw fehler;
+		}
 
-		if (antwort.status === 401 && !zweiterVersuch) return abfrage<T>(koerper, true);
+		if (antwort.status === 401 && !zweiterVersuch) return abfrage<T>(koerper, true, zeitgrenzeMs);
 		if (antwort.status === 401) throw new IgdbAuthError("IGDB hat das Token abgelehnt.");
 		if (antwort.status === 429) throw new IgdbRateError("IGDB-Ratenlimit erreicht.");
 		if (!antwort.ok) throw new IgdbAbrufError(`IGDB antwortete mit ${antwort.status}.`);
@@ -188,6 +207,20 @@ export function erstelleIgdbClient(
 			if (sauber.length === 0) return [];
 			const bedingung = sauber.map((w) => `slug ~ *"${w}"*`).join(" & ");
 			return abfrage(`fields ${IGDB_FELDER}; where ${bedingung} & ${filter}; sort name asc; limit ${limit};`);
+		},
+
+		/**
+		 * Die Spiele eines Bundles (Nachtrag f1i): `where bundles = (id)` mit
+		 * demselben Plattformfilter wie jede Suche - eine Anfrage, mit
+		 * Zeitgrenze, weil der Scanner mit offener Karte darauf wartet.
+		 */
+		async bundleInhalt(bundleId: number): Promise<IgdbSpielRoh[]> {
+			if (!Number.isInteger(bundleId) || bundleId <= 0) return [];
+			return abfrage(
+				`fields ${IGDB_FELDER_BUNDLE}; where bundles = (${bundleId}) & ${filter}; limit ${BUNDLE_HOECHSTENS};`,
+				false,
+				BUNDLE_ZEITGRENZE_MS,
+			);
 		},
 
 		/** Bis zu 50 Spiele nach ID - eine Anfrage fuer das Auffrischen. */
