@@ -424,3 +424,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 28.11.2026 | **Collection-Disc: ein Exemplar je enthaltenem Spiel mit demselben Code**, kein eigenes Spiel „Collection"; Disc-Gesamtzahlen zählen Hüllen | [3](spec/03-sammlung.md) |
 | 28.11.2026 | Scanner: **Rahmen bleibt in der Farbe des Falls, bis wieder gescannt werden kann** | [9.1](spec/09-1-scanner-am-handy.md) |
 | 28.11.2026 | Scanner: **IGDB-Bundle in Fall 3 führt zu den Spielen der Sammlung**, vorab angekreuzt; eigenes Spiel nur als leiser Weg | [9.1](spec/09-1-scanner-am-handy.md) |
+| 28.11.2026 | **Keine Optimierung der Lesekosten von Dashboard und Sammlung** trotz 80 % des D1-Tageskontingents – der Scan-Tag war ein Ausnahmefall | [16.2](spec/16-2-offene-stufen.md) |

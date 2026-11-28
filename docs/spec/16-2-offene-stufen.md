@@ -126,7 +126,7 @@ Vermutung, keine Messung – und **eine, die am 11.10.2026 nicht trug:** An dem 
 Deploys samt Produktionsprüfungen, und der Zähler stand bei **282 512**. Deploy-Betrieb allein
 erklärt die Million also nicht; näher liegt die Messsitzung des 09.10. selbst, die über sechs
 Tage Preisverlauf und alle Releases gelesen hat. Gehört einmal eigens angesehen, blockiert
-aber keine Teilstufe.
+aber keine Teilstufe. **Am 28.11.2026 kam das Tageskontingent auf über 80 %** (4,16 Mio. bis 11 UTC, Mail von Cloudflare): Scan-Durchgang mit drei Deploys (je eine Sicherung) und häufigem Öffnen der App. Laut Stichprobe (`d1QueriesAdaptiveGroups`) lesen **Dashboard und Sammlung je Öffnen rund 45 000 bis 100 000 Zeilen** (Zählung der Sammlung rund 44 000, Plattformtabelle rund 46 000), der Scanner selbst wenig (Suche rund 2 000). Die App öffnet immer auf dem Dashboard. **Keine Optimierung** (Entscheidung des Nutzers vom 28.11.2026): ein Ausnahmetag, im Alltag wird die App seltener geöffnet.
 
 #### Offen: die CPU-Grenze, Betriebswarnungen, Verspätung der Actions am Nachmittag (18r-b)
 
