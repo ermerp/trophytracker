@@ -151,6 +151,8 @@ das: ein `nein` des Nutzers und ein bereits gesetztes `ja` (etwa aus dem Feed) b
 Region; ein geratenes `PAL` würde den Feed-Abgleich in Stufe 20 irreführen. Das Löschen eines
 Exemplars setzt nichts zurück – dass ein Exemplar weg ist, sagt nichts darüber, ob es die Disc gibt.
 
+**Eine Hülle, mehrere Spiele** (Nachtrag f1h, Entscheidung des Nutzers vom 28.11.2026): Eine Collection-Disc („ICO & Shadow of the Colossus Collection") bekommt an **jedem** enthaltenen Spiel ein eigenes Exemplar mit **demselben `ean`** – gleicher Code heißt eine Hülle (Index `idx_physical_copy_ean`, Migration 0042). Kein eigenes Spiel „Collection" und keine Beziehungstabelle: Die Spiele stehen ohnehin einzeln da (je eine Trophäenliste), und Lücken, „nur digital gespielt" und die Disc-Fassung fragen je Release. „Je Release genau eine Disc" gilt unverändert je Release; `ean_mapping` zeigt auf **ein** Release der Hülle. **Gesamtzahlen** der Discs (Dashboard „Physisch", Spalte „Disc", `huellen` in `GET /api/physical-copies`) zählen Hüllen, also verschiedene Codes, Exemplare ohne Code einzeln; alles je Release bleibt. Erfasst wird über den Scanner (9.1); Exemplare, die vor f1h für eine Collection angelegt wurden, ändern sich nicht.
+
 **Drei Quellen, eine Rangfolge (Stufe 14).** `physical_source` sagt, wer den Status gesetzt hat:
 `igdb` (Händlereintrag mit physischem Medium, 7.6), `manuell` (Exemplar angelegt oder ausdrücklich
 über `PATCH /api/releases/:id` gesetzt) oder später `feed` (Stufe 20). Automatische Quellen setzen

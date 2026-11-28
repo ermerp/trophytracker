@@ -27,6 +27,8 @@ export type Exemplar = {
   kaufpreisCents: number | null
   notiz: string | null
   angelegtAm: string
+  /** Andere Spiele derselben Hülle – gleicher Code, eine Disc (Nachtrag f1h). */
+  gleicheHuelle?: Array<{ spielId: number; titel: string; plattform: string }>
 }
 
 export type Digital = { id: number; quelle: Quelle; erworbenAm: string | null; herkunft: 'nutzer' | 'psn' }

@@ -549,7 +549,15 @@ export const gameRoutes = new Hono<AppEnv>()
 								zuletztGespielt: r.last_played_at,
 							},
 				bewertung: bewertungen.has(r.id) ? bewertungAntwort(bewertungen.get(r.id)!) : null,
-				exemplare: besitz.exemplare.filter((e) => e.release_id === r.id).map(exemplarAntwort),
+				exemplare: besitz.exemplare
+					.filter((e) => e.release_id === r.id)
+					.map((e) => ({
+						...exemplarAntwort(e),
+						// Andere Spiele derselben Huelle (Nachtrag f1h): gleicher Code, eine Disc.
+						gleicheHuelle: besitz.gleicheHuelle
+							.filter((h) => e.ean !== null && h.ean === e.ean)
+							.map((h) => ({ spielId: h.game_id, titel: h.title, plattform: h.platform })),
+					})),
 				digital: besitz.digital
 					.filter((d) => d.release_id === r.id)
 					.map((d) => ({ id: d.id, quelle: d.source, erworbenAm: d.acquired_at, herkunft: d.herkunft })),

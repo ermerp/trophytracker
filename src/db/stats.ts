@@ -1,5 +1,6 @@
 import { ERLAUBTE_PLATTFORMEN, type Plattform } from "../domain/titel";
 import { PLAY_STATUS, type PlayStatus } from "../domain/play-status";
+import { HUELLE_SCHLUESSEL } from "./ownership";
 
 /**
  * Kennzahlen fuers Dashboard (Stufe 19a, Abschnitt 13).
@@ -51,7 +52,6 @@ export const PLATTFORM_SQL =
 	"AND t2.defined_platinum > 0)) AS platin_moeglich, " +
 	"SUM(EXISTS (SELECT 1 FROM trophy_progress t3 WHERE t3.release_id = r.id " +
 	"AND t3.defined_platinum > 0 AND t3.earned_platinum > 0)) AS platin, " +
-	"SUM(EXISTS (SELECT 1 FROM physical_copy p1 WHERE p1.release_id = r.id)) AS disc, " +
 	"SUM(EXISTS (SELECT 1 FROM digital_entitlement d1 WHERE d1.release_id = r.id)) AS digital, " +
 	// Digital NUR ueber PS Plus (Stufe 24): eine Berechtigung aus dem Abo und
 	// keine andere. Zwei Unterabfragen statt eines OR (CLAUDE.md), beide ueber
@@ -59,6 +59,19 @@ export const PLATTFORM_SQL =
 	"SUM(EXISTS (SELECT 1 FROM digital_entitlement d2 WHERE d2.release_id = r.id AND d2.source = 'plus') " +
 	"AND NOT EXISTS (SELECT 1 FROM digital_entitlement d3 WHERE d3.release_id = r.id AND d3.source <> 'plus')) AS nur_plus " +
 	`FROM release r WHERE NOT ${NUR_WUNSCH} GROUP BY r.platform`;
+
+/**
+ * Discs je Plattform, als HUELLEN gezaehlt (Nachtrag f1h): Eine
+ * Collection-Disc traegt an jedem ihrer Spiele ein Exemplar mit demselben
+ * Code und ist trotzdem eine Disc im Regal (`HUELLE_SCHLUESSEL`). Bis f1h
+ * stand hier "Releases mit Disc" in PLATTFORM_SQL - bei je Release genau einer
+ * Disc dieselbe Zahl. Ein Release mit Disc gehoert nie zu NUR_WUNSCH, die
+ * Bedingung entfaellt deshalb. Ein Lauf ueber physical_copy, je Zeile ein
+ * Primaerschluessel-Lookup auf release.
+ */
+export const HUELLEN_SQL =
+	`SELECT r.platform AS platform, COUNT(DISTINCT ${HUELLE_SCHLUESSEL}) AS huellen ` +
+	"FROM physical_copy p JOIN release r ON r.id = p.release_id GROUP BY r.platform";
 
 /** Ein Release ohne Zeile in play_status zaehlt als 'nicht_gespielt' (Abschnitt 12). */
 export const STATUS_SQL =
@@ -162,6 +175,7 @@ export type PlattformZeile = {
 	mit_liste: number;
 	platin_moeglich: number;
 	platin: number;
+	/** Discs als Huellen (Nachtrag f1h, `HUELLEN_SQL`). */
 	disc: number;
 	digital: number;
 	/** Digital nur ueber PS Plus (Stufe 24). */
@@ -250,7 +264,7 @@ export class StatsRepository {
 	 * ReviewRepository.zaehlungNachGrund).
 	 */
 	async kennzahlen(): Promise<Kennzahlen> {
-		const [plattformen, status, trophaeen, listen, spiele, letztes, letzteTrophaee] = await this.db.batch([
+		const [plattformen, status, trophaeen, listen, spiele, letztes, letzteTrophaee, huellen] = await this.db.batch([
 			this.db.prepare(PLATTFORM_SQL),
 			this.db.prepare(STATUS_SQL),
 			this.db.prepare(TROPHAEEN_SQL),
@@ -258,6 +272,7 @@ export class StatsRepository {
 			this.db.prepare(SPIELE_SQL),
 			this.db.prepare(LETZTES_PLATIN_SQL),
 			this.db.prepare(LETZTE_TROPHAEE_SQL),
+			this.db.prepare(HUELLEN_SQL),
 		]);
 
 		const jePlattform = Object.fromEntries(
@@ -267,7 +282,10 @@ export class StatsRepository {
 			// Eine unbekannte Plattform kann es wegen des CHECK auf release
 			// nicht geben; faellt sie doch an, bleibt sie draussen statt eine
 			// fuenfte Spalte aufzumachen (7.6).
-			if (zeile.platform in jePlattform) jePlattform[zeile.platform as Plattform] = zeile;
+			if (zeile.platform in jePlattform) jePlattform[zeile.platform as Plattform] = { ...zeile, disc: 0 };
+		}
+		for (const zeile of huellen.results as { platform: string; huellen: number }[]) {
+			if (zeile.platform in jePlattform) jePlattform[zeile.platform as Plattform].disc = zeile.huellen;
 		}
 
 		const jeStatus = Object.fromEntries(PLAY_STATUS.map((s) => [s, 0])) as Record<PlayStatus, number>;

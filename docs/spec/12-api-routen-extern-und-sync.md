@@ -54,7 +54,7 @@ POST   /api/scan                      Body: { ean } – 400 bei Form oder Prüfz
                                       angebot? { titel, plattform }, scans }
 GET    /api/scan/:ean/online          eBay live (Stufe 17c): { ean, quelle, angebote, titel, eindeutig, zielSpielId, kandidaten[] };
                                       liest nur, schreibt nichts und ordnet nichts zu; 503 ohne Zugangsdaten oder bei erschöpftem Kontingent
-POST   /api/scan/:ean/assign          Body: { releaseId } oder { spielId, plattform } (Release entsteht bei Bedarf) – legt Disc mit EAN und Mapping an, erledigt Kauf/Wunsch;
+POST   /api/scan/:ean/assign          Body: { releaseId } oder { spielId, plattform } (Release entsteht bei Bedarf), seit f1h auch { ziele: [...] } (eine Hülle, höchstens 6, 409 an einem Ziel schreibt nichts, 3) – legt Disc mit EAN und Mapping an, erledigt Kauf/Wunsch;
                                       201 wie POST /api/physical-copies plus ean, spiel { spielId, titel, plattform }; ein vorhandenes Mapping wird überschrieben
 DELETE /api/scan/:ean                 Mapping lösen (Rückgängig: erst DELETE /api/physical-copies/:id); die Disc bleibt; 404 ohne Mapping
 

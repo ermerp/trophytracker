@@ -135,6 +135,105 @@ export function angelegtAus(a: { vorhanden?: boolean; releaseNeu?: boolean }): {
   return { spielNeu: false, releaseNeu: a.releaseNeu === true }
 }
 
+// --- Eine Hülle, mehrere Spiele (Nachtrag f1h) --------------------------------------
+
+/**
+ * Ein Ziel des Zuordnens: ein vorhandenes Release oder Spiel + Plattform
+ * (das Release entsteht beim Zuordnen). Derselbe Wertebereich wie `ziele` in
+ * `POST /api/scan/:ean/assign`.
+ */
+export type Ziel = { releaseId: number } | { spielId: number; plattform: ScanPlattform }
+
+/** Ein gewähltes Spiel der Hülle – mit dem Ziel, auf das seine Disc kommt. */
+export type HuellenWahl = { spielId: number; titel: string; plattform: ScanPlattform; ziel: Ziel; releaseNeu: boolean }
+
+/** Höchstens so viele Spiele je Hülle – dieselbe Grenze wie `HOECHSTENS_ZIELE` im Worker. */
+export const HOECHSTENS_SPIELE = 6
+
+/**
+ * Wohin die Disc eines Spiels auf einer Plattform kommt: an sein Release
+ * dort, wenn es eines ohne Disc gibt, sonst an ein neues. `null`, wenn dort
+ * schon eine Disc steht – je Release genau eine.
+ */
+export function zielAufPlattform(
+  spielId: number,
+  releases: readonly KandidatRelease[],
+  plattform: ScanPlattform,
+): { ziel: Ziel; releaseNeu: boolean } | null {
+  const r = releases.find((x) => x.plattform === plattform)
+  if (!r) return { ziel: { spielId, plattform }, releaseNeu: true }
+  return r.exemplare > 0 ? null : { ziel: { releaseId: r.releaseId }, releaseNeu: false }
+}
+
+/** Ein Spiel an- oder abwählen; dasselbe Spiel steht höchstens einmal darin, und die Grenze gilt. */
+export function wahlUmschalten(wahl: readonly HuellenWahl[], neu: HuellenWahl): HuellenWahl[] {
+  const da = wahl.find((w) => w.spielId === neu.spielId)
+  if (da && gleichesZiel(da.ziel, neu.ziel)) return wahl.filter((w) => w.spielId !== neu.spielId)
+  if (da) return wahl.map((w) => (w.spielId === neu.spielId ? neu : w))
+  return wahl.length >= HOECHSTENS_SPIELE ? [...wahl] : [...wahl, neu]
+}
+
+export function gleichesZiel(a: Ziel, b: Ziel): boolean {
+  if ('releaseId' in a) return 'releaseId' in b && a.releaseId === b.releaseId
+  return 'spielId' in b && a.spielId === b.spielId && a.plattform === b.plattform
+}
+
+/**
+ * Beschriftung des Hauptknopfs: „Disc erfassen · PS4" für ein Spiel,
+ * „Disc für n Spiele erfassen" für eine Hülle – dort ohne Plattform: Mit ihr
+ * bricht die Beschriftung bei 360 px um (gemessen am 28.11.2026), und die
+ * Plattform steht an jedem gewählten Spiel darüber.
+ */
+export function hauptText(wahl: readonly HuellenWahl[]): { text: string; plattform: ScanPlattform | null } {
+  if (wahl.length > 1) return { text: `Disc für ${wahl.length} Spiele erfassen`, plattform: null }
+  return { text: 'Disc erfassen', plattform: wahl[0]?.plattform ?? null }
+}
+
+/** Die eine Plattform aller gewählten Spiele – `null`, wenn sie sich unterscheiden oder nichts gewählt ist. */
+export function gemeinsamePlattform(wahl: readonly HuellenWahl[]): ScanPlattform | null {
+  const p = [...new Set(wahl.map((w) => w.plattform))]
+  return p.length === 1 ? p[0] : null
+}
+
+/**
+ * Die Reihenfolge der Ziele: Das Mapping zeigt nach dem Zuordnen auf das
+ * erste. Steht das Release, auf das der Code vorher zeigte, unter den Zielen,
+ * kommt es nach vorn – dann bleibt das Mapping, wo es war, und Rückgängig muss
+ * es nicht wiederherstellen.
+ */
+export function zieleOrdnen(wahl: readonly HuellenWahl[], vorherReleaseId: number | null): HuellenWahl[] {
+  const vorn = wahl.filter((w) => 'releaseId' in w.ziel && w.ziel.releaseId === vorherReleaseId)
+  return [...vorn, ...wahl.filter((w) => !vorn.includes(w))]
+}
+
+// --- Der Rahmen des Kamerabilds --------------------------------------------------
+
+/**
+ * Was gerade unter dem Bild steht – soweit es für den Rahmen zählt. `code`
+ * trägt das Signal, mit dem die Karte aufging (`signalFuer`).
+ */
+export type KartenLage = { art: 'leer' } | { art: 'erfasst' } | { art: 'code'; signal: Signal } | { art: 'fehler' }
+
+/**
+ * Die Farbe des Rahmens (Wunsch des Nutzers vom 28.11.2026): **Solange ein
+ * Vorgang offen ist** – eine Karte wartet auf eine Entscheidung, die
+ * Erkennung ruht –, steht die Farbe seines Falls (neuer Code, schon im Regal,
+ * Fehler). Ist wieder Scannen dran (leer, erfasst), ist der Rahmen neutral
+ * (`null`); nur das kurze Aufleuchten (`blitz`) nach „erfasst" bleibt, weil die
+ * Kamera dort sofort weiterläuft.
+ */
+export function rahmenFuer(lage: KartenLage, blitz: Signal | null): Signal | null {
+  switch (lage.art) {
+    case 'code':
+      return lage.signal
+    case 'fehler':
+      return 'fehler'
+    case 'leer':
+    case 'erfasst':
+      return blitz
+  }
+}
+
 // --- Rückgängig ---------------------------------------------------------------------
 
 /** Ein Schreibzugriff des Rückwegs. `erwartet`: ein Status, der hier Erfolg heißt. */
@@ -145,10 +244,9 @@ export type Schritt = {
   erwartet?: number
 }
 
-/** Was eine Erfassung im Scanner alles geschrieben hat – das Gedächtnis für Rückgängig. */
-export type Erfassung = {
+/** Eine Disc, die ein Zug angelegt hat – mit allem, was der Worker nebenbei schrieb. */
+export type ErfassteDisc = {
   exemplarId: number
-  ean: string
   releaseId: number
   spielId: number | null
   absichtenErledigt: ReadonlyArray<{ id: number }>
@@ -158,55 +256,111 @@ export type Erfassung = {
   spielNeu: boolean
   /** Das Release ist in diesem Zug entstanden („andere Plattform", „Release anhängen"). */
   releaseNeu: boolean
+}
+
+/**
+ * Was ein Zug im Scanner alles geschrieben hat – das Gedächtnis für
+ * Rückgängig. Seit Nachtrag f1h kann ein Zug mehrere Discs anlegen: eine
+ * Hülle, mehrere Spiele, alle mit demselben Code. Das Mapping zeigt danach
+ * auf die erste.
+ */
+export type Erfassung = {
+  ean: string
+  discs: readonly ErfassteDisc[]
   /**
-   * Worauf der Code vorher zeigte (Fall 1 → „Ist ein anderes Spiel"):
-   * Zuordnen überschreibt das Mapping, Rückgängig muss es zurückbringen.
+   * Worauf der Code vorher zeigte (Fall 1 → „Ist ein anderes Spiel",
+   * „+ weiteres Spiel dieser Hülle"): Zuordnen überschreibt das Mapping,
+   * Rückgängig muss es zurückbringen.
    */
   vorherMapping: { releaseId: number; mitDisc: boolean } | null
 }
 
+/** Eine Disc aus der Antwort von `POST /api/scan/:ean/assign`. */
+export type AntwortDisc = {
+  id: number
+  releaseId: number
+  physischStatusGesetzt?: boolean
+  releaseNeu?: boolean
+  spiel: { spielId: number } | null
+  absichtenErledigt: ReadonlyArray<{ id: number }>
+}
+
 /**
- * Der Rückweg nach einer Erfassung – der Stand vor der Aktion, auch was der
- * Worker nebenbei geschrieben hat. Reihenfolge wie `erfassenZurueck`
- * (`preisliste.ts`):
+ * Die Erfassung aus der Antwort. `releaseNeu` kommt vom Worker (er hat das
+ * Release angelegt) **oder** vom Anlegen davor (Fall 3: `POST /api/games`
+ * legte Spiel und Release an, `angelegt`). Ein fehlender Schlüssel heißt
+ * „nicht neu" – wie bei `angelegtAus`: lieber ein Release stehen lassen als
+ * ein vorhandenes löschen.
+ */
+export function erfassungAus(
+  ean: string,
+  discs: readonly AntwortDisc[],
+  angelegt: { releaseId: number; spielNeu: boolean; releaseNeu: boolean } | null,
+  vorherMapping: Erfassung['vorherMapping'],
+): Erfassung {
+  return {
+    ean,
+    vorherMapping,
+    discs: discs.map((d) => {
+      const vorab = angelegt?.releaseId === d.releaseId ? angelegt : null
+      return {
+        exemplarId: d.id,
+        releaseId: d.releaseId,
+        spielId: d.spiel?.spielId ?? null,
+        absichtenErledigt: d.absichtenErledigt,
+        physischStatusGesetzt: d.physischStatusGesetzt,
+        spielNeu: vorab?.spielNeu ?? false,
+        releaseNeu: d.releaseNeu === true || (vorab?.releaseNeu ?? false),
+      }
+    }),
+  }
+}
+
+/**
+ * Der Rückweg nach einem Zug – der Stand vor der Aktion, auch was der Worker
+ * nebenbei geschrieben hat, für **jede** Disc des Zugs. Reihenfolge wie
+ * `erfassenZurueck` (`preisliste.ts`):
  *
  * 1. **Erledigte Absichten wieder öffnen** – zuerst, damit ein Abbruch danach
  *    nie einen still erledigten Eintrag ohne Disc hinterlässt.
- * 2. **Disc löschen** (protokolliert `exemplar_geloescht`).
- * 3. **Mapping**: Zeigte der Code vorher auf ein anderes Release mit Disc,
- *    zeigt er wieder dorthin – über dieselbe Route, die dafür 409 antwortet
- *    und das Mapping trotzdem setzt (9.2). Zeigte er schon vorher auf dieses
- *    Release, bleibt es. Sonst wird es gelöst.
- * 4. **Was neu entstand, wieder weg**: ein neues Spiel samt Release
+ * 2. **Discs löschen** (protokolliert je `exemplar_geloescht`).
+ * 3. **Mapping**: Zeigte der Code vorher auf ein Release außerhalb des Zugs
+ *    mit Disc, zeigt er wieder dorthin – über dieselbe Route, die dafür 409
+ *    antwortet und das Mapping trotzdem setzt (9.2). Zeigte er schon vorher
+ *    auf das erste Release des Zugs, bleibt es. Sonst wird es gelöst.
+ * 4. **Was neu entstand, wieder weg**, je Disc: ein neues Spiel samt Release
  *    (`DELETE /api/games`, `spiel_geloescht`), sonst ein neues Release
  *    (`DELETE /api/releases`, `release_geloescht`), sonst die Disc-Fassung
  *    zurück auf „unbekannt", wenn das Erfassen sie gesetzt hat.
  *
- * Grenze: Zeigte der Code vorher auf ein anderes Release **ohne** Disc, lässt
- * sich das Mapping nicht wiederherstellen, ohne dort eine Disc anzulegen – es
- * wird gelöst, und ein erneuter Scan fragt neu.
+ * Grenze: Zeigte der Code vorher auf ein Release **ohne** Disc, das nicht das
+ * erste des Zugs ist, lässt sich das Mapping nicht wiederherstellen, ohne dort
+ * eine Disc anzulegen – es wird gelöst, und ein erneuter Scan fragt neu.
+ * `zieleOrdnen` stellt ein solches Release deshalb nach vorn.
  */
 export function scanZurueck(e: Erfassung): Schritt[] {
-  const schritte: Schritt[] = e.absichtenErledigt.map((a) => ({
-    methode: 'PATCH',
-    pfad: `/api/plans/${a.id}`,
-    koerper: { status: 'offen' },
-  }))
-  schritte.push({ methode: 'DELETE', pfad: `/api/physical-copies/${e.exemplarId}` })
+  const schritte: Schritt[] = e.discs.flatMap((d) =>
+    d.absichtenErledigt.map((a): Schritt => ({ methode: 'PATCH', pfad: `/api/plans/${a.id}`, koerper: { status: 'offen' } })),
+  )
+  for (const d of e.discs) schritte.push({ methode: 'DELETE', pfad: `/api/physical-copies/${d.exemplarId}` })
 
   const vorher = e.vorherMapping
-  if (vorher && vorher.releaseId !== e.releaseId && vorher.mitDisc) {
+  const jetzt = e.discs[0]?.releaseId ?? null
+  const imZug = (id: number) => e.discs.some((d) => d.releaseId === id)
+  if (vorher && !imZug(vorher.releaseId) && vorher.mitDisc) {
     schritte.push({ methode: 'POST', pfad: `/api/scan/${e.ean}/assign`, koerper: { releaseId: vorher.releaseId }, erwartet: 409 })
-  } else if (!vorher || vorher.releaseId !== e.releaseId) {
+  } else if (!vorher || vorher.releaseId !== jetzt) {
     schritte.push({ methode: 'DELETE', pfad: `/api/scan/${e.ean}` })
   }
 
-  if (e.spielNeu && e.spielId !== null) {
-    schritte.push({ methode: 'DELETE', pfad: `/api/games/${e.spielId}` })
-  } else if (e.releaseNeu) {
-    schritte.push({ methode: 'DELETE', pfad: `/api/releases/${e.releaseId}` })
-  } else if (e.physischStatusGesetzt === true) {
-    schritte.push({ methode: 'PATCH', pfad: `/api/releases/${e.releaseId}`, koerper: { discFassung: 'unbekannt' } })
+  for (const d of e.discs) {
+    if (d.spielNeu && d.spielId !== null) {
+      schritte.push({ methode: 'DELETE', pfad: `/api/games/${d.spielId}` })
+    } else if (d.releaseNeu) {
+      schritte.push({ methode: 'DELETE', pfad: `/api/releases/${d.releaseId}` })
+    } else if (d.physischStatusGesetzt === true) {
+      schritte.push({ methode: 'PATCH', pfad: `/api/releases/${d.releaseId}`, koerper: { discFassung: 'unbekannt' } })
+    }
   }
   return schritte
 }

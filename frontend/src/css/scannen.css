@@ -462,6 +462,7 @@ select.scan-link {
   display: flex;
   align-items: center;
   gap: var(--a2);
+  box-sizing: border-box;
   width: 100%;
   padding: var(--a1);
   font-size: 0.875rem;
@@ -515,6 +516,13 @@ button.scan-wahl.gewaehlt,
   display: inline-flex;
   align-items: center;
   gap: var(--a1);
+}
+
+/* Gewählt für diese Hülle (Nachtrag f1h) – dieselbe Aussage wie der gewählte Treffer oben. */
+.scan-wahl-knoepfe .knopf.gewaehlt {
+  border-color: var(--text-leise);
+  background: var(--flaeche-hoch);
+  color: var(--text);
 }
 
 .scan-suche input,
@@ -698,4 +706,20 @@ button.scan-wahl.gewaehlt,
 .scan-zaehler b {
   font-weight: 600;
   color: var(--text);
+}
+
+/* --- Eine Hülle, mehrere Spiele (Nachtrag f1h) --- */
+
+/* Der leise Weg zu einem weiteren Spiel derselben Hülle, unter dem Vorschlag. */
+.scan-weitere {
+  align-self: flex-start;
+  padding: 0;
+  font-size: 0.8125rem;
+  text-align: left;
+}
+
+/* Fall 1: die Spiele der Hülle als Links zum Spiel. */
+a.scan-wahl {
+  color: var(--text);
+  text-decoration: none;
 }
