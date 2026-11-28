@@ -79,6 +79,7 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 16 | [16-2-betriebswarnungen.md](16-2-betriebswarnungen.md) | Betriebswarnungen (18m, 18m-b), Nachtläufe bis 05:00 UTC |
 | 16 | [16-2-endlos-scrollen.md](16-2-endlos-scrollen.md) | Endlos-Scrollen in der Sammlung und im Änderungsprotokoll (Stufe 22) |
 | 16 | [16-4-finale-stufen.md](16-4-finale-stufen.md) | die fünf finalen Stufen |
+| 16 | [16-4-scan-durchgang.md](16-4-scan-durchgang.md) | Finale Stufe 1: Stand des Scan-Durchgangs, offene Befunde |
 | 17 | [17-risiken.md](17-risiken.md) | bekannte Risiken und wie damit umgegangen wird |
 
 Im Code stehen Verweise der Form „Abschnitt 5.3". Die Nummern gelten weiter;

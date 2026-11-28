@@ -1057,3 +1057,10 @@ zu lesen – die Zeit aus der Reihenfolge-Entscheidung vom 22.10. (20i-c), die 1
 23.11. auf 13:17 und 15:17 verlegt hat. Erst `markt.yml` zeigte es. → Wer einen Termin nennt,
 liest ihn aus der Quelle (Workflow, `wrangler.jsonc`), nicht aus einer Spezifikationszeile,
 die eine spätere Stufe überholt hat (CLAUDE.md, „Was berichtet … wird, kommt aus der Sache selbst").
+
+**28.11.2026 – Scan-Durchgang.** Während der Nutzer die Sammlung scannte, liefen drei Deploys und
+viele Abfragen; das D1-Tageskontingent stand bei über 80 % (4,16 von 5 Mio. Zeilen bis 11 UTC), und
+der Nutzer erfuhr es aus einer Mail von Cloudflare, nicht von mir. Dashboard und Sammlung lesen je
+Öffnen 45 000 bis 100 000 Zeilen, und die App öffnet auf dem Dashboard. → An einem Tag mit viel
+Betrieb `rows_read` des UTC-Tags mitlesen (`d1AnalyticsAdaptiveGroups` je Stunde), bevor ein weiterer
+Deploy oder eine Messung dazukommt (CLAUDE.md, „Zeilenlese- und Schreibgrenze").

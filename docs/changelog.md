@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 217 | 28.11.2026 | **Abschluss 28.11.:** Stand des Scan-Durchgangs und sechs offene Befunde (16.4), D1-Kontingent über 80 % mit Lesekosten von Dashboard und Sammlung, keine Optimierung (16.2), eine Lehre |
 | 216 | 28.11.2026 | **Nachtrag f1i: Collection über das IGDB-Bundle** – Fall 3 mit Bundle-Treffer führt zur Mehrfachwahl, Inhalt über `GET /api/igdb/bundle/:id/inhalt`, gemessen 8 von 8 (9.1) |
 | 215 | 28.11.2026 | **Nachtrag f1h: eine Hülle, mehrere Spiele** – Collection-Discs als Exemplar je Spiel mit gleichem Code (Index 0042), Mehrfachwahl im Scanner, Zuordnen mit `ziele` in einem Batch, Disc-Gesamtzahlen zählen Hüllen, „gleiche Hülle wie" im Spieldetail; derselbe Code nach „×" wieder lesbar, Rahmen bleibt bis Vorgangsende (3, 9.1, 12) |
 | 214 | 28.11.2026 | **Nachtrag f1g, Prüfung am Gerät:** Ton und Vibration über den Lautsprecher synchron, Bluetooth-Verzögerung bewusst nicht ausgeglichen (9.1) |
