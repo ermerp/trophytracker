@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 213 | 28.11.2026 | **Nachtrag f1g: Scanner am Handy** – eine Karte je Fall mit festem Hauptknopf, Fall 3 in einem Tipp, vollständiges Rückgängig (Disc-Fassung, neues Release, überschriebenes Mapping, neues Spiel; `releaseNeu` an `POST /api/games`), vier Muster aus Ton und Vibration, Tokens `--scan-regal` / `--scan-erfasst`, letzte Scans auf dem Gerät; neuer Abschnitt 9.1, Reihenfolge der finalen Stufe 1 (16.4) |
 | 212 | 28.11.2026 | **Nachtrag: Nacht zum 28.11.** – die erste nach dem Import: Spielzeit-Volllauf 35 / 17 ms, erste Produktionswerte von 18p-b (7 ms für 50 Spiele), Gebrauchtpreise 661 Releases in 745 s – Zuschnitt und Takt bleiben (16.2, 16.4) |
 | 211 | 27.11.2026 | **Abschluss 27.11. (Nacht):** Wunschlisten-Import abgeschlossen (16.4), Blockübernahme zurückgestellt, 16.2 vom Worker-Takt auf das Zeitlimit der Action umgestellt, zwei Lehren (Gerät, Uhrzeit), Gerät eines Fehlers erfragen (CLAUDE.md) |
 | 210 | 27.11.2026 | **Nachtrag f1f: CPU der Import-Durchsicht.** Cloudflare brach am Abend die Seiten der Import-Durchsicht mit `exceededCpu` ab; die Wunschtitel werden jetzt einmal je Aufruf vorbereitet (`vorbereiteteWuensche`), `titelSchluessel` baut seine Ausdrücke nur noch einmal, der Abgleich fragt die Sammlung je Schritt in einer Abfrage; Blockübernahme zur Entscheidung offen (8.2, 16.4) |
