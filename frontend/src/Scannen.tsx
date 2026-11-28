@@ -2,21 +2,33 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiFehler, PLATTFORMEN, anfrage, erledigtText, neuestePlattform, type ErfasstAntwort, type IgdbKandidat, type Plattform } from './api'
 import { Kopfzeile } from './Kopfzeile'
-import { ScanAuswahl, type Wahl } from './ScanAuswahl'
+import { ScanAuswahl } from './ScanAuswahl'
 import { Dubletten, useAnlegen, type Angelegt } from './SpielAnlegen'
 import { PlattformChip } from './SpielTeile'
 import { Zeichen } from './Symbole'
 import { useKamera } from './kamera'
 import {
+  PLATTFORM_FOLGE,
   anderePlattformen,
+  erfassungAus,
+  gemeinsamePlattform,
   hauptRelease,
+  hauptText,
   kandidatenOrdnen,
+  rahmenFuer,
   scanZurueck,
   signalFuer,
+  wahlUmschalten,
+  zielAufPlattform,
+  zieleOrdnen,
+  type AntwortDisc,
   type Erfassung,
   type Ergebnis,
+  type HuellenWahl,
+  type KartenLage,
   type Schritt,
   type Signal,
+  type Ziel,
 } from './scanner'
 import {
   ERGEBNIS_TEXT,
@@ -55,6 +67,13 @@ import { signalGeben, tonBereit } from './ton'
  *    weiter, der Block bleibt bis zum nächsten Code.
  * 5. **Fehler**: Meldung und „Nochmal versuchen".
  *
+ * **Eine Hülle, mehrere Spiele** (Nachtrag f1h): Eine Collection-Disc trägt
+ * an jedem ihrer Spiele eine eigene Disc mit demselben Code. In Fall 2 und in
+ * der Suche lassen sich deshalb mehrere Spiele wählen („Disc für n Spiele
+ * erfassen"), Fall 1 zeigt alle Spiele der Hülle, und „+ weiteres Spiel
+ * dieser Hülle" hängt eines an einen schon erfassten Code an. Rückgängig
+ * nimmt den ganzen Zug zurück.
+ *
  * Jeder Fall gibt ein Signal – Rahmenfarbe, Ton und Vibration (`scanner.ts`,
  * `ton.ts`) –, damit man beim Abscannen nicht auf den Bildschirm sehen muss.
  * Das Textfeld für die EAN bleibt als Notnagel hinter „Code eintippen".
@@ -62,18 +81,30 @@ import { signalGeben, tonBereit } from './ton'
  * Spur (9.3); „Letzte Scans" ist nur ein Gedächtnis des Geräts.
  */
 
+type HuellenSpiel = { releaseId: number; spielId: number; titel: string; plattform: Plattform; bild: string | null; exemplare: number }
+
 type Treffer = {
   ean: string
   treffer: 'mapping' | 'angebot' | 'keiner'
-  release?: { releaseId: number; spielId: number; titel: string; plattform: Plattform; bild: string | null; exemplare: number }
+  release?: HuellenSpiel
+  /** Alle Spiele der Hülle, das Mapping-Release vorn (Nachtrag f1h); fehlt bei einem älteren Worker. */
+  huelle?: HuellenSpiel[]
   angebot?: { titel: string; plattform: string | null }
   scans: number
 }
+
+/** Eine Disc des Zugs, wie der Worker sie nennt (Nachtrag f1h). */
+type ZugDisc = AntwortDisc &
+  Pick<ErfasstAntwort, 'absichtenErledigt' | 'aufListe'> & {
+    spiel: { spielId: number; titel: string; plattform: Plattform } | null
+    bild?: string | null
+  }
 
 type Zuordnung = ErfasstAntwort & {
   ean: string
   releaseId: number
   spiel: { spielId: number; titel: string; plattform: Plattform } | null
+  discs?: ZugDisc[]
 }
 
 /**
@@ -93,8 +124,8 @@ type OnlineStand = { ean: string } & ({ art: 'laeuft' } | { art: 'da'; o: Online
 
 /** Was zum Zuordnen gehört, aber nicht in den Körper der Anfrage. */
 type Zusammenhang = {
-  spielNeu: boolean
-  releaseNeu: boolean
+  /** Fall 3: Spiel und Release, die `POST /api/games` eben angelegt hat. */
+  angelegt: { releaseId: number; spielNeu: boolean; releaseNeu: boolean } | null
   bild: string | null
   vorherMapping: Erfassung['vorherMapping']
 }
@@ -102,24 +133,40 @@ type Zusammenhang = {
 /** Was „Nochmal versuchen" wiederholt. */
 type Wiederholung =
   | { art: 'aufloesen'; roh: string; zaehlen: boolean }
-  | { art: 'zuordnen'; ean: string; koerper: Wahl; z: Zusammenhang }
+  | { art: 'zuordnen'; ean: string; ziele: Ziel[]; z: Zusammenhang }
   | { art: 'zurueck'; rest: Schritt[]; erfasst: ErfasstKarte }
 
-type Modus = 'vorschlag' | 'suche' | 'anlegen'
+/** `weitere`: die Suche für ein weiteres Spiel eines schon erfassten Codes (Nachtrag f1h). */
+type Modus = 'vorschlag' | 'suche' | 'anlegen' | 'weitere'
 
 type ErfasstKarte = {
   art: 'erfasst'
   e: Erfassung
   z: Zuordnung
+  /** Die Discs dieses Zugs mit Titel und Plattform – eine je Spiel der Hülle. */
+  discs: ZugDisc[]
   bild: string | null
   eintragId: string
 }
 
 type Karte =
   | { art: 'leer'; hinweis: string | null }
-  | { art: 'code'; t: Treffer; modus: Modus }
+  | { art: 'code'; t: Treffer; modus: Modus; vorwahl?: HuellenWahl[] }
   | ErfasstKarte
   | { art: 'fehler'; ean: string | null; meldung: string; nochmal: Wiederholung | null }
+
+/** Was der Rahmen des Kamerabilds wissen muss (`rahmenFuer`). */
+function kartenLage(k: Karte): KartenLage {
+  if (k.art === 'code') return { art: 'code', signal: signalFuer({ art: 'aufgeloest', treffer: k.t.treffer, exemplare: k.t.release?.exemplare ?? null }) }
+  if (k.art === 'fehler') return { art: 'fehler' }
+  return { art: k.art }
+}
+
+/** Die Discs aus der Antwort – bei einem älteren Worker die eine oben. */
+const discsAus = (a: Zuordnung): ZugDisc[] =>
+  a.discs ?? [{ id: a.id, releaseId: a.releaseId, physischStatusGesetzt: a.physischStatusGesetzt, spiel: a.spiel, absichtenErledigt: a.absichtenErledigt, aufListe: a.aufListe }]
+
+const titelDerHuelle = (discs: readonly ZugDisc[]) => discs.map((d) => d.spiel?.titel ?? `Release ${d.releaseId}`).join(' + ')
 
 /**
  * Ein Netzausfall kommt als `TypeError` mit englischem Text des Browsers
@@ -206,7 +253,6 @@ export function Scannen() {
   abbrechenRef.current = abbrechenNotieren
   useEffect(() => () => abbrechenRef.current(), [])
 
-  const [letzterCode, setLetzterCode] = useState<string | null>(null)
   const aktuellerCode = useRef<string | null>(null)
   /**
    * Die Erkennung pausiert, solange eine Karte auf eine Entscheidung wartet –
@@ -234,7 +280,6 @@ export function Scannen() {
         const t = await anfrage<Treffer>('/api/scan', { methode: 'POST', koerper: { ean: roh, zaehlen } })
         abbrechenNotieren()
         aktuellerCode.current = t.ean
-        setLetzterCode(t.ean)
         setEingabe('')
         const exemplare = t.release?.exemplare ?? null
         signal({ art: 'aufgeloest', treffer: t.treffer, exemplare })
@@ -268,10 +313,10 @@ export function Scannen() {
     [abbrechenNotieren, onlineHolen, signal, verlauf],
   )
 
-  // Der zuletzt behandelte Code löst nicht erneut aus, bis ein anderer kam
-  // (siehe useKamera); dieselbe Disc noch einmal geht über das Textfeld.
+  // Der zuletzt angenommene Code löst erst wieder aus, wenn er zwischendurch
+  // aus dem Bild war (`wiederholsperre.ts`, Nachtrag f1h).
   const { videoRef, status: kameraStatus, fehler: kameraFehler, nativ, geraete, starten, stoppen, wechseln, pausiert, setPausiert, kandidat, gespiegelt } =
-    useKamera(aufloesen, letzterCode)
+    useKamera(aufloesen)
   pausieren.current = setPausiert
 
   // ?ean= (alte Links aus den Einstellungen): sofort auflösen, Kamera bleibt aus, bis sie gestartet wird.
@@ -318,49 +363,37 @@ export function Scannen() {
     weiter()
   }
 
-  async function zuordnen(ean: string, koerper: Wahl, z: Zusammenhang) {
+  async function zuordnen(ean: string, ziele: Ziel[], z: Zusammenhang) {
     setLaeuft(true)
     const eintragId = offen.current?.ean === ean ? offen.current.id : neueId(ean, Date.now(), Math.random())
     try {
-      const antwort = await anfrage<Zuordnung>(`/api/scan/${ean}/assign`, { methode: 'POST', koerper })
-      const e: Erfassung = {
-        exemplarId: antwort.id,
-        ean,
-        releaseId: antwort.releaseId,
-        spielId: antwort.spiel?.spielId ?? null,
-        absichtenErledigt: antwort.absichtenErledigt,
-        physischStatusGesetzt: antwort.physischStatusGesetzt,
-        spielNeu: z.spielNeu,
-        releaseNeu: z.releaseNeu,
-        vorherMapping: z.vorherMapping,
-      }
+      const antwort = await anfrage<Zuordnung>(`/api/scan/${ean}/assign`, { methode: 'POST', koerper: { ziele } })
+      const discs = discsAus(antwort)
+      const e = erfassungAus(ean, discs, z.angelegt, z.vorherMapping)
       offen.current = null
+      const erste = discs[0]?.spiel ?? null
       verlauf.aendern((l) =>
         vorne(l, {
           id: eintragId,
           ean,
           zeit: new Date().toISOString(),
           ergebnis: 'erfasst',
-          spielId: antwort.spiel?.spielId ?? null,
-          titel: antwort.spiel?.titel ?? null,
-          plattform: antwort.spiel?.plattform ?? null,
+          spielId: erste?.spielId ?? null,
+          titel: erste ? titelDerHuelle(discs) : null,
+          plattform: erste?.plattform ?? null,
           bild: z.bild,
         }),
       )
       setSitzung((n) => n + 1)
       signal({ art: 'erfasst' })
-      weiter({ art: 'erfasst', e, z: { ...antwort, ean }, bild: z.bild, eintragId })
+      weiter({ art: 'erfasst', e, z: { ...antwort, ean }, discs, bild: z.bild, eintragId })
     } catch (f) {
-      if (f instanceof ApiFehler && f.status === 409 && typeof f.antwort.releaseId === 'number') {
+      if (f instanceof ApiFehler && f.status === 409 && typeof f.antwort.releaseId === 'number' && ziele.length === 1) {
         // Je Release genau eine Disc: Das Mapping hat der Worker trotzdem
         // gesetzt (9.2) – die Karte sagt jetzt, was beim nächsten Scan kommt.
         const a = f.antwort as { releaseId: number; game_id?: number; title?: string; platform?: Plattform }
-        const t: Treffer = {
-          ean,
-          treffer: 'mapping',
-          scans: 0,
-          release: { releaseId: a.releaseId, spielId: a.game_id ?? 0, titel: a.title ?? '', plattform: a.platform ?? 'PS4', bild: z.bild, exemplare: 1 },
-        }
+        const r: HuellenSpiel = { releaseId: a.releaseId, spielId: a.game_id ?? 0, titel: a.title ?? '', plattform: a.platform ?? 'PS4', bild: z.bild, exemplare: 1 }
+        const t: Treffer = { ean, treffer: 'mapping', scans: 0, release: r, huelle: [r] }
         offen.current = null
         verlauf.aendern((l) =>
           vorne(l, { id: eintragId, ean, zeit: new Date().toISOString(), ergebnis: 'regal', spielId: a.game_id ?? null, titel: a.title ?? null, plattform: a.platform ?? null, bild: z.bild }),
@@ -368,8 +401,10 @@ export function Scannen() {
         signal({ art: 'schon_da' })
         setKarte({ art: 'code', t, modus: 'vorschlag' })
       } else {
+        // Bei mehreren Zielen schreibt ein 409 nichts (Nachtrag f1h); die
+        // Meldung des Workers nennt das Spiel, dessen Disc schon steht.
         signal({ art: 'fehler' })
-        setKarte({ art: 'fehler', ean, meldung: meldungAus(f, 'Zuordnen fehlgeschlagen.'), nochmal: wiederholbar(f) ? { art: 'zuordnen', ean, koerper, z } : null })
+        setKarte({ art: 'fehler', ean, meldung: meldungAus(f, 'Zuordnen fehlgeschlagen.'), nochmal: wiederholbar(f) ? { art: 'zuordnen', ean, ziele, z } : null })
       }
     } finally {
       setLaeuft(false)
@@ -377,9 +412,10 @@ export function Scannen() {
   }
 
   /**
-   * Rückgängig: Schritt für Schritt aus `scanZurueck`. Scheitert einer, steht
-   * die Fehlerkarte da, und „Nochmal versuchen" setzt beim gescheiterten an –
-   * die erledigten Schritte noch einmal zu schicken, liefe auf 404.
+   * Rückgängig: Schritt für Schritt aus `scanZurueck` – für alle Discs des
+   * Zugs. Scheitert einer, steht die Fehlerkarte da, und „Nochmal versuchen"
+   * setzt beim gescheiterten an – die erledigten Schritte noch einmal zu
+   * schicken, liefe auf 404.
    */
   async function zurueck(erfasst: ErfasstKarte, schritte: Schritt[] = scanZurueck(erfasst.e)) {
     setLaeuft(true)
@@ -393,7 +429,7 @@ export function Scannen() {
           if (!(s.erwartet !== undefined && f instanceof ApiFehler && f.status === s.erwartet)) throw f
         }
       }
-      verlauf.aendern((l) => zuruecknehmen(l, erfasst.eintragId, erfasst.e.spielNeu))
+      verlauf.aendern((l) => zuruecknehmen(l, erfasst.eintragId, erfasst.e.discs[0]?.spielNeu === true))
       setSitzung((n) => Math.max(0, n - 1))
       setKarte({ art: 'leer', hinweis: 'Zurückgenommen.' })
     } catch (f) {
@@ -404,11 +440,14 @@ export function Scannen() {
     }
   }
 
+  /** „ins Backlog übernehmen": jedes Release des Zugs, dessen Kauf oder Wunsch erledigt wurde und das auf keiner Liste steht. */
   async function insBacklog(k: ErfasstKarte) {
     setLaeuft(true)
     try {
-      await anfrage('/api/plans', { methode: 'POST', koerper: { art: 'backlog', releaseId: k.z.releaseId } })
-      setKarte({ ...k, z: { ...k.z, aufListe: true } })
+      for (const d of k.discs.filter((x) => x.absichtenErledigt.length > 0 && !x.aufListe)) {
+        await anfrage('/api/plans', { methode: 'POST', koerper: { art: 'backlog', releaseId: d.releaseId } })
+      }
+      setKarte({ ...k, z: { ...k.z, aufListe: true }, discs: k.discs.map((d) => ({ ...d, aufListe: true })) })
     } catch (f) {
       setKarte({ art: 'fehler', ean: k.e.ean, meldung: meldungAus(f, 'Anlegen fehlgeschlagen.'), nochmal: null })
     } finally {
@@ -416,9 +455,29 @@ export function Scannen() {
     }
   }
 
+  /**
+   * „+ weiteres Spiel dieser Hülle" am Erfasst-Block (Nachtrag f1h): Der
+   * Code ist jetzt bekannt; die Suche hängt ein weiteres Spiel an ihn an.
+   * Das Rückgängig des ersten Zugs ist damit vorbei – wie bei jedem neuen Code.
+   */
+  async function weiteresSpiel(k: ErfasstKarte) {
+    setLaeuft(true)
+    try {
+      const t = await anfrage<Treffer>('/api/scan', { methode: 'POST', koerper: { ean: k.e.ean, zaehlen: false } })
+      offen.current = { id: neueId(t.ean, Date.now(), Math.random()), ean: t.ean }
+      aktuellerCode.current = t.ean
+      setKarte({ art: 'code', t, modus: 'weitere' })
+      setPausiert(true)
+    } catch (f) {
+      setKarte({ art: 'fehler', ean: k.e.ean, meldung: meldungAus(f, 'Der Code ließ sich nicht laden.'), nochmal: null })
+    } finally {
+      setLaeuft(false)
+    }
+  }
+
   function nochmal(w: Wiederholung) {
     if (w.art === 'aufloesen') void aufloesen(w.roh, w.zaehlen)
-    else if (w.art === 'zuordnen') void zuordnen(w.ean, w.koerper, w.z)
+    else if (w.art === 'zuordnen') void zuordnen(w.ean, w.ziele, w.z)
     else void zurueck(w.erfasst, w.rest)
   }
 
@@ -443,6 +502,9 @@ export function Scannen() {
         online.art !== 'laeuft' &&
         !(online.art === 'da' && online.o.kandidaten.length > 0)) ||
       (karte.t.treffer === 'angebot'))
+
+  /** Solange eine Karte wartet, steht die Farbe ihres Falls; sonst nur das kurze Aufleuchten nach „erfasst". */
+  const rahmen = rahmenFuer(kartenLage(karte), blitz)
 
   const zustandText =
     kameraStatus === 'startet'
@@ -470,7 +532,7 @@ export function Scannen() {
       {listeAuf && <ScanListe liste={verlauf.liste} onSchliessen={listeSchliessen} />}
 
       <div className={eng ? 'scanner eng' : 'scanner'} hidden={listeAuf}>
-        <div className={`scan-kamera${blitz ? ` signal-${blitz}` : ''}`}>
+        <div className={`scan-kamera${rahmen ? ` signal-${rahmen}` : ''}`}>
           <video
             ref={videoRef}
             playsInline
@@ -550,17 +612,24 @@ export function Scannen() {
               key={`${karte.t.ean}-${karte.modus}`}
               t={karte.t}
               modus={karte.modus}
+              vorwahl={karte.vorwahl ?? []}
               online={online?.ean === karte.t.ean ? online : null}
               laeuft={laeuft}
-              onModus={(modus) => setKarte({ ...karte, modus })}
+              onModus={(modus, vorwahl) => setKarte({ ...karte, modus, vorwahl })}
               onAbbrechen={abbrechen}
               onWeiter={() => weiter()}
-              onZuordnen={(koerper, z) => zuordnen(karte.t.ean, koerper, z)}
+              onZuordnen={(ziele, z) => zuordnen(karte.t.ean, ziele, z)}
             />
           )}
 
           {karte.art === 'erfasst' && (
-            <ErfasstBlock k={karte} laeuft={laeuft} onZurueck={() => zurueck(karte)} onBacklog={() => insBacklog(karte)} />
+            <ErfasstBlock
+              k={karte}
+              laeuft={laeuft}
+              onZurueck={() => zurueck(karte)}
+              onBacklog={() => insBacklog(karte)}
+              onWeitere={() => weiteresSpiel(karte)}
+            />
           )}
 
           {karte.art === 'fehler' && (
@@ -675,12 +744,33 @@ function PlattformAuswahl({
   )
 }
 
-const KEIN_ZUSAMMENHANG: Zusammenhang = { spielNeu: false, releaseNeu: false, bild: null, vorherMapping: null }
+const KEIN_ZUSAMMENHANG: Zusammenhang = { angelegt: null, bild: null, vorherMapping: null }
+
+/** Die gewählten Spiele als Ziele des Zuordnens, das alte Mapping-Release vorn (`zieleOrdnen`). */
+const zieleAus = (wahl: readonly HuellenWahl[], vorher: Erfassung['vorherMapping']): Ziel[] =>
+  zieleOrdnen(wahl, vorher?.releaseId ?? null).map((w) => w.ziel)
+
+/** Der Hauptknopf für eine Wahl: „Disc erfassen · PS4" oder „Disc für 2 Spiele erfassen · PS3". */
+function HauptWahl({ wahl, laeuft, onClick }: { wahl: readonly HuellenWahl[]; laeuft: boolean; onClick: () => void }) {
+  const h = hauptText(wahl)
+  return (
+    <button type="button" className="scan-haupt" disabled={laeuft || wahl.length === 0} onClick={onClick}>
+      {h.text}
+      {h.plattform && (
+        <>
+          {' · '}
+          <HauptPlattform p={h.plattform} />
+        </>
+      )}
+    </button>
+  )
+}
 
 /** Fall 1–3 für einen Code: Vorschlag, Suche in der Sammlung oder Anlegen. */
 function CodeKarte({
   t,
   modus,
+  vorwahl,
   online,
   laeuft,
   onModus,
@@ -690,48 +780,37 @@ function CodeKarte({
 }: {
   t: Treffer
   modus: Modus
+  vorwahl: HuellenWahl[]
   online: OnlineStand | null
   laeuft: boolean
-  onModus: (m: Modus) => void
+  onModus: (m: Modus, vorwahl?: HuellenWahl[]) => void
   onAbbrechen: () => void
   onWeiter: () => void
-  onZuordnen: (koerper: Wahl, z: Zusammenhang) => void
+  onZuordnen: (ziele: Ziel[], z: Zusammenhang) => void
 }) {
   const r = t.release
   /** Worauf der Code vorher zeigte – Rückgängig bringt es zurück. */
   const vorherMapping: Erfassung['vorherMapping'] = r ? { releaseId: r.releaseId, mitDisc: r.exemplare > 0 } : null
 
-  if (modus === 'suche') {
+  if (modus === 'suche' || modus === 'weitere') {
     return (
-      <KartenRahmen
-        kennung={t.treffer === 'mapping' ? 'Anderes Spiel' : 'In der Sammlung suchen'}
-        ean={t.ean}
+      <SuchKarte
+        t={t}
+        modus={modus}
+        vorwahl={vorwahl}
+        vorgabe={t.angebot?.titel ?? (online?.art === 'da' ? (online.o.titel ?? '') : '')}
+        laeuft={laeuft}
+        onModus={onModus}
         onAbbrechen={onAbbrechen}
-        leise={
-          <>
-            <Leise onClick={() => onModus('vorschlag')}>Zurück</Leise>
-            <Leise onClick={() => onModus('anlegen')}>Spiel anlegen</Leise>
-          </>
-        }
-      >
-        {t.angebot && (
-          <p className="scan-zeile">
-            Händler: „{t.angebot.titel}"{t.angebot.plattform ? ` (${t.angebot.plattform})` : ''}
-          </p>
-        )}
-        <ScanAuswahl
-          ean={t.ean}
-          vorgabe={t.angebot?.titel ?? (online?.art === 'da' ? (online.o.titel ?? '') : '')}
-          laeuft={laeuft}
-          onWahl={(w, releaseNeu) => onZuordnen(w, { ...KEIN_ZUSAMMENHANG, releaseNeu, vorherMapping })}
-        />
-      </KartenRahmen>
+        onZuordnen={(wahl) => onZuordnen(zieleAus(wahl, vorherMapping), { ...KEIN_ZUSAMMENHANG, bild: null, vorherMapping })}
+      />
     )
   }
 
-  // Fall 1: Der Code ist zugeordnet.
+  // Fall 1: Der Code ist zugeordnet – mit allen Spielen der Hülle (Nachtrag f1h).
   if (t.treffer === 'mapping' && r && modus === 'vorschlag') {
     const imRegal = r.exemplare > 0
+    const huelle = t.huelle && t.huelle.length > 0 ? t.huelle : [r]
     return (
       <KartenRahmen
         kennung={imRegal ? 'Schon erfasst' : 'Code bekannt'}
@@ -745,7 +824,7 @@ function CodeKarte({
               type="button"
               className="scan-haupt"
               disabled={laeuft}
-              onClick={() => onZuordnen({ releaseId: r.releaseId }, { ...KEIN_ZUSAMMENHANG, bild: r.bild, vorherMapping })}
+              onClick={() => onZuordnen([{ releaseId: r.releaseId }], { ...KEIN_ZUSAMMENHANG, bild: r.bild, vorherMapping })}
             >
               Disc erfassen · <HauptPlattform p={r.plattform} />
             </button>
@@ -758,24 +837,54 @@ function CodeKarte({
           </>
         }
       >
-        <div className="scan-spiel">
-          <Cover bild={r.bild} />
-          <div>
-            <p className="scan-titel">{r.titel}</p>
-            <p className="scan-meta">
-              <PlattformChip plattform={r.plattform} />
-              <span>{imRegal ? `Disc ×${r.exemplare}` : 'noch keine Disc'}</span>
-            </p>
-            <p className={imRegal ? 'scan-aussage regal' : 'scan-aussage'}>{imRegal ? 'Steht schon im Regal.' : 'Disc ins Regal aufnehmen?'}</p>
+        {huelle.length === 1 ? (
+          <div className="scan-spiel">
+            <Cover bild={r.bild} />
+            <div>
+              <p className="scan-titel">{r.titel}</p>
+              <p className="scan-meta">
+                <PlattformChip plattform={r.plattform} />
+                <span>{imRegal ? `Disc ×${r.exemplare}` : 'noch keine Disc'}</span>
+              </p>
+              <p className={imRegal ? 'scan-aussage regal' : 'scan-aussage'}>{imRegal ? 'Steht schon im Regal.' : 'Disc ins Regal aufnehmen?'}</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <p className={imRegal ? 'scan-aussage regal' : 'scan-aussage'}>
+              {imRegal ? 'Steht schon im Regal.' : 'Disc ins Regal aufnehmen?'}
+            </p>
+            <ul className="scan-wahlliste">
+              {huelle.map((h) => (
+                <li key={h.releaseId}>
+                  <Link className="scan-wahl" to={`/spiel/${h.spielId}`}>
+                    <Cover bild={h.bild} klein />
+                    <span className="scan-wahl-titel">{h.titel}</span>
+                    <PlattformChip plattform={h.plattform} />
+                    <span className="scan-still">{h.exemplare > 0 ? 'im Regal' : 'keine Disc'}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </KartenRahmen>
     )
   }
 
   // Fall 2: eBay nennt ein Spiel der Sammlung.
   if (modus === 'vorschlag' && online?.art === 'da' && online.o.kandidaten.length > 0) {
-    return <SammlungsKarte t={t} o={online.o} laeuft={laeuft} onModus={onModus} onAbbrechen={onAbbrechen} onWeiter={onWeiter} onZuordnen={onZuordnen} vorherMapping={vorherMapping} />
+    return (
+      <SammlungsKarte
+        t={t}
+        o={online.o}
+        laeuft={laeuft}
+        onModus={onModus}
+        onAbbrechen={onAbbrechen}
+        onWeiter={onWeiter}
+        onZuordnen={(wahl, bild) => onZuordnen(zieleAus(wahl, vorherMapping), { ...KEIN_ZUSAMMENHANG, bild, vorherMapping })}
+      />
+    )
   }
 
   // Fall 3: nicht in der Sammlung (oder eBay weiß nichts) – anlegen.
@@ -788,9 +897,61 @@ function CodeKarte({
       onModus={onModus}
       onAbbrechen={onAbbrechen}
       onAngelegt={(a, bild) =>
-        onZuordnen({ releaseId: a.releaseId }, { spielNeu: a.spielNeu, releaseNeu: a.releaseNeu, bild, vorherMapping })
+        onZuordnen([{ releaseId: a.releaseId }], { angelegt: { releaseId: a.releaseId, spielNeu: a.spielNeu, releaseNeu: a.releaseNeu }, bild, vorherMapping })
       }
     />
+  )
+}
+
+/**
+ * Die Suche in der Sammlung (Stufe 3 der Kette) – seit Nachtrag f1h mit
+ * Mehrfachwahl: Ein Tipp wählt, der Hauptknopf erfasst. Das ist auch der Weg,
+ * eine schon falsch erfasste Collection zu ergänzen (Fall 1 → „Ist ein
+ * anderes Spiel") und am Erfasst-Block ein weiteres Spiel an die Hülle zu
+ * hängen (`weitere`).
+ */
+function SuchKarte({
+  t,
+  modus,
+  vorwahl,
+  vorgabe,
+  laeuft,
+  onModus,
+  onAbbrechen,
+  onZuordnen,
+}: {
+  t: Treffer
+  modus: 'suche' | 'weitere'
+  vorwahl: HuellenWahl[]
+  vorgabe: string
+  laeuft: boolean
+  onModus: (m: Modus, vorwahl?: HuellenWahl[]) => void
+  onAbbrechen: () => void
+  onZuordnen: (wahl: HuellenWahl[]) => void
+}) {
+  const [wahl, setWahl] = useState<HuellenWahl[]>(vorwahl)
+  return (
+    <KartenRahmen
+      kennung={modus === 'weitere' || vorwahl.length > 0 ? 'Spiele der Hülle' : t.treffer === 'mapping' ? 'Anderes Spiel' : 'In der Sammlung suchen'}
+      ean={t.ean}
+      onAbbrechen={onAbbrechen}
+      haupt={<HauptWahl wahl={wahl} laeuft={laeuft} onClick={() => onZuordnen(wahl)} />}
+      leise={
+        modus === 'weitere' ? undefined : (
+          <>
+            <Leise onClick={() => onModus('vorschlag')}>Zurück</Leise>
+            <Leise onClick={() => onModus('anlegen')}>Spiel anlegen</Leise>
+          </>
+        )
+      }
+    >
+      {t.angebot && (
+        <p className="scan-zeile">
+          Händler: „{t.angebot.titel}"{t.angebot.plattform ? ` (${t.angebot.plattform})` : ''}
+        </p>
+      )}
+      <ScanAuswahl ean={t.ean} vorgabe={vorgabe} laeuft={laeuft} wahl={wahl} onUmschalten={(w) => setWahl((alt) => wahlUmschalten(alt, w))} />
+    </KartenRahmen>
   )
 }
 
@@ -803,23 +964,44 @@ function SammlungsKarte({
   onAbbrechen,
   onWeiter,
   onZuordnen,
-  vorherMapping,
 }: {
   t: Treffer
   o: Online
   laeuft: boolean
-  onModus: (m: Modus) => void
+  onModus: (m: Modus, vorwahl?: HuellenWahl[]) => void
   onAbbrechen: () => void
   onWeiter: () => void
-  onZuordnen: (koerper: Wahl, z: Zusammenhang) => void
-  vorherMapping: Erfassung['vorherMapping']
+  onZuordnen: (wahl: HuellenWahl[], bild: string | null) => void
 }) {
   const kandidaten = kandidatenOrdnen(o.kandidaten, o.zielSpielId)
-  const [gewaehlt, setGewaehlt] = useState(kandidaten[0].spielId)
-  const k = kandidaten.find((x) => x.spielId === gewaehlt) ?? kandidaten[0]
-  const haupt = hauptRelease(k.releases)
-  const andere = anderePlattformen(k.releases, haupt)
-  const z: Zusammenhang = { ...KEIN_ZUSAMMENHANG, bild: k.bild, vorherMapping }
+  /** Die Wahl eines Kandidaten: sein Release ohne Disc auf der neuesten Plattform (`hauptRelease`). */
+  const wahlVon = (k: Kandidat): HuellenWahl | null => {
+    const h = hauptRelease(k.releases)
+    return h ? { spielId: k.spielId, titel: k.titel, plattform: h.plattform, ziel: { releaseId: h.releaseId }, releaseNeu: false } : null
+  }
+  const [wahl, setWahl] = useState<HuellenWahl[]>(() => {
+    const erste = kandidaten.map(wahlVon).find((w) => w !== null)
+    return erste ? [erste] : []
+  })
+  const bildVon = (spielId: number | undefined) => kandidaten.find((k) => k.spielId === spielId)?.bild ?? null
+  const bild = bildVon(wahl[0]?.spielId)
+  const einer = kandidaten.length === 1
+  const k = kandidaten[0]
+
+  /**
+   * „Andere Plattform": für alle gewählten Spiele auf einmal – eine Hülle hat
+   * eine Plattform. Nur Plattformen, auf denen keines schon eine Disc hat;
+   * gewählt ist Aktion, wie vor f1h.
+   */
+  const basis = einer ? [k] : kandidaten.filter((x) => wahl.some((w) => w.spielId === x.spielId))
+  const jetzt = gemeinsamePlattform(wahl)
+  const plattformen = basis.length === 0 ? [] : PLATTFORM_FOLGE.filter((p) => p !== jetzt && basis.every((x) => zielAufPlattform(x.spielId, x.releases, p) !== null))
+  const auf = (p: (typeof PLATTFORM_FOLGE)[number]): HuellenWahl[] =>
+    basis.map((x) => {
+      const z = zielAufPlattform(x.spielId, x.releases, p)!
+      return { spielId: x.spielId, titel: x.titel, plattform: p, ...z }
+    })
+  const andere = einer ? anderePlattformen(k.releases, hauptRelease(k.releases)) : null
 
   return (
     <KartenRahmen
@@ -827,10 +1009,8 @@ function SammlungsKarte({
       ean={t.ean}
       onAbbrechen={onAbbrechen}
       haupt={
-        haupt ? (
-          <button type="button" className="scan-haupt" disabled={laeuft} onClick={() => onZuordnen({ releaseId: haupt.releaseId }, z)}>
-            Disc erfassen · <HauptPlattform p={haupt.plattform} />
-          </button>
+        wahl.length > 0 || !kandidaten.every((x) => hauptRelease(x.releases) === null) ? (
+          <HauptWahl wahl={wahl} laeuft={laeuft} onClick={() => onZuordnen(wahl, bild)} />
         ) : (
           <button type="button" className="scan-haupt" onClick={onWeiter}>Weiter</button>
         )
@@ -840,22 +1020,20 @@ function SammlungsKarte({
           <PlattformAuswahl
             text="Andere Plattform"
             disabled={laeuft}
-            optionen={andere.map((a) => ({
-              wert: a.art === 'release' ? `r${a.releaseId}` : `p${a.plattform}`,
-              text: a.art === 'release' ? a.plattform : `${a.plattform} anlegen`,
+            optionen={plattformen.map((p) => ({
+              wert: p,
+              text: andere ? (andere.find((a) => a.plattform === p)?.art === 'neu' ? `${p} anlegen` : p) : basis.every((x) => x.releases.some((r) => r.plattform === p)) ? p : `${p} anlegen`,
             }))}
             onWahl={(w) => {
-              const a = andere.find((x) => (x.art === 'release' ? `r${x.releaseId}` : `p${x.plattform}`) === w)
-              if (!a) return
-              if (a.art === 'release') onZuordnen({ releaseId: a.releaseId }, z)
-              else onZuordnen({ spielId: k.spielId, plattform: a.plattform }, { ...z, releaseNeu: true })
+              const p = PLATTFORM_FOLGE.find((x) => x === w)
+              if (p) onZuordnen(auf(p), bild)
             }}
           />
           <Leise onClick={() => onModus('suche')}>Anderes Spiel</Leise>
         </>
       }
     >
-      {kandidaten.length === 1 ? (
+      {einer ? (
         <div className="scan-spiel">
           <Cover bild={k.bild} />
           <div>
@@ -869,8 +1047,9 @@ function SammlungsKarte({
                 </span>
               ))}
             </p>
-            {!haupt && <p className="scan-aussage regal">Steht schon im Regal.</p>}
+            {wahl.length === 0 && <p className="scan-aussage regal">Steht schon im Regal.</p>}
             {o.titel && <p className="scan-zeile">eBay: {o.titel}</p>}
+            <WeiteresSpiel laeuft={laeuft} onClick={() => onModus('suche', wahl)} />
           </div>
         </div>
       ) : (
@@ -878,27 +1057,43 @@ function SammlungsKarte({
           {o.titel && <p className="scan-zeile">eBay: {o.titel}</p>}
           <ul className="scan-wahlliste">
             {kandidaten.map((x) => {
-              const h = hauptRelease(x.releases)
+              const w = wahlVon(x)
+              const an = wahl.some((y) => y.spielId === x.spielId)
               return (
                 <li key={x.spielId}>
                   <button
                     type="button"
-                    className={x.spielId === k.spielId ? 'scan-wahl gewaehlt' : 'scan-wahl'}
-                    aria-pressed={x.spielId === k.spielId}
-                    onClick={() => setGewaehlt(x.spielId)}
+                    className={an ? 'scan-wahl gewaehlt' : 'scan-wahl'}
+                    aria-pressed={an}
+                    disabled={laeuft || w === null}
+                    onClick={() => {
+                      // Abwählen nimmt den Eintrag, wie er gewählt ist (auch nach „Andere Plattform").
+                      const da = wahl.find((y) => y.spielId === x.spielId)
+                      if (da || w) setWahl((alt) => wahlUmschalten(alt, da ?? w!))
+                    }}
                   >
                     <Cover bild={x.bild} klein />
                     <span className="scan-wahl-titel">{x.titel}</span>
-                    {h ? <PlattformChip plattform={h.plattform} /> : <span className="scan-still">im Regal</span>}
-                    {x.spielId === k.spielId && <Zeichen name="haken" groesse={16} className="scan-haken" />}
+                    {w ? <PlattformChip plattform={an ? (wahl.find((y) => y.spielId === x.spielId)?.plattform ?? w.plattform) : w.plattform} /> : <span className="scan-still">im Regal</span>}
+                    {an && <Zeichen name="haken" groesse={16} className="scan-haken" />}
                   </button>
                 </li>
               )
             })}
           </ul>
+          <WeiteresSpiel laeuft={laeuft} onClick={() => onModus('suche', wahl)} />
         </>
       )}
     </KartenRahmen>
+  )
+}
+
+/** Der leise Weg zu einem weiteren Spiel derselben Hülle (Nachtrag f1h). */
+function WeiteresSpiel({ laeuft, onClick }: { laeuft: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className="scan-link scan-weitere" disabled={laeuft} onClick={onClick}>
+      + weiteres Spiel dieser Hülle
+    </button>
   )
 }
 
@@ -914,7 +1109,7 @@ function NeuKarte({
   t: Treffer
   online: OnlineStand | null
   laeuft: boolean
-  onModus: (m: Modus) => void
+  onModus: (m: Modus, vorwahl?: HuellenWahl[]) => void
   onAbbrechen: () => void
   /** `bild`: das Cover des gewählten Treffers – für den Erfasst-Block und „Letzte Scans". */
   onAngelegt: (a: Angelegt, bild: string | null) => void
@@ -1053,22 +1248,43 @@ function NeuKarte({
 }
 
 /** Fall 4: knapp – die Kamera läuft schon weiter, der Block bleibt bis zum nächsten Code. */
-function ErfasstBlock({ k, laeuft, onZurueck, onBacklog }: { k: ErfasstKarte; laeuft: boolean; onZurueck: () => void; onBacklog: () => void }) {
-  const s = k.z.spiel
+function ErfasstBlock({
+  k,
+  laeuft,
+  onZurueck,
+  onBacklog,
+  onWeitere,
+}: {
+  k: ErfasstKarte
+  laeuft: boolean
+  onZurueck: () => void
+  onBacklog: () => void
+  onWeitere: () => void
+}) {
+  const erledigt = k.discs.flatMap((d) => d.absichtenErledigt)
+  const backlog = k.discs.some((d) => d.absichtenErledigt.length > 0 && !d.aufListe)
   return (
     <section className="scan-erfasst" aria-label="Erfasst">
       <Cover bild={k.bild} klein />
       <div className="scan-erfasst-text">
         <p className="scan-erfasst-titel">
-          {s ? <Link to={`/spiel/${s.spielId}`}>{s.titel}</Link> : `Release ${k.z.releaseId}`}
-          {s && <PlattformChip plattform={s.plattform} />}
+          {k.discs.map((d, i) => (
+            <span key={d.releaseId}>
+              {i > 0 && <span className="scan-still">+ </span>}
+              {d.spiel ? <Link to={`/spiel/${d.spiel.spielId}`}>{d.spiel.titel}</Link> : `Release ${d.releaseId}`}
+              {d.spiel && (i === k.discs.length - 1 || d.spiel.plattform !== k.discs[i + 1]?.spiel?.plattform) && <PlattformChip plattform={d.spiel.plattform} />}
+              {i < k.discs.length - 1 && ' '}
+            </span>
+          ))}
         </p>
         <p className="scan-aussage erfasst" role="status">
-          Disc erfasst.{k.z.absichtenErledigt.length > 0 && ` ${erledigtText(k.z.absichtenErledigt)}`}
+          {k.discs.length > 1 ? `Disc für ${k.discs.length} Spiele erfasst.` : 'Disc erfasst.'}
+          {erledigt.length > 0 && ` ${erledigtText(erledigt)}`}
         </p>
-        {k.z.absichtenErledigt.length > 0 && !k.z.aufListe && (
+        {backlog && (
           <button type="button" className="scan-link" disabled={laeuft} onClick={onBacklog}>ins Backlog übernehmen</button>
         )}
+        <WeiteresSpiel laeuft={laeuft} onClick={onWeitere} />
       </div>
       <button type="button" className="knopf" disabled={laeuft} onClick={onZurueck}>Rückgängig</button>
     </section>

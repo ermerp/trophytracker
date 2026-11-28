@@ -125,7 +125,7 @@ export type PlanZeile = {
 };
 
 /** Die Zeile, wie das Protokoll sie braucht (PlanRepository.kurz). */
-type PlanKurz = {
+export type PlanKurz = {
 	id: number;
 	kind: PlanArt;
 	release_id: number | null;
@@ -471,19 +471,53 @@ export class PlanRepository {
 			const r = await this.db.prepare("SELECT game_id FROM release WHERE id = ?").bind(ziel.releaseId).first<{ game_id: number }>();
 			gameId = r?.game_id ?? null;
 		}
+		const { results } = await this.offeneAmZielAnweisung(kinds, ziel.releaseId, gameId).all<PlanZeile>();
+		return results;
+	}
+
+	/**
+	 * Dasselbe fuer mehrere Ziele in EINEM Batch (Nachtrag f1h: die Discs
+	 * einer Huelle). Das Spiel muss bekannt sein - der Scanner kennt es aus
+	 * seiner Lage-Abfrage, die Vorab-Aufloesung entfaellt. Ergebnis je Ziel
+	 * in derselben Reihenfolge.
+	 */
+	async offeneAnZielen(
+		kinds: readonly PlanArt[],
+		ziele: ReadonlyArray<{ releaseId: number | null; gameId: number }>,
+	): Promise<PlanZeile[][]> {
+		if (kinds.length === 0 || ziele.length === 0) return ziele.map(() => []);
+		const ergebnisse = await this.db.batch(ziele.map((z) => this.offeneAmZielAnweisung(kinds, z.releaseId, z.gameId)));
+		return ergebnisse.map((e) => e.results as PlanZeile[]);
+	}
+
+	private offeneAmZielAnweisung(kinds: readonly PlanArt[], releaseId: number | null, gameId: number | null): D1PreparedStatement {
 		const platzhalter = kinds.map(() => "?").join(", ");
 		// Art und Status stehen in den Unterabfragen: Als aeussere Bedingung liessen
 		// sie SQLite auf idx_plan_offen ausweichen und alle offenen Eintraege der
 		// Arten lesen; so bleiben es zwei Index-Lookups (test/lesekosten.spec.ts).
 		const treffer = `SELECT id FROM plan_entry WHERE %s = ? AND status = 'offen' AND kind IN (${platzhalter})`;
-		const { results } = await this.db
+		return this.db
 			.prepare(
 				PLAN_AUSWAHL +
 					`WHERE pe.id IN (${treffer.replace("%s", "release_id")} UNION ${treffer.replace("%s", "game_id")}) ORDER BY pe.id`,
 			)
-			.bind(ziel.releaseId, ...kinds, gameId, ...kinds)
-			.all<PlanZeile>();
-		return results;
+			.bind(releaseId, ...kinds, gameId, ...kinds);
+	}
+
+	/**
+	 * Die Anweisungen, die offene Eintraege erledigen - je Eintrag das
+	 * Ereignis und davor nichts, danach das UPDATE (Nachtrag f1h). Fuer einen
+	 * Schreiber, der sie in SEINEN Batch legt; `zeilen` sind eben gelesene
+	 * offene Eintraege (`offeneAnZielen`). Das UPDATE bleibt an `status = 'offen'`
+	 * gebunden, ein inzwischen erledigter Eintrag wird nicht noch einmal erledigt.
+	 */
+	erledigenAnweisungen(zeilen: readonly PlanKurz[], anlass: string | null): D1PreparedStatement[] {
+		const update = this.db.prepare(
+			"UPDATE plan_entry SET status = 'erledigt', resolved_at = datetime('now') WHERE id = ? AND status = 'offen'",
+		);
+		return zeilen
+			.filter((z) => z.status === "offen")
+			.flatMap((z) => [this.ereignis(z, { source: "nutzer", kind: "liste_eintrag_erledigt", detail: anlass }), update.bind(z.id)]);
 	}
 
 	/**

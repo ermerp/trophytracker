@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { normalisiereEan, pruefzifferStimmt } from "../domain/ean";
 import { bestertitel, mehrheitstreffer, sammlungstreffer, vorbereiten } from "../domain/scan-titel";
-import { istErlaubtePlattform } from "../domain/titel";
+import { istErlaubtePlattform, type Plattform } from "../domain/titel";
 import { EbayKonfigError, EbayRateError, meldungFuer } from "../ebay/client";
 import type { AppEnv } from "../types";
-import { absichtenErledigen } from "./ownership";
+import { absichtenFuerHuelle } from "./ownership";
 import { liesJson } from "./validierung";
 
 /**
@@ -28,6 +28,36 @@ function eanAus(roh: string): string | null {
 	return ean && pruefzifferStimmt(ean) ? ean : null;
 }
 
+/** Hoechstens so viele Spiele je Huelle: eine Collection hat zwei bis vier, und jede Disc kostet vier Anweisungen im Batch. */
+export const HOECHSTENS_ZIELE = 6;
+
+type Ziel = { releaseId: number } | { spielId: number; plattform: Plattform };
+
+function zielAus(z: unknown): { ziel: Ziel } | { fehler: string } {
+	if (typeof z !== "object" || z === null) return { fehler: "Ein Ziel muss ein Objekt sein." };
+	const o = z as Record<string, unknown>;
+	const hatRelease = o.releaseId !== undefined;
+	const hatSpiel = o.spielId !== undefined || o.plattform !== undefined;
+	if (hatRelease === hatSpiel) return { fehler: "Entweder releaseId oder spielId mit plattform angeben." };
+	if (hatRelease) {
+		const releaseId = Number(o.releaseId);
+		if (!Number.isInteger(releaseId) || releaseId <= 0) return { fehler: "Feld 'releaseId' ist ungültig." };
+		return { ziel: { releaseId } };
+	}
+	const spielId = Number(o.spielId);
+	if (!Number.isInteger(spielId) || spielId <= 0) return { fehler: "Feld 'spielId' ist ungültig." };
+	if (typeof o.plattform !== "string" || !istErlaubtePlattform(o.plattform)) {
+		return { fehler: `Unbekannte Plattform: ${String(o.plattform)}` };
+	}
+	return { ziel: { spielId, plattform: o.plattform } };
+}
+
+/** Zweimal dasselbe Spiel auf derselben Plattform - das waere ein Release, auch wenn es noch nicht existiert. */
+function doppelteSpielPlattform(ziele: readonly Ziel[]): boolean {
+	const schluessel = ziele.flatMap((z) => ("spielId" in z ? [`${z.spielId}/${z.plattform}`] : []));
+	return new Set(schluessel).size !== schluessel.length;
+}
+
 function offenerScan(z: { ean: string; scan_count: number; first_seen_at: string; last_seen_at: string }) {
 	return { ean: z.ean, scans: z.scan_count, zuerstAm: z.first_seen_at, zuletztAm: z.last_seen_at };
 }
@@ -40,7 +70,7 @@ export const scanRoutes = new Hono<AppEnv>()
 		if (!ean) return c.json({ fehler: "EAN muss aus 8 bis 14 Ziffern bestehen." }, 400);
 		if (!pruefzifferStimmt(ean)) return c.json({ fehler: "Die Prüfziffer stimmt nicht – vermutlich ein Tippfehler." }, 400);
 
-		const { mapping, angebot } = await c.var.repos.scan.aufloesen(ean);
+		const { mapping, angebot, huelle } = await c.var.repos.scan.aufloesen(ean);
 		if (mapping) {
 			return c.json({
 				ean,
@@ -53,6 +83,16 @@ export const scanRoutes = new Hono<AppEnv>()
 					bild: mapping.cover_url,
 					exemplare: mapping.exemplare,
 				},
+				// Alle Spiele der Huelle (Nachtrag f1h): die Releases, deren Disc
+				// diesen Code traegt, und das Mapping-Release - dieses vorn.
+				huelle: huelle.map((h) => ({
+					releaseId: h.release_id,
+					spielId: h.game_id,
+					titel: h.title,
+					plattform: h.platform,
+					bild: h.cover_url,
+					exemplare: h.exemplare,
+				})),
 				scans: 0,
 			});
 		}
@@ -146,58 +186,125 @@ export const scanRoutes = new Hono<AppEnv>()
 		});
 	})
 
+	/**
+	 * Zuordnen: Disc(s) und Mapping (9.2). Seit Nachtrag f1h auch fuer eine
+	 * Huelle mit mehreren Spielen (Collection-Disc): `ziele` ist eine Liste aus
+	 * `{releaseId}` oder `{spielId, plattform}`, jedes Ziel bekommt seine
+	 * eigene Disc mit demselben Code (Entscheidung des Nutzers vom 28.11.2026).
+	 * Der alte Koerper - ein Ziel ohne Liste - gilt weiter.
+	 *
+	 * Ablauf und was bei einem Fehler stillsteht:
+	 *
+	 * 1. Lage aller Ziele in einem Lese-Batch. Fehlt eines: 404. Steht an einem
+	 *    schon eine Disc (je Release genau eine, `hatExemplar`): 409 mit diesem
+	 *    Release, und es ist **nichts** geschrieben - bei einem einzigen Ziel
+	 *    ausser dem Mapping, wie bisher (der Code gehoert zu dem Release, und
+	 *    Rueckgaengig stellt so ein ueberschriebenes Mapping wieder her).
+	 * 2. Fehlende Releases anlegen (`releaseFuerPlattform`, je mit Ereignis).
+	 * 3. Offene Absichten aller Releases in einem Lese-Batch.
+	 * 4. Ein Schreib-Batch: Discs, erledigte Absichten, Mapping
+	 *    (`ScanRepository.huelleErfassen`). Scheitert er, steht nur, was 2.
+	 *    angelegt hat - Releases ohne Disc, die der naechste Versuch verwendet.
+	 */
 	.post("/:ean/assign", async (c) => {
 		const ean = eanAus(c.req.param("ean"));
 		if (!ean) return c.json({ fehler: "Ungültige EAN." }, 400);
 		const k = await liesJson(c);
 		if (!k) return c.json({ fehler: "Ungültiges JSON." }, 400);
 
-		const hatRelease = k.releaseId !== undefined;
-		const hatSpiel = k.spielId !== undefined || k.plattform !== undefined;
-		if (hatRelease === hatSpiel) {
-			return c.json({ fehler: "Entweder releaseId oder spielId mit plattform angeben." }, 400);
+		const liste = k.ziele !== undefined;
+		if (liste && (k.releaseId !== undefined || k.spielId !== undefined || k.plattform !== undefined)) {
+			return c.json({ fehler: "Entweder ziele oder ein einzelnes Ziel angeben." }, 400);
+		}
+		const roh = liste ? k.ziele : [k];
+		if (!Array.isArray(roh) || roh.length === 0 || roh.length > HOECHSTENS_ZIELE) {
+			return c.json({ fehler: `Feld 'ziele' muss 1 bis ${HOECHSTENS_ZIELE} Ziele enthalten.` }, 400);
+		}
+		const ziele: Ziel[] = [];
+		for (const z of roh) {
+			const g = zielAus(z);
+			if ("fehler" in g) return c.json({ fehler: g.fehler }, 400);
+			ziele.push(g.ziel);
 		}
 
-		let releaseId: number;
-		if (hatRelease) {
-			releaseId = Number(k.releaseId);
-			if (!Number.isInteger(releaseId) || releaseId <= 0) return c.json({ fehler: "Feld 'releaseId' ist ungültig." }, 400);
-			if (!(await c.var.repos.ownership.releaseExistiert(releaseId))) return c.json({ fehler: "Release nicht gefunden." }, 404);
-		} else {
-			const spielId = Number(k.spielId);
-			if (!Number.isInteger(spielId) || spielId <= 0) return c.json({ fehler: "Feld 'spielId' ist ungültig." }, 400);
-			if (typeof k.plattform !== "string" || !istErlaubtePlattform(k.plattform)) {
-				return c.json({ fehler: `Unbekannte Plattform: ${String(k.plattform)}` }, 400);
-			}
-			if (!(await c.var.repos.games.spielExistiert(spielId))) return c.json({ fehler: "Spiel nicht gefunden." }, 404);
-			releaseId = await c.var.repos.games.releaseFuerPlattform(spielId, k.plattform, "nutzer", "scan");
+		const lage = await c.var.repos.scan.zielLage(ziele);
+		for (let i = 0; i < ziele.length; i++) {
+			if (!lage[i]) return c.json({ fehler: "releaseId" in ziele[i] ? "Release nicht gefunden." : "Spiel nicht gefunden." }, 404);
+		}
+		const vorhanden = lage.map((l) => l!.release_id).filter((id): id is number => id !== null);
+		if (new Set(vorhanden).size !== vorhanden.length || doppelteSpielPlattform(ziele)) {
+			return c.json({ fehler: "Dasselbe Release steht zweimal in den Zielen." }, 400);
 		}
 
 		// Je Release genau eine Disc (Entscheidung des Nutzers vom 27.09.2026).
 		// Beim Scannen ist das der haeufigste Fall eines Versehens: dieselbe
-		// Huelle zweimal ueber den Leser gezogen. Das Mapping wird trotzdem
-		// gesetzt - der Code gehoert zu diesem Release, auch wenn die Disc
-		// schon steht, und beim naechsten Scan soll er sofort treffen.
-		if (await c.var.repos.ownership.hatExemplar(releaseId)) {
-			await c.var.repos.scan.zuordnen(ean, releaseId, "manuell");
-			const kopf = await c.var.repos.scan.releaseKopf(releaseId);
-			return c.json({ fehler: "Für dieses Release steht schon eine Disc im Regal.", releaseId, ...kopf }, 409);
+		// Huelle zweimal ueber den Leser gezogen. Bei einem Ziel wird das
+		// Mapping trotzdem gesetzt - der Code gehoert zu diesem Release, und
+		// beim naechsten Scan soll er sofort treffen. Bei mehreren bricht der
+		// ganze Zug ab, ohne etwas zu schreiben (Nachtrag f1h).
+		const belegt = lage.filter((l) => l!.disc === 1).map((l) => l!);
+		if (belegt.length > 0) {
+			const b = belegt[0];
+			if (ziele.length === 1) await c.var.repos.scan.zuordnen(ean, b.release_id!, "manuell");
+			return c.json(
+				{
+					fehler:
+						ziele.length === 1
+							? "Für dieses Release steht schon eine Disc im Regal."
+							: `Für ${b.title} (${b.platform}) steht schon eine Disc im Regal – nichts erfasst.`,
+					releaseId: b.release_id,
+					game_id: b.game_id,
+					title: b.title,
+					platform: b.platform,
+					belegt: belegt.map((x) => x.release_id),
+				},
+				409,
+			);
 		}
 
-		// Erst die Disc (mit Protokoll), dann das Mapping: Schlaegt das Mapping
-		// fehl, steht die Disc mit ihrer EAN da und der naechste Scan fragt neu.
-		const exemplar = await c.var.repos.ownership.addPhysicalCopy(releaseId, { ean }, "scan");
-		await c.var.repos.scan.zuordnen(ean, releaseId, "manuell");
-		const absichten = await absichtenErledigen(c.var.repos, releaseId);
-		const kopf = await c.var.repos.scan.releaseKopf(releaseId);
+		const discs: Array<{ releaseId: number; gameId: number; titel: string; plattform: Plattform; bild: string | null; releaseNeu: boolean }> = [];
+		for (let i = 0; i < ziele.length; i++) {
+			const l = lage[i]!;
+			let releaseId = l.release_id;
+			let releaseNeu = false;
+			if (releaseId === null) {
+				const z = ziele[i] as { spielId: number; plattform: Plattform };
+				const r = await c.var.repos.games.releaseFuerPlattformMitAngabe(z.spielId, z.plattform, "nutzer", "scan");
+				releaseId = r.releaseId;
+				releaseNeu = r.neu;
+			}
+			discs.push({ releaseId, gameId: l.game_id, titel: l.title, plattform: l.platform, bild: l.cover_url, releaseNeu });
+		}
+
+		const absichten = await absichtenFuerHuelle(c.var.repos, discs);
+		const angelegt = await c.var.repos.scan.huelleErfassen(
+			ean,
+			discs.map((d, i) => ({ releaseId: d.releaseId, erledigen: absichten[i].erledigen })),
+			discs[0].releaseId,
+		);
+
+		const jeDisc = discs.map((d, i) => ({
+			id: angelegt[i].id,
+			releaseId: d.releaseId,
+			physischStatusGesetzt: angelegt[i].physischStatusGesetzt,
+			releaseNeu: d.releaseNeu,
+			spiel: { spielId: d.gameId, titel: d.titel, plattform: d.plattform },
+			bild: d.bild,
+			absichtenErledigt: absichten[i].erledigen.map((e) => ({ id: e.id, art: e.kind, titel: e.titel })),
+			aufListe: absichten[i].aufListe,
+		}));
+		const erste = jeDisc[0];
 		return c.json(
 			{
-				id: exemplar.id,
+				// Die erste Disc oben, wie vor f1h - ein alter Stand der Oberflaeche liest nur das.
+				id: erste.id,
 				ean,
-				releaseId,
-				physischStatusGesetzt: exemplar.physischStatusGesetzt,
-				spiel: kopf ? { spielId: kopf.game_id, titel: kopf.title, plattform: kopf.platform } : null,
-				...absichten,
+				releaseId: erste.releaseId,
+				physischStatusGesetzt: erste.physischStatusGesetzt,
+				spiel: erste.spiel,
+				absichtenErledigt: jeDisc.flatMap((d) => d.absichtenErledigt),
+				aufListe: erste.aufListe,
+				discs: jeDisc,
 			},
 			201,
 		);

@@ -47,6 +47,7 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 	const preisalarm = new PreisalarmRepository(db);
 	const markt = new MarktRepository(db, events, preisalarm);
 	const store = new StoreRepository(db, events, preisalarm);
+	const ownership = new OwnershipRepository(db, events);
 	return {
 		/**
 		 * Bausteine mehrerer Repositories in EINEM D1-Aufruf (Stufe 18p) - fuer
@@ -68,14 +69,14 @@ export function createRepositories(db: D1Database, npssoKey: string) {
 		cronLage: new CronLageRepository(db, { sync, credentials, trophaeen, games, igdb }),
 		// Die Fakten der Betriebswarnungen in einem Batch (Stufe 18m).
 		betrieb: new BetriebRepository(db, { sync, credentials, igdb }),
-		ownership: new OwnershipRepository(db, events),
+		ownership,
 		besitz: new BesitzRepository(db, events),
 		plan,
 		playStatus,
 		kopplung,
 		events,
 		review: new ReviewRepository(db, playStatus, kopplung, events),
-		scan: new ScanRepository(db),
+		scan: new ScanRepository(db, ownership, plan),
 		stats: new StatsRepository(db),
 		preise: new PreiseRepository(db),
 		preisalarm,

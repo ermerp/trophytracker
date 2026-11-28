@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   PLAN_ARTTEXT,
   QUELLENTEXT,
@@ -57,6 +58,7 @@ export function ReleaseKarte({
   const [quellenwahl, setQuellenwahl] = useState(false)
 
   const disc = r.exemplare.length > 0
+  const huelle = r.exemplare.flatMap((e) => e.gleicheHuelle ?? []).filter((h, i, alle) => alle.findIndex((x) => x.spielId === h.spielId) === i)
   const gekauft = r.digital.find((d) => d.quelle !== 'plus')
   const plus = r.digital.find((d) => d.quelle === 'plus')
   const digital = gekauft ?? plus ?? null
@@ -133,6 +135,21 @@ export function ReleaseKarte({
           )}
         </span>
       </div>
+
+      {/* Eine Collection-Disc trägt an jedem ihrer Spiele ein Exemplar mit
+          demselben Code (Nachtrag f1h) – hier steht, welche Spiele noch auf
+          dieser Hülle sind. Nur lesend. */}
+      {huelle.length > 0 && (
+        <p className="still">
+          gleiche Hülle wie:{' '}
+          {huelle.map((h, i) => (
+            <span key={h.spielId}>
+              {i > 0 && ', '}
+              <Link to={`/spiel/${h.spielId}`}>{h.titel}</Link>
+            </span>
+          ))}
+        </p>
+      )}
 
       {quellenwahl && (
         <QuellenTafel

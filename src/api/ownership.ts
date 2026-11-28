@@ -8,6 +8,7 @@ import {
 	type Zustand,
 } from "../db/ownership";
 import type { Repositories } from "../db";
+import type { PlanZeile } from "../db/plan";
 import { EAN_MUSTER } from "../domain/ean";
 import type { AppEnv } from "../types";
 import { ISO_DATUM, liesJson } from "./validierung";
@@ -28,14 +29,45 @@ import { ISO_DATUM, liesJson } from "./validierung";
  * sonst bietet sie "ins Backlog uebernehmen" an.
  */
 
+/** Was das Erfassen erledigt (Abschnitt 5) und wonach "ins Backlog" fragt. */
+const ERLEDIGT_DURCH_BESITZ = ["kauf", "wunsch"] as const;
+const LISTEN = ["todo", "backlog"] as const;
+
 export async function absichtenErledigen(repos: Repositories, releaseId: number) {
-	const offen = await repos.plan.offeneAmZiel(["kauf", "wunsch"], { releaseId });
+	const offen = await repos.plan.offeneAmZiel(ERLEDIGT_DURCH_BESITZ, { releaseId });
 	await repos.plan.erledigen(offen.map((e) => e.id), "besitz");
-	const listen = await repos.plan.offeneAmZiel(["todo", "backlog"], { releaseId });
+	const listen = await repos.plan.offeneAmZiel(LISTEN, { releaseId });
 	return {
 		absichtenErledigt: offen.map((e) => ({ id: e.id, art: e.kind, titel: e.titel })),
 		aufListe: listen.some((e) => e.release_id === releaseId),
 	};
+}
+
+/**
+ * Dieselbe Regel fuer die Discs EINER Huelle (Nachtrag f1h), aber nur der
+ * lesende Teil: Je Release die offenen Kauf- und Wunscheintraege am Release
+ * und am Spiel, dazu `aufListe` - in einem Batch. Das Erledigen legt
+ * `ScanRepository.huelleErfassen` in denselben Batch wie die Discs, damit
+ * keine Disc ohne ihre erledigten Absichten (und umgekehrt) stehen bleibt.
+ * Ein Eintrag, den zwei Releases treffen (Wunsch am Spiel, zwei Plattformen
+ * auf einer Huelle), gehoert dem ersten.
+ */
+export async function absichtenFuerHuelle(
+	repos: Repositories,
+	ziele: ReadonlyArray<{ releaseId: number; gameId: number }>,
+): Promise<Array<{ erledigen: PlanZeile[]; aufListe: boolean }>> {
+	const je = await repos.plan.offeneAnZielen([...ERLEDIGT_DURCH_BESITZ, ...LISTEN], ziele);
+	const vergeben = new Set<number>();
+	return je.map((zeilen, i) => {
+		const erledigen = zeilen.filter(
+			(e) => (ERLEDIGT_DURCH_BESITZ as readonly string[]).includes(e.kind) && !vergeben.has(e.id),
+		);
+		erledigen.forEach((e) => vergeben.add(e.id));
+		return {
+			erledigen,
+			aufListe: zeilen.some((e) => (LISTEN as readonly string[]).includes(e.kind) && e.release_id === ziele[i].releaseId),
+		};
+	});
 }
 
 type Koerper = Record<string, unknown>;
@@ -106,9 +138,11 @@ export const physicalCopyRoutes = new Hono<AppEnv>()
 	.get("/", async (c) => {
 		const limit = Math.min(500, Math.max(1, Number(c.req.query("limit")) || 100));
 		const offset = Math.max(0, Number(c.req.query("offset")) || 0);
-		const { zeilen, gesamt } = await c.var.repos.ownership.listPhysicalCopies(limit, offset);
+		const { zeilen, gesamt, huellen } = await c.var.repos.ownership.listPhysicalCopies(limit, offset);
 		return c.json({
 			gesamt,
+			/** Discs als Huellen gezaehlt (Nachtrag f1h): gleicher Code ist eine Huelle. */
+			huellen,
 			limit,
 			offset,
 			exemplare: zeilen.map((z) => ({ ...exemplarAntwort(z), titel: z.title, plattform: z.platform })),

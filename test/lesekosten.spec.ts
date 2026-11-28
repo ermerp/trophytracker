@@ -6,7 +6,8 @@ import { FEED_HOECHSTENS } from "../src/api/feed";
 import { AUFFRISCH_FRIST_TAGE, CRON_PSN, CRON_WARTUNG, cronFenster, SCHLUESSEL_AUFFRISCHEN } from "../src/sync/cron";
 import { createExecutionContext } from "cloudflare:test";
 import { createRepositories } from "../src/db";
-import { IM_BESITZ_SQL, bestandNachIgdbSql } from "../src/db/ownership";
+import { GLEICHE_HUELLE_SQL, IM_BESITZ_SQL, bestandNachIgdbSql } from "../src/db/ownership";
+import { HUELLE_SQL, ZIEL_SPIEL_SQL, zielReleasesSql } from "../src/db/scan";
 import { einzeln, type Baustein } from "../src/db/baustein";
 import { Geheimnis } from "../src/domain/secret";
 import { createApp, createScheduled } from "../src/index";
@@ -30,6 +31,7 @@ import {
 	LETZTE_TROPHAEE_SQL,
 	LETZTES_PLATIN_SQL,
 	LISTEN_SQL,
+	HUELLEN_SQL,
 	PLATTFORM_SQL,
 	SPIELE_SQL,
 	STATUS_SQL,
@@ -2296,5 +2298,92 @@ describe(`Zeilenlese-Kosten bei ${LISTEN} Listen`, () => {
 			const antwort = await SELF.fetch(`${B}${pfad}`);
 			expect(antwort.status, pfad).toBe(200);
 		}
+	});
+});
+
+/**
+ * Eine Huelle, mehrere Spiele (Nachtrag f1h): der Lookup nach `ean`
+ * (idx_physical_copy_ean, Migration 0042), die Lage vor dem Zuordnen, das
+ * Spieldetail mit "gleiche Huelle wie" und die Huellenzaehlung des
+ * Dashboards. Bestand: 150 Discs mit eigenem Code, dazu drei Collections mit
+ * je zwei Spielen - mehr als die 53 der Produktion vom 28.11.2026.
+ */
+describe("Huellen mit mehreren Spielen (Nachtrag f1h)", () => {
+	/** Ein EAN-13 mit gueltiger Pruefziffer - die Route prueft sie. */
+	const ean = (n: number) => {
+		const basis = `4000000${String(n).padStart(5, "0")}`;
+		const summe = basis.split("").reduce((a, z, i) => a + Number(z) * (i % 2 ? 3 : 1), 0);
+		return basis + ((10 - (summe % 10)) % 10);
+	};
+	const COLLECTION = [ean(90001), ean(90002), ean(90003)];
+
+	const route = async (pfad: string, koerper?: unknown) => {
+		const app = createApp(
+			() => erstellePsnClient(fakeFetch([]).fetch),
+			() => fakeIgdb([[]], { zugang: null }).client,
+		);
+		const zaehler = zaehlendeDb(env.DB);
+		const antwort = await app.request(
+			pfad,
+			koerper === undefined ? undefined : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(koerper) },
+			{ ...env, DB: zaehler.db },
+		);
+		return { status: antwort.status, antwort: (await antwort.json()) as any, aufrufe: zaehler.aufrufe(), anweisungen: zaehler.anweisungen(), gelesen: zaehler.gelesen(), geschrieben: zaehler.geschrieben() };
+	};
+
+	it("liest beim Scan, beim Zuordnen und im Spieldetail nur die Huelle, nicht alle Discs", async () => {
+		const disc = env.DB.prepare("INSERT INTO physical_copy (release_id, ean) VALUES (?, ?)");
+		const anweisungen: D1PreparedStatement[] = [];
+		for (let i = 1; i <= 150; i++) anweisungen.push(disc.bind(releaseVon(i), ean(i)));
+		COLLECTION.forEach((code, k) => {
+			anweisungen.push(disc.bind(releaseVon(201 + 2 * k), code), disc.bind(releaseVon(202 + 2 * k), code));
+		});
+		anweisungen.push(env.DB.prepare("INSERT INTO ean_mapping (ean, release_id) VALUES (?, ?)").bind(COLLECTION[0], releaseVon(201)));
+		await env.DB.batch(anweisungen);
+
+		const huelle = await zeilenGelesen(HUELLE_SQL, COLLECTION[0]);
+		const huelleUnbekannt = await zeilenGelesen(HUELLE_SQL, ean(99999));
+		const lageReleases = await zeilenGelesen(zielReleasesSql(2), releaseVon(301), releaseVon(302));
+		const lageSpiel = await zeilenGelesen(ZIEL_SPIEL_SQL, 303, "PS3");
+		const gleicheHuelle = await zeilenGelesen(GLEICHE_HUELLE_SQL, 201);
+		const gleicheHuelleOhne = await zeilenGelesen(GLEICHE_HUELLE_SQL, 400);
+		const huellenZaehlung = await zeilenGelesen(HUELLEN_SQL);
+
+		// Die Routen, im Zustand der Produktion: ein bekannter Code mit
+		// Collection, ein unbekannter, das Zuordnen zweier Spiele, das Detail.
+		const scanBekannt = await route("/api/scan", { ean: COLLECTION[0] });
+		const scanUnbekannt = await route("/api/scan", { ean: ean(99999) });
+		const zuordnen = await route(`/api/scan/${ean(90004)}/assign`, { ziele: [{ releaseId: releaseVon(301) }, { releaseId: releaseVon(302) }] });
+		const detail = await route("/api/games/201");
+		const ohne = (r: Awaited<ReturnType<typeof route>>) => ({ ...r, antwort: undefined });
+		console.info({
+			huelle, huelleUnbekannt, lageReleases, lageSpiel, gleicheHuelle, gleicheHuelleOhne, huellenZaehlung,
+			scanBekannt: ohne(scanBekannt), scanUnbekannt: ohne(scanUnbekannt), zuordnen: ohne(zuordnen), detail: ohne(detail),
+		});
+
+		expect(scanBekannt.antwort.huelle).toHaveLength(2);
+		expect(zuordnen.status).toBe(201);
+		expect(detail.antwort.releases[0].exemplare[0].gleicheHuelle).toEqual([expect.objectContaining({ spielId: 202 })]);
+
+		// Index-Lookups: zwei Zeilen der Huelle und ihre Releases, kein Lauf
+		// ueber die 156 Discs.
+		expect(huelle).toBeLessThan(20);
+		expect(huelleUnbekannt).toBeLessThan(5);
+		expect(lageReleases).toBeLessThan(10);
+		expect(lageSpiel).toBeLessThan(10);
+		expect(gleicheHuelle).toBeLessThan(20);
+		expect(gleicheHuelleOhne).toBeLessThan(10);
+		// Ein Lauf ueber physical_copy mit einem Lookup je Disc - einmal je
+		// Dashboard-Aufruf.
+		expect(huellenZaehlung).toBeLessThan(3 * 160);
+		expect(scanBekannt.aufrufe).toBe(1);
+		expect(scanBekannt.gelesen).toBeLessThan(30);
+		expect(scanUnbekannt.gelesen).toBeLessThan(10);
+		// Lage, Absichten, Schreiben - je ein Batch, der Kopf kommt aus der Lage.
+		expect(zuordnen.aufrufe).toBe(3);
+		expect(zuordnen.anweisungen).toBeLessThanOrEqual(50);
+		expect(zuordnen.gelesen).toBeLessThan(200);
+
+		await env.DB.batch([env.DB.prepare("DELETE FROM physical_copy"), env.DB.prepare("DELETE FROM ean_mapping"), env.DB.prepare("DELETE FROM game_event")]);
 	});
 });

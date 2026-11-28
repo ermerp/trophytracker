@@ -80,6 +80,36 @@ export const bestandNachIgdbSql = (n: number) =>
 
 export type BestandZeile = { igdb_id: number; platform: string; disc: number; kauf: number; plus: number; gespielt: number };
 
+/** Id und Disc-Fassung aus den Ergebnissen von `exemplarAnweisungen`, ab Index `ab`. */
+export function exemplarErgebnis(ergebnisse: D1Result[], ab: number): { id: number; physischStatusGesetzt: boolean } {
+	const id = (ergebnisse[ab + 2]?.results[0] as { id: number } | undefined)?.id;
+	if (id === undefined) throw new Error("Exemplar konnte nicht angelegt werden.");
+	return { id, physischStatusGesetzt: (ergebnisse[ab + 3]?.meta.changes ?? 0) > 0 };
+}
+
+/**
+ * Andere Spiele, deren Disc denselben Code traegt wie eine Disc dieses
+ * Spiels - "gleiche Huelle wie" im Spieldetail (Nachtrag f1h). Gleicher Code
+ * heisst eine Huelle (Entscheidung des Nutzers vom 28.11.2026). Ueber
+ * idx_release_game, idx_physical_copy_release und idx_physical_copy_ean
+ * (Migration 0042). Exportiert fuer `test/lesekosten.spec.ts`.
+ */
+export const GLEICHE_HUELLE_SQL =
+	"SELECT p.ean, g.id AS game_id, g.title, r.platform FROM physical_copy p " +
+	"JOIN release r ON r.id = p.release_id JOIN game g ON g.id = r.game_id " +
+	"WHERE p.ean IN (SELECT p0.ean FROM physical_copy p0 WHERE p0.ean IS NOT NULL " +
+	"AND p0.release_id IN (SELECT id FROM release WHERE game_id = ?1)) " +
+	"AND r.game_id <> ?1 ORDER BY g.sort_title, r.platform";
+
+export type GleicheHuelleZeile = { ean: string; game_id: number; title: string; platform: string };
+
+/**
+ * Discs als HUELLEN gezaehlt (Nachtrag f1h): Discs mit demselben Code sind
+ * eine Huelle, eine Disc ohne Code ist ihre eigene. Exportiert, damit die
+ * Kennzahlen und `test/lesekosten.spec.ts` dieselbe Regel benutzen.
+ */
+export const HUELLE_SCHLUESSEL = "COALESCE(p.ean, 'id:' || p.id)";
+
 export class OwnershipRepository {
 	constructor(
 		private readonly db: D1Database,
@@ -142,8 +172,10 @@ export class OwnershipRepository {
 	async copiesForGame(gameId: number): Promise<{
 		exemplare: PhysicalCopyZeile[];
 		digital: DigitalEntitlementZeile[];
+		/** Andere Spiele derselben Huelle (Nachtrag f1h). */
+		gleicheHuelle: GleicheHuelleZeile[];
 	}> {
-		const [p, d] = await this.db.batch([
+		const [p, d, h] = await this.db.batch([
 			this.db
 				.prepare(
 					"SELECT id, release_id, ean, condition, has_manual, purchase_date, " +
@@ -157,10 +189,12 @@ export class OwnershipRepository {
 						"WHERE release_id IN (SELECT id FROM release WHERE game_id = ?) ORDER BY id",
 				)
 				.bind(gameId),
+			this.db.prepare(GLEICHE_HUELLE_SQL).bind(gameId),
 		]);
 		return {
 			exemplare: p.results as PhysicalCopyZeile[],
 			digital: d.results as DigitalEntitlementZeile[],
+			gleicheHuelle: h.results as GleicheHuelleZeile[],
 		};
 	}
 
@@ -182,7 +216,19 @@ export class OwnershipRepository {
 		/** Fuer das Protokoll (8.5): 'scan' ab Stufe 17, sonst von Hand. */
 		anlass: string | null = null,
 	): Promise<{ id: number; physischStatusGesetzt: boolean }> {
-		const [, , eingefuegt, status] = await this.db.batch([
+		const ergebnisse = await this.db.batch(this.exemplarAnweisungen(releaseId, felder, anlass));
+		return exemplarErgebnis(ergebnisse, 0);
+	}
+
+	/**
+	 * Die vier Anweisungen eines neuen Exemplars - fuer `addPhysicalCopy` und
+	 * fuer den Scanner, der mehrere Discs einer Huelle in EINEM Batch anlegt
+	 * (Nachtrag f1h). Reihenfolge: Ereignis, Ereignis der Disc-Fassung (mit
+	 * derselben Bedingung wie das UPDATE, davor), INSERT, UPDATE. Das Ergebnis
+	 * liest `exemplarErgebnis` ab dem Index der ersten Anweisung.
+	 */
+	exemplarAnweisungen(releaseId: number, felder: PhysicalCopyFelder = {}, anlass: string | null = null): D1PreparedStatement[] {
+		return [
 			this.events.statement({ source: "nutzer", kind: "exemplar_angelegt", releaseId, neu: felder.condition ?? null, detail: anlass }),
 			// Die Disc-Fassung geht mit auf 'ja' - als eigenes Ereignis, damit
 			// die Aenderung am Release im Verlauf steht (dieselbe Bedingung wie das UPDATE).
@@ -214,11 +260,7 @@ export class OwnershipRepository {
 						"WHERE id = ? AND physical_release_status = 'unbekannt'",
 				)
 				.bind(releaseId),
-		]);
-
-		const id = (eingefuegt.results[0] as { id: number } | undefined)?.id;
-		if (id === undefined) throw new Error("Exemplar konnte nicht angelegt werden.");
-		return { id, physischStatusGesetzt: (status.meta.changes ?? 0) > 0 };
+		];
 	}
 
 	/** Nur die uebergebenen Felder aendern. Spaltennamen kommen aus SPALTEN, nie aus der Eingabe. */
@@ -279,10 +321,12 @@ export class OwnershipRepository {
 	async listPhysicalCopies(
 		limit: number,
 		offset: number,
-	): Promise<{ zeilen: Array<PhysicalCopyZeile & { title: string; platform: string }>; gesamt: number }> {
+	): Promise<{ zeilen: Array<PhysicalCopyZeile & { title: string; platform: string }>; gesamt: number; huellen: number }> {
+		// `gesamt` zaehlt Zeilen - die Blaetterung braucht sie. Die Huellen
+		// (Nachtrag f1h) stehen daneben: Eine Collection-Disc sind mehrere Zeilen.
 		const gesamt = await this.db
-			.prepare("SELECT COUNT(*) AS n FROM physical_copy")
-			.first<{ n: number }>();
+			.prepare(`SELECT COUNT(*) AS n, COUNT(DISTINCT ${HUELLE_SCHLUESSEL}) AS huellen FROM physical_copy p`)
+			.first<{ n: number; huellen: number }>();
 		const { results } = await this.db
 			.prepare(
 				"SELECT p.id, p.release_id, p.ean, p.condition, p.has_manual, p.purchase_date, " +
@@ -293,7 +337,7 @@ export class OwnershipRepository {
 			)
 			.bind(limit, offset)
 			.all<PhysicalCopyZeile & { title: string; platform: string }>();
-		return { zeilen: results, gesamt: gesamt?.n ?? 0 };
+		return { zeilen: results, gesamt: gesamt?.n ?? 0, huellen: gesamt?.huellen ?? 0 };
 	}
 
 	/** Gibt null zurueck, wenn dieselbe Quelle am Release schon eingetragen ist. */

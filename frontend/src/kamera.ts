@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import wasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
 import { besterTreffer, istBestaetigt, noetigeBestaetigungen, zaehleLesung, type Kandidat } from './bestaetigung'
+import { bildVerbuchen, gesperrt, sperren, type Sperre } from './wiederholsperre'
 
 /**
  * Kamera und Barcode-Erkennung für den Scanner (Abschnitt 9.1, Stufe 17).
@@ -18,11 +19,12 @@ import { besterTreffer, istBestaetigt, noetigeBestaetigungen, zaehleLesung, type
  *
  * Nur EAN-13. Nach einem erkannten Code pausiert die Erkennung, bis der
  * Aufrufer sie weiterlaufen lässt (Serienerfassung: das Bild bleibt, die
- * Auflösung erscheint darunter). Der zuletzt behandelte Code (`ignoriere`)
- * löst nicht erneut aus, bis ein anderer kam – sonst ersetzt die Disc, die
- * noch vor der Kamera liegt, ihre eigene „erfasst"-Karte samt Rückgängig
- * durch einen Treffer oder zählt nach „Später" gleich wieder hoch. Dazu
- * eine Sperre von zwei Sekunden für Aufrufer ohne `ignoriere`.
+ * Auflösung erscheint darunter). Der zuletzt angenommene Code löst erst
+ * wieder aus, **wenn er zwischendurch aus dem Bild war** (`wiederholsperre.ts`,
+ * Nachtrag f1h) – sonst ersetzte die Disc, die noch vor der Kamera liegt,
+ * ihre eigene „erfasst"-Karte samt Rückgängig durch einen Treffer. Bis f1h
+ * blieb er gesperrt, bis ein anderer Code kam; nach „×" ließ sich dieselbe
+ * Hülle dann gar nicht mehr scannen.
  */
 
 type Erkenner = { detect(bild: HTMLVideoElement): Promise<Array<{ rawValue: string; format?: string }>> }
@@ -82,24 +84,22 @@ async function sperreLoesen(): Promise<void> {
 }
 
 const TAKT_MS = 150
-const SPERRE_MS = 2000
 
 /**
  * `onCode` liefert, ob der Code angenommen wurde; bei `false` (etwa der
  * Worker antwortet mit einem Fehler) läuft die Erkennung sofort weiter.
  */
-export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, ignoriere: string | null = null) {
+export function useKamera(onCode: (code: string) => Promise<boolean> | boolean) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const erkennerRef = useRef<Erkenner | null>(null)
   const pausiertRef = useRef(false)
-  const letzterRef = useRef<{ code: string; zeit: number } | null>(null)
+  /** Der zuletzt angenommene Code, bis er aus dem Bild war (`wiederholsperre.ts`). */
+  const sperreRef = useRef<Sperre>(null)
   /** Zählt, wie oft der aktuelle Kandidat in Folge gelesen wurde (`bestaetigung.ts`). */
   const kandidatRef = useRef<Kandidat>(null)
   const onCodeRef = useRef(onCode)
   onCodeRef.current = onCode
-  const ignoriereRef = useRef(ignoriere)
-  ignoriereRef.current = ignoriere
 
   const [status, setStatus] = useState<KameraStatus>('aus')
   const [fehler, setFehler] = useState<string | null>(null)
@@ -117,7 +117,6 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
     setPausiertState(wert)
     kandidatRef.current = null
     setKandidat(null)
-    if (!wert) letzterRef.current = { code: letzterRef.current?.code ?? '', zeit: Date.now() }
   }, [])
 
   const stoppen = useCallback(() => {
@@ -202,24 +201,23 @@ export function useKamera(onCode: (code: string) => Promise<boolean> | boolean, 
       beschaeftigt = true
       try {
         const treffer = besterTreffer(await e.detect(video))
-        const code = treffer?.rawValue
-        if (code && !pausiertRef.current && code !== ignoriereRef.current) {
+        const code = treffer?.rawValue ?? null
+        if (pausiertRef.current) return
+        sperreRef.current = bildVerbuchen(sperreRef.current, code, Date.now())
+        if (code && !gesperrt(sperreRef.current, code)) {
           // Erst zählen, dann annehmen: ein Bild allein entscheidet nicht.
-          const noetig = noetigeBestaetigungen(treffer.format)
+          const noetig = noetigeBestaetigungen(treffer?.format)
           kandidatRef.current = zaehleLesung(kandidatRef.current, code)
           const fertig = istBestaetigt(kandidatRef.current, noetig)
           setKandidat(fertig ? null : code)
           if (fertig) {
-            const letzter = letzterRef.current
-            if (!letzter || letzter.code !== code || Date.now() - letzter.zeit > SPERRE_MS) {
-              kandidatRef.current = null
-              letzterRef.current = { code, zeit: Date.now() }
-              pausiertRef.current = true
-              setPausiertState(true)
-              if (!(await onCodeRef.current(code))) {
-                pausiertRef.current = false
-                setPausiertState(false)
-              }
+            kandidatRef.current = null
+            sperreRef.current = sperren(code)
+            pausiertRef.current = true
+            setPausiertState(true)
+            if (!(await onCodeRef.current(code))) {
+              pausiertRef.current = false
+              setPausiertState(false)
             }
           }
         }

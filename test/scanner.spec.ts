@@ -1,13 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
+	HOECHSTENS_SPIELE,
 	MUSTER,
 	angelegtAus,
 	anderePlattformen,
+	erfassungAus,
+	gemeinsamePlattform,
 	hauptRelease,
+	hauptText,
 	kandidatenOrdnen,
+	rahmenFuer,
 	scanZurueck,
 	signalFuer,
+	wahlUmschalten,
+	zielAufPlattform,
+	zieleOrdnen,
+	type ErfassteDisc,
 	type Erfassung,
+	type HuellenWahl,
 	type KandidatRelease,
 } from "../frontend/src/scanner";
 
@@ -100,27 +110,32 @@ describe("kandidatenOrdnen", () => {
 	});
 });
 
-describe("scanZurueck", () => {
-	const basis: Erfassung = {
-		exemplarId: 7,
-		ean: "4005209114554",
-		releaseId: 20,
-		spielId: 10,
-		absichtenErledigt: [],
-		spielNeu: false,
-		releaseNeu: false,
-		vorherMapping: null,
-	};
+/** Ein Zug mit einer Disc - der Fall bis f1h. */
+const disc = (felder: Partial<ErfassteDisc> = {}): ErfassteDisc => ({
+	exemplarId: 7,
+	releaseId: 20,
+	spielId: 10,
+	absichtenErledigt: [],
+	spielNeu: false,
+	releaseNeu: false,
+	...felder,
+});
+const zug = (d: Partial<ErfassteDisc> = {}, vorherMapping: Erfassung["vorherMapping"] = null): Erfassung => ({
+	ean: "4005209114554",
+	discs: [disc(d)],
+	vorherMapping,
+});
 
+describe("scanZurueck", () => {
 	it("Fall 2: Disc und Mapping weg, sonst nichts", () => {
-		expect(scanZurueck(basis)).toEqual([
+		expect(scanZurueck(zug())).toEqual([
 			{ methode: "DELETE", pfad: "/api/physical-copies/7" },
 			{ methode: "DELETE", pfad: "/api/scan/4005209114554" },
 		]);
 	});
 
 	it("erledigte Absichten werden zuerst wieder geoeffnet", () => {
-		const s = scanZurueck({ ...basis, absichtenErledigt: [{ id: 3 }, { id: 4 }] });
+		const s = scanZurueck(zug({ absichtenErledigt: [{ id: 3 }, { id: 4 }] }));
 		expect(s.slice(0, 2)).toEqual([
 			{ methode: "PATCH", pfad: "/api/plans/3", koerper: { status: "offen" } },
 			{ methode: "PATCH", pfad: "/api/plans/4", koerper: { status: "offen" } },
@@ -129,12 +144,12 @@ describe("scanZurueck", () => {
 	});
 
 	it("gesetzte Disc-Fassung kommt zuletzt auf 'unbekannt' zurueck", () => {
-		const s = scanZurueck({ ...basis, physischStatusGesetzt: true });
+		const s = scanZurueck(zug({ physischStatusGesetzt: true }));
 		expect(s.at(-1)).toEqual({ methode: "PATCH", pfad: "/api/releases/20", koerper: { discFassung: "unbekannt" } });
 	});
 
 	it("Fall 3: das neue Spiel wird geloescht - nach Disc und Mapping", () => {
-		const s = scanZurueck({ ...basis, spielNeu: true, releaseNeu: true, physischStatusGesetzt: true });
+		const s = scanZurueck(zug({ spielNeu: true, releaseNeu: true, physischStatusGesetzt: true }));
 		expect(s.map((x) => `${x.methode} ${x.pfad}`)).toEqual([
 			"DELETE /api/physical-copies/7",
 			"DELETE /api/scan/4005209114554",
@@ -143,24 +158,24 @@ describe("scanZurueck", () => {
 	});
 
 	it("neues Release (andere Plattform) wird geloescht, das Spiel bleibt", () => {
-		const s = scanZurueck({ ...basis, releaseNeu: true, physischStatusGesetzt: true });
+		const s = scanZurueck(zug({ releaseNeu: true, physischStatusGesetzt: true }));
 		expect(s.at(-1)).toEqual({ methode: "DELETE", pfad: "/api/releases/20" });
 		expect(s.some((x) => x.pfad.startsWith("/api/games/"))).toBe(false);
 	});
 
 	it("vorheriges Mapping auf ein anderes Release mit Disc wird zurueckgesetzt (409 heisst Erfolg)", () => {
-		const s = scanZurueck({ ...basis, vorherMapping: { releaseId: 99, mitDisc: true } });
+		const s = scanZurueck(zug({}, { releaseId: 99, mitDisc: true }));
 		expect(s[1]).toEqual({ methode: "POST", pfad: "/api/scan/4005209114554/assign", koerper: { releaseId: 99 }, erwartet: 409 });
 		expect(s.some((x) => x.methode === "DELETE" && x.pfad.startsWith("/api/scan/"))).toBe(false);
 	});
 
 	it("Mapping, das schon vorher auf dieses Release zeigte, bleibt stehen", () => {
-		const s = scanZurueck({ ...basis, vorherMapping: { releaseId: 20, mitDisc: false } });
+		const s = scanZurueck(zug({}, { releaseId: 20, mitDisc: false }));
 		expect(s.map((x) => x.pfad)).toEqual(["/api/physical-copies/7"]);
 	});
 
 	it("vorheriges Mapping auf ein Release ohne Disc laesst sich nicht wiederherstellen - es wird geloest", () => {
-		const s = scanZurueck({ ...basis, vorherMapping: { releaseId: 99, mitDisc: false } });
+		const s = scanZurueck(zug({}, { releaseId: 99, mitDisc: false }));
 		expect(s[1]).toEqual({ methode: "DELETE", pfad: "/api/scan/4005209114554" });
 	});
 });
@@ -185,19 +200,128 @@ describe("angelegtAus (POST /api/games)", () => {
 
 describe("scanZurueck nach vorhandenem Spiel mit neuem Release", () => {
 	it("loescht das Release, nicht das Spiel", () => {
-		const s = scanZurueck({
-			exemplarId: 7,
-			ean: "4005209114554",
-			releaseId: 20,
-			spielId: 10,
-			absichtenErledigt: [],
-			vorherMapping: null,
-			...angelegtAus({ vorhanden: true, releaseNeu: true }),
-		});
-		expect(s.map((x) => `${x.methode} ${x.pfad}`)).toEqual([
+		const e = erfassungAus(
+			"4005209114554",
+			[{ id: 7, releaseId: 20, spiel: { spielId: 10 }, absichtenErledigt: [] }],
+			{ releaseId: 20, ...angelegtAus({ vorhanden: true, releaseNeu: true }) },
+			null,
+		);
+		expect(scanZurueck(e).map((x) => `${x.methode} ${x.pfad}`)).toEqual([
 			"DELETE /api/physical-copies/7",
 			"DELETE /api/scan/4005209114554",
 			"DELETE /api/releases/20",
 		]);
+	});
+});
+
+describe("Eine Huelle, mehrere Spiele (Nachtrag f1h)", () => {
+	const zwei: Erfassung = {
+		ean: "4005209114554",
+		vorherMapping: null,
+		discs: [
+			disc({ exemplarId: 7, releaseId: 20, spielId: 10, absichtenErledigt: [{ id: 3 }], physischStatusGesetzt: true }),
+			disc({ exemplarId: 8, releaseId: 21, spielId: 11, absichtenErledigt: [{ id: 4 }], releaseNeu: true }),
+		],
+	};
+
+	it("Rueckgaengig nimmt ALLE Discs des Zugs zurueck - Absichten zuerst, je Release das Neue zuletzt", () => {
+		expect(scanZurueck(zwei).map((x) => `${x.methode} ${x.pfad}`)).toEqual([
+			"PATCH /api/plans/3",
+			"PATCH /api/plans/4",
+			"DELETE /api/physical-copies/7",
+			"DELETE /api/physical-copies/8",
+			"DELETE /api/scan/4005209114554",
+			"PATCH /api/releases/20",
+			"DELETE /api/releases/21",
+		]);
+	});
+
+	it("ein vorheriges Mapping auf eine Disc ausserhalb des Zugs kommt zurueck (+ weiteres Spiel dieser Huelle)", () => {
+		const s = scanZurueck({ ...zwei, vorherMapping: { releaseId: 99, mitDisc: true } });
+		expect(s).toContainEqual({ methode: "POST", pfad: "/api/scan/4005209114554/assign", koerper: { releaseId: 99 }, erwartet: 409 });
+		expect(s.some((x) => x.methode === "DELETE" && x.pfad.startsWith("/api/scan/"))).toBe(false);
+	});
+
+	it("zeigte das Mapping auf das erste Release des Zugs, bleibt es", () => {
+		const s = scanZurueck({ ...zwei, vorherMapping: { releaseId: 20, mitDisc: false } });
+		expect(s.some((x) => x.pfad.startsWith("/api/scan/"))).toBe(false);
+	});
+
+	it("zieleOrdnen stellt das Release des alten Mappings nach vorn", () => {
+		const w = (spielId: number, releaseId: number): HuellenWahl => ({ spielId, titel: `S${spielId}`, plattform: "PS3", ziel: { releaseId }, releaseNeu: false });
+		expect(zieleOrdnen([w(1, 20), w(2, 21)], 21).map((x) => x.spielId)).toEqual([2, 1]);
+		expect(zieleOrdnen([w(1, 20), w(2, 21)], null).map((x) => x.spielId)).toEqual([1, 2]);
+	});
+
+	it("erfassungAus: releaseNeu vom Worker oder vom Anlegen davor, fehlender Schluessel heisst nicht neu", () => {
+		const e = erfassungAus(
+			"4005209114554",
+			[
+				{ id: 7, releaseId: 20, spiel: { spielId: 10 }, absichtenErledigt: [], releaseNeu: true },
+				{ id: 8, releaseId: 21, spiel: { spielId: 11 }, absichtenErledigt: [] },
+				{ id: 9, releaseId: 22, spiel: { spielId: 12 }, absichtenErledigt: [] },
+			],
+			{ releaseId: 22, spielNeu: true, releaseNeu: true },
+			null,
+		);
+		expect(e.discs.map((d) => [d.releaseNeu, d.spielNeu])).toEqual([
+			[true, false],
+			[false, false],
+			[true, true],
+		]);
+	});
+
+	it("zielAufPlattform: vorhandenes Release ohne Disc, sonst neu, mit Disc gar nicht", () => {
+		const releases: KandidatRelease[] = [
+			{ releaseId: 20, plattform: "PS3", exemplare: 0 },
+			{ releaseId: 21, plattform: "PS4", exemplare: 1 },
+		];
+		expect(zielAufPlattform(10, releases, "PS3")).toEqual({ ziel: { releaseId: 20 }, releaseNeu: false });
+		expect(zielAufPlattform(10, releases, "PS5")).toEqual({ ziel: { spielId: 10, plattform: "PS5" }, releaseNeu: true });
+		expect(zielAufPlattform(10, releases, "PS4")).toBeNull();
+	});
+
+	it("wahlUmschalten: an, ab, ein Spiel nur einmal, hoechstens sechs", () => {
+		const w = (spielId: number, releaseId: number): HuellenWahl => ({ spielId, titel: `S${spielId}`, plattform: "PS3", ziel: { releaseId }, releaseNeu: false });
+		let wahl = wahlUmschalten([], w(1, 20));
+		wahl = wahlUmschalten(wahl, w(2, 21));
+		expect(wahl.map((x) => x.spielId)).toEqual([1, 2]);
+		expect(wahlUmschalten(wahl, w(1, 20)).map((x) => x.spielId)).toEqual([2]);
+		// Dasselbe Spiel auf einem anderen Release ersetzt die Wahl, statt es zweimal zu nennen.
+		expect(wahlUmschalten(wahl, w(1, 30)).map((x) => (x.ziel as { releaseId: number }).releaseId)).toEqual([30, 21]);
+		const voll = Array.from({ length: HOECHSTENS_SPIELE }, (_, i) => w(i + 1, 100 + i));
+		expect(wahlUmschalten(voll, w(99, 999))).toHaveLength(HOECHSTENS_SPIELE);
+	});
+
+	it("hauptText: ein Spiel 'Disc erfassen · PS3', mehrere 'Disc fuer n Spiele erfassen' ohne Plattform (360 px)", () => {
+		const w = (spielId: number, plattform: HuellenWahl["plattform"]): HuellenWahl => ({ spielId, titel: "", plattform, ziel: { spielId, plattform }, releaseNeu: true });
+		expect(hauptText([w(1, "PS3")])).toEqual({ text: "Disc erfassen", plattform: "PS3" });
+		expect(hauptText([w(1, "PS3"), w(2, "PS3")])).toEqual({ text: "Disc für 2 Spiele erfassen", plattform: null });
+		expect(hauptText([])).toEqual({ text: "Disc erfassen", plattform: null });
+	});
+
+	it("gemeinsamePlattform: nur wenn alle gewaehlten dieselbe haben", () => {
+		const w = (spielId: number, plattform: HuellenWahl["plattform"]): HuellenWahl => ({ spielId, titel: "", plattform, ziel: { spielId, plattform }, releaseNeu: true });
+		expect(gemeinsamePlattform([w(1, "PS3"), w(2, "PS3")])).toBe("PS3");
+		expect(gemeinsamePlattform([w(1, "PS3"), w(2, "PS4")])).toBeNull();
+		expect(gemeinsamePlattform([])).toBeNull();
+	});
+});
+
+describe("rahmenFuer (Wunsch des Nutzers vom 28.11.2026)", () => {
+	it("steht, solange eine Karte offen ist - in der Farbe ihres Falls, auch ohne Blitz", () => {
+		expect(rahmenFuer({ art: "code", signal: "neu" }, null)).toBe("neu");
+		expect(rahmenFuer({ art: "code", signal: "regal" }, null)).toBe("regal");
+		expect(rahmenFuer({ art: "fehler" }, null)).toBe("fehler");
+	});
+
+	it("die offene Karte schlaegt den Blitz", () => {
+		expect(rahmenFuer({ art: "code", signal: "regal" }, "erfasst")).toBe("regal");
+	});
+
+	it("wenn wieder gescannt werden kann, nur der kurze Blitz - sonst neutral", () => {
+		expect(rahmenFuer({ art: "erfasst" }, "erfasst")).toBe("erfasst");
+		expect(rahmenFuer({ art: "erfasst" }, null)).toBeNull();
+		expect(rahmenFuer({ art: "leer" }, null)).toBeNull();
 	});
 });
