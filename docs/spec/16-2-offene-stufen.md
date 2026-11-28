@@ -115,7 +115,7 @@ offen bleibt.
 
 #### Nach dem grossen Wunschlisten-Import
 
-Der Import ist am **27.11.2026** abgeschlossen (16.4). Die Frage, ob der tägliche Takt der Gebrauchtpreise den grösseren Bestand trägt, stellt sich seit 20i nicht mehr an den Wartungsaufrufen, sondern am Zeitlimit der Action von 30 Minuten (04.11.: 431 Releases in 87 Portionen, 529 s; 26.11.: 487 s); die alte Decke von 520 bis 660 Releases (09.10.2026, 24 von 36 Wartungsaufrufen, Ende neun Minuten vor Fensterschluss; vor dem Import 57 offene Wünsche aus drei Listen) gilt für den Worker-Weg und ist überholt. **Gemessen wird am Lauf vom 28.11.2026, 13:17 UTC** – erst danach ist zu entscheiden, ob Zuschnitt oder Takt sich ändern müssen.
+Der Import ist am **27.11.2026** abgeschlossen (16.4). Die Frage, ob der tägliche Takt der Gebrauchtpreise den grösseren Bestand trägt, stellt sich seit 20i nicht mehr an den Wartungsaufrufen, sondern am Zeitlimit der Action von 30 Minuten (04.11.: 431 Releases in 87 Portionen, 529 s; 26.11.: 487 s); die alte Decke von 520 bis 660 Releases (09.10.2026, 24 von 36 Wartungsaufrufen, Ende neun Minuten vor Fensterschluss; vor dem Import 57 offene Wünsche aus drei Listen) gilt für den Worker-Weg und ist überholt. **Gemessen am 27.11.2026** (Lauf 13:17, gestartet 21:58 nach dem Import): 661 Releases in 745 s, 41 % des Limits, linear rund 1 590 Releases – Zuschnitt und Takt bleiben ([Nächte](16-2-naechte-4.md)).
 
 **Ungeklärt, als Befund notiert:** `rows_read_24h` stand am 09.10.2026 bei **1 212 977**.
 Über einer Million ohne Import heisst laut CLAUDE.md „stimmt etwas nicht". Der gerechnete

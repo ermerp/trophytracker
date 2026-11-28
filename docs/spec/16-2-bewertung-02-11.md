@@ -122,8 +122,9 @@ deren Leerlauf allein bis 17 ms liegt.
   zählte – rund 51 D1-Aufrufe und 100–150 Anweisungen. Jetzt **1 D1-Aufruf mit 4 Anweisungen**
   (Ereignis, `ja`, Stempel, Zählung; [7.6](07-6-igdb.md)), gezählt in `test/luecken.spec.ts`, der Test
   gegen den alten Stand rot. Lesekosten einer vollen Portion gegen den Bestand von 430 Spielen: 2 375
-  Zeilen, davon rund 1 340 die Zählung, die vorher als eigener Aufruf lief. **Die CPU-Wirkung ist eine
-  Erwartung, keine Messung** – fällig ist der Schritt erst wieder um den 16.12.; liegt ein voller
+  Zeilen, davon rund 1 340 die Zählung, die vorher als eigener Aufruf lief. **Erster Produktionswert**
+  (Nacht zum 28.11., nach dem Import außer der Reihe): 7 ms für 50 Spiele in LHR, 9 ms für 18 in DFW
+  ([Nächte](16-2-naechte-4.md)) – n = 1 je Portion; mehrere volle Portionen bringt der Lauf um den 16.12.; liegt ein voller
   Aufruf dann über 10 ms, bekommt er eine eigene, kleinere Portion (heute 50, geteilt mit dem
   Auffrischen; ein eigener Nachtrag, nicht zugleich). **Verworfen:** eine Vorabmessung im eigenen
   Messworker mit nachgebauter IGDB-Antwort (Entscheidung des Nutzers vom 21.11.2026) – sie hätte nur
