@@ -42,6 +42,22 @@
 	--preisalarm: #39b5a4;
 
 	/*
+	 * Signale des Scanners (Nachtrag f1g): Rahmen des Kamerabilds, Aussage der
+	 * Karte und Ergebnis in „Letzte Scans". Eigene Toene statt PS4-Blau und
+	 * Am-Spielen-Gruen (Entscheidung des Nutzers vom 28.11.2026) - neben einem
+	 * Plattform-Kennzeichen waere sonst nicht zu sagen, ob die Farbe die
+	 * Plattform oder das Ergebnis meint.
+	 *   --scan-regal:   der Code ist bekannt, die Disc steht schon im Regal.
+	 *   --scan-erfasst: die Disc ist gerade erfasst worden.
+	 * Ein neuer Code ist --text (hell, "hinsehen"), ein Fehler --gefahr.
+	 * Abstand (CIEDE2000) zum naechsten belegten Ton: --scan-regal 14,7 zu
+	 * --ps4, 16,6 zu --preisalarm; --scan-erfasst 17,3 zu --psvita und
+	 * --st-am_spielen.
+	 */
+	--scan-regal: #5cc8e0;
+	--scan-erfasst: #8bd45a;
+
+	/*
 	 * Ein Ton fuer alles, was FEHLT: keine Disc, kein Download, offenes Platin
 	 * (Wunsch des Nutzers vom 23.09.2026). Vorhanden ist hell, nicht vorhanden
 	 * ist dunkel - eine Regel statt drei Sonderfaellen. Bewusst leise, aber
