@@ -10,6 +10,7 @@ Diese Datei wird **nicht routinemäßig gelesen** – nur ihre ersten fünf Tabe
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 216 | 28.11.2026 | **Nachtrag f1i: Collection über das IGDB-Bundle** – Fall 3 mit Bundle-Treffer führt zur Mehrfachwahl, Inhalt über `GET /api/igdb/bundle/:id/inhalt`, gemessen 8 von 8 (9.1) |
 | 215 | 28.11.2026 | **Nachtrag f1h: eine Hülle, mehrere Spiele** – Collection-Discs als Exemplar je Spiel mit gleichem Code (Index 0042), Mehrfachwahl im Scanner, Zuordnen mit `ziele` in einem Batch, Disc-Gesamtzahlen zählen Hüllen, „gleiche Hülle wie" im Spieldetail; derselbe Code nach „×" wieder lesbar, Rahmen bleibt bis Vorgangsende (3, 9.1, 12) |
 | 214 | 28.11.2026 | **Nachtrag f1g, Prüfung am Gerät:** Ton und Vibration über den Lautsprecher synchron, Bluetooth-Verzögerung bewusst nicht ausgeglichen (9.1) |
 | 213 | 28.11.2026 | **Nachtrag f1g: Scanner am Handy** – eine Karte je Fall mit festem Hauptknopf, Fall 3 in einem Tipp, vollständiges Rückgängig (Disc-Fassung, neues Release, überschriebenes Mapping, neues Spiel; `releaseNeu` an `POST /api/games`), vier Muster aus Ton und Vibration, Tokens `--scan-regal` / `--scan-erfasst`, letzte Scans auf dem Gerät; neuer Abschnitt 9.1, Reihenfolge der finalen Stufe 1 (16.4) |

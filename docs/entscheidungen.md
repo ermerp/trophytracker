@@ -423,3 +423,4 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 28.11.2026 | **Bluetooth-Verzögerung des Scanner-Tons wird nicht ausgeglichen** – über den Lautsprecher synchron, mit Kopfhörern kommt der Ton nach der Vibration | [9.1](spec/09-1-scanner-am-handy.md) |
 | 28.11.2026 | **Collection-Disc: ein Exemplar je enthaltenem Spiel mit demselben Code**, kein eigenes Spiel „Collection"; Disc-Gesamtzahlen zählen Hüllen | [3](spec/03-sammlung.md) |
 | 28.11.2026 | Scanner: **Rahmen bleibt in der Farbe des Falls, bis wieder gescannt werden kann** | [9.1](spec/09-1-scanner-am-handy.md) |
+| 28.11.2026 | Scanner: **IGDB-Bundle in Fall 3 führt zu den Spielen der Sammlung**, vorab angekreuzt; eigenes Spiel nur als leiser Weg | [9.1](spec/09-1-scanner-am-handy.md) |
