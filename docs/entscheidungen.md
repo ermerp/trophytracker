@@ -421,3 +421,5 @@ Getroffen, bevor 20g gebaut wird; sie schließen die drei Fragen, die [16.2](spe
 | 28.11.2026 | **Letzte Scans nur auf dem Gerät**, die letzten 50, Abgebrochene mit; **Fall 3 in einem Tipp** (Anlegen + Disc erfassen); Erfasst-Karte kompakt, Kamera läuft weiter | [9.1](spec/09-1-scanner-am-handy.md) |
 | 28.11.2026 | **Reihenfolge der finalen Stufe 1:** f1g → zweiter vollständiger Scan-Durchgang (alte offene Codes laufen mit) → Prüfbericht → Block B, PS+, Schnittfassungen | [16.4](spec/16-4-finale-stufen.md) |
 | 28.11.2026 | **Bluetooth-Verzögerung des Scanner-Tons wird nicht ausgeglichen** – über den Lautsprecher synchron, mit Kopfhörern kommt der Ton nach der Vibration | [9.1](spec/09-1-scanner-am-handy.md) |
+| 28.11.2026 | **Collection-Disc: ein Exemplar je enthaltenem Spiel mit demselben Code**, kein eigenes Spiel „Collection"; Disc-Gesamtzahlen zählen Hüllen | [3](spec/03-sammlung.md) |
+| 28.11.2026 | Scanner: **Rahmen bleibt in der Farbe des Falls, bis wieder gescannt werden kann** | [9.1](spec/09-1-scanner-am-handy.md) |
