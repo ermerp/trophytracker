@@ -45,6 +45,7 @@ in [`lehren.md`](../lehren.md); Entscheidungen des Nutzers mit Datum in
 | 8.4 | [08-4-unveroeffentlicht.md](08-4-unveroeffentlicht.md) | unveröffentlichte Titel |
 | 8.5 | [08-5-aenderungsprotokoll.md](08-5-aenderungsprotokoll.md) | Änderungsprotokoll je Spiel |
 | 9 | [09-barcode.md](09-barcode.md) | Barcode-Erfassung, Auflösungskette |
+| 9.1 | [09-1-scanner-am-handy.md](09-1-scanner-am-handy.md) | Scanner am Handy: Karten je Fall, Rückgängig, Ton und Vibration, letzte Scans |
 | 9.2, 9.3 | [09-3-ean-quellen.md](09-3-ean-quellen.md) | geprüfte und verworfene EAN-Quellen; warum es keine offenen Scans gibt |
 | 10 | [10-sync-protokoll.md](10-sync-protokoll.md) | `psn_sync_run`, Rohablage, zwei Phasen |
 | 10.1 | [10-1-cron.md](10-1-cron.md) | die Automatik: zwei Cron-Fenster, Auslastung, Lesekosten |

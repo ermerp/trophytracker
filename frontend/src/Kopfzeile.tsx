@@ -48,10 +48,10 @@ type Props = {
 	/** Das App-Symbol links vom Schriftzug – nur das Dashboard trägt es (Stufe 19a). */
 	logo?: boolean
 	/**
-	 * Ein Zurück-Pfeil links vom Titel – nur das Spieldetail trägt ihn
-	 * (Stufe 19c). Es ist die einzige Ansicht, die kein Ort der Leiste ist:
-	 * Man kommt aus der Sammlung, der Wunschliste, dem Dashboard oder dem
-	 * Scanner, und der Weg zurück ist der, den man gekommen ist.
+	 * Ein Zurück-Pfeil links vom Titel – nur Ansichten, die kein Ort der
+	 * Leiste sind: das Spieldetail (Stufe 19c) und seit Nachtrag f1g der
+	 * Scanner. Man kommt aus der Sammlung, der Wunschliste, dem Dashboard oder
+	 * dem Scanner, und der Weg zurück ist der, den man gekommen ist.
 	 */
 	zurueck?: boolean
 	/**

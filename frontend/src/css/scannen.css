@@ -1,87 +1,57 @@
-/* --- Stufe 17: Scannen (Abschnitt 9) --- */
+/* --- Scannen (Abschnitt 9, Stufe 17; überarbeitet in Nachtrag f1g) --- */
 
 /*
- * Drei feste Zonen: Kamera, Textfeld, Ergebniskarte. Das Kamerabild ist auf
- * dem Handy auf gut ein Drittel der Hoehe begrenzt, damit die Karte darunter
- * ohne Scrollen bedienbar bleibt; die Karte hat eine Mindesthoehe, damit die
- * Knoepfe bei jeder Disc an derselben Stelle stehen (Abschnitt 13).
+ * Gebaut für das Handy des Nutzers (360 x 800, sichere Bereiche 37/17):
+ * Zwischen Kopfzeile und Leiste bleiben rund 620 px, und Kamera, Karte samt
+ * Hauptknopf und die erste Zeile „Letzte Scans" müssen ohne Scrollen
+ * hineinpassen. Daher feste Höhen statt Anteilen des Fensters.
+ *
+ * Die Summe aus Kamera und Karte bleibt immer gleich: Braucht eine Karte
+ * mehr Platz (Suche, Anlegen), wird die Kamera flacher – sie ist dann ohnehin
+ * pausiert –, und der Hauptknopf bleibt an derselben Stelle (Entscheidung
+ * des Nutzers vom 28.11.2026: ein Hauptknopf, immer an derselben Stelle).
+ *
+ * Am Desktop wird nichts gestaltet (Entscheidung des Nutzers); die Spalte
+ * bekommt nur eine Höchstbreite, damit das Bild nicht über den Schirm läuft.
  */
-.scanner video[hidden] {
+.scanner {
+  --scan-kamera-h: 14rem;
+  --scan-karte-h: 15.5rem;
+  --scan-eng: 7rem;
+  max-width: 36rem;
+  padding-top: var(--a2);
+}
+
+.scanner[hidden] {
   display: none;
 }
 
-.scanner video {
+.scanner.eng {
+  --scan-kamera-h: calc(14rem - var(--scan-eng));
+  --scan-karte-h: calc(15.5rem + var(--scan-eng));
+}
+
+/* --- Kamerabild mit Zielrahmen und einer Statuszeile --- */
+
+.scan-kamera {
+  position: relative;
+  height: var(--scan-kamera-h);
+  overflow: hidden;
+  background: var(--grund);
+  border: 3px solid var(--linie);
+  border-radius: var(--r2);
+  transition: border-color 0.15s, box-shadow 0.15s, height 0.2s;
+}
+
+.scan-kamera video {
   display: block;
   width: 100%;
-  max-height: 40vh;
+  height: 100%;
   object-fit: cover;
-  background: #000;
-  border-radius: 6px;
 }
 
-.scanner .kamera-zeile {
-  margin: 0.4rem 0;
-}
-
-.scanner form {
-  margin-top: 0.4rem;
-}
-
-.scankarte {
-  min-height: 12rem;
-  margin-top: 0.8rem;
-  padding: 0.8rem;
-  border: 1px solid var(--aus);
-  border-radius: 6px;
-}
-
-.scankarte .pruefkarte {
-  min-height: 0;
-  margin-bottom: 0;
-}
-
-.scankarte .aktionen {
-  margin: 0.5rem 0;
-}
-
-.scankarte .aktionen button {
-  flex: 1 1 9rem;
-}
-
-.scankarte ul.treffer {
-  list-style: none;
-  padding: 0;
-  margin: 0.4rem 0;
-}
-
-.scankarte ul.treffer li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0;
-  border-top: 1px solid var(--linie);
-}
-
-.scankarte ul.treffer .titel {
-  flex: 1 1 12rem;
-  font-weight: 600;
-}
-
-@media (max-width: 30rem) {
-  .scanner video {
-    max-height: 32vh;
-  }
-
-  .scankarte {
-    padding: 0.6rem;
-  }
-
-  .scankarte .pruefkarte .bild {
-    width: 4.5rem;
-    height: 4.5rem;
-    font-size: 1.8rem;
-  }
+.scan-kamera video[hidden] {
+  display: none;
 }
 
 /*
@@ -90,67 +60,642 @@
  * korrigiert in die falsche Richtung. Nur die Darstellung; die Erkennung
  * liest die echten Bilddaten (Rückmeldung des Nutzers vom 18.09.2026).
  */
-.scanner video.gespiegelt {
+.scan-kamera video.gespiegelt {
   transform: scaleX(-1);
 }
 
-/*
- * Rueckmeldung im Bild (Rueckmeldung des Nutzers vom 18.09.2026): Beim
- * Abscannen eines Regals schaut man auf die Huelle, nicht auf eine Liste
- * weiter unten. Der Rahmen leuchtet kurz auf, Haken und Code stehen gross
- * im Bild, und der Zaehler sitzt in der Ecke.
- */
-.kamerabild {
-  position: relative;
-  line-height: 0;
-  border: 3px solid transparent;
-  border-radius: 8px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+/* Der Rahmen leuchtet kurz in der Farbe des Falls (tokens.css). */
+.scan-kamera.signal-neu {
+  border-color: var(--text);
+  box-shadow: 0 0 0 var(--a1) color-mix(in srgb, var(--text) 25%, transparent);
 }
 
-.kamerabild[hidden] {
-  display: none;
+.scan-kamera.signal-regal {
+  border-color: var(--scan-regal);
+  box-shadow: 0 0 0 var(--a1) color-mix(in srgb, var(--scan-regal) 25%, transparent);
 }
 
-.kamerabild.blitz-neu {
-  border-color: rgba(60, 170, 100, 0.95);
-  box-shadow: 0 0 0 4px rgba(60, 170, 100, 0.25);
+.scan-kamera.signal-erfasst {
+  border-color: var(--scan-erfasst);
+  box-shadow: 0 0 0 var(--a1) color-mix(in srgb, var(--scan-erfasst) 25%, transparent);
 }
 
-.kamerabild.blitz-bekannt {
-  border-color: rgba(70, 130, 210, 0.95);
-  box-shadow: 0 0 0 4px rgba(70, 130, 210, 0.25);
+.scan-kamera.signal-fehler {
+  border-color: var(--gefahr);
+  box-shadow: 0 0 0 var(--a1) color-mix(in srgb, var(--gefahr) 25%, transparent);
 }
 
-.kamerabild.blitz-fehler {
-  border-color: rgba(200, 70, 60, 0.95);
-  box-shadow: 0 0 0 4px rgba(200, 70, 60, 0.25);
+/* Vier Ecken als Ziel – breit, weil ein Strichcode breiter als hoch ist. */
+.scan-ziel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 70%;
+  height: 45%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
-.kamerabild .blitz {
+.scan-ziel i {
+  position: absolute;
+  width: var(--a5);
+  height: var(--a5);
+  border: 0 solid var(--text);
+  opacity: 0.85;
+}
+
+.scan-ziel i:nth-child(1) {
+  left: 0;
+  top: 0;
+  border-width: 3px 0 0 3px;
+  border-top-left-radius: var(--r1);
+}
+
+.scan-ziel i:nth-child(2) {
+  right: 0;
+  top: 0;
+  border-width: 3px 3px 0 0;
+  border-top-right-radius: var(--r1);
+}
+
+.scan-ziel i:nth-child(3) {
+  left: 0;
+  bottom: 0;
+  border-width: 0 0 3px 3px;
+  border-bottom-left-radius: var(--r1);
+}
+
+.scan-ziel i:nth-child(4) {
+  right: 0;
+  bottom: 0;
+  border-width: 0 3px 3px 0;
+  border-bottom-right-radius: var(--r1);
+}
+
+.scan-kamera-mitte {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
-  margin: 0;
-  line-height: 1.2;
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
-  /* Hell genug, dass die naechste Huelle waehrenddessen ins Bild kommt. */
-  background: rgba(0, 0, 0, 0.22);
+  gap: var(--a2);
+  padding: var(--a3);
+  text-align: center;
+  color: var(--text-leise);
+  font-size: 0.875rem;
 }
 
-.kamerabild .blitz .zeichen {
+.scan-kamera-mitte p {
+  margin: 0;
+}
+
+.scan-gross {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 4rem;
   font-weight: 700;
+  color: var(--text);
+  text-shadow: var(--schatten-2);
+  pointer-events: none;
 }
 
-.kamerabild .blitz .text {
-  font-size: 1rem;
+.signal-erfasst .scan-gross {
+  color: var(--scan-erfasst);
+}
+
+.signal-fehler .scan-gross {
+  color: var(--gefahr);
+}
+
+.scan-zustand,
+.scan-eintippen,
+.scan-fallback {
+  position: absolute;
+  font-size: 0.75rem;
+  border-radius: var(--r-rund);
+  background: var(--grund);
+}
+
+.scan-zustand {
+  left: var(--a2);
+  bottom: var(--a2);
+  max-width: calc(100% - 8rem);
+  padding: var(--a1) var(--a2);
+  color: var(--text-leise);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scan-kamera .scan-eintippen {
+  right: var(--a2);
+  bottom: var(--a2);
+  padding: var(--a1) var(--a2);
+  border: 1px solid var(--linie);
+  color: var(--text-leise);
+}
+
+.scan-fallback {
+  left: var(--a2);
+  top: var(--a2);
+  color: var(--text-still);
+}
+
+/* Notnagel: das Textfeld hinter „Code eintippen", dazu die Kamera-Knöpfe. */
+.scanner .scan-eintipp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--a2);
+  margin: var(--a2) 0 0;
+}
+
+.scan-eintipp input {
+  flex: 1 1 8rem;
+  width: auto;
+  margin: 0;
+}
+
+/* --- Die Karte: feste Zone, ein Hauptknopf unten --- */
+
+.scan-karte {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--a2);
+  height: var(--scan-karte-h);
+  margin-top: var(--a2);
+  padding: var(--a3);
+  box-sizing: border-box;
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-radius: var(--r2);
+}
+
+.scan-kennung {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  min-height: var(--a5);
+  font-size: 0.75rem;
   font-weight: 600;
-  text-align: center;
-  padding: 0 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+.scan-kennung > span:first-child {
+  flex: 1 1 auto;
+}
+
+.scan-ean {
+  font-family: var(--schrift-display);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.scan-kennung .scan-x {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--a6);
+  height: var(--a6);
+  margin: calc(-1 * var(--a1)) calc(-1 * var(--a1)) calc(-1 * var(--a1)) 0;
+  padding: 0;
+  border-radius: var(--r-rund);
+  background: var(--grund);
+  color: var(--text-leise);
+}
+
+/* Der Inhalt scrollt in seiner Zone; Kennung und Knopf bleiben stehen. */
+.scan-inhalt {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--a2);
+}
+
+.scan-inhalt p {
+  margin: 0;
+}
+
+.scan-spiel {
+  display: flex;
+  gap: var(--a3);
+  align-items: flex-start;
+}
+
+.scan-cover,
+.scan-mini {
+  flex: none;
+  overflow: hidden;
+  aspect-ratio: var(--cover);
+  background: var(--flaeche-hoch);
+  border-radius: var(--r1);
+}
+
+.scan-cover {
+  width: 4rem;
+}
+
+.scan-mini {
+  width: 1.25rem;
+}
+
+.scan-cover img,
+.scan-mini img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scan-titel {
+  font-family: var(--schrift-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.scan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--a2);
+  margin-top: var(--a1);
+  font-size: 0.8125rem;
+  color: var(--text-leise);
+}
+
+.scan-inhalt .scan-aussage,
+.scan-aussage {
+  margin-top: var(--a1);
+  font-size: 0.9rem;
+}
+
+.scan-aussage.regal {
+  color: var(--scan-regal);
+}
+
+.scan-aussage.erfasst {
+  color: var(--scan-erfasst);
+}
+
+.scan-aussage.fehler {
+  color: var(--gefahr);
+}
+
+.scan-zeile {
+  font-size: 0.8125rem;
+  color: var(--text-leise);
+}
+
+.scan-zeile.einzeilig {
+  flex: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scan-still {
+  font-size: 0.75rem;
+  color: var(--text-still);
+}
+
+.scan-hinweis {
+  margin: var(--a2) 0 0;
+  font-size: 0.875rem;
+  color: var(--text-leise);
+}
+
+.scan-unten {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--a1);
+}
+
+/* Der Hauptknopf: hell auf dunkel, voll breit – derselbe Platz in jedem Fall. */
+.scan-unten .scan-haupt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--a2);
+  height: 2.75rem;
+  padding: 0 var(--a3);
+  font-weight: 600;
+  background: var(--text);
+  color: var(--grund);
+  border-color: var(--text);
+  border-radius: var(--r2);
+}
+
+/* Das Plattform-Kennzeichen im hellen Knopf: dunkel, sonst verschwindet es. */
+.scan-haupt .plattform {
+  color: var(--grund);
+}
+
+.scan-leise {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--a2);
+  height: var(--a6);
+  white-space: nowrap;
+}
+
+/* Nichts wird gekürzt: Die Beschriftungen sind so kurz, dass sie bei 360 px
+   in eine Zeile passen (gemessen, Nachtrag f1g). */
+.scan-leise > * {
+  flex: none;
+}
+
+/* Leise Aktionen: Knopf, Link und Auswahlfeld sehen gleich aus. */
+.scan-link {
+  padding: var(--a1) 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text-leise);
+  text-decoration: underline;
+  text-decoration-color: var(--linie);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* Das Auswahlfeld ist so breit wie seine Beschriftung, nicht wie die längste Option. */
+select.scan-link {
+  appearance: none;
+  field-sizing: content;
+}
+
+.scan-link:disabled {
+  color: var(--aus);
+  cursor: default;
+}
+
+/* Auswahllisten in der Karte: eBay-Kandidaten, IGDB-Treffer, Sammlung. */
+.scan-wahlliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.scan-wahlliste > li {
+  border-top: 1px solid var(--linie);
+}
+
+.scan-wahlliste > li:first-child {
+  border-top: none;
+}
+
+.scan-wahl {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  width: 100%;
+  padding: var(--a1);
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+button.scan-wahl {
+  border: 1px solid transparent;
+  background: none;
+  border-radius: var(--r1);
+}
+
+/*
+ * Der gewählte Treffer ist der, den der Hauptknopf meint: heller Rand,
+ * angehobene Fläche, ein Haken. Im IGDB-Fall umfasst der Rahmen auch das
+ * Plattformfeld darunter, es gehört zur Wahl.
+ */
+button.scan-wahl.gewaehlt,
+.scan-wahlzeile.gewaehlt {
+  border: 1px solid var(--text-leise);
+  border-radius: var(--r1);
+  background: var(--flaeche-hoch);
+}
+
+.scan-wahlliste > li.scan-wahlzeile.gewaehlt + li {
+  border-top-color: transparent;
+}
+
+.scan-wahlzeile.gewaehlt select {
+  margin: 0 0 var(--a1) calc(1.25rem + var(--a3));
+}
+
+.scan-haken {
+  flex: none;
+  color: var(--text);
+}
+
+.scan-wahl-titel {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.scan-wahl-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--a1);
+}
+
+.scan-wahl-knoepfe .knopf {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--a1);
+}
+
+.scan-suche input,
+.scan-suchzeile input {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.scanner .scan-suchzeile {
+  display: flex;
+  gap: var(--a2);
+  margin: 0;
+}
+
+.scan-suchzeile input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.scan-suche {
+  display: flex;
+  flex-direction: column;
+  gap: var(--a2);
+}
+
+.scan-suche .scan-wahl {
+  flex-wrap: wrap;
+}
+
+.scan-release {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* --- Fall 4: erfasst, knapp; die Kamera läuft schon weiter --- */
+
+.scan-erfasst {
+  display: flex;
+  align-items: center;
+  gap: var(--a3);
+  margin-top: var(--a2);
+  padding: var(--a2) var(--a3);
+  background: var(--flaeche);
+  border: 1px solid var(--linie);
+  border-left: 3px solid var(--scan-erfasst);
+  border-radius: var(--r2);
+}
+
+.scan-erfasst-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.scan-erfasst-text p {
+  margin: 0;
+}
+
+/* Fliesstext statt Flex: Ein langer Titel bricht um, das Kennzeichen folgt ihm. */
+.scan-erfasst-titel {
+  font-family: var(--schrift-display);
+  font-weight: 600;
+}
+
+.scan-erfasst-titel a {
+  margin-right: var(--a2);
+  color: var(--text);
+}
+
+.scan-erfasst .scan-aussage {
+  margin-top: 0;
+  font-size: 0.8125rem;
+}
+
+.scan-erfasst .knopf {
+  flex: none;
+}
+
+/* --- Letzte Scans --- */
+
+.scan-letzte,
+.scan-liste {
+  margin-top: var(--a3);
+}
+
+.scan-letzte-kopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-still);
+}
+
+.scan-letzte-kopf .scan-link {
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.scan-eintrag {
+  display: flex;
+  align-items: center;
+  gap: var(--a2);
+  min-height: 1.875rem;
+  padding: var(--a1) 0;
+  box-sizing: border-box;
+  border-top: 1px solid var(--linie);
+  font-size: 0.85rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.scan-zeile-mitte {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scan-zeile-titel {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.scan-ergebnis {
+  flex: none;
+  font-size: 0.75rem;
+  color: var(--text-leise);
+}
+
+.scan-ergebnis.erfasst {
+  color: var(--scan-erfasst);
+}
+
+.scan-ergebnis.regal {
+  color: var(--scan-regal);
+}
+
+.scan-ergebnis.abgebrochen,
+.scan-ergebnis.zurueckgenommen {
+  color: var(--text-still);
+}
+
+.scan-liste {
+  max-width: 36rem;
+}
+
+.scan-liste .scan-mini {
+  width: 2rem;
+}
+
+.scan-zeile-mitte .scan-still {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Der Zähler in der Kopfzeile: „7 erfasst". */
+.scan-zaehler {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--a1);
+  height: var(--chip-hoehe);
+  margin-right: var(--a1);
+  padding: 0 var(--a3);
+  font-family: var(--schrift-display);
+  font-size: 0.85rem;
+  color: var(--text-leise);
+  border: 1px solid var(--linie);
+  border-radius: var(--r-rund);
+}
+
+.scan-zaehler b {
+  font-weight: 600;
+  color: var(--text);
 }

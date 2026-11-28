@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { PLATTFORMEN, anfrage, type Plattform } from './api'
-import { SpielAnlegen } from './SpielAnlegen'
+import { PlattformChip } from './SpielTeile'
 
 /**
- * Einen Barcode einem Release zuordnen: aus der Sammlung wählen oder das Spiel
- * anlegen (Stufe 3 und 4 der Kette, Abschnitt 9.2).
+ * Einen Barcode einem Spiel der Sammlung zuordnen (Stufe 3 der Kette,
+ * Abschnitt 9.2): dieselbe Suche wie die Sammlungsansicht
+ * (`GET /api/games?search=&limit=10`, gemessen in `test/lesekosten.spec.ts`).
  *
- * Zwei Nutzer: der Scanner (Disc in der Hand) und die Ansicht „Offene Scans"
- * (Stufe 17b, Code ohne Hülle). Beide brauchen dasselbe – deshalb hier und
- * nicht zweimal.
+ * Seit Nachtrag f1g nur noch die Suche – das Anlegen eines neuen Spiels hat
+ * im Scanner seine eigene Karte (Fall 3), und „Überspringen" ist das Kreuz
+ * der Karte. Je Spiel ein Knopf je Release (mit Disc gesperrt: je Release
+ * genau eine) und „andere Plattform" für Releases, die es noch nicht gibt.
  */
 
 export type Wahl = { releaseId: number } | { spielId: number; plattform: Plattform }
@@ -21,27 +23,18 @@ export const istPlattform = (w: string | null | undefined): w is Plattform =>
 
 export function ScanAuswahl({
   ean,
-  scans = 1,
-  angebot = null,
   vorgabe = '',
   laeuft,
   onWahl,
-  onSpaeter,
-  spaeterText = 'Überspringen',
 }: {
   ean: string
-  /** Wie oft der Code schon gescannt wurde – „zum 2. Mal" ist ein Hinweis. */
-  scans?: number
-  /** Titel und Plattform aus einer Fremdquelle, falls vorhanden. */
-  angebot?: { titel: string; plattform: string | null } | null
-  /** Vorbelegung des Suchfelds, wenn kein Angebot vorliegt. */
+  /** Vorbelegung des Suchfelds. */
   vorgabe?: string
   laeuft: boolean
-  onWahl: (wahl: Wahl) => void
-  onSpaeter?: () => void
-  spaeterText?: string
+  /** `releaseNeu`: Die Wahl legt ein Release an – Rückgängig muss es wieder entfernen. */
+  onWahl: (wahl: Wahl, releaseNeu: boolean) => void
 }) {
-  const [suchtext, setSuchtext] = useState(angebot?.titel ?? vorgabe)
+  const [suchtext, setSuchtext] = useState(vorgabe)
   const [spiele, setSpiele] = useState<SuchSpiel[] | null>(null)
   const [sucht, setSucht] = useState(false)
 
@@ -66,75 +59,58 @@ export function ScanAuswahl({
     return () => clearTimeout(zeit)
   }, [suchtext])
 
-  const plattformVorgabe: Plattform = istPlattform(angebot?.plattform) ? angebot!.plattform : 'PS4'
-
   return (
-    <div className="auswahl">
-      <p>
-        <strong>EAN {ean}</strong> ist noch keinem Spiel zugeordnet
-        {scans > 1 && ` (zum ${scans}. Mal gescannt)`}.
-        {angebot && ` Ein Händler nennt „${angebot.titel}"${angebot.plattform ? ` (${angebot.plattform})` : ''}.`}
-      </p>
-      <p className="steuerung">
-        <input
-          type="search"
-          value={suchtext}
-          onChange={(e) => setSuchtext(e.target.value)}
-          placeholder="Titel in der Sammlung suchen"
-          aria-label={`Titel in der Sammlung suchen für ${ean}`}
-          autoFocus={onSpaeter !== undefined}
-        />{' '}
-        {onSpaeter && (
-          <button type="button" disabled={laeuft} onClick={onSpaeter}>
-            {spaeterText}
-          </button>
-        )}
-      </p>
-      {sucht && <p>sucht …</p>}
-      {spiele && spiele.length === 0 && !sucht && <p>Kein Spiel mit diesem Titel in der Sammlung.</p>}
+    <div className="scan-suche">
+      <input
+        type="search"
+        value={suchtext}
+        onChange={(e) => setSuchtext(e.target.value)}
+        placeholder="Titel in der Sammlung suchen"
+        aria-label={`Titel in der Sammlung suchen für ${ean}`}
+      />
+      {sucht && <p className="scan-still">sucht …</p>}
+      {spiele && spiele.length === 0 && !sucht && <p className="scan-still">Kein Spiel mit diesem Titel in der Sammlung.</p>}
       {spiele && spiele.length > 0 && (
-        <ul className="treffer">
+        <ul className="scan-wahlliste">
           {spiele.map((s) => (
-            <li key={s.id}>
-              <span className="titel">{s.titel}</span>{' '}
-              {s.releases.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  disabled={laeuft || r.exemplare > 0}
-                  title={r.exemplare > 0 ? 'Steht schon im Regal' : undefined}
-                  onClick={() => onWahl({ releaseId: r.id })}
-                >
-                  {r.plattform}
-                  {r.exemplare > 0 && ' · im Regal'}
-                </button>
-              ))}
-              {s.releases.length < PLATTFORMEN.length && (
-                <select
-                  value=""
-                  disabled={laeuft}
-                  aria-label={`Andere Plattform für ${s.titel}`}
-                  onChange={(e) => {
-                    if (istPlattform(e.target.value)) onWahl({ spielId: s.id, plattform: e.target.value })
-                  }}
-                >
-                  <option value="">andere Plattform …</option>
-                  {PLATTFORMEN.filter((p) => !s.releases.some((r) => r.plattform === p)).map((p) => (
-                    <option key={p} value={p}>{p} anlegen</option>
-                  ))}
-                </select>
-              )}
+            <li key={s.id} className="scan-wahl">
+              <span className="scan-mini">{s.bild ? <img src={s.bild} alt="" loading="lazy" /> : null}</span>
+              <span className="scan-wahl-titel">{s.titel}</span>
+              <span className="scan-wahl-knoepfe">
+                {s.releases.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className="knopf"
+                    disabled={laeuft || r.exemplare > 0}
+                    title={r.exemplare > 0 ? 'Steht schon im Regal' : `Disc erfassen (${r.plattform})`}
+                    aria-label={r.exemplare > 0 ? `${r.plattform}: schon im Regal` : `Disc erfassen: ${s.titel} (${r.plattform})`}
+                    onClick={() => onWahl({ releaseId: r.id }, false)}
+                  >
+                    <PlattformChip plattform={r.plattform} />
+                    {r.exemplare > 0 && ' im Regal'}
+                  </button>
+                ))}
+                {s.releases.length < PLATTFORMEN.length && (
+                  <select
+                    value=""
+                    disabled={laeuft}
+                    aria-label={`Andere Plattform für ${s.titel}`}
+                    onChange={(e) => {
+                      if (istPlattform(e.target.value)) onWahl({ spielId: s.id, plattform: e.target.value }, true)
+                    }}
+                  >
+                    <option value="">andere …</option>
+                    {PLATTFORMEN.filter((p) => !s.releases.some((r) => r.plattform === p)).map((p) => (
+                      <option key={p} value={p}>{p} anlegen</option>
+                    ))}
+                  </select>
+                )}
+              </span>
             </li>
           ))}
         </ul>
       )}
-      <SpielAnlegen
-        key={ean}
-        titelVorgabe={suchtext.trim()}
-        plattformVorgabe={plattformVorgabe}
-        vorhandenesVerwenden
-        onAngelegt={(releaseId) => onWahl({ releaseId })}
-      />
     </div>
   )
 }

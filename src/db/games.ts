@@ -1038,6 +1038,20 @@ aeenliste haengt
 		/** Anlass im Protokoll (8.5): Listeneintrag, seit Stufe 17 auch der Scanner. */
 		detail = "für einen Listeneintrag",
 	): Promise<number> {
+		return (await this.releaseFuerPlattformMitAngabe(gameId, plattform, quelle, detail)).releaseId;
+	}
+
+	/**
+	 * Wie releaseFuerPlattform, sagt aber, ob das Release eben erst entstanden
+	 * ist (Nachtrag f1g). Ein Rueckgaengig im Scanner muss ein so angelegtes
+	 * Release wieder entfernen - ein schon vorhandenes darf es nicht anfassen.
+	 */
+	async releaseFuerPlattformMitAngabe(
+		gameId: number,
+		plattform: Plattform,
+		quelle: EreignisQuelle = "nutzer",
+		detail = "für einen Listeneintrag",
+	): Promise<{ releaseId: number; neu: boolean }> {
 		const vorhanden = await this.db
 			.prepare(
 				"SELECT id FROM release WHERE game_id = ? AND platform = ? " +
@@ -1045,14 +1059,14 @@ aeenliste haengt
 			)
 			.bind(gameId, plattform)
 			.first<{ id: number }>();
-		if (vorhanden) return vorhanden.id;
+		if (vorhanden) return { releaseId: vorhanden.id, neu: false };
 		const r = await this.db
 			.prepare("INSERT INTO release (game_id, platform) VALUES (?, ?) RETURNING id")
 			.bind(gameId, plattform)
 			.first<{ id: number }>();
 		if (!r) throw new Error("Release konnte nicht angelegt werden.");
 		await this.events.schreiben({ source: quelle, kind: "release_angelegt", releaseId: r.id, neu: plattform, detail });
-		return r.id;
+		return { releaseId: r.id, neu: true };
 	}
 
 	/**

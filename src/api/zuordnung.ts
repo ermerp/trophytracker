@@ -260,9 +260,11 @@ export const gameRoutes = new Hono<AppEnv>()
 			// Schon in der Sammlung: dieses Spiel nehmen, kein zweites anlegen.
 			const vorhanden = await c.var.repos.games.spielNachIgdbId(igdbId);
 			if (vorhanden !== null) {
-				const releaseId = await c.var.repos.games.releaseFuerPlattform(vorhanden, k.plattform);
+				// `releaseNeu` (Nachtrag f1g): Ein Rueckgaengig im Scanner entfernt
+				// ein hier entstandenes Release wieder, ein vorhandenes nicht.
+				const { releaseId, neu } = await c.var.repos.games.releaseFuerPlattformMitAngabe(vorhanden, k.plattform);
 				const spiel = await c.var.repos.igdb.spiel(vorhanden);
-				return c.json({ spielId: vorhanden, releaseId, titel: spiel?.title ?? "", vorhanden: true });
+				return c.json({ spielId: vorhanden, releaseId, titel: spiel?.title ?? "", vorhanden: true, releaseNeu: neu });
 			}
 			try {
 				treffer = normalisiereTrefferliste(await c.var.igdb.nachIds([igdbId]))[0] ?? null;
